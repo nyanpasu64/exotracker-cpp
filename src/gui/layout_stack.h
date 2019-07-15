@@ -60,16 +60,27 @@ QLabel * create_label(QString label_text, QWidget * parent, QString name = "");
 
 // LayoutStack.
 
-/*! Non-copyable visitor supporting nested construction/destruction. */
-class VisitorBase {
-protected:
-    VisitorBase(VisitorBase const & copyFrom) = delete;
 
+#define MOVE_BUT_DELETE_COPY(NonCopyable) \
+    NonCopyable() = default; \
+    NonCopyable & operator=(const NonCopyable&) = delete; \
+    NonCopyable(const NonCopyable&) = delete; \
+    NonCopyable(NonCopyable &&) = default; \
+
+
+struct NonCopyable {
+    MOVE_BUT_DELETE_COPY(NonCopyable)
+};
+
+
+/*! Non-copyable visitor supporting nested construction/destruction. */
+class VisitorBase : NonCopyable {
+protected:
     virtual ~VisitorBase() {}
 };
 
 
-class LayoutStack final {
+class LayoutStack final : NonCopyable {
 public:
     /*!
     All fields are nullable.
@@ -82,6 +93,8 @@ public:
         QLayout * layout = nullptr;
         Frame * parent = nullptr;
 
+        MOVE_BUT_DELETE_COPY(Frame)
+
         Frame with_layout(QLayout * layout) {
             return {this->widget, layout, this->parent};
         }
@@ -93,7 +106,7 @@ private:
 
 public:
     LayoutStack(QWidget * root) {
-        frames.push(LayoutStack::Frame{root});
+        frames.emplace(LayoutStack::Frame{root});
     }
 
     /*!
@@ -107,13 +120,15 @@ public:
     public:
         WidgetOrLayout * item;
 
-        Raii(LayoutStack * stack, Frame frame, WidgetOrLayout * item)
+        Raii(LayoutStack * stack, Frame && frame, WidgetOrLayout * item)
         : item(item) {
             this->stack = stack;
-            stack->frames.push(frame);
+            stack->frames.push(std::move(frame));
         }
 
-        Raii(Raii const & copyFrom) = delete;
+        WidgetOrLayout * operator->() {
+            return item;
+        }
 
         ~Raii() {
             stack->frames.pop();
@@ -122,19 +137,20 @@ public:
 
     template<typename WidgetOrLayout>
     Raii<WidgetOrLayout> _push_existing_object(WidgetOrLayout * item) {
-        Frame frame;
+        Frame frame = [&]() {
+            if constexpr (std::is_base_of<QWidget, WidgetOrLayout>::value) {
+                QWidget * widget = item;
+                return {widget};
+            } else
+            if constexpr (std::is_base_of<QLayout, WidgetOrLayout>::value) {
+                QLayout * layout = item;
+                return peek().with_layout(layout);
+            } else
+            {
+                static_assert(always_false<WidgetOrLayout>, "Invalid type passed in");
+            }
+        }();
 
-        if constexpr (std::is_base_of<QWidget, WidgetOrLayout>::value) {
-            QWidget * widget = item;
-            frame = Frame{widget};
-        } else
-        if constexpr (std::is_base_of<QLayout, WidgetOrLayout>::value) {
-            QLayout * layout = item;
-            frame = peek().with_layout(layout);
-        } else
-        {
-            static_assert(always_false<WidgetOrLayout>, "Invalid type passed in");
-        }
 
         frame.parent = &peek();
 
@@ -153,6 +169,10 @@ public:
 };
 
 
+//template<typename WidgetOrLayout>
+//LayoutStack::Raii<WidgetOrLayout> create_raii(LayoutStack & stack, )
+
+
 template<typename WidgetOrLayout>
 LayoutStack::Raii<WidgetOrLayout> append_widget(LayoutStack & stack, bool orphan = false) {
     QWidget * parent;
@@ -166,30 +186,28 @@ LayoutStack::Raii<WidgetOrLayout> append_widget(LayoutStack & stack, bool orphan
 }
 
 
-
 template<typename SomeQW>
-class CentralWidgetRaii : public LayoutStack::Raii<SomeQW> {
-    using super = LayoutStack::Raii<SomeQW>;
-
+class CentralWidgetRaii : public VisitorBase {
     static_assert(std::is_base_of<QWidget, SomeQW>::value);
 
+    // Constructed before this (via copy elision), and destructed after this.
+    LayoutStack::Raii<SomeQW> raii;
     QMainWindow * window;
 
 public:
-    CentralWidgetRaii(LayoutStack * stack, LayoutStack::Frame frame, SomeQW * item, QMainWindow * window)
-    : super(stack, frame, item), window(window) {}
+    CentralWidgetRaii(LayoutStack::Raii<SomeQW> && raii, QMainWindow * window)
+    : raii(raii), window(window) {}
 
     ~CentralWidgetRaii() {
-        window->setCentralWidget(inner.item);
-        // Now C++ calls Visitor.~LayoutRaii() to destroy LayoutRaii.
+        window->setCentralWidget(raii.item);
     }
 };
 
 
 template<typename SomeQW>
-auto central_widget(LayoutStack stack, QMainWindow * window) -> CentralWidgetRaii<SomeQW> {
-    create_element
-    return CentralWidgetRaii(stack, )
+CentralWidgetRaii<SomeQW> central_widget(LayoutStack stack, QMainWindow * window) {
+    auto raii = append_widget<SomeQW>(stack);
+    return CentralWidgetRaii(std::move(raii), window);
 }
 
 
