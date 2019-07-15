@@ -69,6 +69,28 @@ struct StackFrame final {
 
 class LayoutStack;
 
+template<typename T>
+class Visitor {
+protected:
+    T * item;
+    Visitor<T>(Visitor<T> const & copyFrom) = delete;
+
+    Visitor<T>(T * item) {
+        this->item = item;
+        enter();
+    }
+    virtual void enter() = 0;
+
+    T * operator->() {
+        return item;
+    }
+
+    ~Visitor() {
+        exit();
+    }
+    virtual void exit() = 0;
+};
+
 /*!
 Handles LayoutStack pushing and popping. We don't need to insert items into parents,
 since QWidget/QLayout insert themselves into their parents.
