@@ -104,12 +104,23 @@ public:
 
 public:
     StackRaii(LayoutStack * stack, StackFrame frame, WidgetOrLayout * item);
-    StackRaii(StackRaii copyFrom) = delete;
+    StackRaii(StackRaii const & copyFrom) = delete;
 
     WidgetOrLayout* operator->();
 
     ~StackRaii();
 };
+
+
+/*
+for other visitors, just hold unique_ptr<inner visitor>.
+Order of `class Outer{Inner field}`:
+- Inner initializer
+- Outer constructor
+- ...
+- Outer destructor
+- Inner destructor
+*/
 
 
 template <class...> constexpr std::false_type always_false{};
@@ -174,37 +185,14 @@ LayoutType * set_layout(LayoutStack &mut stack) {
 }
 
 
-class _new_widget {
-    /*!
-    Constructs item_type using parent.
-    Yields item_type.
-    */
-    template<typename item_type>
-    _new_widget(
-        LayoutStack * stack,
-        bool orphan = false
-    ) {
-        QWidget * parent;
-        if (!orphan) {
-            parent = stack->peek().widget;
-        } else {
-            parent = nullptr;
-        }
-        {
-            stack->push(create_element<item_type>(parent));
-        }
-
-//        with stack.push(create_element(item_type, parent, kwargs)) as item:
-//            if layout:
-//                set_layout(stack, layout)
-//            yield item
-
-//        real_parent = stack.widget
-//        if callable(exit_action):
-//            exit_action(real_parent, item)
-//        elif exit_action:
-//            getattr(real_parent, exit_action)(item)
+template<typename WidgetOrLayout>
+StackRaii<WidgetOrLayout> append_widget(LayoutStack * stack, bool orphan = false) {
+    QWidget * parent;
+    if (!orphan) {
+        parent = stack->peek().widget;
+    } else {
+        parent = nullptr;
     }
 
-    ~_new_widget() {}
-};
+    return stack->push(create_element<WidgetOrLayout>(parent));
+}
