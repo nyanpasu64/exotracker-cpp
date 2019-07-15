@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 
 #include "macros.h"
-#include "gui/layout_stack.h"
+#include "gui/lightweight.h"
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QAction>
@@ -23,15 +23,16 @@
 #include <QtWidgets/QWidget>
 
 
-namespace L = layout_stack;
-
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    L::LayoutStack s(this);
-    { auto w = L::append_widget<QPushButton>(s);
-        w->setText(tr("uwu"));
+    auto w = this;
+    {add_central_widget(QWidget(parent), QVBoxLayout(w));
+        {append_container(QGroupBox(parent), QVBoxLayout(w));
+            {append_widget(QPushButton(parent));
+                w->setText(tr("Hello world!"));
+            }
+        }
     }
 }
 
