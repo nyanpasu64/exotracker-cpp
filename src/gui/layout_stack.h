@@ -3,6 +3,9 @@ child = new QWidget(parent): creates child owned by parent.
 
 layout->addItem does not own.
 QTabWidget->addTab(new QWidget(nullptr)): QTabWidget owns new tab.
+
+Do NOT use smart pointers for holding QClasses.
+You WILL get a double-free (parent + unique_ptr).
 */
 #pragma once
 
@@ -10,6 +13,7 @@ QTabWidget->addTab(new QWidget(nullptr)): QTabWidget owns new tab.
 #include <QWidget>
 #include <QLabel>
 #include <QLayout>
+#include <QMainWindow>
 
 #include <stack>
 #include <memory>
@@ -18,10 +22,14 @@ QTabWidget->addTab(new QWidget(nullptr)): QTabWidget owns new tab.
 
 namespace layout_stack {
 
+// Utility.
 using std::unique_ptr;
 using std::make_unique;
 #define mut
+template <class...> constexpr std::false_type always_false{};
 
+
+// Non-RAII "widget constructors". Does not need to know about LayoutStack.
 
 /*!
 Like HTML document.createElement().
@@ -50,144 +58,157 @@ WidgetOrLayout * create_element(QWidget * parent, QString name = "") {
 QLabel * create_label(QString label_text, QWidget * parent, QString name = "");
 
 
-/*!
-All fields are nullable.
-Does not take ownership of anything pushed.
-*/
-struct StackFrame final {
-    QWidget * widget;
-    QLayout * layout = nullptr;
-    StackFrame * parent = nullptr;
+// LayoutStack.
 
-    StackFrame with_layout(QLayout * layout) {
-        return {this->widget, layout, this->parent};
-    }
-};
-
-
-class LayoutStack;
-
+/*! Non-copyable T-instance holder supporting operator->. */
 template<typename T>
 class Visitor {
 protected:
-    T * item;
+    T inner;
     Visitor<T>(Visitor<T> const & copyFrom) = delete;
 
-    Visitor<T>(T * item) {
-        this->item = item;
-        enter();
-    }
-    virtual void enter() = 0;
-
-    T * operator->() {
-        return item;
+    Visitor<T>(T inner) {
+        this->inner = inner;
     }
 
-    ~Visitor() {
-        exit();
-    }
-    virtual void exit() = 0;
-};
-
-/*!
-Handles LayoutStack pushing and popping. We don't need to insert items into parents,
-since QWidget/QLayout insert themselves into their parents.
-*/
-template<typename WidgetOrLayout>
-class StackRaii final {
-    LayoutStack * stack;
+    virtual ~Visitor() {}
 
 public:
-    WidgetOrLayout * item;
-
-public:
-    StackRaii(LayoutStack * stack, StackFrame frame, WidgetOrLayout * item);
-    StackRaii(StackRaii const & copyFrom) = delete;
-
-    WidgetOrLayout* operator->();
-
-    ~StackRaii();
+    T & operator->() {
+        return inner;
+    }
 };
-
-
-/*
-for other visitors, just hold unique_ptr<inner visitor>.
-Order of `class Outer{Inner field}`:
-- Inner initializer
-- Outer constructor
-- ...
-- Outer destructor
-- Inner destructor
-*/
-
-
-template <class...> constexpr std::false_type always_false{};
 
 
 class LayoutStack final {
-    std::stack<StackFrame> frames;
-    template<typename T> friend class StackRaii;
+public:
+    /*!
+    All fields are nullable.
+    Does not take ownership of anything pushed.
+
+    SHOULD ONLY BE INITIALIZED IN LayoutStack!!!!
+    */
+    struct Frame final {
+        QWidget * widget;
+        QLayout * layout = nullptr;
+        Frame * parent = nullptr;
+
+        Frame with_layout(QLayout * layout) {
+            return {this->widget, layout, this->parent};
+        }
+    };
+
+private:
+    std::stack<LayoutStack::Frame> frames;
+    template<typename T> friend class LayoutRaii;
 
 public:
     LayoutStack(QWidget * root) {
-        frames.push(StackFrame{root});
+        frames.push(LayoutStack::Frame{root});
     }
 
+    /*!
+    Handles LayoutStack pushing and popping. We don't need to insert items into parents,
+    since QWidget/QLayout insert themselves into their parents.
+    */
     template<typename WidgetOrLayout>
-    StackRaii<WidgetOrLayout> _push_existing_object(WidgetOrLayout * item) {
-        StackFrame frame;
-        // if constexpr (std::is_same<StackFrame, WidgetOrLayout>::value) {
-        //     frame = item;
-        // } else
+    class Raii final {
+        LayoutStack * stack;
+
+    public:
+        WidgetOrLayout * item;
+
+        Raii(LayoutStack * stack, Frame frame, WidgetOrLayout * item)
+        : item(item) {
+            this->stack = stack;
+            stack->frames.push(frame);
+        }
+
+        Raii(Raii const & copyFrom) = delete;
+
+        WidgetOrLayout* operator->() {
+            return item;
+        }
+
+        ~Raii() {
+            stack->frames.pop();
+        }
+    };
+
+    template<typename WidgetOrLayout>
+    Raii<WidgetOrLayout> _push_existing_object(WidgetOrLayout * item) {
+        Frame frame;
+
         if constexpr (std::is_base_of<QWidget, WidgetOrLayout>::value) {
             QWidget * widget = item;
-            frame = StackFrame{widget};
+            frame = Frame{widget};
         } else
         if constexpr (std::is_base_of<QLayout, WidgetOrLayout>::value) {
             QLayout * layout = item;
             frame = peek().with_layout(layout);
         } else
+        {
             static_assert(always_false<WidgetOrLayout>, "Invalid type passed in");
+        }
 
         frame.parent = &peek();
 
-        // StackRaii is only constructed once, because copy elision.
+        // Layout::Raii is only constructed once, because copy elision.
         // So we push only once.
-        return StackRaii<WidgetOrLayout>(this, frame, item);
+        return Raii<WidgetOrLayout>(this, frame, item);
     }
 
-    StackFrame & peek() {
+    Frame & peek() {
         return frames.top();
     }
 
-    // don't use widget(), use StackRaii.
+    // don't use widget(), use Layout::Raii.
     // maybe don't use layout(), ^.
     // parent() is unused in corrscope too.
 };
 
 
 template<typename WidgetOrLayout>
-StackRaii<WidgetOrLayout>::StackRaii(LayoutStack *stack, StackFrame frame, WidgetOrLayout * item)
-: item(item) {
-    this->stack = stack;
-    stack->frames.push(frame);
+LayoutStack::Raii<WidgetOrLayout> append_widget(LayoutStack & stack, bool orphan = false) {
+    QWidget * parent;
+    if (!orphan) {
+        parent = stack.peek().widget;
+    } else {
+        parent = nullptr;
+    }
+
+    return stack._push_existing_object(create_element<WidgetOrLayout>(parent));
 }
 
 
-template<typename WidgetOrLayout>
-WidgetOrLayout * StackRaii<WidgetOrLayout>::operator->() {
-    return item;
+
+template<typename SomeQW>
+class CentralWidgetRaii : public Visitor<LayoutStack::Raii<SomeQW>> {
+    using super = Visitor<LayoutStack::Raii<SomeQW>>;
+
+    static_assert(std::is_base_of<QWidget, SomeQW>::value);
+
+    QMainWindow * window;
+
+public:
+    CentralWidgetRaii(LayoutStack * stack, LayoutStack::Frame frame, SomeQW * item, QMainWindow * window)
+    : super({stack, frame, item}), window(window) {}
+
+    ~CentralWidgetRaii() {
+        window->setCentralWidget(inner.item);
+        // Now C++ calls Visitor.~LayoutRaii() to destroy LayoutRaii.
+    }
+};
+
+
+template<typename SomeQW>
+auto central_widget(LayoutStack stack, QMainWindow * window) -> CentralWidgetRaii<SomeQW> {
+    create_element
+    return CentralWidgetRaii(stack, )
 }
 
 
-template<typename WidgetOrLayout>
-StackRaii<WidgetOrLayout>::~StackRaii() {
-    stack->frames.pop();
-}
-
-
-// QLayout is deleted by its owner widget, not by smart pointer.
-// Most of the time straight from the documentation. In general, you can assume that every time you pass a pointer to an object which is meant to be "hold" somehow, there's a ownership transfer involved. A notable exception is QLayout::addWidget (which does NOT reparent the widget to the layout), and probably there are some others (documented or not; of course, the source code has the final word).
+// Non-RAII operations
 
 /*!
 Non-RAII, sets root layout of current widget.
@@ -203,16 +224,5 @@ LayoutType * set_layout(LayoutStack &mut stack) {
 }
 
 
-template<typename WidgetOrLayout>
-StackRaii<WidgetOrLayout> append_widget(LayoutStack & stack, bool orphan = false) {
-    QWidget * parent;
-    if (!orphan) {
-        parent = stack.peek().widget;
-    } else {
-        parent = nullptr;
-    }
-
-    return stack._push_existing_object(create_element<WidgetOrLayout>(parent));
-}
 
 } // namespace
