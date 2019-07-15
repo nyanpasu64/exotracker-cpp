@@ -61,6 +61,8 @@ struct StackFrame final {
 };
 
 
+class LayoutStack;
+
 /*!
 Handles LayoutStack pushing and popping. We don't need to insert items into parents,
 since QWidget/QLayout insert themselves into their parents.
@@ -73,19 +75,11 @@ public:
     WidgetOrLayout * item;
 
 public:
-    StackRaii(LayoutStack * stack, StackFrame frame, WidgetOrLayout item)
-    : item(item) {
-        this->stack = stack;
-        stack->frames.push(frame);
-    }
+    StackRaii(LayoutStack * stack, StackFrame frame, WidgetOrLayout * item);
 
-    WidgetOrLayout* operator->() {
-        return item;
-    }
+    WidgetOrLayout* operator->();
 
-    ~StackRaii() {
-        stack->frames.pop();
-    }
+    ~StackRaii();
 };
 
 
@@ -94,11 +88,11 @@ template <class...> constexpr std::false_type always_false{};
 
 class LayoutStack final {
     std::stack<StackFrame> frames;
-    friend class StackRaii;
+    template<typename T> friend class StackRaii;
 
 public:
     LayoutStack(QWidget * root) {
-        frames.push(StackFrame(root));
+        frames.push(StackFrame{root});
     }
 
     template<typename WidgetOrLayout>
@@ -121,7 +115,7 @@ public:
 
         // StackRaii is only constructed once, because copy elision.
         // So we push only once.
-        return StackRaii<WidgetOrLayout>(this, frame);
+        return StackRaii<WidgetOrLayout>(this, frame, item);
     }
 
     StackFrame peek() {
@@ -134,9 +128,18 @@ public:
 };
 
 
-template<typename LayoutType>
-unique_ptr<LayoutType> set_layout(LayoutStack &mut stack) {
-    static_assert(std::is_base_of(QLayout, LayoutType));;
+// QLayout is deleted by its owner widget, not by smart pointer.
+// Most of the time straight from the documentation. In general, you can assume that every time you pass a pointer to an object which is meant to be "hold" somehow, there's a ownership transfer involved. A notable exception is QLayout::addWidget (which does NOT reparent the widget to the layout), and probably there are some others (documented or not; of course, the source code has the final word).
 
-    auto layout = make_unique<LayoutType>(stack.peek().widget);
+/*!
+Non-RAII, sets root layout of current widget.
+Returned layout is owned by widget, and should not be deleted.
+*/
+template<typename LayoutType>
+LayoutType * set_layout(LayoutStack &mut stack) {
+    static_assert(std::is_base_of<QLayout, LayoutType>::value);;
+
+    auto layout = new LayoutType(stack.peek().widget);
+    stack.peek().layout = layout.get();
+    return layout;
 }
