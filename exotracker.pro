@@ -32,3 +32,4 @@ SOURCES += \
 HEADERS += \
     src/gui/layout_stack.h \
     src/mainwindow.h \
+    src/macros.h

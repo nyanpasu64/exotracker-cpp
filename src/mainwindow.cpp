@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 
+#include "macros.h"
 #include "gui/layout_stack.h"
 
 #include <QtCore/QVariant>
