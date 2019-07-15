@@ -16,6 +16,8 @@ QTabWidget->addTab(new QWidget(nullptr)): QTabWidget owns new tab.
 #include <type_traits>
 
 
+namespace layout_stack {
+
 using std::unique_ptr;
 using std::make_unique;
 #define mut
@@ -45,11 +47,7 @@ WidgetOrLayout * create_element(QWidget * parent, QString name = "") {
 }
 
 
-QLabel * create_element(QString label_text, QWidget * parent, QString name = "") {
-    QLabel * label = create_element<QLabel>(parent, name);
-    label->setText(label_text);
-    return label;
-}
+QLabel * create_label(QString label_text, QWidget * parent, QString name = "");
 
 
 /*!
@@ -151,14 +149,14 @@ public:
         } else
             static_assert(always_false<WidgetOrLayout>, "Invalid type passed in");
 
-        frame.parent = peek();
+        frame.parent = &peek();
 
         // StackRaii is only constructed once, because copy elision.
         // So we push only once.
         return StackRaii<WidgetOrLayout>(this, frame, item);
     }
 
-    StackFrame peek() {
+    StackFrame & peek() {
         return frames.top();
     }
 
@@ -166,6 +164,26 @@ public:
     // maybe don't use layout(), ^.
     // parent() is unused in corrscope too.
 };
+
+
+template<typename WidgetOrLayout>
+StackRaii<WidgetOrLayout>::StackRaii(LayoutStack *stack, StackFrame frame, WidgetOrLayout * item)
+: item(item) {
+    this->stack = stack;
+    stack->frames.push(frame);
+}
+
+
+template<typename WidgetOrLayout>
+WidgetOrLayout * StackRaii<WidgetOrLayout>::operator->() {
+    return item;
+}
+
+
+template<typename WidgetOrLayout>
+StackRaii<WidgetOrLayout>::~StackRaii() {
+    stack->frames.pop();
+}
 
 
 // QLayout is deleted by its owner widget, not by smart pointer.
@@ -186,13 +204,15 @@ LayoutType * set_layout(LayoutStack &mut stack) {
 
 
 template<typename WidgetOrLayout>
-StackRaii<WidgetOrLayout> append_widget(LayoutStack * stack, bool orphan = false) {
+StackRaii<WidgetOrLayout> append_widget(LayoutStack & stack, bool orphan = false) {
     QWidget * parent;
     if (!orphan) {
-        parent = stack->peek().widget;
+        parent = stack.peek().widget;
     } else {
         parent = nullptr;
     }
 
-    return stack->push(create_element<WidgetOrLayout>(parent));
+    return stack.push(create_element<WidgetOrLayout>(parent));
 }
+
+} // namespace
