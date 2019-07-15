@@ -1,3 +1,9 @@
+/*
+child = new QWidget(parent): creates child owned by parent.
+
+layout->addItem does not own.
+QTabWidget->addTab(new QWidget(nullptr)): QTabWidget owns new tab.
+*/
 #pragma once
 
 #include <QString>
@@ -22,14 +28,14 @@ Creates a widget or layout, for insertion into an existing layout.
 Do NOT use for filling a widget with a layout!
 */
 template <typename WidgetOrLayout>
-unique_ptr<WidgetOrLayout> create_element(QWidget * parent, QString name = "") {
-    unique_ptr<WidgetOrLayout> item;
+WidgetOrLayout * create_element(QWidget * parent, QString name = "") {
+    WidgetOrLayout * item;
     if constexpr (std::is_base_of<QLayout, WidgetOrLayout>::value) {
         // new_widget_or_layout is used to add sublayouts, which do NOT have a parent.
         // Only widgets' root layouts have parents.
-        item = make_unique<WidgetOrLayout>(nullptr);
+        item = new WidgetOrLayout(nullptr);
     } else {
-        item = make_unique<WidgetOrLayout>(parent);
+        item = new WidgetOrLayout(parent);
     }
 
     // QObject.objectName defaults to empty string. So does our function default.
@@ -39,8 +45,8 @@ unique_ptr<WidgetOrLayout> create_element(QWidget * parent, QString name = "") {
 }
 
 
-unique_ptr<QLabel> create_element(QString label_text, QWidget * parent, QString name = "") {
-    unique_ptr<QLabel> label = create_element<QLabel>(parent, name);
+QLabel * create_element(QString label_text, QWidget * parent, QString name = "") {
+    QLabel * label = create_element<QLabel>(parent, name);
     label->setText(label_text);
     return label;
 }
@@ -76,6 +82,7 @@ public:
 
 public:
     StackRaii(LayoutStack * stack, StackFrame frame, WidgetOrLayout * item);
+    StackRaii(StackRaii copyFrom) = delete;
 
     WidgetOrLayout* operator->();
 
@@ -143,3 +150,39 @@ LayoutType * set_layout(LayoutStack &mut stack) {
     stack.peek().layout = layout.get();
     return layout;
 }
+
+
+class _new_widget {
+    /*!
+    Constructs item_type using parent.
+    Yields item_type.
+    */
+    template<typename item_type>
+    _new_widget(
+        LayoutStack * stack,
+        bool orphan = false
+    ) {
+        QWidget * parent;
+        if (!orphan) {
+            parent = stack->peek().widget;
+        } else {
+            parent = nullptr;
+        }
+        {
+            stack->push(create_element<item_type>(parent));
+        }
+
+//        with stack.push(create_element(item_type, parent, kwargs)) as item:
+//            if layout:
+//                set_layout(stack, layout)
+//            yield item
+
+//        real_parent = stack.widget
+//        if callable(exit_action):
+//            exit_action(real_parent, item)
+//        elif exit_action:
+//            getattr(real_parent, exit_action)(item)
+    }
+
+    ~_new_widget() {}
+};
