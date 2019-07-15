@@ -134,7 +134,7 @@ public:
     }
 
     template<typename WidgetOrLayout>
-    StackRaii<WidgetOrLayout> push(WidgetOrLayout * item) {
+    StackRaii<WidgetOrLayout> _push_existing_object(WidgetOrLayout * item) {
         StackFrame frame;
         // if constexpr (std::is_same<StackFrame, WidgetOrLayout>::value) {
         //     frame = item;
@@ -212,7 +212,7 @@ StackRaii<WidgetOrLayout> append_widget(LayoutStack & stack, bool orphan = false
         parent = nullptr;
     }
 
-    return stack.push(create_element<WidgetOrLayout>(parent));
+    return stack._push_existing_object(create_element<WidgetOrLayout>(parent));
 }
 
 } // namespace
