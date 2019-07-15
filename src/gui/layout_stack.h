@@ -60,23 +60,12 @@ QLabel * create_label(QString label_text, QWidget * parent, QString name = "");
 
 // LayoutStack.
 
-/*! Non-copyable T-instance holder supporting operator->. */
-template<typename T>
-class Visitor {
+/*! Non-copyable visitor supporting nested construction/destruction. */
+class VisitorBase {
 protected:
-    T inner;
-    Visitor<T>(Visitor<T> const & copyFrom) = delete;
+    VisitorBase(VisitorBase const & copyFrom) = delete;
 
-    Visitor<T>(T inner) {
-        this->inner = inner;
-    }
-
-    virtual ~Visitor() {}
-
-public:
-    T & operator->() {
-        return inner;
-    }
+    virtual ~VisitorBase() {}
 };
 
 
@@ -112,7 +101,7 @@ public:
     since QWidget/QLayout insert themselves into their parents.
     */
     template<typename WidgetOrLayout>
-    class Raii final {
+    class Raii : public VisitorBase {
         LayoutStack * stack;
 
     public:
@@ -125,10 +114,6 @@ public:
         }
 
         Raii(Raii const & copyFrom) = delete;
-
-        WidgetOrLayout* operator->() {
-            return item;
-        }
 
         ~Raii() {
             stack->frames.pop();
@@ -183,8 +168,8 @@ LayoutStack::Raii<WidgetOrLayout> append_widget(LayoutStack & stack, bool orphan
 
 
 template<typename SomeQW>
-class CentralWidgetRaii : public Visitor<LayoutStack::Raii<SomeQW>> {
-    using super = Visitor<LayoutStack::Raii<SomeQW>>;
+class CentralWidgetRaii : public LayoutStack::Raii<SomeQW> {
+    using super = LayoutStack::Raii<SomeQW>;
 
     static_assert(std::is_base_of<QWidget, SomeQW>::value);
 
@@ -192,7 +177,7 @@ class CentralWidgetRaii : public Visitor<LayoutStack::Raii<SomeQW>> {
 
 public:
     CentralWidgetRaii(LayoutStack * stack, LayoutStack::Frame frame, SomeQW * item, QMainWindow * window)
-    : super({stack, frame, item}), window(window) {}
+    : super(stack, frame, item), window(window) {}
 
     ~CentralWidgetRaii() {
         window->setCentralWidget(inner.item);
