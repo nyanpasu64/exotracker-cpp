@@ -32,6 +32,10 @@ Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
 // Once C++20 rolls around, add (...) -> `addWidget/addLayout(w __VA_OPT__(,) __VA_ARGS__)`.
 
 
+//#define set_layout(qlayout_w) \
+//    auto * l = new qlayout_w; \
+
+
 #define add_central_widget(qwidget_parent, qlayout_w) \
     auto * parent = w; \
     auto * w = new qwidget_parent; \
