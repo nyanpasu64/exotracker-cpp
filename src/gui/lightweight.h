@@ -34,8 +34,8 @@
 
 #define add_central_widget(qwidget_parent, qlayout_w) \
     auto * parent = w; \
-    \
     auto * w = new qwidget_parent; \
+    \
     auto * l = new qlayout_w; \
     \
     defer { parent->setCentralWidget(w); }; \
@@ -44,30 +44,29 @@
 
 #define append_container(qwidget_parent, qlayout_w) \
     auto * parent = w; \
-    auto * parentL = l; \
-    \
     auto * w = new qwidget_parent; \
-    auto * l = new qlayout_w; \
     \
+    auto * parentL = l; \
+    auto * l = new qlayout_w; \
     defer { parentL->addWidget(w); }; \
+    \
     require_semicolon
 
 
 #define append_layout(qlayout_nullptr) \
     auto * parentL = l; \
-    \
     auto * l = new qlayout_nullptr; \
-    \
     defer { parentL->addLayout(l); }; \
+    \
     require_semicolon
 
 
 #define append_widget(qwidget_parent) \
     auto * parent = w; \
-    auto * parentL = l; \
-    \
     auto * w = new qwidget_parent; \
-    void * l = nullptr; (void)l; \
     \
+    auto * parentL = l; \
+    void * l = nullptr; (void)l; \
     defer { parentL->addWidget(w); }; \
+    \
     require_semicolon
