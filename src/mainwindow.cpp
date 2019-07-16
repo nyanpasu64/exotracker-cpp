@@ -28,6 +28,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     auto w = this;
     {add_central_widget(QWidget(parent), QVBoxLayout(w));
+        l->setContentsMargins(0, 0, 0, 0);
+
         {append_container(QGroupBox(parent), QVBoxLayout(w));
             {append_layout(QHBoxLayout());
                 {append_widget(QPushButton(parent));
