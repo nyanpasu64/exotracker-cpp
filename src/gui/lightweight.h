@@ -74,3 +74,7 @@ Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
     defer { parentL->addWidget(w); }; \
     \
     require_semicolon
+
+
+#define append_stretch() \
+    l->addStretch()
