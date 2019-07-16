@@ -29,8 +29,21 @@ MainWindow::MainWindow(QWidget *parent)
     auto w = this;
     {add_central_widget(QWidget(parent), QVBoxLayout(w));
         {append_container(QGroupBox(parent), QVBoxLayout(w));
-            {append_widget(QPushButton(parent));
-                w->setText(tr("Hello world!"));
+            {append_layout(QHBoxLayout());
+                {append_widget(QPushButton(parent));
+                    w->setText(tr("Top left"));
+                }
+                {append_widget(QPushButton(parent));
+                    w->setText(tr("Top right"));
+                }
+            }
+            {append_layout(QHBoxLayout());
+                {append_widget(QPushButton(parent));
+                    w->setText(tr("Bottom left"));
+                }
+                {append_widget(QPushButton(parent));
+                    w->setText(tr("Bottom right owowowo"));
+                }
             }
         }
     }
