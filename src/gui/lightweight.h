@@ -76,5 +76,13 @@ Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
     require_semicolon
 
 
+#define add_row(_left, _right) \
+    auto * left = new _left; \
+    auto * right = new _right; \
+    \
+    defer { l->addRow(left, right); }; \
+    require_semicolon
+
+
 #define append_stretch() \
     l->addStretch()

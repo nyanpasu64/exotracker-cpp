@@ -14,6 +14,7 @@
 #include <QtWidgets/QMainWindow>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QMenuBar>
+#include <QtWidgets/QLineEdit>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QStatusBar>
@@ -30,21 +31,20 @@ MainWindow::MainWindow(QWidget *parent)
     {add_central_widget(QWidget(parent), QVBoxLayout(w));
         l->setContentsMargins(0, 0, 0, 0);
 
-        {append_container(QGroupBox(parent), QVBoxLayout(w));
-            {append_layout(QHBoxLayout());
-                {append_widget(QPushButton(parent));
-                    w->setText(tr("Top left"));
-                }
-                {append_widget(QPushButton(parent));
-                    w->setText(tr("Top right"));
-                }
+        {append_container(QGroupBox(parent), QFormLayout(w));
+            {add_row(QPushButton(parent), QLineEdit(parent));
+                left->setText(tr("Top left"));
+                right->setText(tr("Top right"));
             }
-            {append_layout(QHBoxLayout());
+            {add_row(QPushButton(parent), QHBoxLayout());
+                left->setText(tr("Bottom left"));
+
+                auto * l = right;
                 {append_widget(QPushButton(parent));
-                    w->setText(tr("Bottom left"));
+                    w->setText(tr("Bottom right"));
                 }
-                {append_widget(QPushButton(parent));
-                    w->setText(tr("Bottom right owowowo"));
+                {append_widget(QLineEdit(parent));
+                    w->setText(tr("Nyanpasu"));
                 }
             }
         }
