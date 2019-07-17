@@ -32,8 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
         l->setContentsMargins(0, 0, 0, 0);
 
         {append_container(QGroupBox(parent), QFormLayout(w));
-            {add_row(QPushButton(parent), QLineEdit(parent));
-                left->setText(tr("Top left"));
+            {label_row(tr("Top left"), QLineEdit(parent));
                 right->setText(tr("Top right"));
             }
             {add_row(QPushButton(parent), QHBoxLayout());
