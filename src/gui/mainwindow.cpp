@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 
-#include "macros.h"
-#include "gui/lightweight.h"
+#include "util/macros.h"
+#include "gui/lib/lightweight.h"
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QAction>

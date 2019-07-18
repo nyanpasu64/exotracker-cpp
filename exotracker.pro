@@ -25,11 +25,10 @@ else {
 INCLUDEPATH += src
 
 SOURCES += \
-    src/gui/layout_stack.cpp \
     src/main.cpp \
-    src/mainwindow.cpp \
+    src/gui/mainwindow.cpp \
 
 HEADERS += \
-    src/mainwindow.h \
-    src/macros.h \
-    src/gui/lightweight.h \
+    src/gui/mainwindow.h \
+    src/util/macros.h \
+    src/gui/lib/lightweight.h \
