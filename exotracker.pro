@@ -27,8 +27,10 @@ INCLUDEPATH += src
 SOURCES += \
     src/main.cpp \
     src/gui/mainwindow.cpp \
+    src/audio/output.cpp \
 
 HEADERS += \
     src/gui/mainwindow.h \
     src/util/macros.h \
     src/gui/lib/lightweight.h \
+    src/audio/output.h \
