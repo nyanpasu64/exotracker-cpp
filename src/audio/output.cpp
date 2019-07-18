@@ -29,18 +29,18 @@
 #include <cstdio>
 
 // The single CDSound object
-CDSound *CDSound::instance = NULL;
+AudioInterface *AudioInterface::instance = NULL;
 
 // Instance members
 
-CDSound::CDSound() :
+AudioInterface::AudioInterface() :
     m_iDevices(0)
 {
     Q_ASSERT(instance == NULL);
     instance = this;
 }
 
-CDSound::~CDSound()
+AudioInterface::~AudioInterface()
 {}
 
 static unsigned char* m_pSoundBuffer = NULL;
@@ -97,24 +97,24 @@ extern "C" void SDL_FamiTracker(void* userdata, uint8_t* stream, int32_t len)
     ftmAudioSemaphore.release();
 }
 
-bool CDSound::SetupDevice(int iDevice)
+bool AudioInterface::SetupDevice(int iDevice)
 {
     SDL_Init ( SDL_INIT_AUDIO );
 
     return true;
 }
 
-void CDSound::CloseDevice()
+void AudioInterface::CloseDevice()
 {
     SDL_Quit();
 }
 
-void CDSound::ClearEnumeration()
+void AudioInterface::ClearEnumeration()
 {
     m_iDevices = 0;
 }
 
-void CDSound::EnumerateDevices()
+void AudioInterface::EnumerateDevices()
 {
     if (m_iDevices != 0)
         ClearEnumeration();
@@ -122,18 +122,18 @@ void CDSound::EnumerateDevices()
     qDebug("Hook SDL2 here?");
 }
 
-unsigned int CDSound::GetDeviceCount() const
+unsigned int AudioInterface::GetDeviceCount() const
 {
     return m_iDevices;
 }
 
-QString CDSound::GetDeviceName(unsigned int iDevice) const
+QString AudioInterface::GetDeviceName(unsigned int iDevice) const
 {
     Q_ASSERT(iDevice < m_iDevices);
     return m_pcDevice[iDevice];
 }
 
-int CDSound::MatchDeviceID(QString Name) const
+int AudioInterface::MatchDeviceID(QString Name) const
 {
     for (unsigned int i = 0; i < m_iDevices; ++i) {
         if (Name == m_pcDevice[i])
@@ -143,13 +143,13 @@ int CDSound::MatchDeviceID(QString Name) const
     return 0;
 }
 
-int CDSound::CalculateBufferLength(int BufferLen, int Samplerate, int Samplesize, int Channels) const
+int AudioInterface::CalculateBufferLength(int BufferLen, int Samplerate, int Samplesize, int Channels) const
 {
     // Calculate size of the buffer, in bytes
     return ((Samplerate * BufferLen) / 1000) * (Samplesize / 8) * Channels;
 }
 
-CDSoundChannel *CDSound::OpenChannel(int SampleRate, int SampleSize, int Channels, int BufferLength, int Blocks)
+AudioChannel *AudioInterface::OpenChannel(int SampleRate, int SampleSize, int Channels, int BufferLength, int Blocks)
 {
     SDL_AudioSpec sdlAudioSpecIn;
     SDL_AudioSpec sdlAudioSpecOut;
@@ -158,7 +158,7 @@ CDSoundChannel *CDSound::OpenChannel(int SampleRate, int SampleSize, int Channel
     while ((SampleRate * BufferLength / (Blocks * 1000) != (double)SampleRate * BufferLength / (Blocks * 1000)))
         ++BufferLength;
 
-    CDSoundChannel *pChannel = new CDSoundChannel();
+    AudioChannel *pChannel = new AudioChannel();
 
     int SoundBufferSize = CalculateBufferLength(BufferLength, SampleRate, SampleSize, Channels);
     int BlockSize = SoundBufferSize / Blocks;
@@ -225,7 +225,7 @@ CDSoundChannel *CDSound::OpenChannel(int SampleRate, int SampleSize, int Channel
     return pChannel;
 }
 
-void CDSound::CloseChannel(CDSoundChannel *pChannel)
+void AudioInterface::CloseChannel(AudioChannel *pChannel)
 {
     if ( !invisibleFamiTracker )
     {
@@ -242,17 +242,17 @@ void CDSound::CloseChannel(CDSoundChannel *pChannel)
 
 // CDSoundChannel
 
-CDSoundChannel::CDSoundChannel()
+AudioChannel::AudioChannel()
 {
     m_bPaused = true;
     m_iCurrentWriteBlock = 0;
 }
 
-CDSoundChannel::~CDSoundChannel()
+AudioChannel::~AudioChannel()
 {
 }
 
-bool CDSoundChannel::Play()
+bool AudioChannel::Play()
 {
     m_iTotalSamples = 0;
     m_bPaused = false;
@@ -260,25 +260,25 @@ bool CDSoundChannel::Play()
     return true;
 }
 
-bool CDSoundChannel::Stop()
+bool AudioChannel::Stop()
 {
     m_bPaused = true;
     return true;
 }
 
-bool CDSoundChannel::IsPlaying() const
+bool AudioChannel::IsPlaying() const
 {
     return m_bPaused;
 }
 
-bool CDSoundChannel::ClearBuffer()
+bool AudioChannel::ClearBuffer()
 {
     if (IsPlaying())
         return Stop();
     Q_ASSERT(false);    // FIXME
 }
 
-bool CDSoundChannel::WriteBuffer(char *pBuffer, unsigned int Samples)
+bool AudioChannel::WriteBuffer(char *pBuffer, unsigned int Samples)
 {
     memcpy(m_pSoundBuffer+m_iSoundProducer,pBuffer,Samples);
     m_iSoundProducer += Samples;
@@ -287,7 +287,7 @@ bool CDSoundChannel::WriteBuffer(char *pBuffer, unsigned int Samples)
     return true;
 }
 
-buffer_event_t CDSoundChannel::WaitForSyncEvent(uint32_t dwTimeout) const
+buffer_event_t AudioChannel::WaitForSyncEvent(uint32_t dwTimeout) const
 {
     // Wait for a DirectSound event
     bool ok = ftmAudioSemaphore.tryAcquire(1,dwTimeout);

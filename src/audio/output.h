@@ -33,15 +33,14 @@ enum buffer_event_t {
     BUFFER_OUT_OF_SYNC
 };
 
-// DirectSound channel
-class CDSoundChannel : public QObject
+class AudioChannel : public QObject
 {
     Q_OBJECT
-    friend class CDSound;
+    friend class AudioInterface;
 
 public:
-    CDSoundChannel();
-    ~CDSoundChannel();
+    AudioChannel();
+    ~AudioChannel();
 
     bool Play();
     bool Stop();
@@ -96,18 +95,17 @@ typedef struct _SDL_Callback
 
 extern QList<SDL_Callback> sdlHooks;
 
-// DirectSound
-class CDSound
+class AudioInterface
 {
 public:
-    CDSound();
-    ~CDSound();
+    AudioInterface();
+    ~AudioInterface();
 
     bool			SetupDevice(int iDevice);
     void			CloseDevice();
 
-    CDSoundChannel	*OpenChannel(int SampleRate, int SampleSize, int Channels, int BufferLength, int Blocks);
-    void			CloseChannel(CDSoundChannel *pChannel);
+    AudioChannel	*OpenChannel(int SampleRate, int SampleSize, int Channels, int BufferLength, int Blocks);
+    void			CloseChannel(AudioChannel *pChannel);
 
     int				CalculateBufferLength(int BufferLen, int Samplerate, int Samplesize, int Channels) const;
 
@@ -125,7 +123,7 @@ public:
     static const unsigned int MAX_SAMPLE_RATE = 96000;
     static const unsigned int MAX_BUFFER_LENGTH = 10000;
 
-    static CDSound *instance;
+    static AudioInterface *instance;
 
     //	// For enumeration
     unsigned int	m_iDevices;
