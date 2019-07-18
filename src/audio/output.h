@@ -23,6 +23,8 @@
 #include <SDL/SDL.h>
 #include <QObject>
 
+#include <cstdint>
+
 enum buffer_event_t {
     BUFFER_NONE = 0,
     BUFFER_CUSTOM_EVENT = 1,
@@ -47,7 +49,7 @@ public:
     bool ClearBuffer();
     bool WriteBuffer(char *pBuffer, unsigned int Samples);
 
-    buffer_event_t WaitForSyncEvent(DWORD dwTimeout) const;
+    buffer_event_t WaitForSyncEvent(uint32_t dwTimeout) const;
 
     int GetBlockSize() const	{ return m_iBlockSize; }
     int GetBlockSamples() const	{ return m_iBlockSize >> ((m_iSampleSize >> 3) - 1); }
@@ -98,7 +100,7 @@ extern QList<SDL_Callback> sdlHooks;
 class CDSound
 {
 public:
-    CDSound(HWND hWnd, HANDLE hNotification);
+    CDSound();
     ~CDSound();
 
     bool			SetupDevice(int iDevice);
@@ -112,10 +114,10 @@ public:
     // Enumeration
     void			EnumerateDevices();
     void			ClearEnumeration();
-    BOOL			EnumerateCallback(LPGUID lpGuid, LPCTSTR lpcstrDescription, LPCTSTR lpcstrModule, LPVOID lpContext);
+    bool			EnumerateCallback() { return true; }
     unsigned int	GetDeviceCount() const;
-    LPCTSTR			GetDeviceName(unsigned int iDevice) const;
-    int				MatchDeviceID(LPCTSTR Name) const;
+    QString			GetDeviceName(unsigned int iDevice) const;
+    int				MatchDeviceID(QString Name) const;
 
 public:
     static const unsigned int MAX_DEVICES = 256;
@@ -123,9 +125,9 @@ public:
     static const unsigned int MAX_SAMPLE_RATE = 96000;
     static const unsigned int MAX_BUFFER_LENGTH = 10000;
 
-    static CDSound *pThisObject;
+    static CDSound *instance;
 
     //	// For enumeration
     unsigned int	m_iDevices;
-    LPCTSTR			m_pcDevice[MAX_DEVICES];
+    QString			m_pcDevice[MAX_DEVICES];
 };

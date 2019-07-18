@@ -22,18 +22,21 @@
 // DirectSound Interface
 //
 
-#include <cstdio>
 #include "output.h"
+
+#include <QSemaphore>
+
+#include <cstdio>
 
 // The single CDSound object
 CDSound *CDSound::instance = NULL;
 
 // Instance members
 
-CDSound::CDSound(HWND hWnd, HANDLE hNotification) :
+CDSound::CDSound() :
     m_iDevices(0)
 {
-    ASSERT(instance == NULL);
+    Q_ASSERT(instance == NULL);
     instance = this;
 }
 
@@ -50,7 +53,7 @@ QSemaphore ftmAudioSemaphore(0);
 
 QList<SDL_Callback> sdlHooks;
 
-extern bool invisibleFamiTracker;
+bool invisibleFamiTracker = false;  // GUI-less, no Qt widgets shown, used as an WinAmp plugin.
 
 extern "C" void SDL_FamiTracker(void* userdata, uint8_t* stream, int32_t len)
 {
@@ -111,11 +114,6 @@ void CDSound::ClearEnumeration()
     m_iDevices = 0;
 }
 
-BOOL CDSound::EnumerateCallback(LPGUID lpGuid, LPCTSTR lpcstrDescription, LPCTSTR lpcstrModule, LPVOID lpContext)
-{
-    return TRUE;
-}
-
 void CDSound::EnumerateDevices()
 {
     if (m_iDevices != 0)
@@ -129,16 +127,16 @@ unsigned int CDSound::GetDeviceCount() const
     return m_iDevices;
 }
 
-LPCTSTR CDSound::GetDeviceName(unsigned int iDevice) const
+QString CDSound::GetDeviceName(unsigned int iDevice) const
 {
-    ASSERT(iDevice < m_iDevices);
+    Q_ASSERT(iDevice < m_iDevices);
     return m_pcDevice[iDevice];
 }
 
-int CDSound::MatchDeviceID(LPCTSTR Name) const
+int CDSound::MatchDeviceID(QString Name) const
 {
     for (unsigned int i = 0; i < m_iDevices; ++i) {
-        if (!_tcscmp(Name, m_pcDevice[i]))
+        if (Name == m_pcDevice[i])
             return i;
     }
 
@@ -161,8 +159,6 @@ CDSoundChannel *CDSound::OpenChannel(int SampleRate, int SampleSize, int Channel
         ++BufferLength;
 
     CDSoundChannel *pChannel = new CDSoundChannel();
-
-    HANDLE hBufferEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
     int SoundBufferSize = CalculateBufferLength(BufferLength, SampleRate, SampleSize, Channels);
     int BlockSize = SoundBufferSize / Blocks;
@@ -279,6 +275,7 @@ bool CDSoundChannel::ClearBuffer()
 {
     if (IsPlaying())
         return Stop();
+    Q_ASSERT(false);    // FIXME
 }
 
 bool CDSoundChannel::WriteBuffer(char *pBuffer, unsigned int Samples)
@@ -290,7 +287,7 @@ bool CDSoundChannel::WriteBuffer(char *pBuffer, unsigned int Samples)
     return true;
 }
 
-buffer_event_t CDSoundChannel::WaitForSyncEvent(DWORD dwTimeout) const
+buffer_event_t CDSoundChannel::WaitForSyncEvent(uint32_t dwTimeout) const
 {
     // Wait for a DirectSound event
     bool ok = ftmAudioSemaphore.tryAcquire(1,dwTimeout);

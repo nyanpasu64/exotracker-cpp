@@ -20,6 +20,12 @@ else {
     QMAKE_CXXFLAGS += -std=c++17
 }
 
+# Begin linking dependencies
+# https://doc.qt.io/qt-5/qmake-variable-reference.html#libs
+# If you use the Unix -l (library) and -L (library path) flags, qmake handles the libraries correctly on Windows (that is, passes the full path of the library to the linker).
+
+LIBS += -L/usr/lib -lSDL2
+
 # Begin file lists
 
 INCLUDEPATH += src
