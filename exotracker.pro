@@ -34,9 +34,11 @@ SOURCES += \
     src/main.cpp \
     src/gui/mainwindow.cpp \
     src/audio/output.cpp \
+    src/audio/synth.cpp \
 
 HEADERS += \
     src/gui/mainwindow.h \
     src/util/macros.h \
     src/gui/lib/lightweight.h \
     src/audio/output.h \
+    src/audio/synth.h \
