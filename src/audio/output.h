@@ -86,7 +86,7 @@ private:
     bool m_bPaused;
 };
 
-typedef void (*SDL_Callback_Function)(void* userdata,uint8_t* stream,int32_t len);
+using SDL_Callback_Function = void (*)(void* userdata, uint8_t* stream, int32_t len);
 
 typedef struct _SDL_Callback
 {
@@ -100,7 +100,9 @@ extern QList<SDL_Callback> sdlHooks;
 class AudioInterface
 {
 public:
+    // Must only be called once per application run.
     AudioInterface();
+
     ~AudioInterface();
 
     bool			SetupDevice(int iDevice);
