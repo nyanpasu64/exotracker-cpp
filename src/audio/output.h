@@ -25,6 +25,8 @@
 
 #include <cstdint>
 
+namespace audio {
+
 enum buffer_event_t {
     BUFFER_NONE = 0,
     BUFFER_CUSTOM_EVENT = 1,
@@ -129,3 +131,5 @@ public:
     unsigned int	m_iDevices;
     QString			m_pcDevice[MAX_DEVICES];
 };
+
+}   // namespace audio

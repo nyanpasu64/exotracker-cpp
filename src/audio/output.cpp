@@ -28,6 +28,8 @@
 
 #include <cstdio>
 
+namespace audio {
+
 // The single CDSound object
 AudioInterface *AudioInterface::instance = NULL;
 
@@ -293,3 +295,5 @@ buffer_event_t AudioChannel::WaitForSyncEvent(uint32_t dwTimeout) const
     bool ok = ftmAudioSemaphore.tryAcquire(1,dwTimeout);
     return ok?BUFFER_IN_SYNC:BUFFER_OUT_OF_SYNC;
 }
+
+}   // namespace audio
