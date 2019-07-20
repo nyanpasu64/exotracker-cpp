@@ -32,12 +32,12 @@ INCLUDEPATH += src
 
 SOURCES += \
     src/main.cpp \
-    src/gui/mainwindow.cpp \
+    src/gui/main_window.cpp \
     src/audio/output.cpp \
     src/audio/synth.cpp \
 
 HEADERS += \
-    src/gui/mainwindow.h \
+    src/gui/main_window.h \
     src/util/macros.h \
     src/gui/lib/lightweight.h \
     src/audio/output.h \

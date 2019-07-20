@@ -1,4 +1,4 @@
-#include "mainwindow.h"
+#include "main_window.h"
 #include "lib/lightweight.h"
 
 #include "util/macros.h"
