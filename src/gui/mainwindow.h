@@ -3,18 +3,24 @@
 
 #include <QMainWindow>
 
-class MainWindowView;
+#include <memory>
+
+class MainWindowPrivate;
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = 0);
-    ~MainWindow();
+    static std::unique_ptr<MainWindow> make(QWidget * parent = 0);
 
-private:
-    MainWindowView * view;
+    MainWindow(QWidget *parent = 0);
+    virtual void _() = 0;
+    virtual ~MainWindow();
+
+    friend class MainWindowPrivate;
 };
+
+
 
 #endif // MAINWINDOW_H

@@ -38,7 +38,6 @@ SOURCES += \
 
 HEADERS += \
     src/gui/mainwindow.h \
-    src/gui/mainwindow_view.h \
     src/util/macros.h \
     src/gui/lib/lightweight.h \
     src/audio/output.h \
