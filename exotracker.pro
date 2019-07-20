@@ -35,7 +35,6 @@ SOURCES += \
     src/gui/mainwindow.cpp \
     src/audio/output.cpp \
     src/audio/synth.cpp \
-    src/gui/lol_dialog.cpp \
 
 HEADERS += \
     src/gui/mainwindow.h \
@@ -44,4 +43,3 @@ HEADERS += \
     src/gui/lib/lightweight.h \
     src/audio/output.h \
     src/audio/synth.h \
-    src/gui/lol_dialog.h \
