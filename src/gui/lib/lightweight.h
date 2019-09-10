@@ -1,32 +1,5 @@
 #pragma once
 
-#ifndef defer
-
-// https://stackoverflow.com/a/42060129
-struct DeferDummy {};
-
-template <class Lambda>
-struct Deferrer {
-    Lambda f;
-    ~Deferrer() { f(); }
-};
-
-template <class Lambda>
-Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
-    return {f};
-}
-
-#define DEFER_(LINE) zz_defer##LINE
-#define DEFER(LINE) DEFER_(LINE)
-#define defer \
-    auto DEFER(__LINE__) = DeferDummy{} << [&]()
-
-// Usage:
-// defer {...};
-
-#endif // defer
-
-
 #define require_semicolon do {} while (0)
 
 // Once C++20 rolls around, add (...) -> `addWidget/addLayout(w __VA_OPT__(,) __VA_ARGS__)`.
@@ -42,7 +15,7 @@ Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
     \
     auto * l = new qlayout_w; \
     \
-    defer { parent->setCentralWidget(w); }; \
+    parent->setCentralWidget(w); \
     require_semicolon
 
 
@@ -52,7 +25,7 @@ Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
     \
     auto * parentL = l; \
     auto * l = new qlayout_w; \
-    defer { parentL->addWidget(w); }; \
+    parentL->addWidget(w); \
     \
     require_semicolon
 
@@ -60,7 +33,7 @@ Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
 #define append_layout(qlayout_nullptr) \
     auto * parentL = l; \
     auto * l = new qlayout_nullptr; \
-    defer { parentL->addLayout(l); }; \
+    parentL->addLayout(l); \
     \
     require_semicolon
 
@@ -71,7 +44,7 @@ Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
     \
     auto * parentL = l; \
     void * l = nullptr; (void)l; \
-    defer { parentL->addWidget(w); }; \
+    parentL->addWidget(w); \
     \
     require_semicolon
 
@@ -80,14 +53,14 @@ Deferrer<Lambda> operator<<(DeferDummy, Lambda f) {
     auto * left = new _left; \
     auto * right = new _right; \
     \
-    defer { l->addRow(left, right); }; \
+    l->addRow(left, right); \
     require_semicolon
 
 
 #define label_row(left_label, _right) \
     auto * right = new _right; \
     \
-    defer { l->addRow(left_label, right); }; \
+    l->addRow(left_label, right); \
     require_semicolon
 
 
