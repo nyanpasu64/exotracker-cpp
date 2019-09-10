@@ -12,9 +12,9 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    static std::unique_ptr<MainWindow> make(QWidget * parent = 0);
+	static std::unique_ptr<MainWindow> make(QWidget * parent = nullptr);
 
-    MainWindow(QWidget *parent = 0);
+	MainWindow(QWidget *parent = nullptr);
     virtual void _() = 0;
     virtual ~MainWindow();
 
