@@ -6,6 +6,8 @@
 
 QT += core gui widgets
 
+win32:LIBS += -luser32 -lgdi32
+
 TARGET = exotracker
 TEMPLATE = app
 
