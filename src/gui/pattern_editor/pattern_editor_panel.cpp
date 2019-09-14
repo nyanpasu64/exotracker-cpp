@@ -104,8 +104,9 @@ void drawPattern(PatternEditorPanel & self, const QRect &rect) {
     // Then for each channel, draw all notes in that channel lying within view.
     // Notes may be positioned at fractional beats that do not lie in the grid.
 
+    // Draw pixmap onto this widget.
     QPainter painter(&self);
-    painter.drawPixmap(rect, *self.pixmap_.get());
+    painter.drawPixmap(rect, *self.pixmap_);
 }
 
 
