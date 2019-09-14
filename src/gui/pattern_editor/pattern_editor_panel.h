@@ -1,7 +1,7 @@
 #ifndef PATTERNEDITORPANEL_H
 #define PATTERNEDITORPANEL_H
 
-#include "src/document.h"
+#include "document.h"
 
 #include <QWidget>
 #include <QPixmap>
