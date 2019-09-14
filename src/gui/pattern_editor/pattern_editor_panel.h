@@ -1,6 +1,8 @@
 #ifndef PATTERNEDITORPANEL_H
 #define PATTERNEDITORPANEL_H
 
+#include "src/document.h"
+
 #include <QWidget>
 #include <QPixmap>
 #include <QFont>
@@ -33,6 +35,12 @@ signals:
 public slots:
 
 public:
+    // Pattern state.
+    ChannelData channel_data;
+    BeatFraction row_duration_beats = {1, 4};
+    BeatFraction nbeats = 4;
+
+    // Visual state.
     std::unique_ptr<QPixmap> pixmap_;
 
     QFont stepFont_, headerFont_;

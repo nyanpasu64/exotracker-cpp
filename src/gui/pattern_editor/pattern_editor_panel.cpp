@@ -78,14 +78,23 @@ void drawRowBg(PatternEditorPanel & self, int maxWidth) {
     painter.translate(-self.viewportPos);
     painter.setFont(self.stepFont_);
 
-    LOOP(row, 16) {
+    BeatFraction curr_beats = 0;
+    int row = 0;
+    for (;
+         curr_beats < self.nbeats;
+         curr_beats += self.row_duration_beats, row += 1)
+    {
         QPoint ptTopLeft{0, self.dyHeightPerRow * row};
 
         QColor bg {128, 192, 255};
         painter.fillRect(QRect{ptTopLeft, ptTopLeft + QPoint{self.dxWidth, self.dyHeightPerRow}}, bg);
 
         QPen colorLineTop;
-        colorLineTop.setColor(QColor{255, 255, 255});
+        if (curr_beats.denominator() == 1) {
+            colorLineTop.setColor(QColor{255, 255, 255});
+        } else {
+            colorLineTop.setColor(QColor{192, 224, 255});
+        }
         painter.setPen(colorLineTop);
         painter.drawLine(ptTopLeft, ptTopLeft + QPoint{self.dxWidth, 0});
     }
