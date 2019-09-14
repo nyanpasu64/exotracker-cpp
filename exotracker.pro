@@ -33,6 +33,7 @@ else {
 INCLUDEPATH += src boost
 
 SOURCES += \
+    src/document.cpp \
     src/gui/pattern_editor/pattern_editor_panel.cpp \
     src/main.cpp \
     src/gui/main_window.cpp \
@@ -40,6 +41,7 @@ SOURCES += \
     src/audio/synth.cpp \
 
 HEADERS += \
+    src/document.h \
     src/gui/main_window.h \
     src/gui/pattern_editor/pattern_editor_panel.h \
     src/util/macros.h \
