@@ -7,10 +7,20 @@
 #include <boost/rational.hpp>
 #include <cstdint>
 #include <compare>
+#include <map>
+#include <optional>
 
 using FractionInt = int64_t;
 using Fraction = boost::rational<FractionInt>;
 
+
+// TODO variant of u8 or note cut or etc.
+using Note = uint8_t;
+
+struct Row {
+    std::optional<Note> note;
+    // TODO volumes and []effects
+};
 
 /// A timestamp of a row in a pattern.
 ///
@@ -47,3 +57,5 @@ struct TimeInPattern {
         return {anchor_beat, INT16_MIN};
     }
 };
+
+using ChannelData = std::map<TimeInPattern, Row>;
