@@ -30,7 +30,7 @@ else {
 
 # Begin file lists
 
-INCLUDEPATH += src
+INCLUDEPATH += src boost
 
 SOURCES += \
     src/gui/pattern_editor/pattern_editor_panel.cpp \
