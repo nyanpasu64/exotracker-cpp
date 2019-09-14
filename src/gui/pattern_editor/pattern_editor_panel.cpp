@@ -26,6 +26,12 @@ _initDisplay;
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) : QWidget(parent)
 {
     setMinimumSize(320, 200);
+//    TimeInPattern, RowEvent
+    channel_data[TimeInPattern{0, 0}] = RowEvent{0};
+    channel_data[TimeInPattern{{1, 4}, 0}] = RowEvent{1};
+    channel_data[TimeInPattern{{2, 4}, 0}] = RowEvent{2};
+    channel_data[TimeInPattern{1, 0}] = RowEvent{4};
+    Q_ASSERT(channel_data.size() == 4);
 
     /* Font */
     headerFont_ = QApplication::font();
@@ -71,13 +77,11 @@ void PatternEditorPanel::resizeEvent(QResizeEvent *event)
 }
 
 // Begin reverse function ordering
+
+// See document.h for documentation of how patterns work.
+
 /// Draw the background lying behind notes/etc.
-void drawRowBg(PatternEditorPanel & self, int maxWidth) {
-    QPainter painter(self.pixmap_.get());
-
-    painter.translate(-self.viewportPos);
-    painter.setFont(self.stepFont_);
-
+void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
     BeatFraction curr_beats = 0;
     int row = 0;
     for (;
@@ -100,22 +104,59 @@ void drawRowBg(PatternEditorPanel & self, int maxWidth) {
     }
 }
 
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
+template <typename rational>
+inline int round_to_int(rational v)
+{
+    v = v + typename rational::int_type(sgn(v.numerator())) / 2;
+    return boost::rational_cast<int>(v);
+}
+
+/// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
+void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
+    for (const auto& [time, row_event]: self.channel_data) {
+        // Compute where to draw row.
+        BeatFraction beat = time.anchor_beat;
+        BeatFraction & beats_per_row = self.row_duration_beats;
+        BeatFraction row = beat / beats_per_row;
+        int yPx = round_to_int(self.dyHeightPerRow * row);
+        QPoint ptTopLeft{0, yPx};
+
+        // Draw top line.
+        QPen colorLineTop;
+        colorLineTop.setColor({255, 0, 0});
+        painter.setPen(colorLineTop);
+        painter.drawLine(ptTopLeft, ptTopLeft + QPoint{self.dxWidth, 0});
+
+        // TODO Draw text.
+    }
+}
 
 void drawPattern(PatternEditorPanel & self, const QRect &rect) {
     // int maxWidth = std::min(geometry().width(), TracksWidthFromLeftToEnd_);
-    int maxWidth = self.geometry().width();
 
     self.pixmap_->fill(Qt::black);
 
+    QPainter paintOffScreen(self.pixmap_.get());
+
+    paintOffScreen.translate(-self.viewportPos);
+    paintOffScreen.setFont(self.stepFont_);
+
     // First draw the row background. It lies in a regular grid.
-    drawRowBg(self, maxWidth);
+    // TODO only redraw `rect`??? how 2 partial redraw???
+    // i assume Qt will always use full-widget rect???
+    drawRowBg(self, paintOffScreen);
+    drawRowEvents(self, paintOffScreen);
 
     // Then for each channel, draw all notes in that channel lying within view.
     // Notes may be positioned at fractional beats that do not lie in the grid.
 
     // Draw pixmap onto this widget.
-    QPainter painter(&self);
-    painter.drawPixmap(rect, *self.pixmap_);
+    QPainter paintOnScreen(&self);
+    paintOnScreen.drawPixmap(rect, *self.pixmap_);
 }
 
 

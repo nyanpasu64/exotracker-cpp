@@ -17,7 +17,7 @@ using BeatFraction = boost::rational<FractionInt>;
 // TODO variant of u8 or note cut or etc.
 using Note = uint8_t;
 
-struct Row {
+struct RowEvent {
     std::optional<Note> note;
     // TODO volumes and []effects
 };
@@ -58,4 +58,4 @@ struct TimeInPattern {
     }
 };
 
-using ChannelData = std::map<TimeInPattern, Row>;
+using ChannelData = std::map<TimeInPattern, RowEvent>;
