@@ -11,7 +11,7 @@
 #include <optional>
 
 using FractionInt = int64_t;
-using Fraction = boost::rational<FractionInt>;
+using BeatFraction = boost::rational<FractionInt>;
 
 
 // TODO variant of u8 or note cut or etc.
@@ -38,7 +38,7 @@ struct Row {
 /// causing the sorting order to differ from the playback order.
 /// If this happens, the pattern is valid, but playing the pattern will misbehave.
 struct TimeInPattern {
-    Fraction anchor_beat;
+    BeatFraction anchor_beat;
     int16_t frames_offset;
     auto operator<=>(TimeInPattern const &) const = default;
 
@@ -53,7 +53,7 @@ struct TimeInPattern {
     }
 
     /// A timestamp which lies before any notes anchored to the given beat.
-    static TimeInPattern begin_of_beat(Fraction anchor_beat) {
+    static TimeInPattern begin_of_beat(BeatFraction anchor_beat) {
         return {anchor_beat, INT16_MIN};
     }
 };
