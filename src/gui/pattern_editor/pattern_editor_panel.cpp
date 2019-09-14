@@ -70,36 +70,9 @@ void PatternEditorPanel::resizeEvent(QResizeEvent *event)
     initDisplay(*this);
 }
 
-#define _drawPattern() void drawPattern(PatternEditorPanel & self, const QRect &rect)
-_drawPattern();
-
-void PatternEditorPanel::paintEvent(QPaintEvent *event)
-{
-    drawPattern(*this, event->rect());
-}
-
-#define _drawRowBg() void drawRowBg(PatternEditorPanel & self, int maxWidth)
-_drawRowBg();
-
-_drawPattern()
-{
-    // int maxWidth = std::min(geometry().width(), TracksWidthFromLeftToEnd_);
-    int maxWidth = self.geometry().width();
-
-    self.pixmap_->fill(Qt::black);
-
-    // First draw the row background. It lies in a regular grid.
-    drawRowBg(self, maxWidth);
-
-    // Then for each channel, draw all notes in that channel lying within view.
-    // Notes may be positioned at fractional beats that do not lie in the grid.
-
-    QPainter painter(&self);
-    painter.drawPixmap(rect, *self.pixmap_.get());
-}
-
+// Begin reverse function ordering
 /// Draw the background lying behind notes/etc.
-_drawRowBg() {
+void drawRowBg(PatternEditorPanel & self, int maxWidth) {
     QPainter painter(self.pixmap_.get());
 
     painter.translate(-self.viewportPos);
@@ -116,10 +89,29 @@ _drawRowBg() {
         painter.setPen(colorLineTop);
         painter.drawLine(ptTopLeft, ptTopLeft + QPoint{self.dxWidth, 0});
     }
+}
 
-    // for channel
-    // for note
-    // draw note
+
+void drawPattern(PatternEditorPanel & self, const QRect &rect) {
+    // int maxWidth = std::min(geometry().width(), TracksWidthFromLeftToEnd_);
+    int maxWidth = self.geometry().width();
+
+    self.pixmap_->fill(Qt::black);
+
+    // First draw the row background. It lies in a regular grid.
+    drawRowBg(self, maxWidth);
+
+    // Then for each channel, draw all notes in that channel lying within view.
+    // Notes may be positioned at fractional beats that do not lie in the grid.
+
+    QPainter painter(&self);
+    painter.drawPixmap(rect, *self.pixmap_.get());
+}
+
+
+void PatternEditorPanel::paintEvent(QPaintEvent *event)
+{
+    drawPattern(*this, event->rect());
 }
 
 // namespaces
