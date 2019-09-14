@@ -33,6 +33,7 @@ else {
 INCLUDEPATH += src
 
 SOURCES += \
+    src/gui/pattern_editor/pattern_editor_panel.cpp \
     src/main.cpp \
     src/gui/main_window.cpp \
     src/audio/output.cpp \
@@ -40,6 +41,7 @@ SOURCES += \
 
 HEADERS += \
     src/gui/main_window.h \
+    src/gui/pattern_editor/pattern_editor_panel.h \
     src/util/macros.h \
     src/gui/lib/lightweight.h \
     src/audio/output.h \

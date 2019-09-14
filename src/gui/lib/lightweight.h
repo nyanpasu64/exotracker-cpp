@@ -9,6 +9,14 @@
 //    auto * l = new qlayout_w; \
 
 
+#define add_central_widget_no_layout(qwidget_parent) \
+    auto * parent = w; \
+    auto * w = new qwidget_parent; \
+    \
+    parent->setCentralWidget(w); \
+    require_semicolon
+
+
 #define add_central_widget(qwidget_parent, qlayout_w) \
     auto * parent = w; \
     auto * w = new qwidget_parent; \

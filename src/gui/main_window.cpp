@@ -1,3 +1,5 @@
+#include "gui/pattern_editor/pattern_editor_panel.h"
+
 #include "main_window.h"
 #include "lib/lightweight.h"
 
@@ -29,10 +31,14 @@ using std::unique_ptr;
 using std::make_unique;
 
 
+using gui::pattern_editor::PatternEditorPanel;
+
 // module-private
 class MainWindowPrivate : public MainWindow {
 public: // module-private
     // widget pointers go here, if needed
+
+    PatternEditorPanel pattern;
 
     MainWindowPrivate(QWidget * parent) : MainWindow(parent) {
         setupUi();
@@ -42,25 +48,7 @@ public: // module-private
 
     void setupUi() {
         auto w = this;
-        {add_central_widget(QWidget(parent), QVBoxLayout(w));
-            l->setContentsMargins(0, 0, 0, 0);
-
-            {append_container(QGroupBox(parent), QFormLayout(w));
-                {label_row(tr("Top left"), QLineEdit(parent));
-                    right->setText(tr("Top right"));
-                }
-                {add_row(QPushButton(parent), QHBoxLayout());
-                    left->setText(tr("Bottom left"));
-
-                    auto * l = right;
-                    {append_widget(QPushButton(parent));
-                        w->setText(tr("Bottom right"));
-                    }
-                    {append_widget(QLineEdit(parent));
-                        w->setText(tr("Nyanpasu"));
-                    }
-                }
-            }
+        {add_central_widget_no_layout(PatternEditorPanel(parent));
         }
     }
 };
