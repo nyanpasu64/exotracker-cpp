@@ -32,10 +32,10 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) : QWidget(parent)
 {
     setMinimumSize(320, 200);
 //    TimeInPattern, RowEvent
-    channel_data[TimeInPattern{0, 0}] = RowEvent{0};
-    channel_data[TimeInPattern{{1, 4}, 0}] = RowEvent{1};
-    channel_data[TimeInPattern{{2, 4}, 0}] = RowEvent{2};
-    channel_data[TimeInPattern{1, 0}] = RowEvent{4};
+    channel_data[doc::TimeInPattern{0, 0}] = doc::RowEvent{0};
+    channel_data[doc::TimeInPattern{{1, 4}, 0}] = doc::RowEvent{1};
+    channel_data[doc::TimeInPattern{{2, 4}, 0}] = doc::RowEvent{2};
+    channel_data[doc::TimeInPattern{1, 0}] = doc::RowEvent{4};
     Q_ASSERT(channel_data.size() == 4);
 
     /* Font */
@@ -87,7 +87,7 @@ void PatternEditorPanel::resizeEvent(QResizeEvent *event)
 
 /// Draw the background lying behind notes/etc.
 void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
-    BeatFraction curr_beats = 0;
+    doc::BeatFraction curr_beats = 0;
     int row = 0;
     for (;
          curr_beats < self.nbeats;
@@ -124,9 +124,9 @@ inline int round_to_int(rational v)
 void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
     for (const auto& [time, row_event]: self.channel_data) {
         // Compute where to draw row.
-        BeatFraction beat = time.anchor_beat;
-        BeatFraction & beats_per_row = self.row_duration_beats;
-        BeatFraction row = beat / beats_per_row;
+        doc::BeatFraction beat = time.anchor_beat;
+        doc::BeatFraction & beats_per_row = self.row_duration_beats;
+        doc::BeatFraction row = beat / beats_per_row;
         int yPx = round_to_int(self.dyHeightPerRow * row);
         QPoint ptTopLeft{0, yPx};
 

@@ -26,6 +26,8 @@
 namespace gui {
 namespace pattern_editor {
 
+namespace doc = document;
+
 class PatternEditorPanel : public QWidget
 {
     W_OBJECT(PatternEditorPanel)
@@ -38,9 +40,9 @@ public slots:
 
 public:
     // Pattern state.
-    ChannelData channel_data;
-    BeatFraction row_duration_beats = {1, 4};
-    BeatFraction nbeats = 4;
+    doc::ChannelEvents channel_data;
+    doc::BeatFraction row_duration_beats = {1, 4};
+    doc::BeatFraction nbeats = 4;
 
     // Visual state.
     std::unique_ptr<QPixmap> pixmap_;

@@ -10,6 +10,8 @@
 #include <map>
 #include <optional>
 
+namespace document {
+
 using FractionInt = int64_t;
 using BeatFraction = boost::rational<FractionInt>;
 
@@ -20,6 +22,8 @@ using Note = uint8_t;
 struct RowEvent {
     std::optional<Note> note;
     // TODO volumes and []effects
+
+    auto operator<=>(RowEvent const &) const = default;
 };
 
 /// A timestamp of a row in a pattern.
@@ -58,4 +62,7 @@ struct TimeInPattern {
     }
 };
 
-using ChannelData = std::map<TimeInPattern, RowEvent>;
+using ChannelEvents = std::map<TimeInPattern, RowEvent>;
+
+// namespace
+}
