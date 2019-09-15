@@ -20,6 +20,10 @@ std::ostream& operator<< (std::ostream& os, const RowEvent& value) {
 
 TEST_CASE ("Test that ChannelEvents/std::map<TimeInPattern, ...> treats different timestamps differently.") {
 
+    // In C++, if you aggregate-initialize and not fill in all fields,
+    // the remainder are set to {} (acts like 0).
+    CHECK(doc::TimeInPattern{}.anchor_beat == 0);
+
     // std::map<document::TimeInPattern, document::RowEvent>
     CHECK(doc::TimeInPattern{0, 0} == doc::TimeInPattern{0, 0});
     CHECK(doc::TimeInPattern{1, 0} == doc::TimeInPattern{1, 0});
