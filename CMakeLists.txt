@@ -7,20 +7,24 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
 add_executable(exotracker-bin
-        src/document.cpp
-        src/gui/pattern_editor/pattern_editor_panel.cpp
-        src/main.cpp
-        src/gui/main_window.cpp
-        src/audio/output.cpp
-        src/audio/synth.cpp
-
-        src/document.h
-        src/gui/main_window.h
-        src/gui/pattern_editor/pattern_editor_panel.h
+        # Utility
         src/util/macros.h
-        src/gui/lib/lightweight.h
+
+        # Library
+        src/audio/output.cpp
         src/audio/output.h
+        src/audio/synth.cpp
         src/audio/synth.h
+        src/document.cpp
+        src/document.h
+
+        # GUI
+        src/gui/lib/lightweight.h
+        src/gui/main_window.cpp
+        src/gui/main_window.h
+        src/gui/pattern_editor/pattern_editor_panel.cpp
+        src/gui/pattern_editor/pattern_editor_panel.h
+        src/main.cpp
         )
 
 target_include_directories(exotracker-bin PUBLIC src 3rdparty)
