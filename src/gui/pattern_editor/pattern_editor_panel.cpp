@@ -131,6 +131,15 @@ public:
     }
 };
 
+/// Vertical channel dividers are drawn at fixed locations. Horizontal gridlines and events are not.
+/// So draw horizontal lines after of channel dividers.
+/// This macro prevents horizontal gridlines from covering up channel dividers.
+/// It'll be "fun" when I add support for multi-pixel-wide lines ;)
+//#define HORIZ_GRIDLINE(right_top) ((right_top) - QPoint{1, 0})
+
+/// This macro is a no-op and allows horizontal gridlines to cover channel dividers.
+#define HORIZ_GRIDLINE(right_top) (right_top)
+
 /// Draw the background lying behind notes/etc.
 void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
     // In Qt, (0, 0) is top-left, dx is right, and dy is down.
@@ -139,6 +148,11 @@ void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
     for (ChannelDrawIterator it(self); it.has_next();) {
         auto [channel, xleft, xright] = it.next();
         // End loop(channel)
+
+        // drawLine() paints the interval [x1, x2] and [y1, y2] inclusive.
+        // Subtract 1 so xright doesn't enter the next channel, or ybottom enter the next row.
+        // Draw the right border at [xright-1, xright), so it's not overwritten by the next channel at [xright, ...).
+        xright -= 1;
 
         // Begin loop(row)
         int row = 0;
@@ -152,6 +166,9 @@ void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
             int dy_height = self.dyHeightPerRow;
             int ybottom = ytop + dy_height;
             // End loop(row)
+
+            // drawLine() see above.
+            ybottom -= 1;
 
             QPoint left_top{xleft, ytop};
             // QPoint left_bottom{xleft, ybottom};
@@ -172,7 +189,7 @@ void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
             } else {
                 painter.setPen(palette.gridline_non_beat);
             }
-            painter.drawLine(left_top, right_top);
+            painter.drawLine(left_top, HORIZ_GRIDLINE(right_top));
         }
 
     }
@@ -196,6 +213,9 @@ void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
         auto [channel, xleft, xright] = it.next();
         // End loop(channel)
 
+        // drawLine() paints the interval [x1, x2]. Subtract 1 so [xleft, xright-1] doesn't enter the next channel.
+        xright -= 1;
+
         for (const auto&[time, row_event]: self.pattern.channels[channel]) {
             // Compute where to draw row.
             doc::BeatFraction beat = time.anchor_beat;
@@ -209,7 +229,7 @@ void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
             QPen colorLineTop;
             colorLineTop.setColor({255, 0, 0});
             painter.setPen(colorLineTop);
-            painter.drawLine(left_top, right_top);
+            painter.drawLine(left_top, HORIZ_GRIDLINE(right_top));
 
             // TODO Draw text.
         }
