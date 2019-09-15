@@ -43,6 +43,7 @@ public:
     doc::ChannelEvents channel_data;
     doc::BeatFraction row_duration_beats = {1, 4};
     doc::BeatFraction nbeats = 4;
+    bool is_zoomed = false;
 
     // Visual state.
     std::unique_ptr<QPixmap> pixmap_;

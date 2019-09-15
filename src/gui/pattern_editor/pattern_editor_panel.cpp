@@ -30,13 +30,13 @@ _initDisplay;
 
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) : QWidget(parent)
 {
-    setMinimumSize(320, 200);
+    setBaseSize(320, 200);
 //    TimeInPattern, RowEvent
     channel_data[doc::TimeInPattern{0, 0}] = doc::RowEvent{0};
-    channel_data[doc::TimeInPattern{{1, 4}, 0}] = doc::RowEvent{1};
-    channel_data[doc::TimeInPattern{{2, 4}, 0}] = doc::RowEvent{2};
-    channel_data[doc::TimeInPattern{1, 0}] = doc::RowEvent{4};
-    Q_ASSERT(channel_data.size() == 4);
+    channel_data[doc::TimeInPattern{{1, 3}, 0}] = doc::RowEvent{1};
+    channel_data[doc::TimeInPattern{{2, 3}, 0}] = doc::RowEvent{2};
+    channel_data[doc::TimeInPattern{1, 0}] = doc::RowEvent{3};
+    channel_data[doc::TimeInPattern{1 + doc::BeatFraction{1, 4}, 0}] = doc::RowEvent{4};
 
     /* Font */
     headerFont_ = QApplication::font();
