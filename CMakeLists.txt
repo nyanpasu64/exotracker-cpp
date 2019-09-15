@@ -41,3 +41,11 @@ add_executable(exotracker-bin
         src/main.cpp
         )
 target_link_libraries(exotracker-bin exotracker-lib Qt5::Widgets)
+
+# Unit tests
+add_executable(exotracker-tests
+        tests/test_runner.cpp
+        tests/test_document.cpp
+        )
+target_include_directories(exotracker-tests PUBLIC tests)
+target_link_libraries(exotracker-tests exotracker-lib)
