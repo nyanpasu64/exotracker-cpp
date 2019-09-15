@@ -40,9 +40,8 @@ public slots:
 
 public:
     // Pattern state.
-    doc::ChannelEvents channel_data;
+    doc::TrackPattern pattern;
     doc::BeatFraction row_duration_beats = {1, 4};
-    doc::BeatFraction nbeats = 4;
     bool is_zoomed = false;
 
     // Visual state.

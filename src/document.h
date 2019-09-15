@@ -10,6 +10,7 @@
 #include <map>
 #include <optional>
 #include <tuple>
+#include <array>
 
 namespace document {
 
@@ -73,6 +74,22 @@ struct TimeInPattern {
 };
 
 using ChannelEvents = std::map<TimeInPattern, RowEvent>;
+
+namespace _ChannelId {
+enum ChannelId {
+    Test1,
+    Test2,
+    COUNT
+};
+}
+using _ChannelId::ChannelId;
+using ChannelInt = int;
+
+struct TrackPattern {
+    BeatFraction nbeats;
+    std::array<ChannelEvents, ChannelId::COUNT> channels;
+};
+
 
 // namespace
 }

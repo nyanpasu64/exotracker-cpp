@@ -30,13 +30,22 @@ _initDisplay;
 
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) : QWidget(parent)
 {
-    setBaseSize(320, 200);
-//    TimeInPattern, RowEvent
-    channel_data[doc::TimeInPattern{0, 0}] = doc::RowEvent{0};
-    channel_data[doc::TimeInPattern{{1, 3}, 0}] = doc::RowEvent{1};
-    channel_data[doc::TimeInPattern{{2, 3}, 0}] = doc::RowEvent{2};
-    channel_data[doc::TimeInPattern{1, 0}] = doc::RowEvent{3};
-    channel_data[doc::TimeInPattern{1 + doc::BeatFraction{1, 4}, 0}] = doc::RowEvent{4};
+    setMinimumSize(128, 320);
+    // TimeInPattern, RowEvent
+    pattern.nbeats = 4;
+    {
+        auto & channel = pattern.channels[doc::ChannelId::Test1];
+        channel[doc::TimeInPattern{0, 0}] = doc::RowEvent{0};
+        channel[doc::TimeInPattern{{1, 3}, 0}] = doc::RowEvent{1};
+        channel[doc::TimeInPattern{{2, 3}, 0}] = doc::RowEvent{2};
+        channel[doc::TimeInPattern{1, 0}] = doc::RowEvent{3};
+        channel[doc::TimeInPattern{1 + doc::BeatFraction{1, 4}, 0}] = doc::RowEvent{4};
+    }
+    {
+        auto & channel = pattern.channels[doc::ChannelId::Test2];
+        channel[doc::TimeInPattern{2, 0}] = doc::RowEvent{102};
+        channel[doc::TimeInPattern{3, 0}] = doc::RowEvent{103};
+    }
 
     /* Font */
     headerFont_ = QApplication::font();
@@ -83,29 +92,89 @@ void PatternEditorPanel::resizeEvent(QResizeEvent *event)
 
 // Begin reverse function ordering
 
+struct Palette {
+    QColor bg{128, 192, 255};
+    QPen gridline_beat{QColor{255, 255, 255}};
+    QPen gridline_non_beat{QColor{192, 224, 255}};
+    QPen channel_divider{QColor{128, 128, 128}};
+};
+
+Palette palette;
+
 // See document.h for documentation of how patterns work.
+
+struct ChannelDraw {
+    doc::ChannelInt channel;
+    int xleft;
+    int xright;
+};
+
+class ChannelDrawIterator {
+    PatternEditorPanel & pattern_editor;
+    int channel = 0;
+    int x_accum = 0;
+
+public:
+    explicit ChannelDrawIterator(PatternEditorPanel & pattern_editor) : pattern_editor(pattern_editor) {}
+    bool has_next() const {
+        return channel < doc::ChannelId::COUNT;
+    }
+    ChannelDraw next() mut {
+        int xleft = x_accum;
+        int dx_width = pattern_editor.dxWidth;
+        int xright = xleft + dx_width;
+
+        ChannelDraw out{channel, xleft, xright};
+        channel += 1;
+        x_accum = xright;
+        return out;
+    }
+};
 
 /// Draw the background lying behind notes/etc.
 void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
-    doc::BeatFraction curr_beats = 0;
-    int row = 0;
-    for (;
-         curr_beats < self.nbeats;
-         curr_beats += self.row_duration_beats, row += 1)
-    {
-        QPoint ptTopLeft{0, self.dyHeightPerRow * row};
+    // In Qt, (0, 0) is top-left, dx is right, and dy is down.
 
-        QColor bg {128, 192, 255};
-        painter.fillRect(QRect{ptTopLeft, ptTopLeft + QPoint{self.dxWidth, self.dyHeightPerRow}}, bg);
+    // Begin loop(channel)
+    for (ChannelDrawIterator it(self); it.has_next();) {
+        auto [channel, xleft, xright] = it.next();
+        // End loop(channel)
 
-        QPen colorLineTop;
-        if (curr_beats.denominator() == 1) {
-            colorLineTop.setColor(QColor{255, 255, 255});
-        } else {
-            colorLineTop.setColor(QColor{192, 224, 255});
+        // Begin loop(row)
+        int row = 0;
+        doc::BeatFraction curr_beats = 0;
+        for (;
+                curr_beats < self.pattern.nbeats;
+                curr_beats += self.row_duration_beats, row += 1)
+        {
+            // Compute row height.
+            int ytop = self.dyHeightPerRow * row;
+            int dy_height = self.dyHeightPerRow;
+            int ybottom = ytop + dy_height;
+            // End loop(row)
+
+            QPoint left_top{xleft, ytop};
+            // QPoint left_bottom{xleft, ybottom};
+            QPoint right_top{xright, ytop};
+            QPoint right_bottom{xright, ybottom};
+
+            // Draw background of cell.
+            painter.fillRect(QRect{left_top, right_bottom}, palette.bg);
+
+            // Draw divider down right side.
+            painter.setPen(palette.channel_divider);
+            painter.drawLine(right_top, right_bottom);
+
+            // Draw gridline along top of row.
+            QPen colorLineTop;
+            if (curr_beats.denominator() == 1) {
+                painter.setPen(palette.gridline_beat);
+            } else {
+                painter.setPen(palette.gridline_non_beat);
+            }
+            painter.drawLine(left_top, right_top);
         }
-        painter.setPen(colorLineTop);
-        painter.drawLine(ptTopLeft, ptTopLeft + QPoint{self.dxWidth, 0});
+
     }
 }
 
@@ -122,21 +191,28 @@ inline int round_to_int(rational v)
 
 /// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
 void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
-    for (const auto& [time, row_event]: self.channel_data) {
-        // Compute where to draw row.
-        doc::BeatFraction beat = time.anchor_beat;
-        doc::BeatFraction & beats_per_row = self.row_duration_beats;
-        doc::BeatFraction row = beat / beats_per_row;
-        int yPx = round_to_int(self.dyHeightPerRow * row);
-        QPoint ptTopLeft{0, yPx};
+    // Begin loop(channel)
+    for (ChannelDrawIterator it(self); it.has_next();) {
+        auto [channel, xleft, xright] = it.next();
+        // End loop(channel)
 
-        // Draw top line.
-        QPen colorLineTop;
-        colorLineTop.setColor({255, 0, 0});
-        painter.setPen(colorLineTop);
-        painter.drawLine(ptTopLeft, ptTopLeft + QPoint{self.dxWidth, 0});
+        for (const auto&[time, row_event]: self.pattern.channels[channel]) {
+            // Compute where to draw row.
+            doc::BeatFraction beat = time.anchor_beat;
+            doc::BeatFraction & beats_per_row = self.row_duration_beats;
+            doc::BeatFraction row = beat / beats_per_row;
+            int yPx = round_to_int(self.dyHeightPerRow * row);
+            QPoint left_top{xleft, yPx};
+            QPoint right_top{xright, yPx};
 
-        // TODO Draw text.
+            // Draw top line.
+            QPen colorLineTop;
+            colorLineTop.setColor({255, 0, 0});
+            painter.setPen(colorLineTop);
+            painter.drawLine(left_top, right_top);
+
+            // TODO Draw text.
+        }
     }
 }
 
