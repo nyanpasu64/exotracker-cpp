@@ -9,6 +9,7 @@
 #include <compare>
 #include <map>
 #include <optional>
+#include <tuple>
 
 namespace document {
 
@@ -44,7 +45,16 @@ struct RowEvent {
 struct TimeInPattern {
     BeatFraction anchor_beat;
     int16_t frames_offset;
-    auto operator<=>(TimeInPattern const &) const = default;
+    std::strong_ordering operator<=>(TimeInPattern const & rhs) const {
+        // msvc 2019 defines an implicit `operator<=>` on `boost::rational` which behaves in a nonsensical fashion
+        if (anchor_beat < rhs.anchor_beat) return std::strong_ordering::less;
+        if (anchor_beat > rhs.anchor_beat) return std::strong_ordering::greater;
+        return frames_offset <=> rhs.frames_offset;
+    }
+
+    auto operator==(TimeInPattern const & rhs) const {
+        return anchor_beat == rhs.anchor_beat && frames_offset == rhs.frames_offset;
+    }
 
     // TODO remove, only used for testing purposes
     static TimeInPattern from_frac(FractionInt num, FractionInt den) {

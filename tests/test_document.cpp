@@ -23,8 +23,12 @@ TEST_CASE ("Test that ChannelEvents/std::map<TimeInPattern, ...> treats differen
     // std::map<document::TimeInPattern, document::RowEvent>
     CHECK(doc::TimeInPattern{0, 0} == doc::TimeInPattern{0, 0});
     CHECK(doc::TimeInPattern{1, 0} == doc::TimeInPattern{1, 0});
-    CHECK(doc::TimeInPattern{{1, 2}, 0} != doc::TimeInPattern{1, 0});
-    CHECK(doc::TimeInPattern{{1, 2}, 0} != doc::TimeInPattern{{3, 2}, 0});
+
+    const doc::TimeInPattern &half = doc::TimeInPattern{{1, 2}, 0};
+    const doc::TimeInPattern &one = doc::TimeInPattern{1, 0};
+    CHECK(half != one);
+    CHECK(half < one);
+    CHECK_UNARY(half < one || half == one || half > one);
 
     std::map<doc::BeatFraction, int> fraction_test;
     fraction_test[{1, 2}] = 5;
