@@ -6,7 +6,18 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
-add_executable(exotracker-bin
+# Configure global settings
+include_directories(src 3rdparty)
+set(CMAKE_CXX_STANDARD 20)
+if (WIN32)
+    add_compile_definitions(UNICODE _UNICODE)
+    if (MSVC)
+        add_compile_options(/EHsc)
+    endif ()
+endif ()
+
+# Core library, does not use Qt
+add_library(exotracker-lib
         # Utility
         src/util/macros.h
 
@@ -17,7 +28,10 @@ add_executable(exotracker-bin
         src/audio/synth.h
         src/document.cpp
         src/document.h
+        )
 
+# GUI editor, uses Qt
+add_executable(exotracker-bin
         # GUI
         src/gui/lib/lightweight.h
         src/gui/main_window.cpp
@@ -26,16 +40,4 @@ add_executable(exotracker-bin
         src/gui/pattern_editor/pattern_editor_panel.h
         src/main.cpp
         )
-
-target_include_directories(exotracker-bin PUBLIC src 3rdparty)
-
-if (WIN32)
-    target_compile_definitions(exotracker-bin PRIVATE UNICODE _UNICODE)
-    if (MSVC)
-        set_target_properties(exotracker-bin PROPERTIES COMPILE_FLAGS /EHsc)
-    endif ()
-endif ()
-
-target_compile_features(exotracker-bin PUBLIC cxx_std_20)
-
-target_link_libraries(exotracker-bin Qt5::Widgets)
+target_link_libraries(exotracker-bin exotracker-lib Qt5::Widgets)
