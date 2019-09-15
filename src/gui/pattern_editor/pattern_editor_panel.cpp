@@ -1,5 +1,8 @@
 #include "pattern_editor_panel.h"
 #include "util/macros.h"
+
+#include <verdigris/wobjectimpl.h>
+
 #include <QPainter>
 #include <QFontMetrics>
 #include <QPoint>
@@ -19,6 +22,8 @@
 
 namespace gui {
 namespace pattern_editor {
+
+W_OBJECT_IMPL(PatternEditorPanel)
 
 #define _initDisplay void initDisplay(PatternEditorPanel & self)
 _initDisplay;

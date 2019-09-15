@@ -5,6 +5,7 @@
 
 #include "util/macros.h"
 
+#include <verdigris/wobjectimpl.h>
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QAction>
@@ -26,12 +27,12 @@
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
 
-
 using std::unique_ptr;
 using std::make_unique;
 
-
 using gui::pattern_editor::PatternEditorPanel;
+
+W_OBJECT_IMPL(MainWindow)
 
 // module-private
 class MainWindowPrivate : public MainWindow {

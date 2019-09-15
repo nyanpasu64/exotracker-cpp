@@ -1,6 +1,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <verdigris/wobjectdefs.h>
+
 #include <QMainWindow>
 
 #include <memory>
@@ -9,7 +11,7 @@ class MainWindowPrivate;
 
 class MainWindow : public QMainWindow
 {
-    Q_OBJECT
+    W_OBJECT(MainWindow)
 
 public:
 	static std::unique_ptr<MainWindow> make(QWidget * parent = nullptr);

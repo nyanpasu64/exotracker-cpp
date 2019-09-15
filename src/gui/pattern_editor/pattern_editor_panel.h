@@ -3,6 +3,8 @@
 
 #include "document.h"
 
+#include <verdigris/wobjectdefs.h>
+
 #include <QWidget>
 #include <QPixmap>
 #include <QFont>
@@ -26,7 +28,7 @@ namespace pattern_editor {
 
 class PatternEditorPanel : public QWidget
 {
-    Q_OBJECT
+    W_OBJECT(PatternEditorPanel)
 public:
     explicit PatternEditorPanel(QWidget *parent = nullptr);
 

@@ -2,14 +2,7 @@ cmake_minimum_required(VERSION 3.8.0)
 
 project(exotracker)
 
-set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
-
-# it's OFF by default, on 3.0.0 and 3.15.3. why enable on old?
-#if(CMAKE_VERSION VERSION_LESS "3.7.0")
-#    set(CMAKE_INCLUDE_CURRENT_DIR ON)
-#endif()
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
@@ -30,7 +23,7 @@ add_executable(exotracker-bin
     src/audio/synth.h
 )
 
-target_include_directories(exotracker-bin PUBLIC src boost)
+target_include_directories(exotracker-bin PUBLIC src 3rdparty)
 
 if (WIN32)
     target_compile_definitions(exotracker-bin PRIVATE UNICODE _UNICODE)
