@@ -93,10 +93,12 @@ void PatternEditorPanel::resizeEvent(QResizeEvent *event)
 // Begin reverse function ordering
 
 struct Palette {
-    QColor bg{128, 192, 255};
-    QPen gridline_beat{QColor{255, 255, 255}};
-    QPen gridline_non_beat{QColor{192, 224, 255}};
-    QPen channel_divider{QColor{128, 128, 128}};
+    QColor bg{0, 0, 0};
+    QPen channel_divider{QColor{64, 64, 64}};
+    QPen gridline_beat{QColor{64, 192, 255}};
+    QPen gridline_non_beat{QColor{16*2, 56*2, 80*2}};
+    QPen note_line_non_beat{QColor{0, 255, 0}};
+    QPen note_line_beat{QColor{255, 255, 96}};
 };
 
 Palette palette;
@@ -183,7 +185,6 @@ void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
             painter.drawLine(right_top, right_bottom);
 
             // Draw gridline along top of row.
-            QPen colorLineTop;
             if (curr_beats.denominator() == 1) {
                 painter.setPen(palette.gridline_beat);
             } else {
@@ -226,9 +227,9 @@ void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
             QPoint right_top{xright, yPx};
 
             // Draw top line.
-            QPen colorLineTop;
-            colorLineTop.setColor({255, 0, 0});
-            painter.setPen(colorLineTop);
+            // TODO highlight differently based on whether beat or not
+            // TODO add coarse/fine highlight fractions
+            painter.setPen(palette.note_line_non_beat);
             painter.drawLine(left_top, HORIZ_GRIDLINE(right_top));
 
             // TODO Draw text.
