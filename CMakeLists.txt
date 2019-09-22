@@ -28,6 +28,8 @@ add_library(exotracker-lib
         src/audio/synth.h
         src/document.cpp
         src/document.h
+        src/sequencer/sequencer.cpp
+        src/sequencer/sequencer.h
         )
 
 # GUI editor, uses Qt
