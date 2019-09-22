@@ -6,6 +6,10 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
+#vcpkg's portaudio does not support CMake targets, unfortunately.
+find_path(PORTAUDIO_INCLUDE_DIR portaudio.h)
+find_library(PORTAUDIO_LIBRARY portaudio)
+
 # Configure global settings
 include_directories(src 3rdparty)
 set(CMAKE_CXX_STANDARD 20)
@@ -31,6 +35,9 @@ add_library(exotracker-lib
         src/sequencer/sequencer.cpp
         src/sequencer/sequencer.h
         )
+target_include_directories(exotracker-lib PRIVATE ${PORTAUDIO_INCLUDE_DIR})
+target_link_libraries(exotracker-lib PRIVATE ${PORTAUDIO_LIBRARY})
+
 
 # GUI editor, uses Qt
 add_executable(exotracker-bin
