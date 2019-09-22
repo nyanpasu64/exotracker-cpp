@@ -42,7 +42,7 @@ add_executable(exotracker-bin
         src/gui/pattern_editor/pattern_editor_panel.h
         src/main.cpp
         )
-target_link_libraries(exotracker-bin exotracker-lib Qt5::Widgets)
+target_link_libraries(exotracker-bin PRIVATE exotracker-lib Qt5::Widgets)
 
 # Unit tests
 add_executable(exotracker-tests
@@ -50,4 +50,4 @@ add_executable(exotracker-tests
         tests/test_document.cpp
         )
 target_include_directories(exotracker-tests PUBLIC tests)
-target_link_libraries(exotracker-tests exotracker-lib)
+target_link_libraries(exotracker-tests PRIVATE exotracker-lib)
