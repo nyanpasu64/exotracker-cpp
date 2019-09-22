@@ -12,7 +12,7 @@
 #include <tuple>
 #include <array>
 
-namespace document {
+namespace doc {
 
 using FractionInt = int64_t;
 using BeatFraction = boost::rational<FractionInt>;

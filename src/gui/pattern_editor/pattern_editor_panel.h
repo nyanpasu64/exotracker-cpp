@@ -26,8 +26,6 @@
 namespace gui {
 namespace pattern_editor {
 
-namespace doc = document;
-
 class PatternEditorPanel : public QWidget
 {
     W_OBJECT(PatternEditorPanel)

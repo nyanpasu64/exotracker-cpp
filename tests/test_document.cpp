@@ -3,9 +3,7 @@
 //#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
-namespace doc = document;
-
-namespace document {
+namespace doc {
 std::ostream& operator<< (std::ostream& os, const RowEvent& value) {
     os << "RowEvent{";
     if (value.note.has_value()) {
@@ -24,7 +22,7 @@ TEST_CASE ("Test that ChannelEvents/std::map<TimeInPattern, ...> treats differen
     // the remainder are set to {} (acts like 0).
     CHECK(doc::TimeInPattern{}.anchor_beat == 0);
 
-    // std::map<document::TimeInPattern, document::RowEvent>
+    // std::map<doc::TimeInPattern, doc::RowEvent>
     CHECK(doc::TimeInPattern{0, 0} == doc::TimeInPattern{0, 0});
     CHECK(doc::TimeInPattern{1, 0} == doc::TimeInPattern{1, 0});
 
