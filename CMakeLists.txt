@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.8.0)
 project(exotracker)
 
 #Initialize environment
-set(find_portaudio true)    # false if you import portaudio targets via add_subdirectory
-set(portaudio "portaudio")    # or portaudio_static
+set(portaudio "portaudio_static")
+set(portaudiocpp "portaudiocpp_static")
 
 include(cmake_user_override.txt OPTIONAL)
 #End initialize environment
@@ -15,6 +15,15 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 if(find_portaudio)
     find_package(portaudio REQUIRED)
+else()
+    add_subdirectory(
+        "3rdparty/portaudio"
+        EXCLUDE_FROM_ALL
+    )
+    add_subdirectory(
+        "3rdparty/portaudio/bindings/cpp"
+        EXCLUDE_FROM_ALL
+    )
 endif()
 
 # Configure global settings
@@ -44,7 +53,7 @@ add_library(exotracker-lib
         src/sequencer/sequencer.cpp
         src/sequencer/sequencer.h
         )
-target_link_libraries(exotracker-lib PRIVATE ${portaudio})
+target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 
 
 # GUI editor, uses Qt
@@ -57,7 +66,7 @@ add_executable(exotracker-bin
         src/gui/pattern_editor/pattern_editor_panel.h
         src/main.cpp
         )
-target_link_libraries(exotracker-bin PRIVATE exotracker-lib Qt5::Widgets)
+target_link_libraries(exotracker-bin PRIVATE exotracker-lib ${portaudio} ${portaudiocpp} Qt5::Widgets)
 
 # Unit tests
 add_executable(exotracker-tests
