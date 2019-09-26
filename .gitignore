@@ -85,3 +85,5 @@ compile_commands.json
 *creator.user*
 
 # End of https://www.gitignore.io/api/c++,meson,qt
+
+/cmake_user_override.txt

@@ -2,13 +2,20 @@ cmake_minimum_required(VERSION 3.8.0)
 
 project(exotracker)
 
+#Initialize environment
+set(find_portaudio true)    # false if you import portaudio targets via add_subdirectory
+set(portaudio "portaudio")    # or portaudio_static
+
+include(cmake_user_override.txt OPTIONAL)
+#End initialize environment
+
+
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
-
-#vcpkg's portaudio does not support CMake targets, unfortunately.
-find_path(PORTAUDIO_INCLUDE_DIR portaudio.h)
-find_library(PORTAUDIO_LIBRARY portaudio)
+if(find_portaudio)
+    find_package(portaudio REQUIRED)
+endif()
 
 # Configure global settings
 include_directories(src 3rdparty)
@@ -26,6 +33,8 @@ add_library(exotracker-lib
         src/util/macros.h
 
         # Library
+        src/audio/audio.cpp
+        src/audio/audio.h
         src/audio/output.cpp
         src/audio/output.h
         src/audio/synth.cpp
@@ -35,8 +44,7 @@ add_library(exotracker-lib
         src/sequencer/sequencer.cpp
         src/sequencer/sequencer.h
         )
-target_include_directories(exotracker-lib PRIVATE ${PORTAUDIO_INCLUDE_DIR})
-target_link_libraries(exotracker-lib PRIVATE ${PORTAUDIO_LIBRARY})
+target_link_libraries(exotracker-lib PRIVATE ${portaudio})
 
 
 # GUI editor, uses Qt
