@@ -1,5 +1,7 @@
 #include "document.h"
 
+#include <map>
+
 //#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
@@ -16,7 +18,7 @@ std::ostream& operator<< (std::ostream& os, const RowEvent& value) {
 }
 }
 
-TEST_CASE ("Test that ChannelEvents/std::map<TimeInPattern, ...> treats different timestamps differently.") {
+TEST_CASE("Test that TimeInPattern comparisons work properly.") {
 
     // In C++, if you aggregate-initialize and not fill in all fields,
     // the remainder are set to {} (acts like 0).
@@ -37,20 +39,47 @@ TEST_CASE ("Test that ChannelEvents/std::map<TimeInPattern, ...> treats differen
     fraction_test[1] = 10;
     CHECK(fraction_test.size() == 2);
     CHECK(fraction_test.at({1, 2}) == 5);
+}
 
-    doc::ChannelEvents events;
-    events[{0, 0}] = doc::RowEvent{{}};
-    events[{0, 1}] = doc::RowEvent{1};
-    events[{{1, 3}, 0}] = doc::RowEvent{3};
-    events[{{2, 3}, 0}] = doc::RowEvent{6};
-    events[{1, 0}] = doc::RowEvent{10};
-    events[{2, 0}] = doc::RowEvent{20};
+TEST_CASE ("Test that ChannelEvents and KV search is implemented properly.") {
+    using namespace doc;
+
+    doc::ChannelEvents events = doc::ChannelEvents()
+            .push_back({{0, 0}, {}})
+            .push_back({{0, 1}, {1}})
+            .push_back({{{1, 3}, 0}, {3}})
+            .push_back({{{2, 3}, 0}, {6}})
+            .push_back({{1, 0}, {10}})
+            .push_back({{2, 0}, {20}});
 
     CHECK(events.size() == 6);
-    CHECK(events[{0, 0}] == doc::RowEvent{{}});
-    CHECK(events[{0, 1}] == doc::RowEvent{1});
-    CHECK(events[{{1, 3}, 0}] == doc::RowEvent{3});
-    CHECK(events[{{2, 3}, 0}] == doc::RowEvent{6});
-    CHECK(events[{1, 0}] == doc::RowEvent{10});
-    CHECK(events[{2, 0}] == doc::RowEvent{20});
+
+    doc::KV x{events};
+
+    // CHECK_UNARY provides much better compiler errors than CHECK.
+//#define CHECK CHECK_UNARY
+    CHECK(KV{events}.greater_equal({-1, 0})->time == TimeInPattern{0, 0});
+    CHECK(KV{events}.greater_equal({0, 0})->time == TimeInPattern{0, 0});
+    CHECK(KV{events}.greater_equal({{1, 2}, 0})->time == TimeInPattern{{2, 3}, 0});
+    CHECK(KV{events}.greater_equal({10, 0}) == events.end());
+
+    CHECK(KV{events}.contains_time({0, 0}) == true);
+    CHECK(KV{events}.contains_time({0, 1}) == true);
+    CHECK(KV{events}.contains_time({{1, 3}, 0}) == true);
+    CHECK(KV{events}.contains_time({{2, 3}, 0}) == true);
+    CHECK(KV{events}.contains_time({1, 0}) == true);
+    CHECK(KV{events}.contains_time({2, 0}) == true);
+    CHECK(KV{events}.contains_time({-1, 0}) == false);
+    CHECK(KV{events}.contains_time({{1, 2}, 0}) == false);
+    CHECK(KV{events}.contains_time({10, 0}) == false);
+
+    CHECK(KV{events}.entry({0, 0}) == doc::RowEvent{{}});
+    CHECK(KV{events}.entry({0, 1}) == doc::RowEvent{1});
+    CHECK(KV{events}.entry({{1, 3}, 0}) == doc::RowEvent{3});
+    CHECK(KV{events}.entry({{2, 3}, 0}) == doc::RowEvent{6});
+    CHECK(KV{events}.entry({1, 0}) == doc::RowEvent{10});
+    CHECK(KV{events}.entry({2, 0}) == doc::RowEvent{20});
+    CHECK(KV{events}.entry({-1, 0}) == std::nullopt);
+    CHECK(KV{events}.entry({{1, 2}, 0}) == std::nullopt);
+    CHECK(KV{events}.entry({10, 0}) == std::nullopt);
 }
