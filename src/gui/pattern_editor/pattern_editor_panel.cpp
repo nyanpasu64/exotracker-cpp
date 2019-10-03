@@ -101,7 +101,7 @@ struct Palette {
     QPen note_line_beat{QColor{255, 255, 96}};
 };
 
-Palette palette;
+static Palette palette;
 
 // See document.h for documentation of how patterns work.
 
