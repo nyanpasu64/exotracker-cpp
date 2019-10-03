@@ -12,8 +12,8 @@
 /// Therefore when designing immer::type<Inner>, Inner can be a mutable struct,
 /// std collection, or another immer::type.
 
-#include <immer/array.hpp>
-#include <immer/vector.hpp>
+#include <immer/flex_vector.hpp>
+#include <immer/flex_vector_transient.hpp>
 #include <boost/rational.hpp>
 #include <cstdint>
 #include <compare>
@@ -90,42 +90,72 @@ struct TimedChannelEvent {
     auto operator<=>(TimedChannelEvent const &) const = default;
 };
 
-using ChannelEvents = immer::vector<TimedChannelEvent>;
+using ChannelEvents = immer::flex_vector<TimedChannelEvent>;
 
 /// Wrapper for ChannelEvents (I wish C++ had extension methods),
 /// adding the ability to binary-search and treat it as a map.
-struct KV {
-    ChannelEvents & channel_events;
+template<typename ImmerT>
+//using ImmerT = ChannelEvents::transient_type;
+struct KV_Internal {
+    using This = KV_Internal<ImmerT>;
+//    using This = KV_Internal;
+
+    ImmerT channel_events;
 
 private:
     static bool cmp_less_than(TimedChannelEvent const &a, TimeInPattern const &b) {
         return a.time < b;
     }
 
-public:
-    /// I have no clue what type this returns :(
-    auto greater_equal(TimeInPattern t) {
-        return std::lower_bound(channel_events.begin(), channel_events.end(), t, cmp_less_than);
-    }
-
-    bool contains_time(TimeInPattern t) {
-        // I cannot use std::binary_search,
-        // since it requires that the comparator's arguments have interchangable types.
-        // return std::binary_search(channel_events.begin(), channel_events.end(), t, cmp_less_than);
-
-        auto iter = greater_equal(t);
+    bool iter_matches_time(typename ImmerT::iterator iter, TimeInPattern t) const {
         if (iter == channel_events.end()) return false;
         if (iter->time != t) return false;
         return true;
     }
 
-    std::optional<RowEvent> entry(TimeInPattern t) {
+public:
+    typename ImmerT::iterator greater_equal(TimeInPattern t) const {
+        return std::lower_bound(channel_events.begin(), channel_events.end(), t, cmp_less_than);
+    }
+
+    bool contains_time(TimeInPattern t) const {
+        // I cannot use std::binary_search,
+        // since it requires that the comparator's arguments have interchangable types.
+        return iter_matches_time(greater_equal(t), t);
+    }
+
+    std::optional<RowEvent> get_maybe(TimeInPattern t) const {
         auto iter = greater_equal(t);
-        if (iter == channel_events.end()) return {};
-        if (iter->time != t) return {};
-        return {iter->v};
+        if (iter_matches_time(iter, t)) {
+            return {iter->v};
+        } else {
+            return {};
+        }
+    }
+
+    RowEvent get_or_default(TimeInPattern t) const {
+        auto iter = greater_equal(t);
+        if (iter_matches_time(iter, t)) {
+            return iter->v;
+        } else {
+            return {};
+        }
+    }
+
+    /// Only works with KV, not transient. This is because .insert() is missing on flex_vector_transient.
+    This set_time(TimeInPattern t, RowEvent v) {
+        auto iter = greater_equal(t);
+        TimedChannelEvent timed_v{t, v};
+        if (iter_matches_time(iter, t)) {
+            return This{channel_events.set(iter.index(), timed_v)};
+        } else {
+            return This{channel_events.insert(iter.index(), timed_v)};
+        }
     }
 };
+
+using KV = KV_Internal<ChannelEvents>;
+using KVTransient = KV_Internal<ChannelEvents::transient_type>;
 
 namespace _ChannelId {
 enum ChannelId {

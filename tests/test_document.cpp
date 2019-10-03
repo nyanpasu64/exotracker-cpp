@@ -54,10 +54,8 @@ TEST_CASE ("Test that ChannelEvents and KV search is implemented properly.") {
 
     CHECK(events.size() == 6);
 
-    doc::KV x{events};
-
     // CHECK_UNARY provides much better compiler errors than CHECK.
-//#define CHECK CHECK_UNARY
+#define CHECK CHECK_UNARY
     CHECK(KV{events}.greater_equal({-1, 0})->time == TimeInPattern{0, 0});
     CHECK(KV{events}.greater_equal({0, 0})->time == TimeInPattern{0, 0});
     CHECK(KV{events}.greater_equal({{1, 2}, 0})->time == TimeInPattern{{2, 3}, 0});
@@ -73,13 +71,15 @@ TEST_CASE ("Test that ChannelEvents and KV search is implemented properly.") {
     CHECK(KV{events}.contains_time({{1, 2}, 0}) == false);
     CHECK(KV{events}.contains_time({10, 0}) == false);
 
-    CHECK(KV{events}.entry({0, 0}) == doc::RowEvent{{}});
-    CHECK(KV{events}.entry({0, 1}) == doc::RowEvent{1});
-    CHECK(KV{events}.entry({{1, 3}, 0}) == doc::RowEvent{3});
-    CHECK(KV{events}.entry({{2, 3}, 0}) == doc::RowEvent{6});
-    CHECK(KV{events}.entry({1, 0}) == doc::RowEvent{10});
-    CHECK(KV{events}.entry({2, 0}) == doc::RowEvent{20});
-    CHECK(KV{events}.entry({-1, 0}) == std::nullopt);
-    CHECK(KV{events}.entry({{1, 2}, 0}) == std::nullopt);
-    CHECK(KV{events}.entry({10, 0}) == std::nullopt);
+    CHECK(KV{events}.get_maybe({0, 0}) == doc::RowEvent{{}});
+    CHECK(KV{events}.get_maybe({0, 1}) == doc::RowEvent{1});
+    CHECK(KV{events}.get_maybe({-1, 0}) == std::nullopt);
+    CHECK(KV{events}.get_maybe({{1, 2}, 0}) == std::nullopt);
+    CHECK(KV{events}.get_maybe({10, 0}) == std::nullopt);
+
+    CHECK(KV{events}.get_or_default({0, 0}) == doc::RowEvent{{}});
+    CHECK(KV{events}.get_or_default({0, 1}) == doc::RowEvent{1});
+    CHECK(KV{events}.get_or_default({-1, 0}) == doc::RowEvent{{}});
+    CHECK(KV{events}.get_or_default({{1, 2}, 0}) == doc::RowEvent{{}});
+    CHECK(KV{events}.get_or_default({10, 0}) == doc::RowEvent{{}});
 }

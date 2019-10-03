@@ -33,18 +33,25 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) : QWidget(parent)
     setMinimumSize(128, 320);
     // TimeInPattern, RowEvent
     pattern.nbeats = 4;
+
+    using doc::TimeInPattern;
+    using Frac = doc::BeatFraction;
     {
-        auto & channel = pattern.channels[doc::ChannelId::Test1];
-        channel[doc::TimeInPattern{0, 0}] = doc::RowEvent{0};
-        channel[doc::TimeInPattern{{1, 3}, 0}] = doc::RowEvent{1};
-        channel[doc::TimeInPattern{{2, 3}, 0}] = doc::RowEvent{2};
-        channel[doc::TimeInPattern{1, 0}] = doc::RowEvent{3};
-        channel[doc::TimeInPattern{1 + doc::BeatFraction{1, 4}, 0}] = doc::RowEvent{4};
+        auto & channel_ref = pattern.channels[doc::ChannelId::Test1];
+        channel_ref = doc::KV{channel_ref}
+                .set_time({0, 0}, {0})
+                .set_time({{1, 3}, 0}, {1})
+                .set_time({{2, 3}, 0}, {2})
+                .set_time({1, 0}, {3})
+                .set_time({1 + Frac{1, 4}, 0}, {4})
+                .channel_events;
     }
     {
-        auto & channel = pattern.channels[doc::ChannelId::Test2];
-        channel[doc::TimeInPattern{2, 0}] = doc::RowEvent{102};
-        channel[doc::TimeInPattern{3, 0}] = doc::RowEvent{103};
+        auto & channel_ref = pattern.channels[doc::ChannelId::Test2];
+        channel_ref = doc::KV{channel_ref}
+                .set_time({2, 0}, {102})
+                .set_time({3, 0}, {103})
+                .channel_events;
     }
 
     /* Font */
@@ -217,7 +224,12 @@ void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
         // drawLine() paints the interval [x1, x2]. Subtract 1 so [xleft, xright-1] doesn't enter the next channel.
         xright -= 1;
 
-        for (const auto&[time, row_event]: self.pattern.channels[channel]) {
+        // https://bugs.llvm.org/show_bug.cgi?id=33236
+        // the original C++17 spec broke const struct unpacking.
+        for (const auto & timed_event: self.pattern.channels[channel]) {
+            auto & time = timed_event.time;
+            auto & row_event = timed_event.v;
+
             // Compute where to draw row.
             doc::BeatFraction beat = time.anchor_beat;
             doc::BeatFraction & beats_per_row = self.row_duration_beats;
