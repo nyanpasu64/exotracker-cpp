@@ -1,8 +1,6 @@
-#include "gui/pattern_editor/pattern_editor_panel.h"
-
 #include "main_window.h"
+#include "gui/pattern_editor/pattern_editor_panel.h"
 #include "lib/lightweight.h"
-
 #include "util/macros.h"
 
 #include <verdigris/wobjectimpl.h>
@@ -26,6 +24,8 @@
 #include <QtWidgets/QTextEdit>
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
+
+namespace gui {
 
 using std::unique_ptr;
 using std::make_unique;
@@ -68,3 +68,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {}
+
+// namespace
+}

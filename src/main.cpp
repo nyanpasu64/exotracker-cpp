@@ -10,7 +10,7 @@
 #endif
 
 using std::unique_ptr;
-
+using gui::MainWindow;
 
 #include "win32_fonts.h"
 
