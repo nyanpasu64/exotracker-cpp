@@ -46,8 +46,6 @@ add_library(exotracker-lib
         src/audio/audio.h
         src/audio/output.cpp
         src/audio/output.h
-        src/audio/synth.cpp
-        src/audio/synth.h
         src/document.cpp
         src/document.h
         src/sequencer/sequencer.cpp
