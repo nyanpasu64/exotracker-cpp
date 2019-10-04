@@ -172,6 +172,15 @@ struct TrackPattern {
     std::array<ChannelEvents, ChannelId::COUNT> channels;
 };
 
+///// get_document() must be thread-safe in implementations.
+///// For example, if implemented by DocumentHistory,
+///// get_document() must not return invalid states while undoing/redoing.
+//class GetDocument {
+//public:
+//    virtual ~GetDocument() = default;
+//    virtual TrackPattern const & get_document() const = 0;
+//};
 
-// namespace
+
+// namespace doc
 }

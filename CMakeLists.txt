@@ -73,6 +73,9 @@ target_link_libraries(exotracker-bin PRIVATE exotracker-lib ${portaudio} ${porta
 add_executable(exotracker-tests
         tests/test_runner.cpp
         tests/test_document.cpp
+
+        src/gui/history.cpp
+        src/gui/history.h
         )
 target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests PRIVATE exotracker-lib)

@@ -1,6 +1,7 @@
 #include "gui/main_window.h"
 #include "audio/audio.h"
 #include "audio/output.h"
+#include "gui/document_history.h"
 
 #include <QApplication>
 #include <portaudiocpp/PortAudioCpp.hxx>
@@ -13,6 +14,8 @@ using std::unique_ptr;
 using gui::MainWindow;
 
 #include "win32_fonts.h"
+
+using gui::MainWindow;
 
 int main(int argc, char *argv[])
 {
