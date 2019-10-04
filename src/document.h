@@ -172,6 +172,11 @@ struct TrackPattern {
     std::array<ChannelEvents, ChannelId::COUNT> channels;
 };
 
+using HistoryFrame = TrackPattern;
+
+// Update as we flesh out the data stored in a document.
+using Document = TrackPattern;
+
 ///// get_document() must be thread-safe in implementations.
 ///// For example, if implemented by DocumentHistory,
 ///// get_document() must not return invalid states while undoing/redoing.
