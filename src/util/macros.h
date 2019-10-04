@@ -2,6 +2,7 @@
 
 
 #define mut
+// do NOT #define ref, this will result in mysterious compile errors in #include headers!
 
 #define LOOP(i, n) for (int i = 0; i < n; ++i)
 #define LOOPD(i, n, delta) for (int i = 0; i < n; i += delta)
