@@ -42,14 +42,13 @@ public:
 }   // namespace output
 
 struct AudioThreadHandle {
+    // throws PaException or PaCppException or whatever else
+    AudioThreadHandle(pa::System & sys);
+
     output::OutputCallback callback;
 
     // Holds reference to output, so declared afterwards (destruction is last-to-first).
     std::unique_ptr<pa::Stream> stream; //<pa::NonBlocking, pa::Output<Amplitude>>;
-
-    // impl AudioThreadHandle
-    // throws PaException or PaCppException or whatever else
-    AudioThreadHandle(pa::System & sys);
 };
 
 }   // namespace audio

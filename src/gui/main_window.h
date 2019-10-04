@@ -4,7 +4,6 @@
 #include <verdigris/wobjectdefs.h>
 
 #include <QMainWindow>
-
 #include <memory>
 
 
