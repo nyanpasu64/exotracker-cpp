@@ -23,16 +23,18 @@ struct Success {
 ///
 /// This class is approximately correct at best ;)
 class History : boost::noncopyable {
-private:
+public:
     using UnsyncT = doc::HistoryFrame;
     using BoxT = immer::box<UnsyncT>;
 
+private:
     /// immer::atom<T> stores immer::box<T>, not T. This is why we parameterize with unboxed T.
     immer::atom<UnsyncT> current;
     std::vector<BoxT> undo_stack;
     std::vector<BoxT> redo_stack;
 
 public:
+    History(doc::TrackPattern initial_state);
     virtual ~History() = default;
 
     /// Called from UI or audio thread. Non-blocking and thread-safe.
@@ -56,15 +58,8 @@ public:
     Success redo();
 };
 
-// namespace history
+doc::TrackPattern dummy_pattern();
+
+// namespaces
 }
-
-//class DocumentHistory : public history::History
-////        , doc::GetDocument
-//{
-////    doc::TrackPattern const & get_document() const override {
-////        return get();
-////    }
-//};
-
 }

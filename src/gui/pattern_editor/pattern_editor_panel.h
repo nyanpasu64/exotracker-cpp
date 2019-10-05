@@ -2,6 +2,7 @@
 #define PATTERNEDITORPANEL_H
 
 #include "document.h"
+#include "gui/history.h"
 
 #include <verdigris/wobjectdefs.h>
 
@@ -21,6 +22,7 @@
 #include <QPoint>
 #include <memory>
 #include <vector>
+#include <functional>
 
 
 namespace gui {
@@ -37,8 +39,14 @@ signals:
 public slots:
 
 public:
-    // Pattern state.
-    doc::TrackPattern pattern;
+    // Upon construction, history = dummy_history, until a document is created and assigned.
+    history::History dummy_history;
+
+    /// Stores document and undo/redo history.
+    /// Is read by PatternEditorPanel running in main thread.
+    /// When switching documents, can be reassigned by MainWindow(?) running in main thread.
+    std::reference_wrapper<history::History> history;
+
     doc::BeatFraction row_duration_beats = {1, 4};
     bool is_zoomed = false;
 
@@ -62,8 +70,17 @@ public:
     int volWidth_;
     int effWidth_, effIDWidth_, effValWidth_;
 
-    //    void initDisplay();
-    //    void drawPattern(const QRect& rect);
+    // impl
+
+    /// Called by main function.
+    void set_history(history::History & history) {
+        this->history = history;
+    }
+
+    /// Unsure if useful or not.
+    void unset_history() {
+        this->history = dummy_history;
+    }
 
 protected:
     // overrides QWidget

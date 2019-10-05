@@ -39,10 +39,11 @@ class MainWindowPrivate : public MainWindow {
 public: // module-private
     // widget pointers go here, if needed
 
-    PatternEditorPanel * pattern;
+    PatternEditorPanel * pattern_editor_panel;
 
     MainWindowPrivate(QWidget * parent) : MainWindow(parent) {
         setupUi();
+        pattern_editor_panel->set_history(history);
     }
 
     void _() override {}
@@ -50,7 +51,7 @@ public: // module-private
     void setupUi() {
         auto w = this;
         {add_central_widget_no_layout(PatternEditorPanel(parent));
-            pattern = w;
+            pattern_editor_panel = w;
         }
     }
 };
@@ -63,8 +64,35 @@ std::unique_ptr<MainWindow> MainWindow::make(QWidget * parent) {
 
 
 MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent)
-{}
+    // I kinda regret using the same name for namespace "history" and member variable "history".
+    // But it's only a problem since C++ lacks pervasive `self`.
+    QMainWindow(parent), history{history::dummy_pattern()}
+{
+    doc::TrackPattern pattern;
+
+    pattern.nbeats = 4;
+
+    using Frac = doc::BeatFraction;
+
+    // TimeInPattern, RowEvent
+    {
+        auto & channel_ref = pattern.channels[doc::ChannelId::Test1];
+        channel_ref = doc::KV{channel_ref}
+                .set_time({0, 0}, {0})
+                .set_time({{1, 3}, 0}, {1})
+                .set_time({{2, 3}, 0}, {2})
+                .set_time({1, 0}, {3})
+                .set_time({1 + Frac{1, 4}, 0}, {4})
+                .channel_events;
+    }
+    {
+        auto & channel_ref = pattern.channels[doc::ChannelId::Test2];
+        channel_ref = doc::KV{channel_ref}
+                .set_time({2, 0}, {102})
+                .set_time({3, 0}, {103})
+                .channel_events;
+    }
+}
 
 
 MainWindow::~MainWindow()

@@ -1,7 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "document_history.h"
+#include "history.h"
 #include "document.h"
 
 #include <verdigris/wobjectdefs.h>
@@ -20,7 +20,7 @@ class MainWindow : public QMainWindow
     W_OBJECT(MainWindow);
 
 private:
-//    DocumentHistory document;
+    history::History history;
 
 public:
 

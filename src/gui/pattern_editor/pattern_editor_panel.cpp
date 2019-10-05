@@ -28,31 +28,12 @@ W_OBJECT_IMPL(PatternEditorPanel)
 #define _initDisplay void initDisplay(PatternEditorPanel & self)
 _initDisplay;
 
-PatternEditorPanel::PatternEditorPanel(QWidget *parent) : QWidget(parent)
+PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
+    QWidget(parent),
+    dummy_history{doc::TrackPattern{}},
+    history{dummy_history}
 {
     setMinimumSize(128, 320);
-    // TimeInPattern, RowEvent
-    pattern.nbeats = 4;
-
-    using doc::TimeInPattern;
-    using Frac = doc::BeatFraction;
-    {
-        auto & channel_ref = pattern.channels[doc::ChannelId::Test1];
-        channel_ref = doc::KV{channel_ref}
-                .set_time({0, 0}, {0})
-                .set_time({{1, 3}, 0}, {1})
-                .set_time({{2, 3}, 0}, {2})
-                .set_time({1, 0}, {3})
-                .set_time({1 + Frac{1, 4}, 0}, {4})
-                .channel_events;
-    }
-    {
-        auto & channel_ref = pattern.channels[doc::ChannelId::Test2];
-        channel_ref = doc::KV{channel_ref}
-                .set_time({2, 0}, {102})
-                .set_time({3, 0}, {103})
-                .channel_events;
-    }
 
     /* Font */
     headerFont_ = QApplication::font();
@@ -140,6 +121,8 @@ public:
     }
 };
 
+using history::History;
+
 /// Vertical channel dividers are drawn at fixed locations. Horizontal gridlines and events are not.
 /// So draw horizontal lines after of channel dividers.
 /// This macro prevents horizontal gridlines from covering up channel dividers.
@@ -150,7 +133,7 @@ public:
 #define HORIZ_GRIDLINE(right_top) (right_top)
 
 /// Draw the background lying behind notes/etc.
-void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
+void drawRowBg(PatternEditorPanel & self, History::UnsyncT const &pattern, QPainter & painter) {
     // In Qt, (0, 0) is top-left, dx is right, and dy is down.
 
     // Begin loop(channel)
@@ -167,7 +150,7 @@ void drawRowBg(PatternEditorPanel & self, QPainter & painter) {
         int row = 0;
         doc::BeatFraction curr_beats = 0;
         for (;
-                curr_beats < self.pattern.nbeats;
+                curr_beats < pattern.nbeats;
                 curr_beats += self.row_duration_beats, row += 1)
         {
             // Compute row height.
@@ -215,7 +198,7 @@ inline int round_to_int(rational v)
 }
 
 /// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
-void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
+void drawRowEvents(PatternEditorPanel & self, History::UnsyncT const &pattern, QPainter & painter) {
     // Begin loop(channel)
     for (ChannelDrawIterator it(self); it.has_next();) {
         auto [channel, xleft, xright] = it.next();
@@ -226,7 +209,7 @@ void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
 
         // https://bugs.llvm.org/show_bug.cgi?id=33236
         // the original C++17 spec broke const struct unpacking.
-        for (const auto & timed_event: self.pattern.channels[channel]) {
+        for (const auto & timed_event: pattern.channels[channel]) {
             auto & time = timed_event.time;
             auto & row_event = timed_event.v;
 
@@ -252,6 +235,8 @@ void drawRowEvents(PatternEditorPanel & self, QPainter & painter) {
 void drawPattern(PatternEditorPanel & self, const QRect &rect) {
     // int maxWidth = std::min(geometry().width(), TracksWidthFromLeftToEnd_);
 
+    History::BoxT const pattern = self.history.get().get();
+
     self.pixmap_->fill(Qt::black);
 
     QPainter paintOffScreen(self.pixmap_.get());
@@ -262,8 +247,8 @@ void drawPattern(PatternEditorPanel & self, const QRect &rect) {
     // First draw the row background. It lies in a regular grid.
     // TODO only redraw `rect`??? how 2 partial redraw???
     // i assume Qt will always use full-widget rect???
-    drawRowBg(self, paintOffScreen);
-    drawRowEvents(self, paintOffScreen);
+    drawRowBg(self, *pattern, paintOffScreen);
+    drawRowEvents(self, *pattern, paintOffScreen);
 
     // Then for each channel, draw all notes in that channel lying within view.
     // Notes may be positioned at fractional beats that do not lie in the grid.

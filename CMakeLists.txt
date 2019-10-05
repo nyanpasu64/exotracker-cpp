@@ -60,6 +60,8 @@ target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 # GUI editor, uses Qt
 add_executable(exotracker-bin
         # GUI
+        src/gui/history.cpp
+        src/gui/history.h
         src/gui/lib/lightweight.h
         src/gui/main_window.cpp
         src/gui/main_window.h
