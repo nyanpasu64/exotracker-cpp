@@ -39,7 +39,7 @@ class MainWindowPrivate : public MainWindow {
 public: // module-private
     // widget pointers go here, if needed
 
-    PatternEditorPanel pattern;
+    PatternEditorPanel * pattern;
 
     MainWindowPrivate(QWidget * parent) : MainWindow(parent) {
         setupUi();
@@ -50,6 +50,7 @@ public: // module-private
     void setupUi() {
         auto w = this;
         {add_central_widget_no_layout(PatternEditorPanel(parent));
+            pattern = w;
         }
     }
 };

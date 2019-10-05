@@ -30,7 +30,7 @@ class PatternEditorPanel : public QWidget
 {
     W_OBJECT(PatternEditorPanel)
 public:
-    explicit PatternEditorPanel(QWidget *parent = nullptr);
+    explicit PatternEditorPanel(QWidget *parent);
 
 signals:
 
