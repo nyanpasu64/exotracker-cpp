@@ -52,6 +52,8 @@ add_library(exotracker-lib
         src/document.h
         src/sequencer/sequencer.cpp
         src/sequencer/sequencer.h
+
+        3rdparty/Blip_Buffer/Blip_Buffer.cpp
         )
 target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 
