@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     portaudio::System & sys = portaudio::System::instance();
 
     // Begin playing audio. Destroying this variable makes audio stop.
-    audio::AudioThreadHandle audio_handle{sys};
+    auto audio_handle = audio::AudioThreadHandle::make(sys);
 
     unique_ptr<MainWindow> w = MainWindow::make();
     w->show();

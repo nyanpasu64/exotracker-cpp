@@ -32,6 +32,11 @@ int OutputCallback::paCallbackFun(
 
 }
 
+/// Stream which stops and closes itself when destroyed.
+///
+/// Many classes inherit from pa::CallbackStream. I picked one I like.
+/// InterfaceCallbackStream and MemFunCallbackStream all take function pointers,
+/// there's no static dispatch.
 class SelfTerminatingStream : public pa::InterfaceCallbackStream {
 public:
     using pa::InterfaceCallbackStream::InterfaceCallbackStream;
@@ -50,7 +55,10 @@ public:
 static int const stereo_nchan = 2;
 static uintptr_t const mono_smp_per_block = 64;
 
-AudioThreadHandle::AudioThreadHandle(portaudio::System mut & sys) : callback(stereo_nchan) {
+
+/// Why factory method and not constructor?
+/// So we can calculate values (like sampling rate) used in multiple places.
+AudioThreadHandle AudioThreadHandle::make(portaudio::System mut & sys) {
     portaudio::DirectionSpecificStreamParameters outParams(
                 sys.defaultOutputDevice(),
                 stereo_nchan,
@@ -65,11 +73,19 @@ AudioThreadHandle::AudioThreadHandle(portaudio::System mut & sys) : callback(ste
                 (unsigned long) mono_smp_per_block,
                 paNoFlag);
 
-    // Many classes inherit from pa::CallbackStream. I picked one I like.
-    // InterfaceCallbackStream and MemFunCallbackStream all take function pointers,
-    // there's no static dispatch.
-    stream = std::make_unique<SelfTerminatingStream>(params, callback);
+    // We cannot move/memcpy due to self-reference (stream holds reference to callback).
+    // C++17 guaranteed copy elision only works on prvalues, not locals.
+    // So let constructor initialize fields in-place (our factory method cannot).
+    return AudioThreadHandle{outParams, params};
+}
 
+AudioThreadHandle::AudioThreadHandle(
+        portaudio::DirectionSpecificStreamParameters outParams,
+        portaudio::StreamParameters params
+        ) :
+    callback(outParams.numChannels()),
+    stream(std::make_unique<SelfTerminatingStream>(params, callback))
+{
     stream->start();
 }
 
