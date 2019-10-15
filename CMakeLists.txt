@@ -46,6 +46,7 @@ add_library(exotracker-lib
         src/audio/audio.h
         src/audio/event_queue.cpp
         src/audio/event_queue.h
+        src/audio/make_blip_buffer.cpp
         src/audio/output.cpp
         src/audio/output.h
         src/document.cpp
@@ -75,6 +76,7 @@ target_link_libraries(exotracker-bin PRIVATE exotracker-lib ${portaudio} ${porta
 # Unit tests
 add_executable(exotracker-tests
         tests/run_tests.cpp
+        tests/test_blip_buffer.cpp
         tests/test_document.cpp
         tests/audio/test_event_queue.cpp
 
