@@ -56,6 +56,13 @@ Blip_Buffer::~Blip_Buffer()
 		free( buffer_ );
 }
 
+Blip_Buffer::Blip_Buffer(Blip_Buffer &&other)
+	: Blip_Buffer() // initialize via default constructor, C++11 only
+{
+	memmove(this, &other, sizeof *this);
+	other.buffer_ = nullptr;
+}
+
 Silent_Blip_Buffer::Silent_Blip_Buffer()
 {
 	factor_      = 0;

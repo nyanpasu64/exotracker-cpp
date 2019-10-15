@@ -95,7 +95,7 @@ public:
 	Blip_Buffer();
 	~Blip_Buffer();
 	
-	Blip_Buffer(Blip_Buffer &&) = default;
+	Blip_Buffer(Blip_Buffer &&);
 
 	// Deprecated
 	typedef blip_resampled_time_t resampled_time_t;
