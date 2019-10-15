@@ -47,8 +47,8 @@ public:
     }
 };
 
-int stereo_nchan = 2;
-uintptr_t mono_smp_per_block = 64;
+static int const stereo_nchan = 2;
+static uintptr_t const mono_smp_per_block = 64;
 
 AudioThreadHandle::AudioThreadHandle(portaudio::System mut & sys) : callback(stereo_nchan) {
     portaudio::DirectionSpecificStreamParameters outParams(
