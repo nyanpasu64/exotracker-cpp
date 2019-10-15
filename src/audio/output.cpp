@@ -64,7 +64,6 @@ AudioThreadHandle::AudioThreadHandle(portaudio::System mut & sys) : callback(ste
                 48000.0,
                 (unsigned long) mono_smp_per_block,
                 paNoFlag);
-    auto settings = pa::StreamParameters{};
 
     // Many classes inherit from pa::CallbackStream. I picked one I like.
     // InterfaceCallbackStream and MemFunCallbackStream all take function pointers,
