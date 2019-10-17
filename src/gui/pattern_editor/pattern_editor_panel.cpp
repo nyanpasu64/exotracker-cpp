@@ -109,7 +109,7 @@ public:
     bool has_next() const {
         return channel < doc::ChannelId::COUNT;
     }
-    ChannelDraw next() mut {
+    ChannelDraw next() {
         int xleft = x_accum;
         int dx_width = pattern_editor.dxWidth;
         int xright = xleft + dx_width;

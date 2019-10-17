@@ -58,7 +58,7 @@ static uintptr_t const mono_smp_per_block = 64;
 
 /// Why factory method and not constructor?
 /// So we can calculate values (like sampling rate) used in multiple places.
-AudioThreadHandle AudioThreadHandle::make(portaudio::System mut & sys) {
+AudioThreadHandle AudioThreadHandle::make(portaudio::System & sys) {
     portaudio::DirectionSpecificStreamParameters outParams(
                 sys.defaultOutputDevice(),
                 stereo_nchan,
