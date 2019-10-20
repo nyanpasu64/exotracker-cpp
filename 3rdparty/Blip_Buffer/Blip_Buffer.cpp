@@ -148,26 +148,26 @@ void Blip_Buffer::bass_freq( int freq )
 	bass_shift_ = shift;
 }
 
-void Blip_Buffer::end_frame( blip_time_t t )
+void Blip_Buffer::end_frame( blip_nclock_t t )
 {
 	offset_ += t * factor_;
 	assert( samples_avail() <= (blip_long) buffer_size_ ); // time outside buffer length
 }
 
-void Blip_Buffer::remove_silence( blip_long count )
+void Blip_Buffer::remove_silence( blip_nsamp_t count )
 {
 	assert( count <= samples_avail() ); // tried to remove more samples than available
 	offset_ -= (blip_resampled_time_t) count << BLIP_BUFFER_ACCURACY;
 }
 
-blip_long Blip_Buffer::count_samples( blip_time_t t ) const
+blip_nsamp_t Blip_Buffer::count_samples( blip_nclock_t t ) const
 {
 	blip_ulong last_sample  = resampled_time( t ) >> BLIP_BUFFER_ACCURACY;
 	blip_ulong first_sample = offset_ >> BLIP_BUFFER_ACCURACY;
-	return (blip_long) (last_sample - first_sample);
+	return (blip_nsamp_t) (last_sample - first_sample);
 }
 
-blip_time_t Blip_Buffer::count_clocks( blip_long count ) const
+blip_nclock_t Blip_Buffer::count_clocks( blip_nsamp_t count ) const
 {
 	if ( !factor_ )
 	{
@@ -178,10 +178,10 @@ blip_time_t Blip_Buffer::count_clocks( blip_long count ) const
 	if ( count > buffer_size_ )
 		count = buffer_size_;
 	blip_resampled_time_t time = (blip_resampled_time_t) count << BLIP_BUFFER_ACCURACY;
-	return (blip_time_t) ((time - offset_ + factor_ - 1) / factor_);
+	return (blip_nclock_t) ((time - offset_ + factor_ - 1) / factor_);
 }
 
-void Blip_Buffer::remove_samples( blip_long count )
+void Blip_Buffer::remove_samples( blip_nsamp_t count )
 {
 	if ( count )
 	{
@@ -402,7 +402,7 @@ void Blip_Synth_::volume_unit( double new_unit )
 }
 #endif
 
-blip_long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, blip_long max_samples, int stereo )
+blip_nsamp_t Blip_Buffer::read_samples( blip_amplitude_t* BLIP_RESTRICT out, blip_nsamp_t max_samples, int stereo )
 {
 	blip_long count = samples_avail();
 	if ( count > max_samples )
@@ -418,9 +418,9 @@ blip_long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, blip_long
 			for ( blip_long n = count; n; --n )
 			{
 				blip_long s = BLIP_READER_READ( reader );
-				if ( (blip_sample_t) s != s )
+				if ( (blip_amplitude_t) s != s )
 					s = 0x7FFF - (s >> 24);
-				*out++ = (blip_sample_t) s;
+				*out++ = (blip_amplitude_t) s;
 				BLIP_READER_NEXT( reader, bass );
 			}
 		}
@@ -429,9 +429,9 @@ blip_long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, blip_long
 			for ( blip_long n = count; n; --n )
 			{
 				blip_long s = BLIP_READER_READ( reader );
-				if ( (blip_sample_t) s != s )
+				if ( (blip_amplitude_t) s != s )
 					s = 0x7FFF - (s >> 24);
-				*out = (blip_sample_t) s;
+				*out = (blip_amplitude_t) s;
 				out += 2;
 				BLIP_READER_NEXT( reader, bass );
 			}
@@ -443,7 +443,7 @@ blip_long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, blip_long
 	return count;
 }
 
-void Blip_Buffer::mix_samples( blip_sample_t const* in, blip_long count )
+void Blip_Buffer::mix_samples( blip_amplitude_t const* in, blip_nsamp_t count )
 {
 	if ( buffer_size_ == silent_buf_size )
 	{

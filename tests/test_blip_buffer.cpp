@@ -6,7 +6,7 @@
 
 // buffer to read samples into
 static int const buf_size = 10000;
-static blip_sample_t out_buffer[buf_size];
+static blip_amplitude_t out_buffer[buf_size];
 
 static int const SAMPLES_PER_SEC = 48000;
 static int const CPU_CLK_PER_S = 100'000;
@@ -32,7 +32,7 @@ TEST_CASE("Simple demo of blip_buffer") {
     CHECK(count > 0);
 
     // Assert that the result is not silent.
-    gsl::span<blip_sample_t> out_span{out_buffer, count};
+    gsl::span<blip_amplitude_t> out_span{out_buffer, count};
 
     bool not_silent = false;
     for (auto & amplitude : out_span) {
