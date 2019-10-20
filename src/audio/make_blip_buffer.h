@@ -5,7 +5,7 @@
 
 namespace audio {
 
-Blip_Buffer make_blip_buffer(long smp_per_s, long clk_per_s);
+Blip_Buffer make_blip_buffer(blip_long smp_per_s, blip_long clk_per_s);
 
 // end namespace
 }

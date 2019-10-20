@@ -78,12 +78,12 @@ void Blip_Buffer::clear( int entire_buffer )
 	modified_    = 0;
 	if ( buffer_ )
 	{
-		long count = (entire_buffer ? buffer_size_ : samples_avail());
+		blip_long count = (entire_buffer ? buffer_size_ : samples_avail());
 		memset( buffer_, 0, (count + blip_buffer_extra_) * sizeof (buf_t_) );
 	}
 }
 
-Blip_Buffer::blargg_err_t Blip_Buffer::set_sample_rate( long new_rate, int msec )
+Blip_Buffer::blargg_err_t Blip_Buffer::set_sample_rate( blip_long new_rate, int msec )
 {
 	if ( buffer_size_ == silent_buf_size )
 	{
@@ -92,10 +92,10 @@ Blip_Buffer::blargg_err_t Blip_Buffer::set_sample_rate( long new_rate, int msec 
 	}
 	
 	// start with maximum length that resampled time can represent
-	long new_size = (UINT_MAX >> BLIP_BUFFER_ACCURACY) - blip_buffer_extra_ - 64;
+	blip_long new_size = (UINT_MAX >> BLIP_BUFFER_ACCURACY) - blip_buffer_extra_ - 64;
 	if ( msec != blip_max_length )
 	{
-		long s = (new_rate * (msec + 1) + 999) / 1000;
+		blip_long s = (new_rate * (msec + 1) + 999) / 1000;
 		if ( s < new_size )
 			new_size = s;
 		else
@@ -127,7 +127,7 @@ Blip_Buffer::blargg_err_t Blip_Buffer::set_sample_rate( long new_rate, int msec 
 	return 0; // success
 }
 
-blip_resampled_time_t Blip_Buffer::clock_rate_factor( long rate ) const
+blip_resampled_time_t Blip_Buffer::clock_rate_factor( blip_long rate ) const
 {
 	double ratio = (double) sample_rate_ / rate;
 	blip_long factor = (blip_long) floor( ratio * (1L << BLIP_BUFFER_ACCURACY) + 0.5 );
@@ -142,7 +142,7 @@ void Blip_Buffer::bass_freq( int freq )
 	if ( freq > 0 )
 	{
 		shift = 13;
-		long f = (freq << 16) / sample_rate_;
+		blip_long f = (freq << 16) / sample_rate_;
 		while ( (f >>= 1) && --shift ) { }
 	}
 	bass_shift_ = shift;
@@ -151,23 +151,23 @@ void Blip_Buffer::bass_freq( int freq )
 void Blip_Buffer::end_frame( blip_time_t t )
 {
 	offset_ += t * factor_;
-	assert( samples_avail() <= (long) buffer_size_ ); // time outside buffer length
+	assert( samples_avail() <= (blip_long) buffer_size_ ); // time outside buffer length
 }
 
-void Blip_Buffer::remove_silence( long count )
+void Blip_Buffer::remove_silence( blip_long count )
 {
 	assert( count <= samples_avail() ); // tried to remove more samples than available
 	offset_ -= (blip_resampled_time_t) count << BLIP_BUFFER_ACCURACY;
 }
 
-long Blip_Buffer::count_samples( blip_time_t t ) const
+blip_long Blip_Buffer::count_samples( blip_time_t t ) const
 {
-	unsigned long last_sample  = resampled_time( t ) >> BLIP_BUFFER_ACCURACY;
-	unsigned long first_sample = offset_ >> BLIP_BUFFER_ACCURACY;
-	return (long) (last_sample - first_sample);
+	blip_ulong last_sample  = resampled_time( t ) >> BLIP_BUFFER_ACCURACY;
+	blip_ulong first_sample = offset_ >> BLIP_BUFFER_ACCURACY;
+	return (blip_long) (last_sample - first_sample);
 }
 
-blip_time_t Blip_Buffer::count_clocks( long count ) const
+blip_time_t Blip_Buffer::count_clocks( blip_long count ) const
 {
 	if ( !factor_ )
 	{
@@ -181,14 +181,14 @@ blip_time_t Blip_Buffer::count_clocks( long count ) const
 	return (blip_time_t) ((time - offset_ + factor_ - 1) / factor_);
 }
 
-void Blip_Buffer::remove_samples( long count )
+void Blip_Buffer::remove_samples( blip_long count )
 {
 	if ( count )
 	{
 		remove_silence( count );
 		
 		// copy remaining samples to beginning and clear old samples
-		long remain = samples_avail() + blip_buffer_extra_;
+		blip_long remain = samples_avail() + blip_buffer_extra_;
 		memmove( buffer_, buffer_ + count, remain * sizeof *buffer_ );
 		memset( buffer_ + remain, 0, count * sizeof *buffer_ );
 	}
@@ -294,7 +294,7 @@ void Blip_Synth_::adjust_impulse()
 	for ( int p = blip_res; p-- >= blip_res / 2; )
 	{
 		int p2 = blip_res - 2 - p;
-		long error = kernel_unit;
+		blip_long error = kernel_unit;
 		for ( int i = 1; i < size; i += blip_res )
 		{
 			error -= impulses [i + p ];
@@ -337,7 +337,7 @@ void Blip_Synth_::treble_eq( blip_eq_t const& eq )
 	//double const base_unit = 37888.0; // allows treble to +5 dB
 	double const base_unit = 32768.0; // necessary for blip_unscaled to work
 	double rescale = base_unit / 2 / total;
-	kernel_unit = (long) base_unit;
+	kernel_unit = (blip_long) base_unit;
 	
 	// integrate, first difference, rescale, convert to int
 	double sum = 0.0;
@@ -389,8 +389,8 @@ void Blip_Synth_::volume_unit( double new_unit )
 				
 				// keep values positive to avoid round-towards-zero of sign-preserving
 				// right shift for negative values
-				long offset = 0x8000 + (1 << (shift - 1));
-				long offset2 = 0x8000 >> shift;
+				blip_long offset = 0x8000 + (1 << (shift - 1));
+				blip_long offset2 = 0x8000 >> shift;
 				for ( int i = impulses_size(); i--; )
 					impulses [i] = (short) (((impulses [i] + offset) >> shift) - offset2);
 				adjust_impulse();
@@ -402,9 +402,9 @@ void Blip_Synth_::volume_unit( double new_unit )
 }
 #endif
 
-long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, long max_samples, int stereo )
+blip_long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, blip_long max_samples, int stereo )
 {
-	long count = samples_avail();
+	blip_long count = samples_avail();
 	if ( count > max_samples )
 		count = max_samples;
 	
@@ -443,7 +443,7 @@ long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, long max_sampl
 	return count;
 }
 
-void Blip_Buffer::mix_samples( blip_sample_t const* in, long count )
+void Blip_Buffer::mix_samples( blip_sample_t const* in, blip_long count )
 {
 	if ( buffer_size_ == silent_buf_size )
 	{
