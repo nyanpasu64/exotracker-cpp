@@ -245,8 +245,9 @@ private:
 	typedef short imp_t;
 	imp_t impulses [blip_res * (quality / 2) + 1];
 public:
-	Blip_Synth(Blip_Buffer & b) : impl( impulses, quality ) {
+	Blip_Synth(Blip_Buffer & b, double volume) : impl( impulses, quality ) {
 		output(&b);
+		this->volume(volume);
 	}
 	// Cannot be moved or copied because this struct is self-referencing:
 	// Blip_Synth.(Blip_Synth_ impl).impulses points to Blip_Synth.impulses.

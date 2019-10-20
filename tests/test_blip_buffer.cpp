@@ -16,8 +16,7 @@ static int const CPU_CLK_PER_S = 100'000;
 TEST_CASE("Simple demo of blip_buffer") {
     Blip_Buffer blip = audio::make_blip_buffer(SAMPLES_PER_SEC, CPU_CLK_PER_S);
 
-    MyBlipSynth<16> synth{blip};
-    synth.volume(1.0);
+    MyBlipSynth<16> synth{blip, 1.0};
 
     // Writes to blip.
     // update(time, value). Each synth's times must be in sorted order.
