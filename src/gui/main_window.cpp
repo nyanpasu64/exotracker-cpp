@@ -1,7 +1,6 @@
 #include "main_window.h"
 #include "gui/pattern_editor/pattern_editor_panel.h"
 #include "lib/lightweight.h"
-#include "util/macros.h"
 
 #include <verdigris/wobjectimpl.h>
 

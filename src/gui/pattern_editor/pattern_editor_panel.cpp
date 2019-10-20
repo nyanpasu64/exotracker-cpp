@@ -1,5 +1,4 @@
 #include "pattern_editor_panel.h"
-#include "util/macros.h"
 
 #include <verdigris/wobjectimpl.h>
 
