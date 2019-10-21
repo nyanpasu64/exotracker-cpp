@@ -1,20 +1,23 @@
 #include "audio/make_blip_buffer.h"
 
 #include <doctest.h>
+#include <gsl/span>
 #include <Blip_Buffer/Blip_Buffer.h>
 
 // buffer to read samples into
 static int const buf_size = 10000;
-static blip_sample_t samples [buf_size];
+static blip_sample_t out_buffer[buf_size];
 
 static int const SAMPLES_PER_SEC = 48000;
-static int const CPU_CLK_PER_S = 1'000'000;
+static int const CPU_CLK_PER_S = 100'000;
 
 /// Based off
 /// https://github.com/eriser/blip-buffer/blob/4e55118d026ef38d5eee4cd7ec170726196bc41b/demo/buffering.cpp#L28-L33
 TEST_CASE("Simple demo of blip_buffer") {
     Blip_Buffer blip = audio::make_blip_buffer(SAMPLES_PER_SEC, CPU_CLK_PER_S);
-    Blip_Synth synth = audio::make_blip_synth<16>(blip);
+
+    MyBlipSynth<16> synth{blip};
+    synth.volume(1.0);
 
     // Writes to blip.
     // update(time, value). Each synth's times must be in sorted order.
@@ -26,8 +29,20 @@ TEST_CASE("Simple demo of blip_buffer") {
     blip.end_frame(30);
 
     // Writes to samples[0 : <=buf_size].
-    int count = blip.read_samples(samples, buf_size);
+    int count = blip.read_samples(out_buffer, buf_size);
     CHECK(count > 0);
+
+    // Assert that the result is not silent.
+    gsl::span<blip_sample_t> out_span{out_buffer, count};
+
+    bool not_silent = false;
+    for (auto & amplitude : out_span) {
+        if (amplitude != 0) {
+            not_silent = true;
+            break;
+        }
+    }
+    CHECK_UNARY(not_silent);
 }
 
 /**
@@ -48,6 +63,6 @@ TEST_CASE("Counting cycles to ensure we get a "
     CHECK(blip.samples_avail() == samples_wanted);
 
     // Writes to samples[0 : <=buf_size].
-    int count = blip.read_samples(samples, buf_size);
+    int count = blip.read_samples(out_buffer, buf_size);
     CHECK(count == samples_wanted);
 }

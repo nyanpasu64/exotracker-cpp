@@ -4,6 +4,20 @@
 #ifndef BLIP_BUFFER_H
 #define BLIP_BUFFER_H
 
+// based off Q_DISABLE_COPY and the like.
+
+#define BLIP_DISABLE_COPY(Class) \
+	Class(const Class &) = delete;\
+	Class &operator=(const Class &) = delete;
+
+#define BLIP_DISABLE_MOVE(Class) \
+	Class(Class &&) = delete; \
+	Class &operator=(Class &&) = delete;
+
+#define BLIP_DISABLE_COPY_MOVE(Class) \
+	BLIP_DISABLE_COPY(Class) \
+	BLIP_DISABLE_MOVE(Class)
+
 	// internal
 	#include <limits.h>
 	#if INT_MAX < 0x7FFFFFFF
@@ -231,7 +245,12 @@ private:
 	typedef short imp_t;
 	imp_t impulses [blip_res * (quality / 2) + 1];
 public:
-	Blip_Synth() : impl( impulses, quality ) { }
+	Blip_Synth(Blip_Buffer & b) : impl( impulses, quality ) {
+		output(&b);
+	}
+	// Cannot be moved or copied because this struct is self-referencing:
+	// Blip_Synth.(Blip_Synth_ impl).impulses points to Blip_Synth.impulses.
+	BLIP_DISABLE_COPY_MOVE(Blip_Synth)
 #endif
 };
 
