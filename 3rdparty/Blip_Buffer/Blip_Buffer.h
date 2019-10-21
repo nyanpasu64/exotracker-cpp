@@ -202,11 +202,13 @@ const int blip_high_quality = 16;
 // Range specifies the greatest expected change in amplitude. Calculate it
 // by finding the difference between the maximum and minimum expected
 // amplitudes (max - min).
-template<int quality,int range>
+template<int quality>
 class Blip_Synth {
 public:
 	// Set overall volume of waveform
-	void volume( double v ) { impl.volume_unit( v * (1.0 / (range < 0 ? -range : range)) ); }
+	// The actual output value (assuming no DC removal) is around
+	// (amplitude / range) * volume * 65536.
+	void volume( double v, unsigned int range ) { impl.volume_unit( v / range ); }
 	
 	// Configure low-pass filter (see blip_buffer.txt)
 	void treble_eq( blip_eq_t const& eq )       { impl.treble_eq( eq ); }
@@ -217,13 +219,15 @@ public:
 	
 	// Update amplitude of waveform at given time. Using this requires a separate
 	// Blip_Synth for each waveform.
+	// The actual output value (assuming no DC removal) is around
+	// (amplitude / range) * volume * 65536.
 	void update( blip_nclock_t time, int amplitude );
 
 // Low-level interface
 
 	// Add an amplitude transition of specified delta, optionally into specified buffer
 	// rather than the one set with output(). Delta can be positive or negative.
-	// The actual change in amplitude is delta * (volume / range)
+	// The actual change in amplitude is around (delta / range) * volume * 65536.
 	void offset( blip_nclock_t, int delta, Blip_Buffer* ) const;
 	void offset( blip_nclock_t t, int delta ) const { offset( t, delta, impl.buf ); }
 	
@@ -246,9 +250,9 @@ private:
 	typedef short imp_t;
 	imp_t impulses [blip_res * (quality / 2) + 1];
 public:
-	Blip_Synth(Blip_Buffer & b, double volume) : impl( impulses, quality ) {
+	Blip_Synth(Blip_Buffer & b, double volume, unsigned int range) : impl( impulses, quality ) {
 		output(&b);
-		this->volume(volume);
+		this->volume(volume, range);
 	}
 	// Cannot be moved or copied because this struct is self-referencing:
 	// Blip_Synth.(Blip_Synth_ impl).impulses points to Blip_Synth.impulses.
@@ -356,8 +360,8 @@ private:
 
 #include <assert.h>
 
-template<int quality,int range>
-inline void Blip_Synth<quality,range>::offset_resampled( blip_resampled_time_t time,
+template<int quality>
+inline void Blip_Synth<quality>::offset_resampled( blip_resampled_time_t time,
 		int delta, Blip_Buffer* blip_buf ) const
 {
 	// Fails if time is beyond end of Blip_Buffer, due to a bug in caller code or the
@@ -466,20 +470,20 @@ inline void Blip_Synth<quality,range>::offset_resampled( blip_resampled_time_t t
 #undef BLIP_FWD
 #undef BLIP_REV
 
-template<int quality,int range>
+template<int quality>
 #if BLIP_BUFFER_FAST
 	inline
 #endif
-void Blip_Synth<quality,range>::offset( blip_nclock_t t, int delta, Blip_Buffer* buf ) const
+void Blip_Synth<quality>::offset( blip_nclock_t t, int delta, Blip_Buffer* buf ) const
 {
 	offset_resampled( t * buf->factor_ + buf->offset_, delta, buf );
 }
 
-template<int quality,int range>
+template<int quality>
 #if BLIP_BUFFER_FAST
 	inline
 #endif
-void Blip_Synth<quality,range>::update( blip_nclock_t t, int amp )
+void Blip_Synth<quality>::update( blip_nclock_t t, int amp )
 {
 	int delta = amp - impl.last_amp;
 	impl.last_amp = amp;
