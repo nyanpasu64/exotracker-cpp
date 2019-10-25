@@ -2,19 +2,20 @@
 
 #include "doctest.h"
 
-namespace Event_ {
-enum Event {
+namespace EventEnum_ {
+enum EventEnum {
     EndOfCallback,
     Test1,
     Test2,
     COUNT,
 };
 }
-using Event_::Event;
+using EventEnum_::EventEnum;
 
 
 TEST_CASE("Test that EventQueue is filled with time=NEVER, instead of 0.") {
-    using PQ = audio::EventQueue<Event>;
+    using EventT = EventEnum;
+    using PQ = audio::EventQueue<EventT>;
     PQ pq;
     {
         auto event = pq.next_event();
@@ -25,114 +26,70 @@ TEST_CASE("Test that EventQueue is filled with time=NEVER, instead of 0.") {
 
 
 TEST_CASE("Test enqueueing events at t=0.") {
-    using PQ = audio::EventQueue<Event>;
+    using EventT = EventEnum;
+    using PQ = audio::EventQueue<EventT>;
     PQ pq;
 
-    pq.set_timeout(Event::EndOfCallback, 10);
-    pq.set_timeout(Event::Test1, 30);
+    pq.set_timeout(EventT::EndOfCallback, 10);
+    pq.set_timeout(EventT::Test1, 30);
 
     {
         auto event = pq.next_event();
-        CHECK(event.event_id == Event::EndOfCallback);
+        CHECK(event.event_id == EventT::EndOfCallback);
         CHECK(event.cyc_elapsed == 10);
     }
     {
         auto event = pq.next_event();
-        CHECK(event.event_id == Event::Test1);
+        CHECK(event.event_id == EventT::Test1);
         CHECK(event.cyc_elapsed == 20);
     }
 }
-
-TEST_CASE("Test enqueueing events at t=0 with reset_now().") {
-    using PQ = audio::EventQueue<Event>;
-    PQ pq;
-
-    pq.reset_now();
-    pq.set_timeout(Event::EndOfCallback, 10);
-    pq.set_timeout(Event::Test1, 30);
-
-    {
-        auto event = pq.next_event();
-        CHECK(event.event_id == Event::EndOfCallback);
-        CHECK(event.cyc_elapsed == 10);
-    }
-    pq.reset_now();
-    pq.reset_now();  // This method should be idempotent.
-    {
-        auto event = pq.next_event();
-        CHECK(event.event_id == Event::Test1);
-        CHECK(event.cyc_elapsed == 20);
-    }
-}
-
 
 TEST_CASE("Test enqueueing events later in time.") {
-    using PQ = audio::EventQueue<Event>;
+    using EventT = EventEnum;
+    using PQ = audio::EventQueue<EventT>;
     PQ pq;
 
-    pq.set_timeout(Event::EndOfCallback, 10);
+    pq.set_timeout(EventT::EndOfCallback, 10);
     {
         auto event = pq.next_event();
-        CHECK(event.event_id == Event::EndOfCallback);
+        CHECK(event.event_id == EventT::EndOfCallback);
         CHECK(event.cyc_elapsed == 10);
     }
     // now == 10
-    pq.set_timeout(Event::Test1, 30);
+    pq.set_timeout(EventT::Test1, 30);
     {
         auto event = pq.next_event();
-        CHECK(event.event_id == Event::Test1);
+        CHECK(event.event_id == EventT::Test1);
         CHECK(event.cyc_elapsed == 30);
     }
     // now == 40
 }
 
-TEST_CASE("Test enqueueing events later in time with reset_now().") {
-    using PQ = audio::EventQueue<Event>;
-    PQ pq;
-
-    pq.reset_now();
-    pq.set_timeout(Event::EndOfCallback, 10);
-    {
-        auto event = pq.next_event();
-        CHECK(event.event_id == Event::EndOfCallback);
-        CHECK(event.cyc_elapsed == 10);
-    }
-
-    pq.reset_now();
-    pq.set_timeout(Event::Test1, 30);
-    {
-        auto event = pq.next_event();
-        CHECK(event.event_id == Event::Test1);
-        CHECK(event.cyc_elapsed == 30);
-    }
-}
-
-
 TEST_CASE("Test that identically timed events are dequeued in order of increasing EventID.") {
-    using PQ = audio::EventQueue<Event>;
+    using EventT = EventEnum;
+    using PQ = audio::EventQueue<EventT>;
     PQ pq;
-
-    pq.reset_now();
 
     // Enqueue events out of order.
-    pq.set_timeout(Event::Test2, 10);
-    pq.set_timeout(Event::EndOfCallback, 10);
-    pq.set_timeout(Event::Test1, 10);
+    pq.set_timeout(EventT::Test2, 10);
+    pq.set_timeout(EventT::EndOfCallback, 10);
+    pq.set_timeout(EventT::Test1, 10);
 
     // Assert they're dequeued in increasing order.
     {
         auto event = pq.next_event();
-        CHECK(event.event_id == Event::EndOfCallback);
+        CHECK(event.event_id == EventT::EndOfCallback);
         CHECK(event.cyc_elapsed == 10);
     }
     {
         auto event = pq.next_event();
-        CHECK(event.event_id == Event::Test1);
+        CHECK(event.event_id == EventT::Test1);
         CHECK(event.cyc_elapsed == 0);
     }
     {
         auto event = pq.next_event();
-        CHECK(event.event_id == Event::Test2);
+        CHECK(event.event_id == EventT::Test2);
         CHECK(event.cyc_elapsed == 0);
     }
 }
@@ -146,14 +103,14 @@ enum class EventClass {
 };
 
 TEST_CASE("Test PQ with an enum class.") {
-    using PQ = audio::EventQueue<EventClass>;
+    using EventT = EventClass;
+    using PQ = audio::EventQueue<EventT>;
     PQ pq;
 
-    pq.reset_now();
-    pq.set_timeout(EventClass::EndOfCallback, 10);
+    pq.set_timeout(EventT::EndOfCallback, 10);
     {
         auto event = pq.next_event();
-        CHECK(event.event_id == EventClass::EndOfCallback);
+        CHECK(event.event_id == EventT::EndOfCallback);
         CHECK(event.cyc_elapsed == 10);
     }
 }

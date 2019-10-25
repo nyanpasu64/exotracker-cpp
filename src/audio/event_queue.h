@@ -50,32 +50,16 @@ public:
     // private:
     // Fields
     static CycleT const NEVER = std::numeric_limits<CycleT>::max();
-    CycleT times[EventID::COUNT];   // fill with NEVER
-    CycleT now = 0;
+    CycleT time_until[EventID::COUNT];   // fill with NEVER
 
 public:
     EventQueue() {
-        for (auto & time : times) {
+        for (auto & time : time_until) {
             time = NEVER;
         }
     }
 
     // Methods
-
-    /**
-    Prevents internal integer overflow. Has no other effect, and is idempotent.
-
-    Generally, call this method every time you resume the state machine
-    (AKA when the owner callback is called), before you set timeout for EventID::EndOfCallback.
-    */
-    void reset_now() {
-        for (auto & time_cyc : times) {
-            if (time_cyc != NEVER) {
-                time_cyc -= now;
-            }
-        }
-        now = 0;
-    }
 
     /**
     Schedules an event to happen now (t=0) or in the future.
@@ -85,7 +69,7 @@ public:
     the previous event schedule will be dropped.
     */
     void set_timeout(EventID event_id, CycleT in_how_long) {
-        times[(EventInt) event_id] = now + in_how_long;
+        time_until[(EventInt) event_id] = in_how_long;
     }
 
     // TODO rename set_timeout to queue_event?
@@ -115,21 +99,29 @@ public:
         AbsoluteEvent out;
         {
             EventInt event_id = 0;
-            out = {event_id, times[event_id]};
+            out = {event_id, time_until[event_id]};
         }
 
         for (EventInt event_id = 1; event_id < (EventInt) EventID::COUNT; event_id++) {
-            if (times[event_id] < out.time) {
-                out = {event_id, times[event_id]};
+            if (time_until[event_id] < out.time) {
+                out = {event_id, time_until[event_id]};
             }
         }
 
-        times[out.event_id] = NEVER;
+        time_until[out.event_id] = NEVER;
 
-        CycleT cyc_elapsed = out.time - now;
-        now = out.time;
+        advance_time(out.time);
 
-        return RelativeEvent{(EventID) out.event_id, cyc_elapsed};
+        return RelativeEvent{(EventID) out.event_id, out.time};
+    }
+
+private:
+    inline void advance_time(int dtime) {
+        for (auto & time_cyc : time_until) {
+            if (time_cyc != NEVER) {
+                time_cyc -= dtime;
+            }
+        }
     }
 };
 
