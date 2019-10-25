@@ -46,7 +46,6 @@ add_library(exotracker-lib
         src/audio/audio.h
         src/audio/event_queue.cpp
         src/audio/event_queue.h
-        src/audio/make_blip_buffer.cpp
         src/audio/output.cpp
         src/audio/output.h
         src/document.cpp

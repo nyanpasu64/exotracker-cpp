@@ -16,7 +16,7 @@ static int const BLIP_RANGE = 16;
 /// Based off
 /// https://github.com/eriser/blip-buffer/blob/4e55118d026ef38d5eee4cd7ec170726196bc41b/demo/buffering.cpp#L28-L33
 TEST_CASE("Simple demo of blip_buffer") {
-    Blip_Buffer blip = audio::make_blip_buffer(SAMPLES_PER_SEC, CPU_CLK_PER_S);
+    Blip_Buffer blip{SAMPLES_PER_SEC, CPU_CLK_PER_S};
 
     // The actual output value (assuming no DC removal) is around
     // (amplitude / range) * volume * 65536.
@@ -57,7 +57,7 @@ Still, pass a size limit to `blip.read_samples(samples, buf_size)`.
 */
 TEST_CASE("Counting cycles to ensure we get a "
           "perfectly predictable number of samples out of blip_buffer") {
-    Blip_Buffer blip = audio::make_blip_buffer(SAMPLES_PER_SEC, CPU_CLK_PER_S);
+    Blip_Buffer blip{SAMPLES_PER_SEC, CPU_CLK_PER_S};
 
     int const samples_wanted = 1000;
     int cycles_needed = blip.count_clocks(samples_wanted);

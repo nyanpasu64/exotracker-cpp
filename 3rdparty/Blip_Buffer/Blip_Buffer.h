@@ -106,8 +106,12 @@ public:
 	blip_resampled_time_t resampled_duration( int t ) const     { return t * factor_; }
 	blip_resampled_time_t resampled_time( blip_nclock_t t ) const { return t * factor_ + offset_; }
 	blip_resampled_time_t clock_rate_factor( blip_long clock_rate ) const;
-public:
+
+protected:
 	Blip_Buffer();
+
+public:
+	Blip_Buffer(blip_long smp_per_s, blip_long clk_per_s);
 	~Blip_Buffer();
 	
 	Blip_Buffer(Blip_Buffer &&);

@@ -50,6 +50,11 @@ Blip_Buffer::Blip_Buffer()
 	#endif
 }
 
+Blip_Buffer::Blip_Buffer(blip_long smp_per_s, blip_long clk_per_s) : Blip_Buffer() {
+	set_sample_rate(smp_per_s);
+	clock_rate(clk_per_s);
+}
+
 Blip_Buffer::~Blip_Buffer()
 {
 	if ( buffer_size_ != silent_buf_size )
