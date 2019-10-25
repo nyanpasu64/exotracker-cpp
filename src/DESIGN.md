@@ -29,7 +29,7 @@ The sequencer is implemented in C++, and converts pattern data from "events plac
 
 The audio driver is called once per tick. It handles events from the sequencer, as well as volume envelopes and vibrato. It generates register writes once per tick (possibly with delays between channels). It will be implemented separately in C++ and NSF export.
 
-The sound-chip emulator (`ChipSynth` subclasses) can be run for specific periods of time (nclocks). When suspended between emulation calls, they can accept register writes. Each sound chip (not channel) receives its own `ChipSynth`. Separate chips are mixed linearly (addition or weighted average), while each chip can perform nonlinear/arbitrary mixing of its channels. Sound chips can produce output by either writing to `OverallSynth.nes_blip` (type: `Blip_Buffer`), or writing to an audio buffer. This will not be implemented in NSF export (since it's handled by hardware or the NSF player/emulator).
+The sound-chip emulator (`NesChipSynth` subclasses) can be run for specific periods of time (nclocks). When suspended between emulation calls, they can accept register writes. Each sound chip (not channel) receives its own `NesChipSynth`. Separate chips are mixed linearly (addition or weighted average), while each chip can perform nonlinear/arbitrary mixing of its channels. Sound chips can produce output by either writing to `OverallSynth.nes_blip` (type: `Blip_Buffer`), or writing to an audio buffer. This will not be implemented in NSF export (since it's handled by hardware or the NSF player/emulator).
 
 - ~~Due to the design of emu2413, VRC7 may be run for specific number of samples, not clocks.~~ (unsure)
 
