@@ -41,7 +41,7 @@ private:
 
     In OpenMPT, ticks/s can change within a song, so it would need to be a method.
     */
-    uint32_t _cycles_per_tick = CPU_CYC_PER_S / TICKS_PER_S;
+    uint32_t _clocks_per_tick = CPU_CLK_PER_S / TICKS_PER_S;
 
     EventQueue<SynthEvent> _pq;
 
@@ -61,7 +61,7 @@ public:
 
     OverallSynth(int stereo_nchan, int smp_per_s) :
         _stereo_nchan(stereo_nchan),
-        _nes_blip(smp_per_s, CPU_CYC_PER_S)
+        _nes_blip(smp_per_s, CPU_CLK_PER_S)
     {
         _chip_active[ChipID::Nes2A03] = true;
         _chip_synths[ChipID::Nes2A03] = std::make_unique<nes_2a03::Nes2A03Synth>(_nes_blip);

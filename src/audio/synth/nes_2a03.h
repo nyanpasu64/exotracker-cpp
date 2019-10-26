@@ -12,8 +12,8 @@ public:
     explicit Nes2A03Synth(Blip_Buffer & blip) {}
 
     // impl NesChipSynth
-    SynthResult synthesize_chip_cycles(
-            CycleT ncyc, gsl::span<Amplitude> write_buffer
+    SynthResult synthesize_chip_clocks(
+            ClockT nclk, gsl::span<Amplitude> write_buffer
             ) override;
 };
 

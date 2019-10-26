@@ -18,7 +18,7 @@ namespace synth {
 // Except 2A03 APU operates off CPU clock (master clock / 12 if NTSC).
 // https://wiki.nesdev.com/w/index.php/FDS_audio
 // FDS also operates off CPU clock, despite 0CC storing master clock in a constant.
-int const CPU_CYC_PER_S = 1'786'830;
+int const CPU_CLK_PER_S = 1'786'830;
 
 // NTSC is approximately 60 fps.
 int const TICKS_PER_S = 60;
@@ -35,7 +35,7 @@ enum ChipID {
 using ChipID_::ChipID;
 
 /// This type is used widely, so import to audio::synth.
-using event_queue::CycleT;
+using event_queue::ClockT;
 
 // Unused
 template<typename T>
@@ -59,8 +59,8 @@ public:
     /// (if they have a Blip_Synth with a mutable aliased reference to Blip_Buffer).
     /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
     /// The FDS will instead write lowpassed audio to write_buffer.
-    virtual SynthResult synthesize_chip_cycles(
-            CycleT ncyc, gsl::span<Amplitude> write_buffer
+    virtual SynthResult synthesize_chip_clocks(
+            ClockT nclk, gsl::span<Amplitude> write_buffer
             ) = 0;
 };
 

@@ -20,7 +20,7 @@ TEST_CASE("Test that EventQueue is filled with time=NEVER, instead of 0.") {
     {
         auto event = pq.next_event();
         CHECK(event.event_id == 0);
-        CHECK(event.cyc_elapsed == PQ::NEVER);
+        CHECK(event.clk_elapsed == PQ::NEVER);
     }
 }
 
@@ -36,12 +36,12 @@ TEST_CASE("Test enqueueing events at t=0.") {
     {
         auto event = pq.next_event();
         CHECK(event.event_id == EventT::EndOfCallback);
-        CHECK(event.cyc_elapsed == 10);
+        CHECK(event.clk_elapsed == 10);
     }
     {
         auto event = pq.next_event();
         CHECK(event.event_id == EventT::Test1);
-        CHECK(event.cyc_elapsed == 20);
+        CHECK(event.clk_elapsed == 20);
     }
 }
 
@@ -54,14 +54,14 @@ TEST_CASE("Test enqueueing events later in time.") {
     {
         auto event = pq.next_event();
         CHECK(event.event_id == EventT::EndOfCallback);
-        CHECK(event.cyc_elapsed == 10);
+        CHECK(event.clk_elapsed == 10);
     }
     // now == 10
     pq.set_timeout(EventT::Test1, 30);
     {
         auto event = pq.next_event();
         CHECK(event.event_id == EventT::Test1);
-        CHECK(event.cyc_elapsed == 30);
+        CHECK(event.clk_elapsed == 30);
     }
     // now == 40
 }
@@ -80,17 +80,17 @@ TEST_CASE("Test that identically timed events are dequeued in order of increasin
     {
         auto event = pq.next_event();
         CHECK(event.event_id == EventT::EndOfCallback);
-        CHECK(event.cyc_elapsed == 10);
+        CHECK(event.clk_elapsed == 10);
     }
     {
         auto event = pq.next_event();
         CHECK(event.event_id == EventT::Test1);
-        CHECK(event.cyc_elapsed == 0);
+        CHECK(event.clk_elapsed == 0);
     }
     {
         auto event = pq.next_event();
         CHECK(event.event_id == EventT::Test2);
-        CHECK(event.cyc_elapsed == 0);
+        CHECK(event.clk_elapsed == 0);
     }
 }
 
@@ -111,6 +111,6 @@ TEST_CASE("Test PQ with an enum class.") {
     {
         auto event = pq.next_event();
         CHECK(event.event_id == EventT::EndOfCallback);
-        CHECK(event.cyc_elapsed == 10);
+        CHECK(event.clk_elapsed == 10);
     }
 }
