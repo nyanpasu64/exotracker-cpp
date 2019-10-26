@@ -41,6 +41,8 @@ add_compile_definitions(_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 
 # Core library, does not use Qt
 add_library(exotracker-lib
+        ## Audio
+
         # Library (widely used, uncoupled)
         3rdparty/Blip_Buffer/Blip_Buffer.cpp
         src/audio/event_queue.cpp
@@ -52,6 +54,10 @@ add_library(exotracker-lib
         # Implementation files
         src/audio/output.cpp
         src/audio/synth.cpp
+
+        # (2A03 chip synth core)
+        3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
+        3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
         src/audio/synth/nes_2a03.cpp
 
         # Etc.
