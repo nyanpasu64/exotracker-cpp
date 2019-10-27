@@ -1,6 +1,8 @@
 ## Building
 
-CMake.
+This project is built using CMake.
+
+At the moment, this project does not build on compilers other than MSVC 2019, because of the use of C++20 features. In particular, the spaceship operator `<=>` and `= default` are not implemented in other compilers. This issue should resolve itself when C++20 support lands in GCC and Clang.
 
 ### Build Dependencies
 
