@@ -53,7 +53,7 @@ public:
     // private:
     // Fields
     static ClockT const NEVER = std::numeric_limits<ClockT>::max();
-    ClockT time_until[EventID::COUNT];   // fill with NEVER
+    ClockT time_until[(size_t) EventID::COUNT];   // fill with NEVER
 
 public:
     EventQueue() {
