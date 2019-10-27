@@ -52,6 +52,8 @@ add_library(exotracker-lib
         src/document.h
         src/sequencer/sequencer.cpp
         src/sequencer/sequencer.h
+
+        3rdparty/Blip_Buffer/Blip_Buffer.cpp
         )
 target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 
@@ -73,6 +75,7 @@ target_link_libraries(exotracker-bin PRIVATE exotracker-lib ${portaudio} ${porta
 # Unit tests
 add_executable(exotracker-tests
         tests/run_tests.cpp
+        tests/test_blip_buffer.cpp
         tests/test_document.cpp
         tests/audio/test_event_queue.cpp
 
