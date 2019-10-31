@@ -72,3 +72,15 @@ and
 ----
 
 Includes will be ordered from most coupled to least coupled. This ensures that tightly coupled headers don't depend on incidental dependencies.
+
+## Dependencies (3rdparty)
+
+Dependencies may originate from Git repositories (either release/tag, or master), or release tarballs.
+
+To import dependencies from Git repositories, follow the tutorial at https://www.atlassian.com/git/tutorials/git-subtree , under heading "Adding the sub-project as a remote".
+
+```sh
+git subtree [add|pull] --prefix folder_to_create \
+    remote_or_url branch_or_commit \
+    --squash
+```
