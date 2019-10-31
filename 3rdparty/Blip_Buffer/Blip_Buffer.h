@@ -151,16 +151,12 @@ private:
 	#define BLIP_BUFFER_ACCURACY 16
 #endif
 
-// Number bits in phase offset. Fewer than 6 bits (64 phase offsets) results in
-// noticeable broadband noise when synthesizing high frequency square waves.
+// Number bits in phase offset.
+// Fewer than 10 bits (1024 phase offsets) results in
+// aliasing visible on Audacity's spectrum viewer,
+// when synthesizing high-frequency NES triangle or VRC6 pulse waves.
 // Affects size of Blip_Synth objects since they store the waveform directly.
-#ifndef BLIP_PHASE_BITS
-	#if BLIP_BUFFER_FAST
-		#define BLIP_PHASE_BITS 8
-	#else
-		#define BLIP_PHASE_BITS 6
-	#endif
-#endif
+#define BLIP_PHASE_BITS 10
 
 	// Internal
 	typedef blip_ulong blip_resampled_time_t;
