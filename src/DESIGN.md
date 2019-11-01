@@ -1,5 +1,7 @@
 ## Code architecture
 
+I have a [Google Drive folder of design notes](https://drive.google.com/drive/u/0/folders/15A1Td92HofO7KQ62QtuEDSmd4X1KKPAZ).
+
 Code is stored in src/, dependencies in 3rdparty/.
 
 ~~Some classes may have member variables prefixed with a single underscore, like `_var`, to distinguish from locals.~~ (to be decided)
