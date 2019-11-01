@@ -20,7 +20,7 @@ TEST_CASE("Simple demo of blip_buffer") {
 
     // The actual output value (assuming no DC removal) is around
     // (amplitude / range) * volume * 65536.
-    MyBlipSynth synth{blip, VOLUME, BLIP_RANGE};
+    MyBlipSynth synth{blip, BLIP_RANGE, VOLUME};
 
     // Writes to blip.
     // update(time, value). Each synth's times must be in sorted order.

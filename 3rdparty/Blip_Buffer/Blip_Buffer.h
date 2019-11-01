@@ -250,7 +250,10 @@ private:
 	typedef short imp_t;
 	imp_t impulses [blip_res * (quality / 2) + 1];
 public:
-	Blip_Synth(Blip_Buffer & b, double volume, unsigned int range) : impl( impulses, quality ) {
+	// When update(...Amplitude) is called,
+	// the actual output value (assuming no DC removal) is around
+	// (Amplitude / range) * volume * 65536.
+	Blip_Synth(Blip_Buffer & b, unsigned int range, double volume) : impl( impulses, quality ) {
 		output(&b);
 		this->volume(volume, range);
 	}
