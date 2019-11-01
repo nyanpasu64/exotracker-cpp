@@ -30,3 +30,45 @@ The audio driver is called once per tick. It handles events from the sequencer, 
 The sound-chip emulator (`ChipSynth` subclasses) can be run for specific periods of time (nclocks). When suspended between emulation calls, they can accept register writes. Each sound chip (not channel) receives its own `ChipSynth`. Separate chips are mixed linearly (addition or weighted average), while each chip can perform nonlinear/arbitrary mixing of its channels. Sound chips can produce output by either writing to `OverallSynth.nes_blip` (type: `Blip_Buffer`), or writing to an audio buffer. This will not be implemented in NSF export (since it's handled by hardware or the NSF player/emulator).
 
 - ~~Due to the design of emu2413, VRC7 may be run for specific number of samples, not clocks.~~ (unsure)
+
+## Rules for avoiding circular header inclusion
+
+C++ headers malfunction when there is a `#include` cycle. I have designed some rules to prevent inclusion cycles (ensure topological sortability).
+
+Abstract files (in order from common to derived). Each file can include all files listed above.
+
+- ../*_common.h
+- ./general_common.h
+    - External libraries: none
+- ./specific_common.h
+    - External libraries: specific -related libraries
+- ./specific/nested_common.h, if used
+- ./specific/nested.h
+- ./specific.h (public interface of . folder)
+- ./general.h, if used
+- ../app.cpp will interface mostly with ./specific.h (a public interface). I should try C++ modules.
+
+----
+
+Concrete files in the "audio" folder (in order from common to derived). Each file can include all files listed above.
+
+- audio_common.h (general audio types and functions, like Amplitude = s16)
+- output.h
+    - Depends on output-related libraries (portaudio).
+- Application code depends on output.h.
+
+and
+
+- audio_common.h
+- synth_common.h
+    - Depends on synth-related libraries (blip_buf).
+- synth/Nes2A03Synth.h
+    - class audio::synth::Nes2A03Synth
+- synth.h
+- Application code depends on synth.h.
+
+(There is an inconsistency where I place audio/audio_common.h within audio/, but audio/synth.h outside audio/synth/. This inconsistency is unfortunate, but I do not plan to change this.)
+
+----
+
+Includes will be ordered from most coupled to least coupled. This ensures that tightly coupled headers don't depend on incidental dependencies.
