@@ -3,6 +3,8 @@
 #include "audio_common.h"
 
 #include <gsl/gsl>
+#include <cstdint>
+#include <type_traits>
 
 namespace audio {
 namespace output {
@@ -42,6 +44,11 @@ public:
         } catch (...) {}
     }
 };
+
+// When changing the output sample format,
+// be sure to change Amplitude (audio_common.h) and AmplitudeFmt at the same time!
+static_assert(std::is_same_v<Amplitude, int16_t>);
+const auto AmplitudeFmt = portaudio::SampleDataFormat::INT16;
 
 static int const stereo_nchan = 1;
 static uintptr_t const mono_smp_per_block = 64;

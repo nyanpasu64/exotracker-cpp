@@ -20,10 +20,6 @@ namespace output {
 
 namespace pa = portaudio;
 
-// Const variables have internal linkage, unless explicitly declared extern.
-// So this won't be defined multiple times, even if I omit static.
-const auto AmplitudeFmt = portaudio::SampleDataFormat::INT16;
-
 /// I may extract a class Synth,
 /// and change OutputCallback to PortAudioCallback (a thin wrapper around Synth).
 /// I'll only do that once I have multiple API consumers
