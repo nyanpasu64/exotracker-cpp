@@ -2,6 +2,15 @@
 #define _DEBUGOUT_H_
 
 #ifdef _MSC_VER
+
+// windows.h is evil.
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif // WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif // NOMINMAX
+
 #include <crtdbg.h>
 #define _CRTDBG_MAP_ALLOC
 #include <windows.h>
