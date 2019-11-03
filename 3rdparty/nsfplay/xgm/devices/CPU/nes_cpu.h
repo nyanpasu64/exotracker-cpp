@@ -11,61 +11,31 @@
 #define External __inline
 #include "km6502/km6502m.h"
 
-#include "../misc/log_cpu.h"
-
 namespace xgm
 {
 
-class NSF2_IRQ; // forward declaration
-
-class NES_CPU : public IDevice
+/// Class NES_CPU has been stubbed out in exotracker (compared to nsfplay).
+/// This is because exotracker does not emulate the NES 6502 CPU,
+/// but (like Famitracker) implements sound driver logic (generates register writes)
+/// using C++ host code.
+///
+/// Not emulating a 6502 may reduce host CPU usage compared to nsfplay.
+///
+/// Stubbing out the NES CPU reduces exotracker's dependencies on nsfplay,
+/// simplifies exotracker code, and makes compiliation faster.
+///
+/// But it's difficult to delete NES_CPU
+/// because NES_DMC and NES_MMC5 each hold a pointer to it.
+///
+/// - NES_DMC tells NES_CPU to delay reads, which is inconsequential.
+/// - NES_MMC5 depends on NES_CPU::Read() for PCM playback
+///   which FamiTracker does not support, and I may not either.
+///   I may eventually edit NES_MMC5 to remove PCM playback
+///   and not call NES_CPU::Read().
+class NES_CPU
 {
-protected:
-  int init_addr;
-  int play_addr;
-  int song;
-  int region;
-  K6502_Context context;
-  bool breaked;
-  INT64 fclocks_per_frame; // fCPU clocks per frame timer with fixed point precision
-  INT64 fclocks_left_in_frame;
-  UINT32 breakpoint;
-  UINT32 irqs;
-  unsigned int stolen_cycles;
-  bool enable_irq;
-  bool enable_nmi;
-  bool extra_init;
-  bool nmi_play;
-  bool play_ready;
-  IDevice *bus;
-  UINT8 nsf2_bits;
-  NSF2_IRQ* nsf2_irq;
-  CPULogger *log_cpu;
-
-  void run_from (UINT32 address);
-
 public:
-  double nes_basecycles;
-  NES_CPU (double clock = DEFAULT_CLOCK);
-  ~NES_CPU ();
-  void Reset ();
-  void Start (
-    int init_addr_,
-    int play_addr_,
-    double play_rate,
-    int song_,
-    int region_,
-    UINT8 nsf2_bits_,
-    bool enable_irq_,
-    NSF2_IRQ* nsf2_irq_);
-  int Exec (int clock); // returns number of clocks executed
-  void SetMemory (IDevice *);
-  bool Read (UINT32 adr, UINT32 & val, UINT32 id=0);
-  bool Write (UINT32 adr, UINT32 val, UINT32 id=0);
-  void SetLogger (CPULogger *logger);
-  unsigned int GetPC() const;
-  void StealCycles(unsigned int cycles);
-  void EnableNMI(bool enable);
+  void StealCycles(unsigned int cycles) {}
 
   // IRQ devices
   enum {
@@ -74,7 +44,7 @@ public:
     IRQD_NSF2 = 2,
 	IRQD_COUNT
   };
-  void UpdateIRQ(int device, bool on);
+  void UpdateIRQ(int device, bool on) {}
 };
 
 } // namespace xgm
