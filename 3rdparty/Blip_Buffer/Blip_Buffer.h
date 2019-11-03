@@ -489,8 +489,14 @@ template<int quality>
 void Blip_Synth<quality>::update( blip_nclock_t t, int amp )
 {
     int delta = amp - impl.last_amp;
-    impl.last_amp = amp;
-    offset_resampled( t * impl.buf->factor_ + impl.buf->offset_, delta, impl.buf );
+
+    // nsfplay generates a new amplitude every clock.
+    // Usually it's the same as the previous one.
+    // If so, skip the slow synthesis process.
+    if (delta != 0) {
+        impl.last_amp = amp;
+        offset_resampled( t * impl.buf->factor_ + impl.buf->offset_, delta, impl.buf );
+    }
 }
 
 inline blip_eq_t::blip_eq_t( double t ) :
