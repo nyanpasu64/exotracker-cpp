@@ -1,41 +1,31 @@
 #pragma once
 
-#include "audio.h"
-//#include "document.h"
+/// Sends audio to computer speakers.
+///
+/// Synth code generates audio whenever the output callback runs.
+/// It does not operate independently.
 
+#include "synth.h"
+#include "util/macros.h"
+
+#include <Blip_Buffer/Blip_Buffer.h>
 #include <portaudiocpp/PortAudioCpp.hxx>
-#include <gsl/gsl>
 
 #include <random>
 #include <limits>
 #include <iostream>
-
-#define Q_DISABLE_COPY(Class) \
-    Class(const Class &) = delete;\
-    Class &operator=(const Class &) = delete;
-
-#define Q_DISABLE_MOVE(Class) \
-    Class(Class &&) = delete; \
-    Class &operator=(Class &&) = delete;
-
-#define Q_DISABLE_COPY_MOVE(Class) \
-    Q_DISABLE_COPY(Class) \
-    Q_DISABLE_MOVE(Class)
 
 namespace audio {
 namespace output {
 
 namespace pa = portaudio;
 
+/// I may extract a class Synth,
+/// and change OutputCallback to PortAudioCallback (a thin wrapper around Synth).
+/// I'll only do that once I have multiple API consumers
+/// (PortAudio, RtAudio, or WAV export) and can design a good API for all of them.
 class OutputCallback : public pa::CallbackInterface {
-
-    int stereo_nchan;
-
-    std::default_random_engine generator;
-    std::uniform_int_distribution<Amplitude> distribution{
-        -std::numeric_limits<Amplitude>::max(),
-        std::numeric_limits<Amplitude>::max()
-    };
+    synth::OverallSynth synth;
 
 public:
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
@@ -43,7 +33,9 @@ public:
     // interleaved=false was added to support ASIO's native representation.
     static const bool interleaved = true;
 
-    explicit OutputCallback(int stereo_nchan) : stereo_nchan(stereo_nchan) {}
+    OutputCallback(int stereo_nchan, int smp_per_s) :
+        synth{stereo_nchan, smp_per_s}
+    {}
 
     // impl pa::CallbackInterface
 
@@ -52,7 +44,6 @@ public:
                       const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags) override;
 
 };
-}   // namespace output
 
 // Maybe the AudioThreadHandle should only be possible to return a unique_ptr.
 // Then we hold a SelfTerminatingStream by value, not unique_ptr.
@@ -76,7 +67,7 @@ private:
     But to reduce latency, I synthesize audio within the output callback (like OpenMPT).
     Which causes self-reference, so this struct cannot be moved.
     */
-    Q_DISABLE_COPY_MOVE(AudioThreadHandle)
+    DISABLE_COPY_MOVE(AudioThreadHandle)
 
     AudioThreadHandle(
             portaudio::DirectionSpecificStreamParameters outParams,
@@ -84,4 +75,5 @@ private:
             );
 };
 
+}   // namespace output
 }   // namespace audio

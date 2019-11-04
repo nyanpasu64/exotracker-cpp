@@ -1,5 +1,4 @@
 #include "gui/main_window.h"
-#include "audio/audio.h"
 #include "audio/output.h"
 #include "gui/document_history.h"
 
@@ -29,7 +28,7 @@ int main(int argc, char *argv[])
     portaudio::System & sys = portaudio::System::instance();
 
     // Begin playing audio. Destroying this variable makes audio stop.
-    auto audio_handle = audio::AudioThreadHandle::make(sys);
+    auto audio_handle = audio::output::AudioThreadHandle::make(sys);
 
     unique_ptr<MainWindow> w = MainWindow::make();
     w->show();

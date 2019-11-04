@@ -41,19 +41,22 @@ add_compile_definitions(_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 
 # Core library, does not use Qt
 add_library(exotracker-lib
-        # Library
-        src/audio/audio.cpp
-        src/audio/audio.h
-        src/audio/event_queue.cpp
-        src/audio/event_queue.h
-        src/audio/output.cpp
-        src/audio/output.h
-        src/document.cpp
-        src/document.h
-        src/sequencer/sequencer.cpp
-        src/sequencer/sequencer.h
-
+        # Library (widely used, uncoupled)
         3rdparty/Blip_Buffer/Blip_Buffer.cpp
+        src/audio/event_queue.cpp
+
+        # Common files (tightly coupled)
+        src/audio/audio_common.cpp
+        src/audio/synth_common.cpp
+
+        # Implementation files
+        src/audio/output.cpp
+        src/audio/synth.cpp
+        src/audio/synth/nes_2a03.cpp
+
+        # Etc.
+        src/document.cpp
+        src/sequencer/sequencer.cpp
         )
 target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 

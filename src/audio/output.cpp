@@ -1,5 +1,11 @@
 #include "output.h"
 
+#include "audio_common.h"
+
+#include <gsl/gsl>
+#include <cstdint>
+#include <type_traits>
+
 namespace audio {
 namespace output {
 
@@ -11,25 +17,12 @@ int OutputCallback::paCallbackFun(
         PaStreamCallbackFlags statusFlags
         ) {
     // Convert output buffer from raw pointer into GSL span.
-    std::ptrdiff_t stereo_smp_per_block = stereo_nchan * mono_smp_per_block;
+    std::ptrdiff_t stereo_smp_per_block = synth._stereo_nchan * mono_smp_per_block;
     gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
 
-    // Silence output buffer.
-    for (Amplitude & y : output) y = 0;
-
-    // Add mono noise.
-    for (ptrdiff_t x = 0; x + stereo_nchan <= output.size(); x += stereo_nchan) {
-        auto chan_y = output.subspan(x, stereo_nchan);
-
-        Amplitude rand_y = this->distribution(this->generator);
-        for (Amplitude & y : chan_y) {
-            y += rand_y / 3;
-        }
-    }
+    synth.synthesize_overall(output, mono_smp_per_block);
 
     return PaStreamCallbackResult::paContinue;
-}
-
 }
 
 /// Stream which stops and closes itself when destroyed.
@@ -52,7 +45,12 @@ public:
     }
 };
 
-static int const stereo_nchan = 2;
+// When changing the output sample format,
+// be sure to change Amplitude (audio_common.h) and AmplitudeFmt at the same time!
+static_assert(std::is_same_v<Amplitude, int16_t>);
+const auto AmplitudeFmt = portaudio::SampleDataFormat::INT16;
+
+static int const stereo_nchan = 1;
 static uintptr_t const mono_smp_per_block = 64;
 
 
@@ -83,10 +81,12 @@ AudioThreadHandle::AudioThreadHandle(
         portaudio::DirectionSpecificStreamParameters outParams,
         portaudio::StreamParameters params
         ) :
-    callback(outParams.numChannels()),
+    callback(outParams.numChannels(), (int)params.sampleRate()),
     stream(std::make_unique<SelfTerminatingStream>(params, callback))
 {
     stream->start();
 }
 
+// end namespaces
+}
 }
