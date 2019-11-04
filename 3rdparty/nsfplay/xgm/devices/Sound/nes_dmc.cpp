@@ -79,7 +79,7 @@ namespace xgm
       trkinfo[1].volume = noise_volume+(envelope_disable?0:0x10)+(envelope_loop?0x20:0);
       trkinfo[1].key = length_counter[1]>0 && enable[1] &&
                        (envelope_disable ? (noise_volume>0) : (envelope_counter>0));
-      trkinfo[1]._freq = reg[0x400e-0x4008]&0xF;
+      trkinfo[1]._freq = reg[0x400e - 0x4008]&0xF;
       trkinfo[1].freq = clock/double(wavlen_table[pal][trkinfo[1]._freq] * ((noise_tap&(1<<6)) ? 93 : 1));
       trkinfo[1].tone = noise_tap & (1<<6);
       trkinfo[1].output = out[1];

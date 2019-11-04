@@ -26,7 +26,7 @@ Nes2A03Synth::Nes2A03Synth(Blip_Buffer &blip) :
 NesChipSynth::SynthResult Nes2A03Synth::synthesize_chip_clocks(
         ClockT nclk, gsl::span<Amplitude> write_buffer
         ) {
-    std::array<INT32, 2> stereo_out;
+    std::array<xgm::INT32, 2> stereo_out;
 
     // Will running apu1 and apu2 in separate loops improve locality of reference?
     for (ClockT clock = 0; clock < nclk; clock++) {

@@ -9,7 +9,6 @@
 #define USE_INLINEMMC 0
 #define USE_USERPOINTER	1
 #define External __inline
-#include "km6502/km6502m.h"
 
 namespace xgm
 {
