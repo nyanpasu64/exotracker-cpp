@@ -79,10 +79,16 @@ Includes will be ordered from most coupled to least coupled. This ensures that t
 
 Dependencies may originate from Git repositories (either release/tag, or master), or release tarballs.
 
-To import dependencies from Git repositories, follow the tutorial at https://www.atlassian.com/git/tutorials/git-subtree , under heading "Adding the sub-project as a remote".
+To import dependencies from Git repositories, ~~follow the tutorial at https://www.atlassian.com/git/tutorials/git-subtree , under heading "Adding the sub-project as a remote".~~
 
 ```sh
 git subtree [add|pull] --prefix folder_to_create \
     remote_or_url branch_or_commit \
     --squash
 ```
+
+`git subtree` is useful in theory. In practice, it squashes the remote repo into a single commit, then performs a subtree merge (the remote repo becomes a subdir in exotracker's filesystem).
+
+The issue is that rebasing and reapplying the squashed commit will write that commit into / instead of /3rdparty/repo/, whether I use plain rebase or `git rebase --rebase-merges`. Since [Git 2.24.0 (commit 917a319)](https://github.com/git/git/commit/917a319ea59c130a14cff7656537ba14f593568b), you can specify `git rebase --rebase-merges --strategy subtree`, which works, but is a complex and ugly incantation.
+
+My new preference is to just squash the subtree merge commit out of existence, which simplifies the commit graph too. I lose the ability to `git subtree pull`, but that's unimportant since the upstreams I'm using barely move at all (except for gsl and immer).
