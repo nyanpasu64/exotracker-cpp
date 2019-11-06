@@ -63,8 +63,13 @@ public:
         _stereo_nchan(stereo_nchan),
         _nes_blip(smp_per_s, CPU_CLK_PER_S)
     {
-        _chip_active[ChipID::Nes2A03] = true;
-        _chip_synths[ChipID::Nes2A03] = nes_2a03::make_Nes2A03Synth(_nes_blip);
+        _chip_active[ChipID::NesApu1] = true;
+        auto apu1_unique = nes_2a03::make_NesApu1Synth(_nes_blip);
+        auto & apu1 = *apu1_unique;
+        _chip_synths[ChipID::NesApu1] = std::move(apu1_unique);
+
+        _chip_active[ChipID::NesApu2] = true;
+        _chip_synths[ChipID::NesApu2] = nes_2a03::make_NesApu2Synth(_nes_blip, apu1);
 
         for (auto & chip_synth : _chip_synths) {
             assert(chip_synth != nullptr);

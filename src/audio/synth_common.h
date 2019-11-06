@@ -28,7 +28,8 @@ int const TICKS_PER_S = 60;
 namespace ChipID_ {
 enum ChipID {
     // TODO add chip ZERO???
-    Nes2A03,
+    NesApu1,
+    NesApu2,
     COUNT,
 };
 }
@@ -60,8 +61,8 @@ public:
     /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
     /// The FDS will instead write lowpassed audio to write_buffer.
     virtual SynthResult synthesize_chip_clocks(
-            ClockT nclk, gsl::span<Amplitude> write_buffer
-            ) = 0;
+        ClockT nclk, gsl::span<Amplitude> write_buffer
+    ) = 0;
 };
 
 // end namespaces
