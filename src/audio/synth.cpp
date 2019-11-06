@@ -36,7 +36,7 @@ void OverallSynth::synthesize_overall(
         SampleT nsamp_expected = _nes_blip.count_samples((blip_nclock_t) Nclk);
 
         // Synthesize and mix audio from each enabled chip.
-        FOREACH(ChipID, chip_id) {
+        FOREACH(NesChipID, chip_id) {
             if (_chip_active[chip_id]) {
 
                 // Run the chip for a specific number of clocks.
