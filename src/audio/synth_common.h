@@ -27,10 +27,13 @@ int const TICKS_PER_S = 60;
 /// This type is used widely, so import to audio::synth.
 using event_queue::ClockT;
 
-// Unused
-template<typename T>
-using Samples = T;
+using Address = uint16_t;
+using Byte = uint8_t;
 
+struct RegisterWrite {
+    Address address;
+    Byte value;
+};
 
 /// Sound chip base class for NES chips and expansions.
 /// Other consoles may use a different base class (SNES) or maybe not (wavetable chips).

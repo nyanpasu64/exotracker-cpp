@@ -1,6 +1,7 @@
 #pragma once
 
 #include "synth/nes_2a03.h"
+#include "chips.h"
 #include "synth_common.h"
 #include "audio_common.h"
 #include "util/enum_map.h"
@@ -18,28 +19,8 @@ enum class SynthEvent {
     COUNT
 };
 
-/// List of sound chips supported.
-enum class NesChipID {
-    NesApu1,
-    NesApu2,
-
-    COUNT,
-    NotNesChip,
-};
-
-/// List of sound channels, belonging to chips.
-enum class ChannelID {
-    // NesApu1
-    Pulse1,
-    Pulse2,
-
-    // NesApu2
-    Tri,
-    Noise,
-    Dpcm,
-
-    COUNT,
-};
+using chips::NesChipID;
+using chips::ChannelID;
 
 class OverallSynth : boost::noncopyable {
 public:
@@ -69,6 +50,9 @@ private:
     EventQueue<SynthEvent> _pq;
 
     // Member variables
+
+    // Register writes.
+    chips::ChannelRegisterWrites _channel_register_writes;
 
     // Audio written into this and read to output.
     Blip_Buffer _nes_blip;
