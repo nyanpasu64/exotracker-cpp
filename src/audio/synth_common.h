@@ -24,17 +24,6 @@ int const CPU_CLK_PER_S = 1'786'830;
 int const TICKS_PER_S = 60;
 
 
-/// List of sound chips supported.
-namespace ChipID_ {
-enum ChipID {
-    // TODO add chip ZERO???
-    NesApu1,
-    NesApu2,
-    COUNT,
-};
-}
-using ChipID_::ChipID;
-
 /// This type is used widely, so import to audio::synth.
 using event_queue::ClockT;
 

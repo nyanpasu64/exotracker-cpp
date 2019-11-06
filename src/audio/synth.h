@@ -17,6 +17,17 @@ enum class SynthEvent {
     COUNT
 };
 
+/// List of sound chips supported.
+namespace ChipID_ {
+enum ChipID {
+    // TODO add chip ZERO???
+    NesApu1,
+    NesApu2,
+    COUNT,
+};
+}
+using ChipID_::ChipID;
+
 
 class OverallSynth : boost::noncopyable {
 public:
