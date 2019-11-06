@@ -64,7 +64,7 @@ public:
         _nes_blip(smp_per_s, CPU_CLK_PER_S)
     {
         _chip_active[ChipID::Nes2A03] = true;
-        _chip_synths[ChipID::Nes2A03] = std::make_unique<nes_2a03::Nes2A03Synth>(_nes_blip);
+        _chip_synths[ChipID::Nes2A03] = nes_2a03::make_Nes2A03Synth(_nes_blip);
 
         for (auto & chip_synth : _chip_synths) {
             assert(chip_synth != nullptr);
