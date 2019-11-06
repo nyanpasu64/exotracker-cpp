@@ -6,6 +6,23 @@
 namespace audio {
 namespace synth {
 
+OverallSynth::OverallSynth(int stereo_nchan, int smp_per_s) :
+    _stereo_nchan(stereo_nchan),
+    _nes_blip(smp_per_s, CPU_CLK_PER_S)
+{
+    _chip_active[NesChipID::NesApu1] = true;
+    auto apu1_unique = nes_2a03::make_NesApu1Synth(_nes_blip);
+    auto & apu1 = *apu1_unique;
+    _chip_synths[NesChipID::NesApu1] = std::move(apu1_unique);
+
+    _chip_active[NesChipID::NesApu2] = true;
+    _chip_synths[NesChipID::NesApu2] = nes_2a03::make_NesApu2Synth(_nes_blip, apu1);
+
+    for (auto & chip_synth : _chip_synths) {
+        assert(chip_synth != nullptr);
+    }
+}
+
 #define FOREACH(Enum, variable) \
     for (size_t variable = 0; variable < enum_count<Enum>; variable++)
 
