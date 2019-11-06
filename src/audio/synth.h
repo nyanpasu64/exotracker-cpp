@@ -20,12 +20,26 @@ enum class SynthEvent {
 
 /// List of sound chips supported.
 enum class NesChipID {
-    // TODO add chip ZERO???
     NesApu1,
     NesApu2,
+
     COUNT,
+    NotNesChip,
 };
 
+/// List of sound channels, belonging to chips.
+enum class ChannelID {
+    // NesApu1
+    Pulse1,
+    Pulse2,
+
+    // NesApu2
+    Tri,
+    Noise,
+    Dpcm,
+
+    COUNT,
+};
 
 class OverallSynth : boost::noncopyable {
 public:
