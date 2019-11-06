@@ -21,14 +21,16 @@ OverallSynth::OverallSynth(int stereo_nchan, int smp_per_s) :
     for (auto & chip_synth : _chip_synths) {
         assert(chip_synth != nullptr);
     }
+
+    _pq.set_timeout(SynthEvent::Tick, 0);
 }
 
 #define FOREACH(Enum, variable) \
     for (size_t variable = 0; variable < enum_count<Enum>; variable++)
 
 void OverallSynth::synthesize_overall(
-        gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block
-        ) {
+    gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block
+) {
 
     // In all likelihood this function will not work if stereo_nchan != 1.
     // If I ever add a stereo console (SNES, maybe SN76489 like sneventracker),
@@ -36,14 +38,18 @@ void OverallSynth::synthesize_overall(
 
     // GSL uses std::ptrdiff_t (not size_t) for sizes and indexes.
     // Compilers may define ::ptrdiff_t in global namespace. https://github.com/RobotLocomotion/drake/issues/2374
-    std::size_t const nsamp = mono_smp_per_block;
+    std::ptrdiff_t const nsamp = mono_smp_per_block;
     std::ptrdiff_t samples_so_far = 0;  // [0, nsamp]
 
     /// Writes to output buffer, can be called multiple times (appends after end of previous call)
-    /// Should this code be inlined (moving it away from samples_so_far)?
-    auto synthesize_all_for = [this, &samples_so_far, nsamp, output_buffer]
-            (ClockT Nclk)
-    {
+    ///
+    /// Every time this function is called,
+    /// it starts out with _nes_blip's timebase beginning at 0.
+    /// Every time it returns, it first resets _nes_blip's timebase via end_frame().
+    /// As a result, the caller does not need to keep track of time.
+    auto synthesize_all_for = [this, &samples_so_far, nsamp, output_buffer](
+        ClockT Nclk
+    ) {
         if (Nclk == 0) return;
 
         // signed long (64-bit on linux64)? size_t (64-bit on x64)? uint32_t?
@@ -83,9 +89,29 @@ void OverallSynth::synthesize_overall(
     };
 
     ClockT nclk_to_play = _nes_blip.count_clocks(nsamp);
+    _pq.set_timeout(SynthEvent::EndOfCallback, nclk_to_play);
 
-    // FIXME replace this with interleaved (synthesis, handle event)
-    synthesize_all_for(nclk_to_play);
+    while (true) {
+        auto [event_id, clk_elapsed] = _pq.next_event();
+        synthesize_all_for(clk_elapsed);
+
+        switch (event_id) {
+
+        case SynthEvent::EndOfCallback: {
+            assert(samples_so_far == nsamp);
+            assert(_nes_blip.samples_avail() == 0);
+            return;
+        }
+
+        case SynthEvent::Tick: {
+            _pq.set_timeout(SynthEvent::Tick, _clocks_per_tick);
+            break;
+        }
+
+        default: {}
+
+        }
+    }
 }
 
 // end namespaces

@@ -79,6 +79,7 @@ public:
 
     // TODO rename set_timeout to queue_event?
     // TODO add unqueue_event()? remove_event?
+    // TODO time_until(EventID) method (pass through to m_time_until)?
 
     struct RelativeEvent {
         EventID event_id;
