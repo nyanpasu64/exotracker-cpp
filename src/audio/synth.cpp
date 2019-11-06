@@ -7,7 +7,7 @@ namespace audio {
 namespace synth {
 
 #define FOREACH(Enum, variable) \
-    for (size_t variable = 0; variable < Enum::COUNT; variable++)
+    for (size_t variable = 0; variable < enum_count<Enum>; variable++)
 
 void OverallSynth::synthesize_overall(
         gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block
