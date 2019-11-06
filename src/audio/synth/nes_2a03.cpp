@@ -16,7 +16,7 @@ const static int APU2_RANGE = 100;
 const static double APU1_VOLUME = 0.0;
 const static double APU2_VOLUME = 0.0;
 
-class Nes2A03Synth : public NesChipSynth {
+class Nes2A03Synth : public BaseNesSynth {
     xgm::NES_CPU cpu;
 
     /// APU1 (2 pulses)
@@ -63,7 +63,7 @@ public:
     }
 };
 
-std::unique_ptr<NesChipSynth> make_Nes2A03Synth(Blip_Buffer & blip) {
+std::unique_ptr<BaseNesSynth> make_Nes2A03Synth(Blip_Buffer & blip) {
     return std::make_unique<Nes2A03Synth>(blip);
 }
 

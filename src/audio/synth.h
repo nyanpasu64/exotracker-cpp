@@ -54,7 +54,7 @@ private:
     Amplitude _temp_buffer[1 << 16];
 
     bool _chip_active[ChipID::COUNT] = {};
-    std::unique_ptr<NesChipSynth> _chip_synths[ChipID::COUNT] = {};
+    std::unique_ptr<BaseNesSynth> _chip_synths[ChipID::COUNT] = {};
 
 public:
     OverallSynth(OverallSynth &&) = default;

@@ -44,9 +44,9 @@ using Samples = T;
 
 /// Sound chip base class for NES chips and expansions.
 /// Other consoles may use a different base class (SNES) or maybe not (wavetable chips).
-class NesChipSynth : boost::noncopyable {
+class BaseNesSynth : boost::noncopyable {
 public:
-    virtual ~NesChipSynth() {}
+    virtual ~BaseNesSynth() {}
 
     struct SynthResult {
         bool wrote_audio;
