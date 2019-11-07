@@ -43,7 +43,7 @@ Abstract files (in order from common to derived). Each file can include all file
 - ./general_common.h
     - External libraries: none
 - ./specific_common.h
-    - External libraries: specific -related libraries
+    - External libraries: specific-related libraries
 - ./specific/nested_common.h, if used
 - ./specific/nested.h
 - ./specific.h (public interface of . folder)
