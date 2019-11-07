@@ -5,53 +5,32 @@
 /// Synth code generates audio whenever the output callback runs.
 /// It does not operate independently.
 
-#include "synth.h"
 #include "util/macros.h"
 
-#include <Blip_Buffer/Blip_Buffer.h>
 #include <portaudiocpp/PortAudioCpp.hxx>
 
-#include <random>
-#include <limits>
-#include <iostream>
+#include <memory>
 
 namespace audio {
 namespace output {
 
 namespace pa = portaudio;
 
-/// I may extract a class Synth,
-/// and change OutputCallback to PortAudioCallback (a thin wrapper around Synth).
-/// I'll only do that once I have multiple API consumers
-/// (PortAudio, RtAudio, or WAV export) and can design a good API for all of them.
-class OutputCallback : public pa::CallbackInterface {
-    synth::OverallSynth synth;
-
-public:
-    // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
-    // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
-    // interleaved=false was added to support ASIO's native representation.
-    static const bool interleaved = true;
-
-    OutputCallback(int stereo_nchan, int smp_per_s) :
-        synth{stereo_nchan, smp_per_s}
-    {}
-
-    // impl pa::CallbackInterface
-
-    // returns PaStreamCallbackResult.
-    int paCallbackFun(const void *inputBufferVoid, void *outputBufferVoid, unsigned long mono_smp_per_block,
-                      const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags) override;
-
-};
-
-// Maybe the AudioThreadHandle should only be possible to return a unique_ptr.
-// Then we hold a SelfTerminatingStream by value, not unique_ptr.
 struct AudioThreadHandle {
-    output::OutputCallback callback;
+    // output.h does not contain #include "synth.h",
+    // and only exposes output::OutputCallback via unique_ptr<pa::CallbackInterface>.
+    //
+    // Advantage: Changing the layout of synth::OverallSynth
+    //  will not recompile OutputCallback and everything that #includes output.h.
+    //
+    // No disadvantage: No speed loss from indirection or reduced locality,
+    //  since pa::Stream accesses via pointer anyway.
+    std::unique_ptr<portaudio::CallbackInterface> callback;
 
-    // Holds reference to output, so declared afterwards (destruction is last-to-first).
-    std::unique_ptr<pa::Stream> stream; //<pa::NonBlocking, pa::Output<Amplitude>>;
+    // Holds reference to `callback`, so declared afterwards
+    // (destruction is last-to-first).
+    // Barely accessed (->start()), so indirection is not a speed concern.
+    std::unique_ptr<pa::Stream> stream;
 
 public:
     // throws PaException or PaCppException or whatever else
@@ -70,9 +49,9 @@ private:
     DISABLE_COPY_MOVE(AudioThreadHandle)
 
     AudioThreadHandle(
-            portaudio::DirectionSpecificStreamParameters outParams,
-            portaudio::StreamParameters params
-            );
+        portaudio::DirectionSpecificStreamParameters outParams,
+        portaudio::StreamParameters params
+    );
 };
 
 }   // namespace output
