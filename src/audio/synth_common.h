@@ -24,16 +24,6 @@ int const CPU_CLK_PER_S = 1'786'830;
 int const TICKS_PER_S = 60;
 
 
-/// List of sound chips supported.
-namespace ChipID_ {
-enum ChipID {
-    // TODO add chip ZERO???
-    Nes2A03,
-    COUNT,
-};
-}
-using ChipID_::ChipID;
-
 /// This type is used widely, so import to audio::synth.
 using event_queue::ClockT;
 
@@ -44,9 +34,9 @@ using Samples = T;
 
 /// Sound chip base class for NES chips and expansions.
 /// Other consoles may use a different base class (SNES) or maybe not (wavetable chips).
-class NesChipSynth : boost::noncopyable {
+class BaseNesSynth : boost::noncopyable {
 public:
-    virtual ~NesChipSynth() {}
+    virtual ~BaseNesSynth() {}
 
     struct SynthResult {
         bool wrote_audio;
@@ -60,8 +50,8 @@ public:
     /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
     /// The FDS will instead write lowpassed audio to write_buffer.
     virtual SynthResult synthesize_chip_clocks(
-            ClockT nclk, gsl::span<Amplitude> write_buffer
-            ) = 0;
+        ClockT nclk, gsl::span<Amplitude> write_buffer
+    ) = 0;
 };
 
 // end namespaces

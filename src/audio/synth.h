@@ -17,6 +17,17 @@ enum class SynthEvent {
     COUNT
 };
 
+/// List of sound chips supported.
+namespace NesChipID_ {
+enum NesChipID {
+    // TODO add chip ZERO???
+    NesApu1,
+    NesApu2,
+    COUNT,
+};
+}
+using NesChipID_::NesChipID;
+
 
 class OverallSynth : boost::noncopyable {
 public:
@@ -53,8 +64,8 @@ private:
     // Per-chip "special audio" written into this and read into _nes_blip.
     Amplitude _temp_buffer[1 << 16];
 
-    bool _chip_active[ChipID::COUNT] = {};
-    std::unique_ptr<NesChipSynth> _chip_synths[ChipID::COUNT] = {};
+    bool _chip_active[NesChipID::COUNT] = {};
+    std::unique_ptr<BaseNesSynth> _chip_synths[NesChipID::COUNT] = {};
 
 public:
     OverallSynth(OverallSynth &&) = default;
@@ -63,8 +74,13 @@ public:
         _stereo_nchan(stereo_nchan),
         _nes_blip(smp_per_s, CPU_CLK_PER_S)
     {
-        _chip_active[ChipID::Nes2A03] = true;
-        _chip_synths[ChipID::Nes2A03] = std::make_unique<nes_2a03::Nes2A03Synth>(_nes_blip);
+        _chip_active[NesChipID::NesApu1] = true;
+        auto apu1_unique = nes_2a03::make_NesApu1Synth(_nes_blip);
+        auto & apu1 = *apu1_unique;
+        _chip_synths[NesChipID::NesApu1] = std::move(apu1_unique);
+
+        _chip_active[NesChipID::NesApu2] = true;
+        _chip_synths[NesChipID::NesApu2] = nes_2a03::make_NesApu2Synth(_nes_blip, apu1);
 
         for (auto & chip_synth : _chip_synths) {
             assert(chip_synth != nullptr);
