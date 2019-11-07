@@ -3,6 +3,7 @@
 #include "synth/nes_2a03.h"
 #include "synth_common.h"
 #include "audio_common.h"
+#include "util/enum_map.h"
 
 #include <memory>
 
@@ -18,15 +19,12 @@ enum class SynthEvent {
 };
 
 /// List of sound chips supported.
-namespace NesChipID_ {
-enum NesChipID {
+enum class NesChipID {
     // TODO add chip ZERO???
     NesApu1,
     NesApu2,
     COUNT,
 };
-}
-using NesChipID_::NesChipID;
 
 
 class OverallSynth : boost::noncopyable {
@@ -64,8 +62,8 @@ private:
     // Per-chip "special audio" written into this and read into _nes_blip.
     Amplitude _temp_buffer[1 << 16];
 
-    bool _chip_active[NesChipID::COUNT] = {};
-    std::unique_ptr<BaseNesSynth> _chip_synths[NesChipID::COUNT] = {};
+    EnumMap<NesChipID, bool> _chip_active = {};
+    EnumMap<NesChipID, std::unique_ptr<BaseNesSynth>> _chip_synths = {};
 
 public:
     OverallSynth(OverallSynth &&) = default;

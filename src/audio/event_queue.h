@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/enum_map.h"
+
 #include <cstdint>
 #include <limits>
 #include <type_traits>
@@ -47,13 +49,13 @@ template<typename EventID>
 class EventQueue {
 public:
     // Types
-    using EventInt = std::underlying_type_t<EventID>;
+    using EventInt = size_t;
     using ClockT = event_queue::ClockT;
 
     // private:
     // Fields
     static ClockT const NEVER = std::numeric_limits<ClockT>::max();
-    ClockT time_until[(size_t) EventID::COUNT];   // fill with NEVER
+    EnumMap<EventID, ClockT> time_until;   // fill with NEVER
 
 public:
     EventQueue() {
@@ -72,7 +74,7 @@ public:
     the previous event schedule will be dropped.
     */
     void set_timeout(EventID event_id, ClockT in_how_long) {
-        time_until[(EventInt) event_id] = in_how_long;
+        time_until[event_id] = in_how_long;
     }
 
     // TODO rename set_timeout to queue_event?
@@ -105,7 +107,7 @@ public:
             out = {event_id, time_until[event_id]};
         }
 
-        for (EventInt event_id = 1; event_id < (EventInt) EventID::COUNT; event_id++) {
+        for (EventInt event_id = 1; event_id < enum_count<EventID>; event_id++) {
             if (time_until[event_id] < out.time) {
                 out = {event_id, time_until[event_id]};
             }
