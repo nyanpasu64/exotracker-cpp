@@ -1,5 +1,5 @@
 #include "gui/main_window.h"
-#include "audio/output.h"
+#include "audio.h"
 #include "gui/document_history.h"
 
 #include <QApplication>
