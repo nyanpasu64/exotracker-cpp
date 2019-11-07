@@ -1,7 +1,7 @@
 #pragma once
 
 #include "synth/nes_2a03.h"
-#include "chips.h"
+#include "synth/music_engine.h"
 #include "synth_common.h"
 #include "audio_common.h"
 #include "util/enum_map.h"
@@ -18,9 +18,6 @@ enum class SynthEvent {
     ChannelUpdate,
     COUNT
 };
-
-using chips::NesChipID;
-using chips::ChannelID;
 
 class OverallSynth : boost::noncopyable {
 public:
@@ -51,8 +48,11 @@ private:
 
     // Member variables
 
+    // Music engine, produces register writes.
+    music_engine::OverallMusicEngine _music_engine;
+
     // Register writes.
-    chips::ChannelRegisterWrites _channel_register_writes;
+    ChipRegisterWriteQueue _channel_register_writes;
 
     // Audio written into this and read to output.
     Blip_Buffer _nes_blip;

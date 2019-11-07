@@ -13,6 +13,7 @@ namespace event_queue {
 // However, "cycle" can be confused with audio waveform cycles.
 // So call it "clock" instead.
 using ClockT = uint32_t;
+static ClockT constexpr NEVER = std::numeric_limits<ClockT>::max();
 }
 
 /**
@@ -52,9 +53,10 @@ public:
     using EventInt = size_t;
     using ClockT = event_queue::ClockT;
 
+    static ClockT constexpr NEVER = event_queue::NEVER;
+
     // private:
     // Fields
-    static ClockT const NEVER = std::numeric_limits<ClockT>::max();
     EnumMap<EventID, ClockT> time_until;   // fill with NEVER
 
 public:

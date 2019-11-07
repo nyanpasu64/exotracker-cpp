@@ -50,10 +50,12 @@ add_library(exotracker-lib
         # Common files (tightly coupled)
         src/audio/audio_common.cpp
         src/audio/synth_common.cpp
+        src/audio/synth/music_engine_common.cpp
 
         # Implementation files
         src/audio/output.cpp
         src/audio/synth.cpp
+        src/audio/synth/music_engine.cpp
 
         # (2A03 chip synth core)
         3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
