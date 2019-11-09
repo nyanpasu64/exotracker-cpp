@@ -9,7 +9,7 @@ namespace synth {
 
 using ChannelToNesChip = EnumMap<ChannelID, NesChipID>;
 
-static const ChannelToNesChip channel_to_nes_chip = []() {
+static const ChannelToNesChip CHANNEL_TO_NES_CHIP = []() {
     /// [ChannelID] NesChipID
     ChannelToNesChip channel_to_nes_chip;
     channel_to_nes_chip.fill(NesChipID::COUNT);
@@ -87,20 +87,21 @@ void OverallSynth::synthesize_overall(
 
         // Synthesize and mix audio from each enabled chip.
         FOREACH(NesChipID, chip_id) {
-            if (_chip_active[chip_id]) {
+            if (!_chip_active[chip_id]) {
+                continue;
+            }
 
-                // Run the chip for a specific number of clocks.
-                // Most chips will write to _nes_blip
-                // (if they have a Blip_Synth with a mutable aliased reference to Blip_Buffer).
-                // The FDS will instead write lowpassed audio to _temp_buffer.
-                auto synth_result = _chip_synths[chip_id]->synthesize_chip_clocks(
-                            Nclk, _temp_buffer);
+            // Run the chip for a specific number of clocks.
+            // Most chips will write to _nes_blip
+            // (if they have a Blip_Synth with a mutable aliased reference to Blip_Buffer).
+            // The FDS will instead write lowpassed audio to _temp_buffer.
+            auto synth_result = _chip_synths[chip_id]->synthesize_chip_clocks(
+                        Nclk, _temp_buffer);
 
-                // If the chip outputs audio instead of _nes_blip steps, mix the audio into _nes_blip.
-                if (synth_result.wrote_audio) {
-                    assert(synth_result.nsamp_returned == nsamp_expected);
-                    _nes_blip.mix_samples(_temp_buffer, synth_result.nsamp_returned);
-                }
+            // If the chip outputs audio instead of _nes_blip steps, mix the audio into _nes_blip.
+            if (synth_result.wrote_audio) {
+                assert(synth_result.nsamp_returned == nsamp_expected);
+                _nes_blip.mix_samples(_temp_buffer, synth_result.nsamp_returned);
             }
         }
 
