@@ -17,6 +17,9 @@ TEST_CASE("Test that EventQueue is filled with time=NEVER, instead of 0.") {
     using EventT = EventEnum;
     using PQ = audio::EventQueue<EventT>;
     PQ pq;
+
+    CHECK(pq.get_time_until(EventT::EndOfCallback) == PQ::NEVER);
+
     {
         auto event = pq.next_event();
         CHECK(event.event_id == 0);

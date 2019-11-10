@@ -73,31 +73,32 @@ class BaseNesSynth : boost::noncopyable {
 public:
     virtual ~BaseNesSynth() {}
 
-    struct SynthResult {
-        bool wrote_audio;
+    virtual void write_memory(RegisterWrite write) = 0;
 
-        // blip_buffer uses signed int for nsamp.
-        blip_nsamp_t nsamp_returned;
-    };
+    /// If the synth generates audio via Blip_Synth, nsamp_returned == 0.
+    /// If the synth writes audio into `write_buffer`,
+    /// nsamp_returned == how many samples were written.
+    using NsampWritten = blip_nsamp_t;
 
     /// Most NesChipSynth subclasses will write to a Blip_Buffer
     /// (if they have a Blip_Synth with a mutable aliased reference to Blip_Buffer).
     /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
     /// The FDS will instead write lowpassed audio to write_buffer.
-    virtual SynthResult synthesize_chip_clocks(
-        ClockT nclk, gsl::span<Amplitude> write_buffer
+    virtual NsampWritten synthesize_chip_clocks(
+        ClockT clk_offset, ClockT nclk, gsl::span<Amplitude> write_buffer
     ) = 0;
 };
 
 /// Maybe just inline the methods, don't move to .cpp?
 class RegisterWriteQueue {
 
+public:
     struct RelativeRegisterWrite {
-        Address address;
-        Byte value;
-        ClockT dtime;
+        RegisterWrite write;
+        ClockT time_before;
     };
 
+private:
     std::vector<RelativeRegisterWrite> vec;
 
     struct WriteState {
@@ -110,7 +111,6 @@ class RegisterWriteQueue {
     struct ReadState {
         ClockT prev_time = 0;
         size_t index = 0;
-        RelativeRegisterWrite dummy = {};
         bool pending() const {
             return prev_time != 0 || index != 0;
         }
@@ -132,15 +132,16 @@ public:
 
     // Called by OverallDriver’s member drivers.
 
+    // Is this a usable API? I don't know.
+    // I think music_engine::TimeRef will make it easier to use.
     void add_time(ClockT dtime) {
         input.accum_dtime += dtime;
     }
 
     void push_write(RegisterWrite val) {
         assert(!output.pending());
-        RelativeRegisterWrite relative{val.address, val.value, input.accum_dtime};
+        RelativeRegisterWrite relative{.write=val, .time_before=input.accum_dtime};
         input.accum_dtime = 0;
-
 
         vec.push_back(relative);
     }
@@ -163,7 +164,11 @@ public:
 
         assert(output.index < vec.size());
         RelativeRegisterWrite out = vec[output.index++];
-        return RegisterWrite{out.address, out.value};
+        return out.write;
+    }
+
+    size_t num_unread() {
+        return vec.size() - output.index;
     }
 };
 

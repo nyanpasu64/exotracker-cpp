@@ -39,8 +39,12 @@ public:
     }
 
     // impl NesChipSynth
-    SynthResult synthesize_chip_clocks(
-        ClockT nclk, gsl::span<Amplitude> write_buffer
+    void write_memory(RegisterWrite write) override {
+        apu1.Write(write.address, write.value);
+    }
+
+    NsampWritten synthesize_chip_clocks(
+        ClockT clk_offset, ClockT nclk, gsl::span<Amplitude> write_buffer
     ) override {
         std::array<xgm::INT32, 2> stereo_out;
 
@@ -48,10 +52,10 @@ public:
         for (ClockT clock = 0; clock < nclk; clock++) {
             apu1.Tick(1);
             apu1.Render(&stereo_out[0]);
-            apu1_synth.update((blip_nclock_t) clock, stereo_out[0]);
+            apu1_synth.update((blip_nclock_t) (clk_offset + clock), stereo_out[0]);
         }
 
-        return SynthResult{.wrote_audio=false, .nsamp_returned=0};
+        return 0;
     }
 };
 
@@ -87,18 +91,22 @@ public:
     }
 
     // impl NesChipSynth
-    SynthResult synthesize_chip_clocks(
-        ClockT nclk, gsl::span<Amplitude> write_buffer
+    void write_memory(RegisterWrite write) override {
+        apu2.Write(write.address, write.value);
+    }
+
+    NsampWritten synthesize_chip_clocks(
+        ClockT clk_offset, ClockT nclk, gsl::span<Amplitude> write_buffer
     ) override {
         std::array<xgm::INT32, 2> stereo_out;
 
         for (ClockT clock = 0; clock < nclk; clock++) {
             apu2.Tick(1);
             apu2.Render(&stereo_out[0]);
-            apu2_synth.update((blip_nclock_t) clock, stereo_out[0]);
+            apu2_synth.update((blip_nclock_t) (clk_offset + clock), stereo_out[0]);
         }
 
-        return SynthResult{.wrote_audio=false, .nsamp_returned=0};
+        return 0;
     }
 };
 

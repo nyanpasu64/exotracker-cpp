@@ -13,9 +13,11 @@ namespace synth {
 
 /// States for the synth callback loop.
 enum class SynthEvent {
+    // EndOfCallback comes before Tick.
+    // If a callback ends at the same time as a tick occurs,
+    // the tick should happen next callback.
     EndOfCallback,
     Tick,
-    ChannelUpdate,
     COUNT
 };
 
@@ -44,7 +46,7 @@ private:
     */
     uint32_t _clocks_per_tick = CPU_CLK_PER_S / TICKS_PER_S;
 
-    EventQueue<SynthEvent> _pq;
+    EventQueue<SynthEvent> _events;
 
     // Member variables
 
@@ -52,7 +54,7 @@ private:
     music_engine::OverallMusicEngine _music_engine;
 
     // Register writes.
-    ChipRegisterWriteQueue _channel_register_writes;
+    ChipRegisterWriteQueue _chip_register_writes;
 
     // Audio written into this and read to output.
     Blip_Buffer _nes_blip;
@@ -68,6 +70,14 @@ public:
 
     OverallSynth(int stereo_nchan, int smp_per_s);
 
+private:
+    // signed long (64-bit on linux64)? size_t (64-bit on x64)? uint32_t?
+    // blip_buffer uses blip_long AKA signed int for nsamp.
+    using SampleT = blip_nsamp_t;
+
+    void run_chip_for(ClockT Clk_before_tick, ClockT Clk_to_run, NesChipID Chip_id);
+
+public:
     /// Generates audio to be sent to an audio output (speaker) or WAV file.
     /// The entire output buffer is written to.
     ///
