@@ -71,7 +71,7 @@ struct RegisterWrite {
 /// Other consoles may use a different base class (SNES) or maybe not (wavetable chips).
 class BaseNesSynth : boost::noncopyable {
 public:
-    virtual ~BaseNesSynth() {}
+    virtual ~BaseNesSynth() = default;
 
     virtual void write_memory(RegisterWrite write) = 0;
 
