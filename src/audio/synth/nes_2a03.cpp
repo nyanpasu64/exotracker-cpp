@@ -14,10 +14,11 @@ namespace nes_2a03 {
 // Disable external linkage.
 namespace {
 
-const int APU1_RANGE = 100;
+// APU1 single pulse wave playing at volume F produces values 0 and 1223.
+const int APU1_RANGE = 3000;
 const int APU2_RANGE = 100;
 
-const double APU1_VOLUME = 0.0;
+const double APU1_VOLUME = 0.5;
 const double APU2_VOLUME = 0.0;
 
 // unnamed namespace
