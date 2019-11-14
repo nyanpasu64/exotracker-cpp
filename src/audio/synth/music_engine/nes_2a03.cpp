@@ -20,7 +20,13 @@ class Apu1PulseEngine : public SubMusicEngine {
     PulseNum const _pulse_num;
     Address const _base_address;
 
-    BEGIN_BITFIELD_TYPE(Apu1Reg, uint32_t)
+    int _ticks_before_next_note = 0;
+
+    // Reading a ADD_BITFIELD_MEMBER does not sign-extended it.
+    // The read value can only be negative
+    // if the ADD_BITFIELD_MEMBER has the same length as the storage type
+    // (AKA the type returned by member accesses).
+    BEGIN_BITFIELD_TYPE(Apu1Reg, int32_t)
         // Access bit fields.
     //  ADD_BITFIELD_MEMBER(memberName,     offset,         bits)
         ADD_BITFIELD_MEMBER(volume,         BYTE(0) + 0,    4)
@@ -51,7 +57,17 @@ public:
             return;
         }
 
-        _next_state.volume = 0xf;
+        if (_ticks_before_next_note == 0) {
+            _ticks_before_next_note = 60;
+
+            _next_state.volume = 0xf;
+            assert(_next_state.volume == 0xf);
+            assert(_next_state.volume != -1);
+        } else {
+            _next_state.volume = std::max(0, _next_state.volume - 1);
+        }
+        _ticks_before_next_note -= 1;
+
         _next_state.duty = 0x1;
         _next_state.period_minus_1 = 0x1ab;
 
