@@ -20,7 +20,9 @@ class Apu1PulseEngine : public SubMusicEngine {
     PulseNum const _pulse_num;
     Address const _base_address;
 
-    int _ticks_before_next_note = 0;
+    // TODO add InstrEnvelope class
+    // with array, index, and "should tick" or "reached end" methods.
+    int _volume_index = 0;
 
     // Reading a ADD_BITFIELD_MEMBER does not sign-extended it.
     // The read value can only be negative
@@ -52,22 +54,32 @@ public:
     {}
 
     // impl SubMusicEngine
-    void run(RegisterWriteQueue & register_writes) override {
+    void run(
+        RegisterWriteQueue & register_writes, sequencer::EventsThisTickRef const events
+    ) override {
         if (_pulse_num != 0) {
             return;
         }
 
-        if (_ticks_before_next_note == 0) {
-            _ticks_before_next_note = 60;
+        bool new_note = false;
 
-            _next_state.volume = 0xf;
-            assert(_next_state.volume == 0xf);
-            assert(_next_state.volume != -1);
-        } else {
-            _next_state.volume = std::max(0, _next_state.volume - 1);
+        for (doc::RowEvent event : events) {
+            if (event.note.has_value()) {
+                _volume_index = 0;
+                new_note = true;
+            }
         }
-        _ticks_before_next_note -= 1;
 
+        int volume = 0xf - (_volume_index / 1);
+
+        if (!new_note) {
+            // Advance envelope. TODO move to InstrEnvelope or SynthEnvelope class.
+            if (volume > 0) {
+                _volume_index += 1;
+            }
+        }
+
+        _next_state.volume = volume;
         _next_state.duty = 0x1;
         _next_state.period_minus_1 = 0x1ab;
 

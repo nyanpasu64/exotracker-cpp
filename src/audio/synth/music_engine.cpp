@@ -21,6 +21,8 @@ OverallMusicEngine::OverallMusicEngine() {
     }
 }
 
+using sequencer::EventsThisTickRef;
+
 void OverallMusicEngine::get_frame_registers(
     ChipRegisterWriteQueue & chip_register_writes
 ) {
@@ -29,9 +31,10 @@ void OverallMusicEngine::get_frame_registers(
 
         SubMusicEngine & sub_engine = *_channel_engines[chan];
         RegisterWriteQueue & reg_writes = chip_register_writes[chip];
+        EventsThisTickRef tick_events = _channel_sequencers[chan].next_tick();
 
         // All register writes will be at time 0 for simplicity, for the time being.
-        sub_engine.run(reg_writes);
+        sub_engine.run(reg_writes, tick_events);
     }
 }
 

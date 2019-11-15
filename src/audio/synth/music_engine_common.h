@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../synth_common.h"
+#include "sequencer/sequencer.h"
 #include "util/macros.h"
 
 namespace audio {
@@ -22,7 +23,9 @@ public:
     virtual ~SubMusicEngine() = default;
 
     // TODO add parameter `TimeRef (const) & time`
-    virtual void run(synth::RegisterWriteQueue & register_writes) = 0;
+    virtual void run(
+        RegisterWriteQueue & register_writes, sequencer::EventsThisTickRef const events
+    ) = 0;
 };
 
 }
