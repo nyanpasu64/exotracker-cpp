@@ -12,9 +12,9 @@ OverallMusicEngine::OverallMusicEngine() {
 #define INITIALIZE(key)  _channel_engines[ChannelID::key] = nes_2a03::make_ ## key();
     INITIALIZE(Pulse1)
     INITIALIZE(Pulse2)
-    INITIALIZE(Tri)
-    INITIALIZE(Noise)
-    INITIALIZE(Dpcm)
+//    INITIALIZE(Tri)
+//    INITIALIZE(Noise)
+//    INITIALIZE(Dpcm)
 
     for (auto & engine : _channel_engines) {
         assert(engine != nullptr);

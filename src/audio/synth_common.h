@@ -50,10 +50,10 @@ enum class ChannelID {
     Pulse1,
     Pulse2,
 
-    // NesApu2
-    Tri,
-    Noise,
-    Dpcm,
+//    // NesApu2
+//    Tri,
+//    Noise,
+//    Dpcm,
 
     COUNT,
 };

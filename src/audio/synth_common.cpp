@@ -11,9 +11,9 @@ const ChannelToNesChip CHANNEL_TO_NES_CHIP = []() {
     channel_to_nes_chip[ChannelID::Pulse1] = NesChipID::NesApu1;
     channel_to_nes_chip[ChannelID::Pulse2] = NesChipID::NesApu1;
 
-    channel_to_nes_chip[ChannelID::Tri] = NesChipID::NesApu2;
-    channel_to_nes_chip[ChannelID::Noise] = NesChipID::NesApu2;
-    channel_to_nes_chip[ChannelID::Dpcm] = NesChipID::NesApu2;
+//    channel_to_nes_chip[ChannelID::Tri] = NesChipID::NesApu2;
+//    channel_to_nes_chip[ChannelID::Noise] = NesChipID::NesApu2;
+//    channel_to_nes_chip[ChannelID::Dpcm] = NesChipID::NesApu2;
 
     for (NesChipID chip_id : channel_to_nes_chip) {
         if (chip_id == NesChipID::COUNT) {

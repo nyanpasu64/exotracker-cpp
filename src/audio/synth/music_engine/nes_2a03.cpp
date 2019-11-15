@@ -112,46 +112,46 @@ std::unique_ptr<SubMusicEngine> make_Pulse2() {
     return std::make_unique<Apu1PulseEngine>(1);
 }
 
-// Triangle engine
+//// Triangle engine
 
-class Apu2TriEngine : public SubMusicEngine {
-public:
-    // impl SubMusicEngine
-    void run(RegisterWriteQueue & register_writes) override {
-        // do nothing
-    }
-};
+//class Apu2TriEngine : public SubMusicEngine {
+//public:
+//    // impl SubMusicEngine
+//    void run(RegisterWriteQueue & register_writes) override {
+//        // do nothing
+//    }
+//};
 
-std::unique_ptr<SubMusicEngine> make_Tri() {
-    return std::make_unique<Apu2TriEngine>();
-}
+//std::unique_ptr<SubMusicEngine> make_Tri() {
+//    return std::make_unique<Apu2TriEngine>();
+//}
 
-// Noise engine
+//// Noise engine
 
-class Apu2NoiseEngine : public SubMusicEngine {
-public:
-    // impl SubMusicEngine
-    void run(RegisterWriteQueue & register_writes) override {
-        // do nothing
-    }
-};
+//class Apu2NoiseEngine : public SubMusicEngine {
+//public:
+//    // impl SubMusicEngine
+//    void run(RegisterWriteQueue & register_writes) override {
+//        // do nothing
+//    }
+//};
 
-std::unique_ptr<SubMusicEngine> make_Noise() {
-    return std::make_unique<Apu2NoiseEngine>();
-}
+//std::unique_ptr<SubMusicEngine> make_Noise() {
+//    return std::make_unique<Apu2NoiseEngine>();
+//}
 
-// DPCM engine
+//// DPCM engine
 
-class Apu2DpcmEngine : public SubMusicEngine {
-public:
-    // impl SubMusicEngine
-    void run(RegisterWriteQueue & register_writes) override {
-        // do nothing
-    }
-};
+//class Apu2DpcmEngine : public SubMusicEngine {
+//public:
+//    // impl SubMusicEngine
+//    void run(RegisterWriteQueue & register_writes) override {
+//        // do nothing
+//    }
+//};
 
-std::unique_ptr<SubMusicEngine> make_Dpcm() {
-    return std::make_unique<Apu2DpcmEngine>();
-}
+//std::unique_ptr<SubMusicEngine> make_Dpcm() {
+//    return std::make_unique<Apu2DpcmEngine>();
+//}
 
 }   // namespace
