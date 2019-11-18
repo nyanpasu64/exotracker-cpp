@@ -74,12 +74,8 @@ target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 add_executable(exotracker-bin
         # GUI
         src/gui/history.cpp
-        src/gui/history.h
-        src/gui/lib/lightweight.h
         src/gui/main_window.cpp
-        src/gui/main_window.h
         src/gui/pattern_editor/pattern_editor_panel.cpp
-        src/gui/pattern_editor/pattern_editor_panel.h
         src/main.cpp
         )
 target_link_libraries(exotracker-bin PRIVATE exotracker-lib ${portaudio} ${portaudiocpp} Qt5::Widgets)
@@ -92,7 +88,6 @@ add_executable(exotracker-tests
         tests/audio/test_event_queue.cpp
 
         src/gui/history.cpp
-        src/gui/history.h
         )
 target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests PRIVATE exotracker-lib)
