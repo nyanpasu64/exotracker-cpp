@@ -140,12 +140,12 @@ void OverallSynth::synthesize_overall(
 
     // GSL uses std::ptrdiff_t (not size_t) for sizes and indexes.
     // Compilers may define ::ptrdiff_t in global namespace. https://github.com/RobotLocomotion/drake/issues/2374
-    std::ptrdiff_t const nsamp = mono_smp_per_block;
+    blip_nsamp_t const nsamp = (blip_nsamp_t) mono_smp_per_block;
 
-    ClockT nclk_to_play = _nes_blip.count_clocks(nsamp);
+    ClockT nclk_to_play = (ClockT) _nes_blip.count_clocks(nsamp);
     _events.set_timeout(SynthEvent::EndOfCallback, nclk_to_play);
 
-    std::ptrdiff_t samples_so_far = 0;  // [0, nsamp]
+    blip_nsamp_t samples_so_far = 0;  // [0, nsamp]
 
     while (true) {
         ClockT prev_to_tick = _events.get_time_until(SynthEvent::Tick);
@@ -171,8 +171,10 @@ void OverallSynth::synthesize_overall(
 
             // i keep getting signedness warnings: https://github.com/Microsoft/GSL/issues/322
             auto writable_region = output_buffer.subspan(samples_so_far);
-            SampleT nsamp_returned =
-                    _nes_blip.read_samples(&writable_region[0], writable_region.size());
+            SampleT nsamp_returned = _nes_blip.read_samples(
+                &writable_region[0],
+                (blip_nsamp_t) writable_region.size()
+            );
             assert(nsamp_returned == nsamp_expected);
             samples_so_far += nsamp_returned;
         }

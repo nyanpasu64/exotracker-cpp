@@ -55,6 +55,7 @@ TEST_CASE ("Test that ChannelEvents and KV search is implemented properly.") {
     CHECK(events.size() == 6);
 
     // CHECK_UNARY provides much better compiler errors than CHECK.
+#undef CHECK
 #define CHECK CHECK_UNARY
     CHECK(KV{events}.greater_equal({-1, 0})->time == TimeInPattern{0, 0});
     CHECK(KV{events}.greater_equal({0, 0})->time == TimeInPattern{0, 0});
