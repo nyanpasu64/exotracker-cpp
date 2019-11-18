@@ -1,6 +1,6 @@
 #pragma once
 
-#include "music_engine_common.h"
+#include "music_driver_common.h"
 #include "../synth_common.h"
 #include "sequencer/sequencer.h"
 #include "util/enum_map.h"
@@ -9,15 +9,15 @@
 
 namespace audio {
 namespace synth {
-namespace music_engine {
+namespace music_driver {
 
-/// (sound, audio, music, playback) (engine, driver)
-class OverallMusicEngine {
-    EnumMap<ChannelID, std::unique_ptr<SubMusicEngine>> _channel_engines;
+/// (sound, audio, music, playback) (driver, driver)
+class OverallMusicDriver {
+    EnumMap<ChannelID, std::unique_ptr<SubMusicDriver>> _channel_drivers;
     EnumMap<ChannelID, sequencer::ChannelSequencer> _channel_sequencers;
 
 public:
-    OverallMusicEngine();
+    OverallMusicDriver();
 
     void get_frame_registers(ChipRegisterWriteQueue & chip_register_writes);
 };

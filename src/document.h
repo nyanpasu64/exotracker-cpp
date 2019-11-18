@@ -46,7 +46,7 @@ struct RowEvent {
 /// `anchor_beat` controls "how many beats into the pattern" the note plays.
 /// It should be non-negative.
 ///
-/// The NES generally runs the audio engine 60 times a second.
+/// The NES generally runs the audio driver 60 times a second.
 /// Negative or positive `frames_offset` causes a note to play before or after the beat.
 ///
 /// All positions are sorted by (anchor_beat, frames_offset).

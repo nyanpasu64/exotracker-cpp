@@ -5,16 +5,16 @@
 #include <cassert>
 #include <cstdint>
 
-namespace audio::synth::music_engine::nes_2a03 {
+namespace audio::synth::music_driver::nes_2a03 {
 
-// Pulse 1/2 engine
+// Pulse 1/2 driver
 
 /// Convert [byte][bit]Bit indexing to [bit]Bit.
 constexpr int BITS_PER_BYTE = 8;
 #define BYTE_BIT(byte, bit) ((byte) * BITS_PER_BYTE + (bit))
 #define BYTE(byte) (BITS_PER_BYTE * (byte))
 
-class Apu1PulseEngine : public SubMusicEngine {
+class Apu1PulseDriver : public SubMusicDriver {
     using PulseNum = Range<0, 2, uint32_t>;
 
     PulseNum const _pulse_num;
@@ -48,12 +48,12 @@ class Apu1PulseEngine : public SubMusicEngine {
     Apu1Reg _next_state = 0;
 
 public:
-    Apu1PulseEngine(PulseNum pulse_num) :
+    Apu1PulseDriver(PulseNum pulse_num) :
         _pulse_num(pulse_num),
         _base_address(0x4000 + 0x4 * pulse_num)
     {}
 
-    // impl SubMusicEngine
+    // impl SubMusicDriver
     void run(
         RegisterWriteQueue & register_writes, sequencer::EventsThisTickRef const events
     ) override {
@@ -116,54 +116,54 @@ public:
     }
 };
 
-std::unique_ptr<SubMusicEngine> make_Pulse1() {
-    return std::make_unique<Apu1PulseEngine>(0);
+std::unique_ptr<SubMusicDriver> make_Pulse1() {
+    return std::make_unique<Apu1PulseDriver>(0);
 }
 
-std::unique_ptr<SubMusicEngine> make_Pulse2() {
-    return std::make_unique<Apu1PulseEngine>(1);
+std::unique_ptr<SubMusicDriver> make_Pulse2() {
+    return std::make_unique<Apu1PulseDriver>(1);
 }
 
-//// Triangle engine
+//// Triangle driver
 
-//class Apu2TriEngine : public SubMusicEngine {
+//class Apu2TriDriver : public SubMusicDriver {
 //public:
-//    // impl SubMusicEngine
+//    // impl SubMusicDriver
 //    void run(RegisterWriteQueue & register_writes) override {
 //        // do nothing
 //    }
 //};
 
-//std::unique_ptr<SubMusicEngine> make_Tri() {
-//    return std::make_unique<Apu2TriEngine>();
+//std::unique_ptr<SubMusicDriver> make_Tri() {
+//    return std::make_unique<Apu2TriDriver>();
 //}
 
-//// Noise engine
+//// Noise driver
 
-//class Apu2NoiseEngine : public SubMusicEngine {
+//class Apu2NoiseDriver : public SubMusicDriver {
 //public:
-//    // impl SubMusicEngine
+//    // impl SubMusicDriver
 //    void run(RegisterWriteQueue & register_writes) override {
 //        // do nothing
 //    }
 //};
 
-//std::unique_ptr<SubMusicEngine> make_Noise() {
-//    return std::make_unique<Apu2NoiseEngine>();
+//std::unique_ptr<SubMusicDriver> make_Noise() {
+//    return std::make_unique<Apu2NoiseDriver>();
 //}
 
-//// DPCM engine
+//// DPCM driver
 
-//class Apu2DpcmEngine : public SubMusicEngine {
+//class Apu2DpcmDriver : public SubMusicDriver {
 //public:
-//    // impl SubMusicEngine
+//    // impl SubMusicDriver
 //    void run(RegisterWriteQueue & register_writes) override {
 //        // do nothing
 //    }
 //};
 
-//std::unique_ptr<SubMusicEngine> make_Dpcm() {
-//    return std::make_unique<Apu2DpcmEngine>();
+//std::unique_ptr<SubMusicDriver> make_Dpcm() {
+//    return std::make_unique<Apu2DpcmDriver>();
 //}
 
 }   // namespace

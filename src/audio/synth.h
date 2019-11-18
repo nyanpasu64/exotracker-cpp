@@ -1,7 +1,7 @@
 #pragma once
 
 #include "synth/nes_2a03.h"
-#include "synth/music_engine.h"
+#include "synth/music_driver.h"
 #include "synth_common.h"
 #include "audio_common.h"
 #include "util/enum_map.h"
@@ -50,8 +50,8 @@ private:
 
     // Member variables
 
-    // Music engine, produces register writes.
-    music_engine::OverallMusicEngine _music_engine;
+    // Music driver, produces register writes.
+    music_driver::OverallMusicDriver _music_driver;
 
     // Register writes.
     ChipRegisterWriteQueue _chip_register_writes;

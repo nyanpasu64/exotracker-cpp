@@ -198,7 +198,7 @@ void OverallSynth::synthesize_overall(
                 }
 
                 // Initialize register write queue with next tick of events.
-                _music_engine.get_frame_registers(_chip_register_writes);
+                _music_driver.get_frame_registers(_chip_register_writes);
 
                 _events.set_timeout(SynthEvent::Tick, _clocks_per_tick);
                 break;

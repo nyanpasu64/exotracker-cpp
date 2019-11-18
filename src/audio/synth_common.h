@@ -133,7 +133,7 @@ public:
     // Called by OverallDriver’s member drivers.
 
     // Is this a usable API? I don't know.
-    // I think music_engine::TimeRef will make it easier to use.
+    // I think music_driver::TimeRef will make it easier to use.
     void add_time(ClockT dtime) {
         input.accum_dtime += dtime;
     }

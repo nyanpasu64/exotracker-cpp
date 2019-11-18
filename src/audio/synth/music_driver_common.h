@@ -6,7 +6,7 @@
 
 namespace audio {
 namespace synth {
-namespace music_engine {
+namespace music_driver {
 
 struct TimeRef {
     DISABLE_COPY_MOVE(TimeRef)
@@ -18,9 +18,9 @@ struct TimeRef {
 template<int begin, int end, typename T>
 using Range = T;
 
-class SubMusicEngine {
+class SubMusicDriver {
 public:
-    virtual ~SubMusicEngine() = default;
+    virtual ~SubMusicDriver() = default;
 
     // TODO add parameter `TimeRef (const) & time`
     virtual void run(
