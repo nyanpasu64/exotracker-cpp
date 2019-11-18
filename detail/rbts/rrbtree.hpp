@@ -23,6 +23,13 @@ namespace immer {
 namespace detail {
 namespace rbts {
 
+// https://github.com/arximboldi/immer/issues/11#issuecomment-508753298
+// >The first warning [C4267] is actually ignorable,
+// >the code is correct because tail_size == branches<BL>,
+// >which is a small and in the count_t domain.
+#pragma warning(push)
+#pragma warning(disable:4267)
+
 template <typename T,
           typename MemoryPolicy,
           bits_t   B,
@@ -1277,6 +1284,7 @@ struct rrbtree
 #endif // IMMER_DEBUG_PRINT
 };
 
+#pragma warning(pop)
 } // namespace rbts
 } // namespace detail
 } // namespace immer
