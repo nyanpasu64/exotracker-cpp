@@ -13,6 +13,9 @@ include(cmake_user_override.txt OPTIONAL)
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
+
+# Disable PortAudio MME to avoid compiler warnings (and because MME is bad).
+set(PA_USE_WMME OFF CACHE BOOL "Enable support for MME" FORCE)
 if(find_portaudio)
     find_package(portaudio REQUIRED)
 else()
