@@ -59,11 +59,13 @@ private:
     // Audio written into this and read to output.
     Blip_Buffer _nes_blip;
 
-    // Per-chip "special audio" written into this and read into _nes_blip.
-    Amplitude _temp_buffer[1 << 16];
-
     EnumMap<NesChipID, bool> _chip_active = {};
     EnumMap<NesChipID, std::unique_ptr<BaseNesSynth>> _chip_synths = {};
+
+    /// Per-chip "special audio" written into this and read into _nes_blip.
+    /// This MUST remain the last field in the struct,
+    /// which may/not improve memory locality of other fields.
+    Amplitude _temp_buffer[1 << 16];
 
 public:
     OverallSynth(OverallSynth &&) = default;
