@@ -1,13 +1,12 @@
 #pragma once
 
 #include "../synth_common.h"
-#include "sequencer/sequencer.h"
+#include "sequencer.h"
 #include "util/macros.h"
 
-namespace audio {
-namespace synth {
-namespace music_driver {
+namespace audio::synth::music_driver {
 
+/// Unused at the moment. Possibly related to RegisterWriteQueue?
 struct TimeRef {
     DISABLE_COPY_MOVE(TimeRef)
     synth::ClockT time;
@@ -18,16 +17,5 @@ struct TimeRef {
 template<int begin, int end, typename T>
 using Range = T;
 
-class SubMusicDriver {
-public:
-    virtual ~SubMusicDriver() = default;
-
-    // TODO add parameter `TimeRef (const) & time`
-    virtual void run(
-        RegisterWriteQueue & register_writes, sequencer::EventsThisTickRef const events
-    ) = 0;
-};
-
-}
-}
+// end namespace
 }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "synth/nes_2a03.h"
-#include "synth/music_driver.h"
 #include "synth_common.h"
 #include "audio_common.h"
 #include "util/enum_map.h"
@@ -50,17 +49,11 @@ private:
 
     // Member variables
 
-    // Music driver, produces register writes.
-    music_driver::OverallMusicDriver _music_driver;
-
-    // Register writes.
-    ChipRegisterWriteQueue _chip_register_writes;
-
     // Audio written into this and read to output.
     Blip_Buffer _nes_blip;
 
-    EnumMap<NesChipID, bool> _chip_active = {};
-    EnumMap<NesChipID, std::unique_ptr<BaseNesSynth>> _chip_synths = {};
+    /// vector<ChipIndex -> unique_ptr<ChipInstance subclass>>
+    std::vector<std::unique_ptr<ChipInstance>> _chip_instances = {};
 
     /// Per-chip "special audio" written into this and read into _nes_blip.
     /// This MUST remain the last field in the struct,
@@ -76,8 +69,6 @@ private:
     // signed long (64-bit on linux64)? size_t (64-bit on x64)? uint32_t?
     // blip_buffer uses blip_long AKA signed int for nsamp.
     using SampleT = blip_nsamp_t;
-
-    void run_chip_for(ClockT Clk_before_tick, ClockT Clk_to_run, NesChipID Chip_id);
 
 public:
     /// Generates audio to be sent to an audio output (speaker) or WAV file.

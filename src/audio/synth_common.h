@@ -35,58 +35,26 @@ using event_queue::ClockT;
 using Address = uint16_t;
 using Byte = uint8_t;
 
+/// Index into a list of active sound chips.
+using ChipIndex = uint32_t;
+
 /// List of sound chips supported.
-enum class NesChipID {
-    NesApu1,
-    NesApu2,
+enum class ChipKind {
+    Apu1,
+//    Apu2,
 
     COUNT,
-    NotNesChip,
 };
 
-/// List of sound channels, belonging to chips.
-enum class ChannelID {
-    // NesApu1
+enum class Apu1ChannelID {
     Pulse1,
     Pulse2,
-
-//    // NesApu2
-//    Tri,
-//    Noise,
-//    Dpcm,
-
     COUNT,
 };
-
-using ChannelToNesChip = EnumMap<ChannelID, NesChipID>;
-extern const ChannelToNesChip CHANNEL_TO_NES_CHIP;
-
 
 struct RegisterWrite {
     Address address;
     Byte value;
-};
-
-/// Sound chip base class for NES chips and expansions.
-/// Other consoles may use a different base class (SNES) or maybe not (wavetable chips).
-class BaseNesSynth : boost::noncopyable {
-public:
-    virtual ~BaseNesSynth() = default;
-
-    virtual void write_memory(RegisterWrite write) = 0;
-
-    /// If the synth generates audio via Blip_Synth, nsamp_returned == 0.
-    /// If the synth writes audio into `write_buffer`,
-    /// nsamp_returned == how many samples were written.
-    using NsampWritten = blip_nsamp_t;
-
-    /// Most NesChipSynth subclasses will write to a Blip_Buffer
-    /// (if they have a Blip_Synth with a mutable aliased reference to Blip_Buffer).
-    /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
-    /// The FDS will instead write lowpassed audio to write_buffer.
-    virtual NsampWritten synthesize_chip_clocks(
-        ClockT clk_offset, ClockT nclk, gsl::span<Amplitude> write_buffer
-    ) = 0;
 };
 
 /// Maybe just inline the methods, don't move to .cpp?
@@ -172,7 +140,70 @@ public:
     }
 };
 
-using ChipRegisterWriteQueue = EnumMap<NesChipID, RegisterWriteQueue>;
+// /// Each ChanToPatternData is logically tied to a ChipInstance,
+// /// and has length == enum_count<ChipInstance::type-erased ChipKind>.
+// using ChanToEvents = gsl::span<sequencer::EventsThisTickRef>;
+
+/// Static polymorphic properties of classes,
+/// which can be accessed via pointers to subclasses.
+#define STATIC_DECL(type_name_parens) \
+    virtual type_name_parens const = 0;
+
+#define STATIC(type_name_parens, value) \
+    type_name_parens const final { return value; }
+
+/// Base class, for a single NES chip's (software driver + sequencers
+/// + hardware emulator synth).
+/// Non-NES consoles may use a different base class (SNES) or maybe not (wavetable chips).
+class ChipInstance : boost::noncopyable {
+public:
+    // fields
+    RegisterWriteQueue _register_writes;
+    STATIC_DECL(ChipKind chip_kind())
+
+    // type-erased dependent values:
+    //  defined in subclasses, enforced via runtime release_assert.
+    //  This is OK because it's not checked in a hot inner loop.
+    // type ChannelID = Apu1ChannelID;
+
+    // impl
+    virtual ~ChipInstance() = default;
+
+    /// Eventually, (document, ChipIndex) will be passed in as well.
+    /// Sequencer's time passes.
+    /// Mutates _register_writes.
+    virtual void driver_tick() = 0;
+
+    /// Cannot cross tick boundaries. Can cross register-write boundaries.
+    void run_chip_for(
+        ClockT prev_to_tick,
+        ClockT prev_to_next,
+        Blip_Buffer & nes_blip,
+        gsl::span<Amplitude> temp_buffer
+    );
+
+private:
+    /// Called with data from _register_writes.
+    /// Time does not pass.
+    virtual void synth_write_memory(RegisterWrite write) = 0;
+
+protected:
+    /// If the synth generates audio via Blip_Synth, nsamp_returned == 0.
+    /// If the synth writes audio into `write_buffer`,
+    /// nsamp_returned == how many samples were written.
+    using NsampWritten = blip_nsamp_t;
+
+private:
+    /// Cannot cross tick boundaries, nor register-write boundaries.
+    ///
+    /// Most NesChipSynth subclasses will write to a Blip_Buffer
+    /// (if they have a Blip_Synth with a mutable aliased reference to Blip_Buffer).
+    /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
+    /// The FDS will instead write lowpassed audio to write_buffer.
+    virtual NsampWritten synth_run_clocks(
+        ClockT clk_offset, ClockT nclk, gsl::span<Amplitude> write_buffer
+    ) = 0;
+};
 
 // end namespaces
 }

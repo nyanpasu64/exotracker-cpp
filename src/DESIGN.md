@@ -4,7 +4,7 @@ I have a [Google Drive folder of design notes](https://drive.google.com/drive/u/
 
 Code is stored in src/, dependencies in 3rdparty/.
 
-~~Some classes may have member variables prefixed with a single underscore, like `_var`, to distinguish from locals.~~ (to be decided)
+Classes have member variables prefixed with a single underscore, like `_var`, to distinguish from locals. Not all classes follow this convention yet (but they should eventually).
 
 src/gui/history.h has `gui::history::History`. There is only 1 instance, and it owns tracker pattern state. The pattern editor and audio thread read from `History`.
 
@@ -15,7 +15,7 @@ Tracker pattern state is immutable, using data structures supplied by the immer 
 I am following some Rust-inspired rules in the codebase.
 
 - Polymorphic classes are non-copyable. Maybe non-polymorphic classes (not value structs) too.
-- Mutable aliasing is disallowed, except when mandated by third-party libraries (blip_buffer).
+- Mutable aliasing is disallowed, except when mandated by third-party libraries (Blip_Synth points to Blip_Buffer, nsfplay APU2 points to APU1).
 - Self-referential structs are disallowed, except when mandated by third-party libraries (blip_buffer and portaudio), in which case the copy and move constructors are disabled (or move constructor is manually fixed, in the case of Blip_Buffer).
 - Inheritance and storing data in base classes is discouraged.
 
@@ -27,7 +27,7 @@ In function signatures, out parameters (mutable references primarily written to,
 
 Design notes at https://docs.google.com/document/d/17g5wqgpUPWItvHCY-0eCaqZSNdVKwouYoGbu-RTAjfo .
 
-There is only 1 audio thread, which runs callbacks called by PortAudio, like OpenMPT.
+There is only 1 audio thread, which runs callbacks called by PortAudio. This is how OpenMPT works as well.
 
 The audio system (`OverallSynth`) is driven by sound synthesis callbacks. Every time the audio callback calls `OverallSynth.synthesize_overall()`, it synthesizes a fixed number of samples, using `EventQueue` to know when to trigger new ticks (frame or vblank).
 
@@ -36,15 +36,41 @@ Alternatives to this design:
 - Synthesizing 1 tick of audio at a time from the callback thread is also an acceptable option.
 - Synthesizing audio in a separate "synth thread", and splitting into fixed-size chunks queued up and read by the "output thread", is unacceptable since it generates latency. (This is how FamiTracker works.) Even with a length-0 queue, the synth thread can run 1 audio block ahead of the output thread.
 
-### Audio components (unfinished)
+### Audio components (code is unfinished)
 
-The sequencer is implemented in C++, and converts pattern data from "events placed at beats" into "events separated by ticks". This is a complex task because events are located at beat fractions, not entries in a fixed array. So when performing NSF export, exotracker will likely use the C++ sequencer to compile patterns into a list of (delay, event), much like PPMCK or GEMS. The NSF driver will only have a simplified sequencer.
+`OverallSynth` owns a list of sound chips: `vector<ChipIndex -> unique_ptr<ChipInstance subclass>>`. Which chips are loaded, and in what order, is determined by the current document's properties. Each `ChipInstance` subclass can appear more than once, allowing you to use the same chip multiple times (not possible on 0CC-FamiTracker).
 
-The sound driver (`MusicDriver`) is called once per tick. It handles events from the sequencer, as well as volume envelopes and vibrato. It generates register writes once per tick (possibly with delays between channels). It will be implemented separately in C++ and NSF export.
+Each `ChipInstance` handles the channels/drivers/synthesis internally, so `OverallSynth` doesn't need to know how many channels each chip has. This reduces the potential for logic errors and broken invariants (different parts of the program disagreeing about chip/channel layout).
 
-The sound-chip emulator (`NesChipSynth` subclasses) can be run for specific periods of time (nclocks). When suspended between emulation calls, they can accept register writes. Each sound chip (not channel) receives its own `NesChipSynth`. Separate chips are mixed linearly (addition or weighted average), while each chip can perform nonlinear/arbitrary mixing of its channels. Sound chips can produce output by either writing to `OverallSynth.nes_blip` (type: `Blip_Buffer`), or writing to an audio buffer. This will not be implemented in NSF export (since it's handled by hardware or the NSF player/emulator).
+`ChipInstance` subclasses (sound chip objects) are defined in `synth/nes_2a03.cpp` etc. The header (`synth/nes_2a03.h` etc.) exposes factory functions returning `unique_ptr<ChipInstance>` base-class pointers. All methods except `ChipInstance::run_chip_for()` are pure virtual (implemented in subclasses).
 
-- ~~Due to the design of emu2413, VRC7 may be run for specific number of samples, not clocks.~~ (unsure)
+----
+
+Each `ChipInstance` subclass `(Chip)Instance` has an associated `(Chip)ChannelID` enum (or enum class), also found as `(Chip)Instance::ChannelID`, specifying which channels that chip has. `(Chip)Instance` owns a sequencer (`ChipSequencer<(Chip)Instance::ChannelID>`), driver `(Chip)Driver`, and sound chip emulator (from nsfplay). 
+
+Each sound chip module (`ChipInstance` subclass) can be run for a specific period of time (nclock: `ClockT`). The sound chip's synthesis callback (`ChipInstance::run_chip_for()`) is called by `OverallSynth`, and alternates running the synthesizer to generate audio for a duration in clock cycles (`ChipInstance::synth_run_clocks()`), and handling externally-imposed ticks or internally-timed register writes. On every tick (60 ticks/second), the synthesis callback returns, `OverallSynth` calls `ChipInstance::driver_tick()`, `ChipInstance`'s sound driver fetches event data from the sequencer and determines what registers to write to the chip (for new notes, instruments, vibrato, etc), and `OverallSynth` calls the synthesis callback again. On every register write, the synthesis callback writes to the registers of its sound chip (`ChipInstance::synth_write_memory()`) before resuming synthesis.
+
+Audio generated from separate emulated sound chips is mixed linearly (addition or weighted average). Each sound chip returns premixed audio from all channels, instead of returning each channel's audio level. (Why? I use nsfplay to emulate sound chips; each nsfplay chip returns premixed audio from all channels. Also many Famicom chips mix their channels using nonlinear or time-division mixing.) Each sound chip can output audio by either writing to `OverallSynth._nes_blip` (type: `Blip_Buffer`), or writing to an temporary buffer passed into the sound chip callback.
+
+Sound chip emulation (audio synthesis) will *not* be implemented in my future NSF driver (since it's handled by hardware or the NSF player/emulator).
+
+----
+
+The sequencer (`ChipSequencer<ChannelID>` holding many `ChannelSequencer`) is implemented in C++, and converts pattern data from "events placed at beats" into "events separated by ticks". This is a complex task because events are located at beat fractions, not entries in a fixed array (which other trackers use). So when performing NSF export, exotracker will likely use the C++ sequencer to compile patterns into a list of (delay, event), much like PPMCK or GEMS. The NSF driver will only have a simplified sequencer.
+
+In the remainder of this section, I ignore NSF export and focus on PC playback. Each `ChannelSequencer` remembers its position in a document, but not what document it's playing (except as a performance optimization). Every call to `ChannelSequencer` will pass the latest document available as an argument (which changes every time the user edits the document's patterns or global options). This is not implemented yet, though.
+
+`ChipSequencer<ChannelID>` is defined in `audio/synth/sequencer.h`. It owns `EnumMap<ChannelID, ChannelSequencer>` (one `ChannelSequencer` for every channel the current chip has).
+
+----
+
+Each chip's sound driver (`(Chip)Driver`) is called once per tick. It handles events from the sequencer, as well as volume envelopes and vibrato. It generates register writes once per tick (possibly with delays between channels). It will be implemented separately in C++ and NSF export.
+
+Each `(Chip)Instance` subclass owns a `(Chip)Driver` owning several `(Chip)(Channel)Driver`, neither of which inherits from global interfaces. Drivers are only exposed to their owning instance, not to `OverallSynth` or beyond.
+
+My current API provides no way for drivers to *read* from sound chips' address spaces. Channel drivers can use custom APIs to tell their owning chip driver how to handle chip-wide register writes: after all channel drivers are done running (and generating register writes), the chip driver knows the desired state of each channel and can generate more register writes. (For example, the 5B chip has a single 6-bit register telling the chip to enable/disable tone/noise for each of the 3 channels.)
+
+j0CC handles this differently. CAPU (hardware chip synth) Read() method, but it's completely unused. The 5B uses static globals, rather than a ChipDriver class, to write chip-wide registers.
 
 ## Rules for avoiding circular header inclusion
 

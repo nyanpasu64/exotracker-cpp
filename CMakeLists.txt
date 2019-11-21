@@ -53,12 +53,12 @@ add_library(exotracker-lib
         # Common files (tightly coupled)
         src/audio/audio_common.cpp
         src/audio/synth_common.cpp
+        src/audio/synth/sequencer.cpp
         src/audio/synth/music_driver_common.cpp
 
         # Implementation files
         src/audio/output.cpp
         src/audio/synth.cpp
-        src/audio/synth/music_driver.cpp
 
         # 2A03 audio
         3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
@@ -68,7 +68,6 @@ add_library(exotracker-lib
 
         # Etc.
         src/document.cpp
-        src/sequencer/sequencer.cpp
         )
 target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 

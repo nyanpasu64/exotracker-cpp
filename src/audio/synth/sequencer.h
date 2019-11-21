@@ -1,6 +1,7 @@
 #pragma once
 
 #include "document.h"
+#include "util/enum_map.h"
 
 #include <gsl/span>
 
@@ -9,7 +10,7 @@
 
 namespace sequencer {
 
-using EventsThisTickRef = gsl::span<doc::RowEvent>;
+using EventsRef = gsl::span<doc::RowEvent>;
 
 /*
 TODO only expose through unique_ptr?
@@ -21,7 +22,7 @@ since ChannelSequencer's list of fields is in flux, and co-evolves with its meth
 class ChannelSequencer {
     using EventsThisTickOwned = std::vector<doc::RowEvent>;
     EventsThisTickOwned _events_this_tick;
-    int time_until_toggle = 0;
+    int time_until_toggle = 30 + rand() % 90;
 
 public:
     // impl
@@ -47,7 +48,8 @@ public:
     void seek() {}
     
     // Owning a vector, but returning a span, avoids the double-indirection of vector&.
-    EventsThisTickRef next_tick() {
+    /// Eventually, (document, ChipIndex, ChannelIdInt) will be passed in as well.
+    EventsRef next_tick() {
         _events_this_tick.clear();
 
         if (time_until_toggle == 0) {
@@ -66,6 +68,27 @@ public:
         time_until_toggle -= 1;
 
         return _events_this_tick;
+    }
+};
+
+/// The sequencer owned by a (Chip)Instance.
+/// ChannelID is an enum of that chip's channels, followed by COUNT.
+template<typename ChannelID>
+class ChipSequencer {
+    EnumMap<ChannelID, ChannelSequencer> _channel_sequencers;
+
+public:
+    // impl
+
+    /// Eventually, (document, ChipIndex) will be passed in as well.
+    EnumMap<ChannelID, EventsRef> sequencer_tick() {
+        EnumMap<ChannelID, EventsRef> channel_events;
+
+        for (size_t chan = 0; chan < enum_count<ChannelID>; chan++) {
+            channel_events[chan] = _channel_sequencers[chan].next_tick();
+        }
+
+        return channel_events;
     }
 };
 
