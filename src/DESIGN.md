@@ -10,12 +10,18 @@ src/gui/history.h has `gui::history::History`. There is only 1 instance, and it 
 
 Tracker pattern state is immutable, using data structures supplied by the immer library. This allows the audio thread to read it without blocking. The UI thread creates edited copies of the old state, using structural sharing to avoid copying unmodified data, then atomically updates `History.current`.
 
+## Code style
+
 I am following some Rust-inspired rules in the codebase.
 
 - Polymorphic classes are non-copyable. Maybe non-polymorphic classes (not value structs) too.
 - Mutable aliasing is disallowed, except when mandated by third-party libraries (blip_buffer).
 - Self-referential structs are disallowed, except when mandated by third-party libraries (blip_buffer and portaudio), in which case the copy and move constructors are disabled (or move constructor is manually fixed, in the case of Blip_Buffer).
 - Inheritance and storing data in base classes is discouraged.
+
+In audio code, "out parameters" are common since they don't require allocations (heap allocations can take a long time, pool allocations are faster).
+
+In function signatures, out parameters (mutable references primarily written to, not read from) are placed at the end of the argument list. This follows the [Google Style Guide](https://google.github.io/styleguide/cppguide.html#Output_Parameters).
 
 ## Audio architecture
 
