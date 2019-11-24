@@ -76,7 +76,9 @@ public:
     ///
     /// output must have length length of mono_smp_per_block * stereo_nchan.
     /// It is treated as an array of interleaved samples, [smp#, * nchan + chan#] Amplitude.
-    void synthesize_overall(gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block);
+    void synthesize_overall(
+        gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block
+    );
 };
 
 
