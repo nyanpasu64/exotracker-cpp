@@ -8,13 +8,12 @@ Dependency graph of .h files. Top-level headers `#include` nested headers.
         - synth_common
             - event_queue
             - make_blip_buffer
+            - synth/chip_kinds_common
     - music_driver
         - chips
             - synth_common
         - music_driver/nes_2a03
-            - music_driver_common
-    - chips
-        - synth_common
+            - synth/music_driver_common (nearly empty)
     - synth_common
 
 chips.h contains a list of sound chips, etc. It can be used by synth.h and music_driver.h, but not synth/nes_2a03 or other sound chips. This reduces recompilation.

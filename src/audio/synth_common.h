@@ -1,5 +1,6 @@
 #pragma once
 
+#include "synth/chip_kinds_common.h"
 #include "make_blip_buffer.h"
 #include "event_queue.h"
 #include "audio_common.h"
@@ -14,6 +15,8 @@
 
 namespace audio {
 namespace synth {
+
+using namespace chip_kinds;
 
 // https://wiki.nesdev.com/w/index.php/CPU
 // >Emulator authors may wish to emulate the NTSC NES/Famicom CPU at 21441960 Hz...
@@ -34,23 +37,6 @@ using event_queue::ClockT;
 
 using Address = uint16_t;
 using Byte = uint8_t;
-
-/// Index into a list of active sound chips.
-using ChipIndex = uint32_t;
-
-/// List of sound chips supported.
-enum class ChipKind {
-    Apu1,
-//    Apu2,
-
-    COUNT,
-};
-
-enum class Apu1ChannelID {
-    Pulse1,
-    Pulse2,
-    COUNT,
-};
 
 struct RegisterWrite {
     Address address;
