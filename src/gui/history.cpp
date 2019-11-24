@@ -1,9 +1,18 @@
 #include "history.h"
 
+#include "audio/synth/chip_kinds_common.h"
+#include "util/macros.h"
+
+#include <cassert>
+
 namespace gui {
 namespace history {
 
-History::History(doc::TrackPattern initial_state) : current{initial_state} {}
+namespace chip_kinds = audio::synth::chip_kinds;
+
+History::History(doc::Document initial_state) :
+    current{doc::HistoryFrame{initial_state}}
+{}
 
 History::BoxT const History::get() const {
     return current.load();
@@ -47,33 +56,53 @@ Success History::redo() {
     return Success{true};
 }
 
-doc::TrackPattern dummy_pattern() {
-    doc::TrackPattern pattern;
-
-    pattern.nbeats = 4;
-
+doc::Document dummy_document() {
     using Frac = doc::BeatFraction;
 
-    // TimeInPattern, RowEvent
+    doc::Document::ChipList::transient_type chips;
+    doc::SequenceEntry::ChipChannelEvents::transient_type chip_channel_events;
+
+    // chip 0
     {
-        auto & channel_ref = pattern.channels[doc::ChannelId::Test1];
-        channel_ref = doc::KV{channel_ref}
-                .set_time({0, 0}, {0})
-                .set_time({{1, 3}, 0}, {1})
-                .set_time({{2, 3}, 0}, {2})
-                .set_time({1, 0}, {3})
-                .set_time({1 + Frac{1, 4}, 0}, {4})
-                .channel_events;
-    }
-    {
-        auto & channel_ref = pattern.channels[doc::ChannelId::Test2];
-        channel_ref = doc::KV{channel_ref}
-                .set_time({2, 0}, {102})
-                .set_time({3, 0}, {103})
-                .channel_events;
+        auto const chip_kind = chip_kinds::ChipKind::Apu1;
+        using ChannelID = chip_kinds::Apu1ChannelID;
+
+        chips.push_back(chip_kind);
+        chip_channel_events.push_back([]() {
+            doc::SequenceEntry::ChannelToEvents::transient_type channel_events;
+
+            channel_events.push_back([]() {
+                // TimeInPattern, RowEvent
+                doc::EventList events = doc::KV{{}}
+                    .set_time({0, 0}, {0})
+                    .set_time({{1, 3}, 0}, {1})
+                    .set_time({{2, 3}, 0}, {2})
+                    .set_time({1, 0}, {3})
+                    .set_time({1 + Frac{1, 4}, 0}, {4})
+                    .event_list;
+                return events;
+            }());
+
+            channel_events.push_back([]() {
+                doc::EventList events = doc::KV{{}}
+                    .set_time({2, 0}, {102})
+                    .set_time({3, 0}, {103})
+                    .event_list;
+                return events;
+            }());
+
+            release_assert(channel_events.size() == (int)ChannelID::COUNT);
+            return channel_events.persistent();
+        }());
     }
 
-    return pattern;
+    return doc::Document {
+        .chips = chips.persistent(),
+        .pattern = doc::SequenceEntry {
+            .nbeats = 4,
+            .chip_channel_events = chip_channel_events.persistent(),
+        },
+    };
 }
 
 // namespaces

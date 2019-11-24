@@ -8,13 +8,37 @@
 namespace audio {
 namespace synth {
 
-OverallSynth::OverallSynth(int stereo_nchan, int smp_per_s) :
+OverallSynth::OverallSynth(
+    int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document
+) :
     _stereo_nchan(stereo_nchan),
-    _nes_blip(smp_per_s, CPU_CLK_PER_S)
+    _nes_blip(smp_per_s, CPU_CLK_PER_S),
+    _get_document(get_document)
 {
-    auto apu1_unique = nes_2a03::make_Apu1Instance(_nes_blip);
-//    auto & apu1 = *apu1_unique;
-    _chip_instances.push_back(std::move(apu1_unique));
+    doc::Document document = get_document.get_document();
+
+    // Optional non-owning reference to the previous chip, which may/not be APU1.
+    // Passed to APU2.
+    // If an APU2 is not immediately preceded by an APU1 (if apu1_maybe == nullptr),
+    // this is a malformed document, so throw an exception.
+    nes_2a03::BaseApu1Instance * apu1_maybe = nullptr;
+
+    for (ChipKind chip_kind : document.chips) {
+        switch (chip_kind) {
+            case ChipKind::Apu1: {
+                auto apu1_unique = nes_2a03::make_Apu1Instance(_nes_blip);
+                apu1_maybe = apu1_unique.get();
+                _chip_instances.push_back(std::move(apu1_unique));
+                break;
+            }
+
+            case ChipKind::COUNT: break;
+        }
+
+        if (chip_kind != ChipKind::Apu1) {
+            apu1_maybe = nullptr;
+        }
+    }
 
     _events.set_timeout(SynthEvent::Tick, 0);
 }

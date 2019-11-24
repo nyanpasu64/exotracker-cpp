@@ -41,10 +41,10 @@ TEST_CASE("Test that TimeInPattern comparisons work properly.") {
     CHECK(fraction_test.at({1, 2}) == 5);
 }
 
-TEST_CASE ("Test that ChannelEvents and KV search is implemented properly.") {
+TEST_CASE ("Test that EventList and KV search is implemented properly.") {
     using namespace doc;
 
-    doc::ChannelEvents events = doc::ChannelEvents()
+    doc::EventList events = doc::EventList()
             .push_back({{0, 0}, {}})
             .push_back({{0, 1}, {1}})
             .push_back({{{1, 3}, 0}, {3}})

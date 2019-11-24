@@ -19,6 +19,7 @@ public:
     // interleaved=false was added to support ASIO's native representation.
     static const bool interleaved = true;
 
+    // Constructor
     using synth::OverallSynth::OverallSynth;
 
     // impl pa::CallbackInterface
@@ -72,7 +73,9 @@ static uintptr_t const MONO_SMP_PER_BLOCK = 64;
 
 /// Why factory method and not constructor?
 /// So we can calculate values (like sampling rate) used in multiple places.
-AudioThreadHandle AudioThreadHandle::make(portaudio::System & sys) {
+AudioThreadHandle AudioThreadHandle::make(
+    portaudio::System & sys, doc::GetDocument & get_document
+) {
     portaudio::DirectionSpecificStreamParameters outParams(
                 sys.defaultOutputDevice(),
                 STEREO_NCHAN,
@@ -90,15 +93,16 @@ AudioThreadHandle AudioThreadHandle::make(portaudio::System & sys) {
     // We cannot move/memcpy due to self-reference (stream holds reference to callback).
     // C++17 guaranteed copy elision only works on prvalues, not locals.
     // So let constructor initialize fields in-place (our factory method cannot).
-    return AudioThreadHandle{outParams, params};
+    return AudioThreadHandle{outParams, params, get_document};
 }
 
 AudioThreadHandle::AudioThreadHandle(
     portaudio::DirectionSpecificStreamParameters outParams,
-    portaudio::StreamParameters params
+    portaudio::StreamParameters params,
+    doc::GetDocument & get_document
 ) :
     callback(std::make_unique<OutputCallback>(
-        outParams.numChannels(), (int)params.sampleRate()
+        outParams.numChannels(), (int)params.sampleRate(), get_document
     )),
     stream(std::make_unique<SelfTerminatingStream>(params, *callback))
 {

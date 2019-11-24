@@ -2,25 +2,23 @@
 
 #include <verdigris/wobjectimpl.h>
 
-#include <QPainter>
-#include <QFontMetrics>
-#include <QPoint>
 #include <QApplication>
-#include <QClipboard>
-#include <QMenu>
-#include <QAction>
-#include <QRegularExpression>
-#include <QRegularExpressionMatch>
-#include <QMetaMethod>
+#include <QFontMetrics>
+#include <QPainter>
+#include <QPoint>
+
 #include <algorithm>
-#include <vector>
-#include <utility>
-#include <stdexcept>
 #include <cstdlib>
+#include <optional>
+#include <stdexcept>
+#include <utility>
+#include <vector>
 
 
 namespace gui {
 namespace pattern_editor {
+
+namespace chip_kinds = doc::chip_kinds;
 
 W_OBJECT_IMPL(PatternEditorPanel)
 
@@ -29,7 +27,7 @@ _initDisplay;
 
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     QWidget(parent),
-    dummy_history{doc::TrackPattern{}},
+    dummy_history{doc::Document{}},
     history{dummy_history}
 {
     setMinimumSize(128, 320);
@@ -93,32 +91,42 @@ static Palette palette;
 // See document.h for documentation of how patterns work.
 
 struct ChannelDraw {
-    doc::ChannelInt channel;
+    chip_kinds::ChipIndex chip;
+    chip_kinds::ChannelIndex channel;
     int xleft;
     int xright;
 };
 
-class ChannelDrawIterator {
-    PatternEditorPanel & pattern_editor;
-    int channel = 0;
+// where Callback_of_ChannelDraw: Fn(ChannelDraw)
+template<typename Callback_of_ChannelDraw>
+void foreach_channel_draw(
+    PatternEditorPanel const & pattern_editor,
+    doc::Document const document,
+    Callback_of_ChannelDraw callback
+) {
+
     int x_accum = 0;
 
-public:
-    explicit ChannelDrawIterator(PatternEditorPanel & pattern_editor) : pattern_editor(pattern_editor) {}
-    bool has_next() const {
-        return channel < doc::ChannelId::COUNT;
-    }
-    ChannelDraw next() {
-        int xleft = x_accum;
-        int dx_width = pattern_editor.dxWidth;
-        int xright = xleft + dx_width;
+    // local
+    for (
+        chip_kinds::ChipIndex chip_index = 0;
+        chip_index < document.chips.size();
+        chip_index++
+    ) {
+        for (
+            chip_kinds::ChannelIndex channel_index = 0;
+            channel_index < document.chip_index_to_nchan(chip_index);
+            channel_index++
+        ) {
+            int xleft = x_accum;
+            int dx_width = pattern_editor.dxWidth;
+            int xright = xleft + dx_width;
 
-        ChannelDraw out{channel, xleft, xright};
-        channel += 1;
-        x_accum = xright;
-        return out;
+            callback(ChannelDraw{chip_index, channel_index, xleft, xright});
+            x_accum = xright;
+        }
     }
-};
+}
 
 using history::History;
 
@@ -132,13 +140,14 @@ using history::History;
 #define HORIZ_GRIDLINE(right_top) (right_top)
 
 /// Draw the background lying behind notes/etc.
-void drawRowBg(PatternEditorPanel & self, History::UnsyncT const &pattern, QPainter & painter) {
-    // In Qt, (0, 0) is top-left, dx is right, and dy is down.
+static void drawRowBg(
+    PatternEditorPanel & self, doc::Document const &document, QPainter & painter
+) {
+    doc::SequenceEntry pattern = document.pattern;
 
-    // Begin loop(channel)
-    for (ChannelDrawIterator it(self); it.has_next();) {
-        auto [channel, xleft, xright] = it.next();
-        // End loop(channel)
+    // In Qt, (0, 0) is top-left, dx is right, and dy is down.
+    foreach_channel_draw(self, document, [&](ChannelDraw channel_draw) {
+        auto [chip, channel, xleft, xright] = channel_draw;
 
         // drawLine() paints the interval [x1, x2] and [y1, y2] inclusive.
         // Subtract 1 so xright doesn't enter the next channel, or ybottom enter the next row.
@@ -149,8 +158,8 @@ void drawRowBg(PatternEditorPanel & self, History::UnsyncT const &pattern, QPain
         int row = 0;
         doc::BeatFraction curr_beats = 0;
         for (;
-                curr_beats < pattern.nbeats;
-                curr_beats += self.row_duration_beats, row += 1)
+            curr_beats < pattern.nbeats;
+            curr_beats += self.row_duration_beats, row += 1)
         {
             // Compute row height.
             int ytop = self.dyHeightPerRow * row;
@@ -181,8 +190,7 @@ void drawRowBg(PatternEditorPanel & self, History::UnsyncT const &pattern, QPain
             }
             painter.drawLine(left_top, HORIZ_GRIDLINE(right_top));
         }
-
-    }
+    });
 }
 
 template <typename T> int sgn(T val) {
@@ -197,25 +205,33 @@ inline int round_to_int(rational v)
 }
 
 /// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
-void drawRowEvents(PatternEditorPanel & self, History::UnsyncT const &pattern, QPainter & painter) {
-    // Begin loop(channel)
-    for (ChannelDrawIterator it(self); it.has_next();) {
-        auto [channel, xleft, xright] = it.next();
-        // End loop(channel)
+static void drawRowEvents(
+    PatternEditorPanel & self, doc::Document const &document, QPainter & painter
+) {
+    using Frac = doc::BeatFraction;
+
+    doc::SequenceEntry pattern = document.pattern;
+
+    foreach_channel_draw(self, document, [&](ChannelDraw channel_draw) {
+        auto [chip, channel, xleft, xright] = channel_draw;
 
         // drawLine() paints the interval [x1, x2]. Subtract 1 so [xleft, xright-1] doesn't enter the next channel.
         xright -= 1;
 
         // https://bugs.llvm.org/show_bug.cgi?id=33236
         // the original C++17 spec broke const struct unpacking.
-        for (const auto & timed_event: pattern.channels[channel]) {
-            auto & time = timed_event.time;
-            auto & row_event = timed_event.v;
+        for (
+            doc::TimedChannelEvent timed_event
+            : pattern.chip_channel_events[chip][channel]
+        ) {
+            doc::TimeInPattern time = timed_event.time;
+            // TODO draw the event
+            doc::RowEvent row_event = timed_event.v;
 
             // Compute where to draw row.
-            doc::BeatFraction beat = time.anchor_beat;
-            doc::BeatFraction & beats_per_row = self.row_duration_beats;
-            doc::BeatFraction row = beat / beats_per_row;
+            Frac beat = time.anchor_beat;
+            Frac beats_per_row = self.row_duration_beats;
+            Frac row = beat / beats_per_row;
             int yPx = round_to_int(self.dyHeightPerRow * row);
             QPoint left_top{xleft, yPx};
             QPoint right_top{xright, yPx};
@@ -228,13 +244,11 @@ void drawRowEvents(PatternEditorPanel & self, History::UnsyncT const &pattern, Q
 
             // TODO Draw text.
         }
-    }
+    });
 }
 
-void drawPattern(PatternEditorPanel & self, const QRect &rect) {
-    // int maxWidth = std::min(geometry().width(), TracksWidthFromLeftToEnd_);
-
-    History::BoxT const pattern = self.history.get().get();
+static void drawPattern(PatternEditorPanel & self, const QRect &rect) {
+    doc::Document const document = self.history.get().get_document();
 
     self.pixmap_->fill(Qt::black);
 
@@ -246,8 +260,8 @@ void drawPattern(PatternEditorPanel & self, const QRect &rect) {
     // First draw the row background. It lies in a regular grid.
     // TODO only redraw `rect`??? how 2 partial redraw???
     // i assume Qt will always use full-widget rect???
-    drawRowBg(self, *pattern, paintOffScreen);
-    drawRowEvents(self, *pattern, paintOffScreen);
+    drawRowBg(self, document, paintOffScreen);
+    drawRowEvents(self, document, paintOffScreen);
 
     // Then for each channel, draw all notes in that channel lying within view.
     // Notes may be positioned at fractional beats that do not lie in the grid.

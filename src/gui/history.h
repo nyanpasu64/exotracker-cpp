@@ -22,7 +22,7 @@ struct Success {
 /// while get() can be called from any thread desired (audio thread).
 ///
 /// This class is approximately correct at best ;)
-class History : boost::noncopyable {
+class History : boost::noncopyable, public doc::GetDocument {
 public:
     using UnsyncT = doc::HistoryFrame;
     using BoxT = immer::box<UnsyncT>;
@@ -34,7 +34,7 @@ private:
     std::vector<BoxT> redo_stack;
 
 public:
-    History(doc::TrackPattern initial_state);
+    History(doc::Document initial_state);
     virtual ~History() = default;
 
     /// Called from UI or audio thread. Non-blocking and thread-safe.
@@ -56,9 +56,14 @@ public:
 
     /// Called from UI thread. Switch `get()` to next state.
     Success redo();
+
+    // impl doc::GetDocument
+    doc::Document const & get_document() const override {
+        return get().get().document;
+    }
 };
 
-doc::TrackPattern dummy_pattern();
+doc::Document dummy_document();
 
 // namespaces
 }

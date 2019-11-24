@@ -5,6 +5,7 @@
 /// Synth code generates audio whenever the output callback runs.
 /// It does not operate independently.
 
+#include "document.h"
 #include "util/macros.h"
 
 #include <portaudiocpp/PortAudioCpp.hxx>
@@ -33,8 +34,15 @@ struct AudioThreadHandle {
     std::unique_ptr<pa::Stream> stream;
 
 public:
-    // throws PaException or PaCppException or whatever else
-    static AudioThreadHandle make(pa::System & sys);
+
+    /// Preconditions:
+    /// - get_document argument must outlive returned OverallSynth.
+    /// - get_document's list of chips must not change between calls.
+    ///   If it changes, destroy returned OverallSynth and create a new one.
+    /// - In get_document's list of chips, any APU2 must be preceded directly with APU1.
+    ///
+    /// throws PaException or PaCppException or whatever else
+    static AudioThreadHandle make(pa::System & sys, doc::GetDocument & get_document);
 
 private:
     /*
@@ -50,7 +58,8 @@ private:
 
     AudioThreadHandle(
         portaudio::DirectionSpecificStreamParameters outParams,
-        portaudio::StreamParameters params
+        portaudio::StreamParameters params,
+        doc::GetDocument & get_document
     );
 };
 

@@ -1,6 +1,6 @@
 #include "gui/main_window.h"
+#include "gui/history.h"
 #include "audio.h"
-#include "gui/document_history.h"
 
 #include <QApplication>
 #include <portaudiocpp/PortAudioCpp.hxx>
@@ -25,6 +25,7 @@ int main(int argc, char *argv[])
 #ifdef _WIN32
     win32_set_font();
 #endif
+    gui::history::History history{gui::history::dummy_document()};
 
     portaudio::AutoSystem autoSys;
     portaudio::System & sys = portaudio::System::instance();
@@ -38,9 +39,9 @@ int main(int argc, char *argv[])
     std::cout.flush();
 
     // Begin playing audio. Destroying this variable makes audio stop.
-    auto audio_handle = audio::output::AudioThreadHandle::make(sys);
+    auto audio_handle = audio::output::AudioThreadHandle::make(sys, history);
 
-    unique_ptr<MainWindow> w = MainWindow::make();
+    unique_ptr<MainWindow> w = MainWindow::make(history);
     w->show();
 
     return a.exec();

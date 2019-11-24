@@ -12,6 +12,10 @@
 /// Therefore when designing immer::type<Inner>, Inner can be a mutable struct,
 /// std collection, or another immer::type.
 
+#include "audio/synth/chip_kinds_common.h"
+
+#include <immer/array.hpp>
+#include <immer/array_transient.hpp>
 #include <immer/flex_vector.hpp>
 #include <immer/flex_vector_transient.hpp>
 #include <boost/rational.hpp>
@@ -24,6 +28,8 @@
 #include <utility>
 
 namespace doc {
+
+namespace chip_kinds = audio::synth::chip_kinds;
 
 // Adapted from https://www.fluentcpp.com/2019/04/09/how-to-emulate-the-spaceship-operator-before-c20-with-crtp/
 
@@ -122,17 +128,15 @@ struct TimedChannelEvent {
     COMPARE_ONLY(compare_, TimedChannelEvent)
 };
 
-using ChannelEvents = immer::flex_vector<TimedChannelEvent>;
+using EventList = immer::flex_vector<TimedChannelEvent>;
 
-/// Wrapper for ChannelEvents (I wish C++ had extension methods),
+/// Owning wrapper for EventList (I wish C++ had extension methods),
 /// adding the ability to binary-search and treat it as a map.
 template<typename ImmerT>
-//using ImmerT = ChannelEvents::transient_type;
 struct KV_Internal {
     using This = KV_Internal<ImmerT>;
-//    using This = KV_Internal;
 
-    ImmerT channel_events;
+    ImmerT event_list;
 
 private:
     static bool cmp_less_than(TimedChannelEvent const &a, TimeInPattern const &b) {
@@ -140,14 +144,14 @@ private:
     }
 
     bool iter_matches_time(typename ImmerT::iterator iter, TimeInPattern t) const {
-        if (iter == channel_events.end()) return false;
+        if (iter == event_list.end()) return false;
         if (iter->time != t) return false;
         return true;
     }
 
 public:
     typename ImmerT::iterator greater_equal(TimeInPattern t) const {
-        return std::lower_bound(channel_events.begin(), channel_events.end(), t, cmp_less_than);
+        return std::lower_bound(event_list.begin(), event_list.end(), t, cmp_less_than);
     }
 
     bool contains_time(TimeInPattern t) const {
@@ -179,45 +183,68 @@ public:
         auto iter = greater_equal(t);
         TimedChannelEvent timed_v{t, v};
         if (iter_matches_time(iter, t)) {
-            return This{channel_events.set(iter.index(), timed_v)};
+            return This{event_list.set(iter.index(), timed_v)};
         } else {
-            return This{channel_events.insert(iter.index(), timed_v)};
+            return This{event_list.insert(iter.index(), timed_v)};
         }
     }
 };
 
-using KV = KV_Internal<ChannelEvents>;
-using KVTransient = KV_Internal<ChannelEvents::transient_type>;
+using KV = KV_Internal<EventList>;
+using KVTransient = KV_Internal<EventList::transient_type>;
 
-namespace _ChannelId {
-enum ChannelId {
-    Test1,
-    Test2,
-    COUNT
-};
-}
-using _ChannelId::ChannelId;
-using ChannelInt = int;
-
-struct TrackPattern {
+struct SequenceEntry {
     BeatFraction nbeats;
-    std::array<ChannelEvents, ChannelId::COUNT> channels;
+
+    // TODO add pattern indexing scheme.
+    /**
+    Invariant (expressed through dependent types):
+    - [chip: ChipInt] [ChannelID<chips[chip]: ChipKind>] EventList
+
+    Invariant (expressed without dependent types):
+    - chip: (ChipInt = [0, Document.chips.size()))
+    - chips[chip]: ChipKind
+    - channel: (ChannelIndex = [0, CHIP_TO_NCHAN[chip]))
+    - chip_channel_events[chip][channel]: EventList
+    */
+    using ChannelToEvents = immer::array<EventList>;
+    using ChipChannelEvents = immer::array<ChannelToEvents>;
+    ChipChannelEvents chip_channel_events;
 };
 
-using HistoryFrame = TrackPattern;
+using FlatChannelInt = uint32_t;
 
-// Update as we flesh out the data stored in a document.
-using Document = TrackPattern;
+struct Document {
+    /// vector<ChipIndex -> ChipKind>
+    using ChipList = immer::array<chip_kinds::ChipKind>;
+    ChipList chips;
 
-///// get_document() must be thread-safe in implementations.
-///// For example, if implemented by DocumentHistory,
-///// get_document() must not return invalid states while undoing/redoing.
-//class GetDocument {
-//public:
-//    virtual ~GetDocument() = default;
-//    virtual TrackPattern const & get_document() const = 0;
-//};
+    chip_kinds::ChannelIndex chip_index_to_nchan(chip_kinds::ChipIndex index) const {
+        return chip_kinds::CHIP_TO_NCHAN[chips[index]];
+    }
 
+    // TODO add multiple patterns.
+    SequenceEntry pattern;
+};
+
+struct HistoryFrame {
+    Document document;
+    // TODO add std::string diff_from_previous.
+};
+
+/// get_document() must be thread-safe in implementations.
+/// For example, if implemented by DocumentHistory,
+/// get_document() must not return invalid states while undoing/redoing.
+class GetDocument {
+public:
+    virtual ~GetDocument() = default;
+    virtual Document const & get_document() const = 0;
+};
+
+// immer::flex_vector (possibly other types)
+// is a class wrapping immer/detail/rbts/rrbtree.hpp.
+// immer's rrbtree is the size of a few pointers, and does not hold node data.
+// So immer types take up little space in their owning struct (comparable to shared_ptr).
 
 // namespace doc
 }

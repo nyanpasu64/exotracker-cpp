@@ -3,6 +3,7 @@
 #include "synth/nes_2a03.h"
 #include "synth_common.h"
 #include "audio_common.h"
+#include "document.h"
 #include "util/enum_map.h"
 
 #include <memory>
@@ -20,9 +21,11 @@ enum class SynthEvent {
     COUNT
 };
 
+/// <'a>
 class OverallSynth : boost::noncopyable {
+    // runtime constants
 public:
-    int _stereo_nchan;
+    int const _stereo_nchan;
 
 private:
     /*
@@ -43,11 +46,12 @@ private:
 
     In OpenMPT, ticks/s can change within a song, so it would need to be a method.
     */
-    uint32_t _clocks_per_tick = CPU_CLK_PER_S / TICKS_PER_S;
+    uint32_t const _clocks_per_tick = CPU_CLK_PER_S / TICKS_PER_S;
+
+    // fields
+    doc::GetDocument &/*'a*/ _get_document;
 
     EventQueue<SynthEvent> _events;
-
-    // Member variables
 
     // Audio written into this and read to output.
     Blip_Buffer _nes_blip;
@@ -61,12 +65,17 @@ private:
     Amplitude _temp_buffer[1 << 16];
 
 public:
-    OverallSynth(OverallSynth &&) = default;
-
-    OverallSynth(int stereo_nchan, int smp_per_s);
+    // impl
+    /// Preconditions:
+    /// - get_document argument must outlive returned OverallSynth.
+    /// - get_document's list of chips must not change between calls.
+    ///   If it changes, discard returned OverallSynth and create a new one.
+    /// - In get_document's list of chips, any APU2 must be preceded directly with APU1.
+    OverallSynth(
+        int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document
+    );
 
 private:
-    // signed long (64-bit on linux64)? size_t (64-bit on x64)? uint32_t?
     // blip_buffer uses blip_long AKA signed int for nsamp.
     using SampleT = blip_nsamp_t;
 

@@ -20,12 +20,13 @@ class MainWindow : public QMainWindow
     W_OBJECT(MainWindow);
 
 private:
-    history::History history;
 
 public:
 
     // impl
-    static std::unique_ptr<MainWindow> make(QWidget * parent = nullptr);
+    static std::unique_ptr<MainWindow> make(
+        history::History & history, QWidget * parent = nullptr
+    );
 
     MainWindow(QWidget *parent = nullptr);
     virtual void _() = 0;
