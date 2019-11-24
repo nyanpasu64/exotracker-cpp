@@ -24,4 +24,7 @@ enum class Apu1ChannelID {
     COUNT,
 };
 
+using ChipToNchan = EnumMap<ChipKind, ChannelIndex>;
+extern const ChipToNchan CHIP_TO_NCHAN;
+
 }
