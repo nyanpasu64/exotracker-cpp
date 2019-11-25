@@ -100,6 +100,11 @@ public:
     IMMER_NODISCARD const T* data() const { return impl_.data(); }
 
     /*!
+     * Provide mutable access to the raw underlaying data.
+     */
+    IMMER_NODISCARD T* data_mut() { return impl_.data_mut(*this); }
+
+    /*!
      * Access the last element.
      */
     IMMER_NODISCARD const T& back() const { return data()[size() - 1]; }
@@ -181,7 +186,7 @@ private:
         : impl_(std::move(impl))
     {}
 
-    impl_t  impl_  = impl_t::empty;
+    impl_t  impl_  = impl_t::empty();
 };
 
 } // namespace immer
