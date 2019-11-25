@@ -14,19 +14,53 @@
 
 #include <immer/flex_vector.hpp>
 #include <immer/flex_vector_transient.hpp>
+
+#include <algorithm>
+#include <array>
 #include <boost/rational.hpp>
 #include <cstdint>
-#include <compare>
 #include <optional>
 #include <tuple>
-#include <array>
-#include <algorithm>
+#include <utility>
 
 namespace doc {
 
+// Adapted from https://www.fluentcpp.com/2019/04/09/how-to-emulate-the-spaceship-operator-before-c20-with-crtp/
+
+#define KEY(method, paren_of_fields) \
+    constexpr auto method() const { \
+        return std::tie paren_of_fields; \
+    } \
+
+#define COMPARE_ONLY(method, T) \
+    [[nodiscard]] constexpr bool operator<(const T& other) const { \
+        return this->method() < other.method(); \
+    } \
+    [[nodiscard]] constexpr bool operator>(const T& other) const { \
+        return this->method() > other.method(); \
+    } \
+    [[nodiscard]] constexpr bool operator>=(const T& other) const { \
+        return this->method() >= other.method(); \
+    } \
+    [[nodiscard]] constexpr bool operator<=(const T& other) const { \
+        return this->method() <= other.method(); \
+    } \
+
+#define EQUALABLE(method, T) \
+    [[nodiscard]] constexpr bool operator==(const T& other) const { \
+        return this->method() == other.method(); \
+    } \
+    [[nodiscard]] constexpr bool operator!=(const T& other) const { \
+        return this->method() != other.method(); \
+    } \
+
+
+#define COMPARABLE(method, T) \
+    EQUALABLE(method, T) \
+    COMPARE_ONLY(method, T) \
+
 using FractionInt = int64_t;
 using BeatFraction = boost::rational<FractionInt>;
-
 
 // TODO variant of u8 or note cut or etc.
 using Note = uint8_t;
@@ -35,7 +69,8 @@ struct RowEvent {
     std::optional<Note> note;
     // TODO volumes and []effects
 
-    bool operator==(RowEvent const &) const = default;
+    KEY(key_, (note))
+    EQUALABLE(key_, RowEvent)
 };
 
 /// A timestamp of a row in a pattern.
@@ -56,16 +91,9 @@ struct RowEvent {
 struct TimeInPattern {
     BeatFraction anchor_beat;
     int16_t frames_offset;
-    std::strong_ordering operator<=>(TimeInPattern const & rhs) const {
-        // msvc 2019 defines an implicit `operator<=>` on `boost::rational` which behaves in a nonsensical fashion
-        if (anchor_beat < rhs.anchor_beat) return std::strong_ordering::less;
-        if (anchor_beat > rhs.anchor_beat) return std::strong_ordering::greater;
-        return frames_offset <=> rhs.frames_offset;
-    }
 
-    auto operator==(TimeInPattern const & rhs) const {
-        return anchor_beat == rhs.anchor_beat && frames_offset == rhs.frames_offset;
-    }
+    KEY(key_, (anchor_beat, frames_offset))
+    COMPARABLE(key_, TimeInPattern)
 
     // TODO remove, only used for testing purposes
     static TimeInPattern from_frac(FractionInt num, FractionInt den) {
@@ -87,7 +115,11 @@ struct TimedChannelEvent {
     TimeInPattern time;
     RowEvent v;
 
-    auto operator<=>(TimedChannelEvent const &) const = default;
+    KEY(equal_, (time, v))
+    EQUALABLE(equal_, TimedChannelEvent)
+
+    KEY(compare_, (time))
+    COMPARE_ONLY(compare_, TimedChannelEvent)
 };
 
 using ChannelEvents = immer::flex_vector<TimedChannelEvent>;
