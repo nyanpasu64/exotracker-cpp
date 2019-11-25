@@ -14,10 +14,10 @@
 
 #include <immer/flex_vector.hpp>
 #include <immer/flex_vector_transient.hpp>
+#include <boost/rational.hpp>
 
 #include <algorithm>
 #include <array>
-#include <boost/rational.hpp>
 #include <cstdint>
 #include <optional>
 #include <tuple>
