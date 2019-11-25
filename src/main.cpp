@@ -9,6 +9,8 @@
 #include <Windows.h>
 #endif
 
+#include <iostream>
+
 using std::unique_ptr;
 using gui::MainWindow;
 
@@ -26,6 +28,14 @@ int main(int argc, char *argv[])
 
     portaudio::AutoSystem autoSys;
     portaudio::System & sys = portaudio::System::instance();
+
+    std::cout << "APIs {\n";
+    for (auto x = sys.hostApisBegin(), y = sys.hostApisEnd(); x != y; ++x) {
+        std::cout << x->name() << "\n";
+    }
+    std::cout << "} APIs\n";
+    std::cout << "Default API: " << sys.defaultHostApi().name() << "\n";
+    std::cout.flush();
 
     // Begin playing audio. Destroying this variable makes audio stop.
     auto audio_handle = audio::output::AudioThreadHandle::make(sys);
