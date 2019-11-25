@@ -15,7 +15,7 @@ OverallSynth::OverallSynth(
     _nes_blip(smp_per_s, CPU_CLK_PER_S),
     _get_document(get_document)
 {
-    doc::Document document = get_document.get_document();
+    doc::Document document = _get_document.get_document();
 
     // Optional non-owning reference to the previous chip, which may/not be APU1.
     // Passed to APU2.
@@ -46,6 +46,7 @@ OverallSynth::OverallSynth(
 void OverallSynth::synthesize_overall(
     gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block
 ) {
+    doc::Document document = _get_document.get_document();
 
     // In all likelihood this function will not work if stereo_nchan != 1.
     // If I ever add a stereo console (SNES, maybe SN76489 like sneventracker),
@@ -97,13 +98,17 @@ void OverallSynth::synthesize_overall(
             // This is the important one.
             case SynthEvent::Tick: {
                 // Reset register write queue.
-                for (auto & chip : _chip_instances) {
+                ChipIndex const nchip = _chip_instances.size();
+
+                for (ChipIndex chip_index = 0; chip_index < nchip; chip_index++) {
+                    auto & chip = _chip_instances[chip_index];
+
                     RegisterWriteQueue & register_writes = chip->_register_writes;
                     release_assert(register_writes.num_unread() == 0);
                     register_writes.clear();
 
                     // chip's time passes.
-                    chip->driver_tick();
+                    chip->driver_tick(document, chip_index);
                 }
 
                 _events.set_timeout(SynthEvent::Tick, _clocks_per_tick);

@@ -4,6 +4,7 @@
 #include "make_blip_buffer.h"
 #include "event_queue.h"
 #include "audio_common.h"
+#include "document.h"
 #include "util/enum_map.h"
 #include "util/macros.h"
 
@@ -158,7 +159,11 @@ public:
     /// Eventually, (document, ChipIndex) will be passed in as well.
     /// Sequencer's time passes.
     /// Mutates _register_writes.
-    virtual void driver_tick() = 0;
+    ///
+    /// We take a Document& to avoid repeatedly mutating atomic refcounts (slow?)
+    virtual void driver_tick(
+        doc::Document & document, chip_kinds::ChipIndex chip_index
+    ) = 0;
 
     /// Cannot cross tick boundaries. Can cross register-write boundaries.
     void run_chip_for(

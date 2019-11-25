@@ -133,10 +133,13 @@ class Apu1Driver {
     Apu1PulseDriver _pulse2_driver{1};
 
 public:
-    void driver_tick(RegisterWriteQueue &/*out*/ register_writes) {
-
+    void driver_tick(
+        doc::Document & document,
+        ChipIndex chip_index,
+        RegisterWriteQueue &/*out*/ register_writes
+    ) {
         EnumMap<ChannelID, sequencer::EventsRef> channel_events =
-            _chip_sequencer.sequencer_tick();
+            _chip_sequencer.sequencer_tick(document, chip_index);
 
         _pulse1_driver.tick(channel_events[ChannelID::Pulse1], /*mut*/ register_writes);
         _pulse2_driver.tick(channel_events[ChannelID::Pulse2], /*mut*/ register_writes);

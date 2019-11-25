@@ -1,4 +1,4 @@
 #include "sequencer.h"
 
-namespace sequencer {
+namespace audio::synth::sequencer {
 }

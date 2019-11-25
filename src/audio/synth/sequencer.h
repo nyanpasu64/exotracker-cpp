@@ -8,7 +8,9 @@
 #include <vector>
 #include <cstdlib>
 
-namespace sequencer {
+namespace audio::synth::sequencer {
+
+using namespace chip_kinds;
 
 using EventsRef = gsl::span<doc::RowEvent>;
 
@@ -49,7 +51,9 @@ public:
     
     // Owning a vector, but returning a span, avoids the double-indirection of vector&.
     /// Eventually, (document, ChipIndex, ChannelIdInt) will be passed in as well.
-    EventsRef next_tick() {
+    EventsRef next_tick(
+        doc::Document & document, ChipIndex chip_index, ChannelIndex chan_index
+    ) {
         _events_this_tick.clear();
 
         if (time_until_toggle == 0) {
@@ -81,11 +85,14 @@ public:
     // impl
 
     /// Eventually, (document, ChipIndex) will be passed in as well.
-    EnumMap<ChannelID, EventsRef> sequencer_tick() {
+    EnumMap<ChannelID, EventsRef> sequencer_tick(
+        doc::Document & document, ChipIndex chip_index
+    ) {
         EnumMap<ChannelID, EventsRef> channel_events;
 
         for (size_t chan = 0; chan < enum_count<ChannelID>; chan++) {
-            channel_events[chan] = _channel_sequencers[chan].next_tick();
+            channel_events[chan] = _channel_sequencers[chan]
+                .next_tick(document, chip_index, chan);
         }
 
         return channel_events;
