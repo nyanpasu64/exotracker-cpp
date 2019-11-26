@@ -25,6 +25,7 @@ class Apu1PulseDriver {
 
     // TODO add InstrEnvelope class
     // with array, index, and "should tick" or "reached end" methods.
+    bool _note_active = false;
     int _volume_index = 0;
 
     // Reading a ADD_BITFIELD_MEMBER does not sign-extended it.
@@ -67,17 +68,23 @@ public:
         for (doc::RowEvent event : events) {
             if (event.note.has_value()) {
                 _volume_index =  0;
+                _note_active = true;
                 new_note = true;
             }
         }
 
-        int volume = 0xc - (_volume_index / 1) - 3 * _pulse_num;
+        int volume;
+        if (_note_active) {
+            volume = 0xc - (_volume_index / 1) - 3 * _pulse_num;
 
-        if (!new_note) {
-            // Advance envelope. TODO move to InstrEnvelope or SynthEnvelope class.
-            if (volume > 0) {
-                _volume_index += 1;
+            if (!new_note) {
+                // Advance envelope. TODO move to InstrEnvelope or SynthEnvelope class.
+                if (volume > 0) {
+                    _volume_index += 1;
+                }
             }
+        } else {
+            volume = 0;
         }
 
         _next_state.volume = volume;
