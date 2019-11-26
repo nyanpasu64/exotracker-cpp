@@ -60,13 +60,23 @@ namespace chip_kinds = audio::synth::chip_kinds;
         return this->method() != other.method(); \
     } \
 
-
 #define COMPARABLE(method, T) \
     EQUALABLE(method, T) \
     COMPARE_ONLY(method, T) \
 
 using FractionInt = int64_t;
 using BeatFraction = boost::rational<FractionInt>;
+
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
+template <typename rational>
+inline int round_to_int(rational v)
+{
+    v = v + typename rational::int_type(sgn(v.numerator())) / 2;
+    return boost::rational_cast<int>(v);
+}
 
 // TODO variant of u8 or note cut or etc.
 using Note = uint8_t;
@@ -79,6 +89,10 @@ struct RowEvent {
     EQUALABLE(key_, RowEvent)
 };
 
+/// Why signed? Events can have negative offsets and play before their anchor beat,
+/// or even before the owning pattern starts. This is a feature(tm).
+using TickT = int32_t;
+
 /// A timestamp of a row in a pattern.
 ///
 /// Everything about exotracker operates using half-open [inclusive, exclusive) ranges.
@@ -88,17 +102,17 @@ struct RowEvent {
 /// It should be non-negative.
 ///
 /// The NES generally runs the audio driver 60 times a second.
-/// Negative or positive `frames_offset` causes a note to play before or after the beat.
+/// Negative or positive `tick_offset` causes a note to play before or after the beat.
 ///
-/// All positions are sorted by (anchor_beat, frames_offset).
-/// This code makes no attempt to prevent `frames_offset` from
+/// All positions are sorted by (anchor_beat, tick_offset).
+/// This code makes no attempt to prevent `tick_offset` from
 /// causing the sorting order to differ from the playback order.
 /// If this happens, the pattern is valid, but playing the pattern will misbehave.
 struct TimeInPattern {
     BeatFraction anchor_beat;
-    int16_t frames_offset;
+    TickT tick_offset;
 
-    KEY(key_, (anchor_beat, frames_offset))
+    KEY(key_, (anchor_beat, tick_offset))
     COMPARABLE(key_, TimeInPattern)
 
     // TODO remove, only used for testing purposes
@@ -117,18 +131,18 @@ struct TimeInPattern {
     }
 };
 
-struct TimedChannelEvent {
+struct TimedRowEvent {
     TimeInPattern time;
     RowEvent v;
 
     KEY(equal_, (time, v))
-    EQUALABLE(equal_, TimedChannelEvent)
+    EQUALABLE(equal_, TimedRowEvent)
 
     KEY(compare_, (time))
-    COMPARE_ONLY(compare_, TimedChannelEvent)
+    COMPARE_ONLY(compare_, TimedRowEvent)
 };
 
-using EventList = immer::flex_vector<TimedChannelEvent>;
+using EventList = immer::flex_vector<TimedRowEvent>;
 
 /// Owning wrapper for EventList (I wish C++ had extension methods),
 /// adding the ability to binary-search and treat it as a map.
@@ -139,7 +153,7 @@ struct KV_Internal {
     ImmerT event_list;
 
 private:
-    static bool cmp_less_than(TimedChannelEvent const &a, TimeInPattern const &b) {
+    static bool cmp_less_than(TimedRowEvent const &a, TimeInPattern const &b) {
         return a.time < b;
     }
 
@@ -181,7 +195,7 @@ public:
     /// Only works with KV, not transient. This is because .insert() is missing on flex_vector_transient.
     This set_time(TimeInPattern t, RowEvent v) {
         auto iter = greater_equal(t);
-        TimedChannelEvent timed_v{t, v};
+        TimedRowEvent timed_v{t, v};
         if (iter_matches_time(iter, t)) {
             return This{event_list.set(iter.index(), timed_v)};
         } else {
@@ -194,6 +208,7 @@ using KV = KV_Internal<EventList>;
 using KVTransient = KV_Internal<EventList::transient_type>;
 
 struct SequenceEntry {
+    /// Invariant: Must be positive and nonzero.
     BeatFraction nbeats;
 
     // TODO add pattern indexing scheme.
@@ -212,7 +227,9 @@ struct SequenceEntry {
     ChipChannelEvents chip_channel_events;
 };
 
-using FlatChannelInt = uint32_t;
+struct SequencerOptions {
+    TickT ticks_per_beat;
+};
 
 struct Document {
     /// vector<ChipIndex -> ChipKind>
@@ -226,6 +243,8 @@ struct Document {
 
     // TODO add multiple patterns.
     SequenceEntry pattern;
+
+    SequencerOptions sequencer_options;
 };
 
 struct HistoryFrame {

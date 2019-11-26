@@ -193,17 +193,6 @@ static void drawRowBg(
     });
 }
 
-template <typename T> int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
-
-template <typename rational>
-inline int round_to_int(rational v)
-{
-    v = v + typename rational::int_type(sgn(v.numerator())) / 2;
-    return boost::rational_cast<int>(v);
-}
-
 /// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
 static void drawRowEvents(
     PatternEditorPanel & self, doc::Document const &document, QPainter & painter
@@ -221,7 +210,7 @@ static void drawRowEvents(
         // https://bugs.llvm.org/show_bug.cgi?id=33236
         // the original C++17 spec broke const struct unpacking.
         for (
-            doc::TimedChannelEvent timed_event
+            doc::TimedRowEvent timed_event
             : pattern.chip_channel_events[chip][channel]
         ) {
             doc::TimeInPattern time = timed_event.time;
@@ -232,7 +221,7 @@ static void drawRowEvents(
             Frac beat = time.anchor_beat;
             Frac beats_per_row = self.row_duration_beats;
             Frac row = beat / beats_per_row;
-            int yPx = round_to_int(self.dyHeightPerRow * row);
+            int yPx = doc::round_to_int(self.dyHeightPerRow * row);
             QPoint left_top{xleft, yPx};
             QPoint right_top{xright, yPx};
 

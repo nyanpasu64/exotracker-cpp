@@ -6,13 +6,66 @@
 #include <gsl/span>
 
 #include <vector>
-#include <cstdlib>
 
 namespace audio::synth::sequencer {
 
 using namespace chip_kinds;
 
 using EventsRef = gsl::span<doc::RowEvent>;
+
+/// Why signed? Events can have negative offsets and play before their anchor beat,
+/// or even before the owning pattern starts. This is a feature(tm).
+using TickT = int32_t;
+
+/// This struct can either represent a tick or delay.
+///
+/// FlattenedEventList._delay_events is std::vector<TickOrDelayEvent>.
+///
+/// FlattenedEventList::load_events_mut() first uses it to store ticks,
+/// then converts it to delays before returning.
+struct TickOrDelayEvent {
+    TickT tick_or_delay;
+    TickT & delay() {
+        return tick_or_delay;
+    }
+    doc::RowEvent event;
+};
+
+using DelayEvent = TickOrDelayEvent;
+using DelayEventsRef = gsl::span<DelayEvent>;
+
+struct FlattenedEventList {
+    // types
+    struct EventListAndDuration {
+        doc::EventList const & event_list;
+        doc::BeatFraction nbeats;
+    };
+
+    // fields
+    std::vector<TickOrDelayEvent> _delay_events;
+    std::ptrdiff_t _next_event_idx;
+
+    // TODO cache all inputs into load_events_mut(),
+    // and add a method to increment cache.now().
+
+    // impl
+    FlattenedEventList() {
+        // FamiTracker only supports 256 rows per channel. Who would fill them all?
+        // 512 events ought to be enough for everybody!?
+        // make that 1024 because i may add scripts which auto-generate
+        // "note release" events before new notes begin
+        _delay_events.reserve(1024);
+    }
+
+    /// returns mutable <'Self>.
+    [[nodiscard]] DelayEventsRef load_events_mut(
+        EventListAndDuration const pattern, doc::SequencerOptions options, TickT now
+    );
+
+    [[nodiscard]] DelayEventsRef get_events_mut();
+
+    void pop_event();
+};
 
 /*
 TODO only expose through unique_ptr?
@@ -24,27 +77,18 @@ since ChannelSequencer's list of fields is in flux, and co-evolves with its meth
 class ChannelSequencer {
     using EventsThisTickOwned = std::vector<doc::RowEvent>;
     EventsThisTickOwned _events_this_tick;
-    int time_until_toggle = 30 + rand() % 90;
+
+    // Idea: In ticked/timed code, never use "curr" in variable names.
+    // Only ever use prev and next. This may reduce bugs, or not.
+    int _next_tick = 0;
+
+    /// TODO: Recomputed whenever next_tick() receives different EventList or parameters.
+    /// For now, recomputed every tick.
+    FlattenedEventList _event_cache;
 
 public:
     // impl
-    ChannelSequencer() {
-        /*
-        On ticks without events, ChannelSequencer should return a 0-length vector.
-        On ticks with events, ChannelSequencer should return a 1-length vector.
-
-        The only time we should return more than 1 event is with broken documents,
-        where multiple events occur at the same time
-        (usually due to early events being offset later,
-        or later events being offset earlier).
-
-        Later events prevent earlier events from being offset later;
-        instead they will pile up at the same time as the later event.
-
-        We should never reach or exceed 4 events simultaneously.
-        */
-        _events_this_tick.reserve(4);
-    }
+    ChannelSequencer();
 
     /// TODO
     void seek() {}
@@ -53,26 +97,7 @@ public:
     /// Eventually, (document, ChipIndex, ChannelIdInt) will be passed in as well.
     EventsRef next_tick(
         doc::Document & document, ChipIndex chip_index, ChannelIndex chan_index
-    ) {
-        _events_this_tick.clear();
-
-        if (time_until_toggle == 0) {
-            // Yield an event.
-            std::optional<doc::Note> note;
-            // note = {} refers to "row without note". I want "random note cuts", but that will come later.
-            note = {60};
-            _events_this_tick = {doc::RowEvent{note}};
-
-            // Queue next event.
-            time_until_toggle = 30 + rand() % 90;
-        }
-
-        // Advance time.
-        assert(time_until_toggle > 0);
-        time_until_toggle -= 1;
-
-        return _events_this_tick;
-    }
+    );
 };
 
 /// The sequencer owned by a (Chip)Instance.

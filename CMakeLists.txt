@@ -88,9 +88,11 @@ add_executable(exotracker-tests
         tests/run_tests.cpp
         tests/test_blip_buffer.cpp
         tests/test_document.cpp
+        src/audio/synth/sequencer.cpp
         tests/audio/test_event_queue.cpp
 
         src/gui/history.cpp
         )
 target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests PRIVATE exotracker-lib)
+target_compile_definitions(exotracker-tests PRIVATE UNITTEST)

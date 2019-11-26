@@ -78,7 +78,7 @@ doc::Document dummy_document() {
                     .set_time({{1, 3}, 0}, {1})
                     .set_time({{2, 3}, 0}, {2})
                     .set_time({1, 0}, {3})
-                    .set_time({1 + Frac{1, 4}, 0}, {4})
+                    .set_time({1 + Frac{2, 3}, 0}, {4})
                     .event_list;
                 return events;
             }());
@@ -102,6 +102,9 @@ doc::Document dummy_document() {
             .nbeats = 4,
             .chip_channel_events = chip_channel_events.persistent(),
         },
+        .sequencer_options = doc::SequencerOptions{
+            .ticks_per_beat = 24,
+        }
     };
 }
 
