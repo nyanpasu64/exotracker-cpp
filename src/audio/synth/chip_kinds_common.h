@@ -10,6 +10,8 @@ namespace audio::synth::chip_kinds {
 using ChipIndex = uint32_t;
 using ChannelIndex = uint32_t;
 
+ChipIndex constexpr MAX_NCHIP = 100;
+
 /// List of sound chips supported.
 enum class ChipKind {
     Apu1,

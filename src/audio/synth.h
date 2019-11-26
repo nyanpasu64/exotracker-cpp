@@ -57,6 +57,7 @@ private:
     Blip_Buffer _nes_blip;
 
     /// vector<ChipIndex -> unique_ptr<ChipInstance subclass>>
+    /// _chip_instances.size() in [1..MAX_NCHIP] inclusive. Derived from Document::chips.
     std::vector<std::unique_ptr<ChipInstance>> _chip_instances = {};
 
     /// Per-chip "special audio" written into this and read into _nes_blip.

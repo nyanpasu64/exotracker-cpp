@@ -216,6 +216,7 @@ using FlatChannelInt = uint32_t;
 
 struct Document {
     /// vector<ChipIndex -> ChipKind>
+    /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
     using ChipList = immer::array<chip_kinds::ChipKind>;
     ChipList chips;
 
