@@ -8,7 +8,7 @@
 
 #include <memory>
 
-namespace audio::synth::music_driver::nes_2a03 {
+namespace audio::synth::music_driver::driver_2a03 {
 
 // Pulse 1/2 driver
 

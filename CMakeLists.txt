@@ -65,7 +65,7 @@ add_library(exotracker-lib
         3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
         3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
         src/audio/synth/nes_2a03.cpp
-        src/audio/synth/music_driver/nes_2a03.cpp
+        src/audio/synth/music_driver/driver_2a03.cpp
 
         # Etc.
         src/document.cpp

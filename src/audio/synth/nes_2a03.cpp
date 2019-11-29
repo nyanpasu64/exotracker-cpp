@@ -1,5 +1,5 @@
 #include "nes_2a03.h"
-#include "music_driver/nes_2a03.h"
+#include "music_driver/driver_2a03.h"
 
 #include <nsfplay/xgm/devices/CPU/nes_cpu.h>
 #include <nsfplay/xgm/devices/Sound/nes_apu.h>
@@ -34,7 +34,7 @@ public:
 
 private:
     // fields
-    music_driver::nes_2a03::Apu1Driver _driver;
+    music_driver::driver_2a03::Apu1Driver _driver;
 
     // NesApu2Synth::apu2 (xgm::NES_DMC) holds a reference to apu1 (xgm::NES_APU).
     xgm::NES_APU _apu1;
