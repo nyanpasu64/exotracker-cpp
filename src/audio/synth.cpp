@@ -98,7 +98,7 @@ void OverallSynth::synthesize_overall(
             // This is the important one.
             case SynthEvent::Tick: {
                 // Reset register write queue.
-                ChipIndex const nchip = _chip_instances.size();
+                ChipIndex const nchip = (ChipIndex) _chip_instances.size();
 
                 for (ChipIndex chip_index = 0; chip_index < nchip; chip_index++) {
                     auto & chip = _chip_instances[chip_index];

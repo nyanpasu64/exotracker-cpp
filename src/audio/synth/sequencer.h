@@ -115,7 +115,7 @@ public:
     ) {
         EnumMap<ChannelID, EventsRef> channel_events;
 
-        for (size_t chan = 0; chan < enum_count<ChannelID>; chan++) {
+        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             channel_events[chan] = _channel_sequencers[chan]
                 .next_tick(document, chip_index, chan);
         }
