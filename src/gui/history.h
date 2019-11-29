@@ -63,8 +63,6 @@ public:
     }
 };
 
-doc::Document dummy_document();
-
 // namespaces
 }
 }

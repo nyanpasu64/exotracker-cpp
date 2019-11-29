@@ -26,7 +26,11 @@ OverallSynth::OverallSynth(
     for (ChipKind chip_kind : document.chips) {
         switch (chip_kind) {
             case ChipKind::Apu1: {
-                auto apu1_unique = nes_2a03::make_Apu1Instance(_nes_blip);
+                auto apu1_unique = nes_2a03::make_Apu1Instance(
+                    _nes_blip,
+                    CPU_CLK_PER_S,
+                    doc::FrequenciesRef{document.frequency_table}
+                );
                 apu1_maybe = apu1_unique.get();
                 _chip_instances.push_back(std::move(apu1_unique));
                 break;

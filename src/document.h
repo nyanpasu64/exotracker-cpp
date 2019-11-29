@@ -19,6 +19,7 @@
 #include <immer/flex_vector.hpp>
 #include <immer/flex_vector_transient.hpp>
 #include <boost/rational.hpp>
+#include <gsl/span>
 
 #include <algorithm>
 #include <array>
@@ -274,6 +275,30 @@ struct SequencerOptions {
     TickT ticks_per_beat;
 };
 
+// Tuning table types
+inline namespace tuning {
+    using ChromaticInt = ChromaticInt;
+    using FreqDouble = double;
+    using RegisterInt = int;
+
+    template<typename T>
+    using Owned_ = std::array<T, doc::CHROMATIC_COUNT>;
+
+    template<typename T>
+    using Ref_ = gsl::span<T, doc::CHROMATIC_COUNT>;
+
+
+    using FrequenciesOwned = Owned_<FreqDouble>;
+    using FrequenciesRef = Ref_<FreqDouble>;
+
+    using TuningOwned = Owned_<RegisterInt>;
+    using TuningRef = Ref_<RegisterInt>;
+
+    FrequenciesOwned equal_temperament(
+        ChromaticInt root_chromatic = 69, FreqDouble root_frequency = 440.
+    );
+}
+
 struct Document {
     /// vector<ChipIndex -> ChipKind>
     /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
@@ -288,7 +313,10 @@ struct Document {
     SequenceEntry pattern;
 
     SequencerOptions sequencer_options;
+    FrequenciesOwned frequency_table;
 };
+
+Document dummy_document();
 
 struct HistoryFrame {
     Document document;

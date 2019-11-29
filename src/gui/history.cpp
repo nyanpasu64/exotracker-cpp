@@ -56,59 +56,6 @@ Success History::redo() {
     return Success{true};
 }
 
-doc::Document dummy_document() {
-    using Frac = doc::BeatFraction;
-
-    doc::Document::ChipList::transient_type chips;
-    doc::SequenceEntry::ChipChannelEvents::transient_type chip_channel_events;
-
-    // chip 0
-    {
-        auto const chip_kind = chip_kinds::ChipKind::Apu1;
-        using ChannelID = chip_kinds::Apu1ChannelID;
-
-        chips.push_back(chip_kind);
-        chip_channel_events.push_back([]() {
-            doc::SequenceEntry::ChannelToEvents::transient_type channel_events;
-
-            channel_events.push_back([]() {
-                // TimeInPattern, RowEvent
-                doc::EventList events = doc::KV{{}}
-                    .set_time({0, 0}, {0})
-                    .set_time({{1, 3}, 0}, {1})
-                    .set_time({{2, 3}, 0}, {2})
-                    .set_time({1, 0}, {3})
-                    .set_time({1 + Frac{2, 3}, 0}, {4})
-                    .event_list;
-                return events;
-            }());
-
-            channel_events.push_back([]() {
-                doc::EventList events = doc::KV{{}}
-                    .set_time({2, 0}, {102})
-                    .set_time({3, 0}, {103})
-                    .set_time({3 + Frac{1, 2}, 0}, {doc::NOTE_CUT})
-                    .event_list;
-                return events;
-            }());
-
-            release_assert(channel_events.size() == (int)ChannelID::COUNT);
-            return channel_events.persistent();
-        }());
-    }
-
-    return doc::Document {
-        .chips = chips.persistent(),
-        .pattern = doc::SequenceEntry {
-            .nbeats = 4,
-            .chip_channel_events = chip_channel_events.persistent(),
-        },
-        .sequencer_options = doc::SequencerOptions{
-            .ticks_per_beat = 24,
-        }
-    };
-}
-
 // namespaces
 }
 }

@@ -88,8 +88,11 @@ add_executable(exotracker-tests
         tests/run_tests.cpp
         tests/test_blip_buffer.cpp
         tests/test_document.cpp
-        src/audio/synth/sequencer.cpp
         tests/audio/test_event_queue.cpp
+
+        src/document.cpp
+        src/audio/synth/sequencer.cpp
+        src/audio/synth/music_driver/driver_2a03.cpp
 
         src/gui/history.cpp
         )

@@ -43,7 +43,10 @@ private:
     // friend class NesApu2Synth;
 
 public:
-    explicit Apu1Instance(Blip_Buffer & blip) :
+    explicit Apu1Instance(
+        Blip_Buffer & blip, ClockT clocks_per_sec, doc::FrequenciesRef frequencies
+    ) :
+        _driver{clocks_per_sec, frequencies},
         _apu1_synth{blip, APU1_RANGE, APU1_VOLUME}
     {
         _apu1.Reset();
@@ -77,8 +80,10 @@ public:
     }
 };
 
-std::unique_ptr<BaseApu1Instance> make_Apu1Instance(Blip_Buffer & blip) {
-    return std::make_unique<Apu1Instance>(blip);
+std::unique_ptr<BaseApu1Instance> make_Apu1Instance(
+    Blip_Buffer & blip, ClockT clocks_per_sec, doc::FrequenciesRef frequencies
+) {
+    return std::make_unique<Apu1Instance>(blip, clocks_per_sec, frequencies);
 }
 
 ///// APU2 (tri noise dpcm)

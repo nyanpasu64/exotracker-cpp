@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 #ifdef _WIN32
     win32_set_font();
 #endif
-    gui::history::History history{gui::history::dummy_document()};
+    gui::history::History history{doc::dummy_document()};
 
     portaudio::AutoSystem autoSys;
     portaudio::System & sys = portaudio::System::instance();
