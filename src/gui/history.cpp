@@ -87,6 +87,7 @@ doc::Document dummy_document() {
                 doc::EventList events = doc::KV{{}}
                     .set_time({2, 0}, {102})
                     .set_time({3, 0}, {103})
+                    .set_time({3 + Frac{1, 2}, 0}, {doc::NOTE_CUT})
                     .event_list;
                 return events;
             }());

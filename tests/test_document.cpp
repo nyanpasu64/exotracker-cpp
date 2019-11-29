@@ -1,6 +1,7 @@
 #include "document.h"
 
 #include <map>
+#include <type_traits>
 
 //#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
@@ -9,7 +10,16 @@ namespace doc {
 std::ostream& operator<< (std::ostream& os, const RowEvent& value) {
     os << "RowEvent{";
     if (value.note.has_value()) {
-        os << int(*value.note);
+        Note note = *value.note;
+        if (note.is_cut()) {
+            os << "note cut";
+        } else if (note.is_release()) {
+            os << "note release";
+        } else if (note.is_valid_note()) {
+            os << int(note.value);
+        } else {
+            os << "invalid note " << int(note.value);
+        }
     }  else {
         os << "{}";
     }
