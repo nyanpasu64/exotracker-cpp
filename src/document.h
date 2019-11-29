@@ -34,12 +34,13 @@ namespace chip_kinds = audio::synth::chip_kinds;
 
 // Adapted from https://www.fluentcpp.com/2019/04/09/how-to-emulate-the-spaceship-operator-before-c20-with-crtp/
 
-#define KEY(method, paren_of_fields) \
+// I'd call this _KEY, but _[Uppercase] names are reserved by the compiler.
+#define ZZ_KEY(method, paren_of_fields) \
     constexpr auto method() const { \
         return std::tie paren_of_fields; \
     } \
 
-#define COMPARE_ONLY(method, T) \
+#define ZZ_COMPARE_INTERNAL(method, T) \
     [[nodiscard]] constexpr bool operator<(const T& other) const { \
         return this->method() < other.method(); \
     } \
@@ -53,7 +54,7 @@ namespace chip_kinds = audio::synth::chip_kinds;
         return this->method() <= other.method(); \
     } \
 
-#define EQUALABLE(method, T) \
+#define ZZ_EQUAL_INTERNAL(method, T) \
     [[nodiscard]] constexpr bool operator==(const T& other) const { \
         return this->method() == other.method(); \
     } \
@@ -61,9 +62,18 @@ namespace chip_kinds = audio::synth::chip_kinds;
         return this->method() != other.method(); \
     } \
 
-#define COMPARABLE(method, T) \
-    EQUALABLE(method, T) \
-    COMPARE_ONLY(method, T) \
+#define COMPARE_ONLY(T, paren_of_fields) \
+    ZZ_KEY(compare_only_, paren_of_fields) \
+    ZZ_COMPARE_INTERNAL(compare_only_, T) \
+
+#define EQUALABLE(T, paren_of_fields) \
+    ZZ_KEY(equalable_, paren_of_fields) \
+    ZZ_EQUAL_INTERNAL(equalable_, T) \
+
+#define COMPARABLE(T, paren_of_fields) \
+    ZZ_KEY(comparable_, paren_of_fields)\
+    ZZ_EQUAL_INTERNAL(comparable_, T) \
+    ZZ_COMPARE_INTERNAL(comparable_, T) \
 
 using FractionInt = int64_t;
 using BeatFraction = boost::rational<FractionInt>;
@@ -86,8 +96,7 @@ struct RowEvent {
     std::optional<Note> note;
     // TODO volumes and []effects
 
-    KEY(key_, (note))
-    EQUALABLE(key_, RowEvent)
+    EQUALABLE(RowEvent, (note))
 };
 
 /// Why signed? Events can have negative offsets and play before their anchor beat,
@@ -114,8 +123,7 @@ struct TimeInPattern {
     TickT tick_offset;
     using TickLimits = std::numeric_limits<decltype(tick_offset)>;
 
-    KEY(key_, (anchor_beat, tick_offset))
-    COMPARABLE(key_, TimeInPattern)
+    COMPARABLE(TimeInPattern, (anchor_beat, tick_offset))
 
     // TODO remove, only used for testing purposes
     static TimeInPattern from_frac(FractionInt num, FractionInt den) {
@@ -137,11 +145,8 @@ struct TimedRowEvent {
     TimeInPattern time;
     RowEvent v;
 
-    KEY(equal_, (time, v))
-    EQUALABLE(equal_, TimedRowEvent)
-
-    KEY(compare_, (time))
-    COMPARE_ONLY(compare_, TimedRowEvent)
+    EQUALABLE(TimedRowEvent, (time, v))
+    COMPARE_ONLY(TimedRowEvent, (time))
 };
 
 using EventList = immer::flex_vector<TimedRowEvent>;
