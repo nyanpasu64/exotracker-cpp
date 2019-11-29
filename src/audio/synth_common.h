@@ -8,7 +8,7 @@
 #include "util/enum_map.h"
 #include "util/macros.h"
 
-#include <gsl/gsl>
+#include <gsl/span>
 #include <boost/core/noncopyable.hpp>
 
 #include <cassert>

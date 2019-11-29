@@ -3,7 +3,7 @@
 #include "synth.h"
 #include "audio_common.h"
 
-#include <gsl/gsl>
+#include <gsl/span>
 #include <cstdint>  // int16_t
 #include <type_traits>  // is_same_v
 
