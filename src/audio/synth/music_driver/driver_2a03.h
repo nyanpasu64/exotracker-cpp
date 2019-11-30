@@ -119,9 +119,17 @@ public:
 
         for (doc::RowEvent event : events) {
             if (event.note.has_value()) {
-                _volume_index =  0;
-                _note_active = true;
-                new_note = true;
+                doc::Note note = *event.note;
+
+                if (note.is_valid_note()) {
+                    _note_active = true;
+                    new_note = true;
+                    _volume_index = 0;
+                    _next_state.period_reg = _tuning_table[note.value];
+                } else {
+                    _note_active = false;
+                    new_note = false;
+                }
             }
         }
 
@@ -141,7 +149,6 @@ public:
 
         _next_state.volume = volume;
         _next_state.duty = 0x1 + _pulse_num;
-        _next_state.period_reg = 0x1ab;
 
         /*
         i don't know why this works, but it's what 0cc .nsf does.
