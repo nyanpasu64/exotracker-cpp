@@ -72,6 +72,8 @@ class Apu1PulseDriver {
     Address const _base_address;
     TuningRef _tuning_table;
 
+    bool _first_tick_occurred = false;
+
     // TODO add InstrEnvelope class
     // with array, index, and "should tick" or "reached end" methods.
     bool _note_active = false;
@@ -170,7 +172,10 @@ public:
 
 
         for (Address byte_idx = 0; byte_idx < Apu1Reg::BYTES; byte_idx++) {
-            if (_next_state.bytes[byte_idx] != _prev_state.bytes[byte_idx]) {
+            if (
+                !_first_tick_occurred
+                || _next_state.bytes[byte_idx] != _prev_state.bytes[byte_idx]
+            ) {
                 auto write = RegisterWrite{
                     .address = (Address) (_base_address + byte_idx),
                     .value = (Byte) (_next_state.bytes[byte_idx])
@@ -178,6 +183,7 @@ public:
                 register_writes.push_write(write);
             }
         }
+        _first_tick_occurred = true;
         _prev_state = _next_state;
         return;
     }
