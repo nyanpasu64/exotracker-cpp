@@ -64,11 +64,11 @@ Document dummy_document() {
 
             channel_events.push_back([]() {
                 EventList events = KV{{}}
-                    .set_time({2, 0}, {64})
+                    .set_time({2, 0}, {48})
                     .set_time({2 + Frac{1, 4}, 0}, {NOTE_CUT})
-                    .set_time({2 + Frac{2, 4}, 0}, {60})
+                    .set_time({2 + Frac{2, 4}, 0}, {44})
                     .set_time({2 + Frac{3, 4}, 0}, {NOTE_CUT})
-                    .set_time({3, 0}, {62})
+                    .set_time({3, 0}, {40})
                     .event_list;
                 return events;
             }());
