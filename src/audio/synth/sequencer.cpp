@@ -120,7 +120,7 @@ static TickT time_to_ticks(doc::TimeInPattern time, doc::SequencerOptions option
 
 // impl FlattenedEventList
 
-DelayEventsRef FlattenedEventList::load_events_mut(
+DelayEventsRefMut FlattenedEventList::load_events_mut(
     EventListAndDuration const pattern,
     doc::SequencerOptions options,
     TickT now
@@ -139,17 +139,17 @@ DelayEventsRef FlattenedEventList::load_events_mut(
         );
     }
 
-    make_tick_times_monotonic(DelayEventsRef{_delay_events});
+    make_tick_times_monotonic(DelayEventsRefMut{_delay_events});
 
     // Converts _delay_events from (tick, event) to (delay, event) format.
-    _next_event_idx = convert_tick_to_delay(now, DelayEventsRef{_delay_events});
+    _next_event_idx = convert_tick_to_delay(now, DelayEventsRefMut{_delay_events});
 
     // Returns reference to _delay_events.
     return get_events_mut();
 }
 
-DelayEventsRef FlattenedEventList::get_events_mut() {
-    return DelayEventsRef{_delay_events}.subspan(_next_event_idx);
+DelayEventsRefMut FlattenedEventList::get_events_mut() {
+    return DelayEventsRefMut{_delay_events}.subspan(_next_event_idx);
 }
 
 void FlattenedEventList::pop_event() {
@@ -202,7 +202,7 @@ EventsRef ChannelSequencer::next_tick(
     // Load list of upcoming events.
     // (In the future, mutate list instead of regenerating with different `now` every tick.
     // Use assertions to ensure that mutation and regeneration produce the same result.)
-    DelayEventsRef delay_events = _event_cache.load_events_mut(
+    DelayEventsRefMut delay_events = _event_cache.load_events_mut(
         {events, nbeats}, document.sequencer_options, _next_tick
     );
 

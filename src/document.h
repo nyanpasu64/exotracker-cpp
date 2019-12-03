@@ -285,8 +285,7 @@ inline namespace tuning {
     using Owned_ = std::array<T, doc::CHROMATIC_COUNT>;
 
     template<typename T>
-    using Ref_ = gsl::span<T, doc::CHROMATIC_COUNT>;
-
+    using Ref_ = gsl::span<T const, doc::CHROMATIC_COUNT>;
 
     using FrequenciesOwned = Owned_<FreqDouble>;
     using FrequenciesRef = Ref_<FreqDouble>;

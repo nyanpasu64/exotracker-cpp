@@ -11,7 +11,7 @@ namespace audio::synth::sequencer {
 
 using namespace chip_kinds;
 
-using EventsRef = gsl::span<doc::RowEvent>;
+using EventsRef = gsl::span<doc::RowEvent const>;
 
 /// Why signed? Events can have negative offsets and play before their anchor beat,
 /// or even before the owning pattern starts. This is a feature(tm).
@@ -32,7 +32,7 @@ struct TickOrDelayEvent {
 };
 
 using DelayEvent = TickOrDelayEvent;
-using DelayEventsRef = gsl::span<DelayEvent>;
+using DelayEventsRefMut = gsl::span<DelayEvent>;
 
 struct FlattenedEventList {
     // types
@@ -58,11 +58,11 @@ struct FlattenedEventList {
     }
 
     /// returns mutable <'Self>.
-    [[nodiscard]] DelayEventsRef load_events_mut(
+    [[nodiscard]] DelayEventsRefMut load_events_mut(
         EventListAndDuration const pattern, doc::SequencerOptions options, TickT now
     );
 
-    [[nodiscard]] DelayEventsRef get_events_mut();
+    [[nodiscard]] DelayEventsRefMut get_events_mut();
 
     void pop_event();
 };

@@ -115,7 +115,7 @@ public:
     // so after Apu1PulseDriver writes to channels,
     // Apu1Driver can toggle hardware envelopes.
     void tick(
-        sequencer::EventsRef const events, RegisterWriteQueue &/*out*/ register_writes
+        sequencer::EventsRef events, RegisterWriteQueue &/*out*/ register_writes
     ) {
         bool new_note = false;
 

@@ -128,7 +128,6 @@ public:
 
 // /// Each ChanToPatternData is logically tied to a ChipInstance,
 // /// and has length == enum_count<ChipInstance::type-erased ChipKind>.
-// using ChanToEvents = gsl::span<sequencer::EventsThisTickRef>;
 
 /// Static polymorphic properties of classes,
 /// which can be accessed via pointers to subclasses.
