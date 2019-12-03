@@ -87,13 +87,13 @@ class Apu1PulseDriver {
         // Access bit fields.
     //  ADD_BITFIELD_MEMBER(memberName,     offset,         bits)
         ADD_BITFIELD_MEMBER(volume,         BYTE(0) + 0,    4)
-        ADD_BITFIELD_MEMBER(lol_const_vol,  BYTE(0) + 4,    1)
-        ADD_BITFIELD_MEMBER(lol_halt,       BYTE(0) + 5,    1)
+        ADD_BITFIELD_MEMBER(const_vol,      BYTE(0) + 4,    1)
+        ADD_BITFIELD_MEMBER(length_halt,    BYTE(0) + 5,    1)
         ADD_BITFIELD_MEMBER(duty,           BYTE(0) + 6,    2)
 
         // Period: clock/cycle = (period_reg + 1) * 16
-        ADD_BITFIELD_MEMBER(period_reg, BYTE(2) + 0,    BYTE(1) + 3)
-        ADD_BITFIELD_MEMBER(lol_length,     BYTE(3) + 3,    5)
+        ADD_BITFIELD_MEMBER(period_reg,     BYTE(2) + 0,    BYTE(1) + 3)
+        ADD_BITFIELD_MEMBER(length,         BYTE(3) + 3,    5)
 
         // Access raw bytes in endian-independent fashion.
         constexpr static Address BYTES = 4;
@@ -127,6 +127,10 @@ public:
                     _note_active = true;
                     new_note = true;
                     _volume_index = 0;
+
+                    // Changing pitch may write to $4003, which resets phase and creates a click.
+                    // There is a way to avoid this click: http://forums.nesdev.com/viewtopic.php?t=231
+                    // I did not implement that method, so I get clicks.
                     _next_state.period_reg = _tuning_table[note.value];
                 } else {
                     _note_active = false;
@@ -153,22 +157,26 @@ public:
         _next_state.duty = 0x1 + _pulse_num;
 
         /*
-        i don't know why this works, but it's what 0cc .nsf does.
-        imo these registers are useless in famitracker-style music.
-
         - https://wiki.nesdev.com/w/index.php/APU#Pulse_.28.244000-4007.29
         - https://wiki.nesdev.com/w/index.php/APU_Pulse
         */
 
         // https://wiki.nesdev.com/w/index.php/APU_Envelope
-        _next_state.lol_const_vol = 1;
+        // const_vol could be renamed disable_env or deactivate_env.
+        _next_state.const_vol = 1;
 
         // https://wiki.nesdev.com/w/index.php/APU_Length_Counter
-//        _next_state.lol_halt = 1;
-//        _next_state.lol_length = 1;
+        // Length counter is enabled based on $4015, length_halt, AND length.
+        // But length_halt=1 also enables envelope looping.
+
+        // Written by FamiTracker's .nsf driver, but not necessary.
+        // _next_state.length_halt = 1;
+        // _next_state.length = 1;
 
         // https://wiki.nesdev.com/w/index.php/APU_Sweep
-//        _next_state.bytes[1] = 0x08;
+        // >if the negate flag is false, the shift count is zero, and the current period is at least $400, the target period will be large enough to mute the channel.
+        // >to fully disable the sweep unit, a program must turn off enable and turn on negate, such as by writing $08.
+        _next_state.bytes[1] = 0x08;
 
 
         for (Address byte_idx = 0; byte_idx < Apu1Reg::BYTES; byte_idx++) {
