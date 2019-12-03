@@ -1,7 +1,6 @@
 #include "synth.h"
 #include "util/macros.h"
 
-#include <cassert>
 #include <cstddef>
 #include <stdexcept>
 

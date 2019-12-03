@@ -11,7 +11,6 @@
 #include <gsl/span>
 #include <boost/core/noncopyable.hpp>
 
-#include <cassert>
 #include <vector>
 
 namespace audio {

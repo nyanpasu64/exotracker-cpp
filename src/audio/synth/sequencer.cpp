@@ -7,7 +7,6 @@
 #endif
 
 #include <algorithm>  // std::min
-#include <cassert>  // assert (not used at the moment)
 #include <limits>  // std::numeric_limits
 #include <type_traits>  // std::is_signed_v
 

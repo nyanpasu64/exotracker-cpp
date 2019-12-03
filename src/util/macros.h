@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdexcept>
+#include <cassert>  // assert() is not used in this header, but supplied to includers.
 
 // based off Q_DISABLE_COPY and the like.
 

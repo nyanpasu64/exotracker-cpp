@@ -1,9 +1,6 @@
 #include "history.h"
 
 #include "audio/synth/chip_kinds_common.h"
-#include "util/macros.h"
-
-#include <cassert>
 
 namespace gui {
 namespace history {
