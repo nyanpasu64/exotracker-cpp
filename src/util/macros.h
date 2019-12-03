@@ -19,5 +19,5 @@
 
 #define release_assert(expr) \
     do { if (!(expr)) { \
-        throw std::logic_error(#expr " is false"); \
+        throw std::logic_error("release_assert failed: `" #expr "` is false"); \
     } } while (0)
