@@ -62,14 +62,32 @@ void OverallSynth::synthesize_overall(
     // Compilers may define ::ptrdiff_t in global namespace. https://github.com/RobotLocomotion/drake/issues/2374
     blip_nsamp_t const nsamp = (blip_nsamp_t) mono_smp_per_block;
 
-    ClockT nclk_to_play = (ClockT) _nes_blip.count_clocks(nsamp);
-    _events.set_timeout(SynthEvent::EndOfCallback, nclk_to_play);
-
+    /*
+    Blip_Buffer::count_clocks(nsamp) initially clamped nsamp to (..., _capacity].
+    Even if I remove that clamp, it runs `nsamp << (BLIP_BUFFER_ACCURACY = 16)`.
+    So passing in any nsamp in [2^16, ...) will fail due to integer overflow.
+    So if we want to accept large nsamp, we must recompute nclk_to_play after each tick.
+    */
     blip_nsamp_t samples_so_far = 0;  // [0, nsamp]
 
     while (true) {
+        release_assert(samples_so_far <= nsamp);
+
+        // If I were to call count_clocks() once outside the loop,
+        // the value would be incorrect for large nsamp.
+        //
+        // count_clocks() is clamped to (..Blip_Buffer.buffer_size_].
+        // If I were to remove that clamping, it would overflow at 65536
+        // due to `count << BLIP_BUFFER_ACCURACY`.
+        // To avoid overflow, repeatedly compute it in the loop.
+        ClockT nclk_to_play = (ClockT) _nes_blip.count_clocks(nsamp - samples_so_far);
+        _events.set_timeout(SynthEvent::EndOfCallback, nclk_to_play);
+
         ClockT prev_to_tick = _events.get_time_until(SynthEvent::Tick);
         auto [event_id, prev_to_next] = _events.next_event();
+        if (event_id == SynthEvent::EndOfCallback) {
+            assert(_nes_blip.count_samples(nclk_to_play) == nsamp - samples_so_far);
+        }
 
         // Synthesize audio (synth's time passes).
         if (prev_to_next > 0) {
@@ -89,7 +107,6 @@ void OverallSynth::synthesize_overall(
             );
 
             samples_so_far += nsamp_returned;
-            assert(samples_so_far <= nsamp);
         }
 
         // Handle events (synth's time doesn't pass).
