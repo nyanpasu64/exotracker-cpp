@@ -29,8 +29,10 @@ else()
     )
 endif()
 
+add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
+
 # Configure global settings
-include_directories(src 3rdparty)
+include_directories(src 3rdparty 3rdparty/fmt_/include)
 set(CMAKE_CXX_STANDARD 20)
 if (WIN32)
     add_compile_definitions(UNICODE _UNICODE)
@@ -71,7 +73,7 @@ add_library(exotracker-lib
         src/document.cpp
         )
 target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
-
+target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
 
 # GUI editor, uses Qt
 add_executable(exotracker-bin
