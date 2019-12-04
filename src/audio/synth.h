@@ -46,7 +46,7 @@ private:
 
     In OpenMPT, ticks/s can change within a song, so it would need to be a method.
     */
-    uint32_t const _clocks_per_tick = CPU_CLK_PER_S / TICKS_PER_S;
+    uint32_t const _clocks_per_tick = CLOCKS_PER_S / TICKS_PER_S;
 
     // fields
     doc::GetDocument &/*'a*/ _get_document;

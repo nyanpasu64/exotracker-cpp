@@ -11,7 +11,7 @@ OverallSynth::OverallSynth(
     int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document
 ) :
     _stereo_nchan(stereo_nchan),
-    _nes_blip(smp_per_s, CPU_CLK_PER_S),
+    _nes_blip(smp_per_s, CLOCKS_PER_S),
     _get_document(get_document)
 {
     doc::Document document = _get_document.get_document();
@@ -27,7 +27,7 @@ OverallSynth::OverallSynth(
             case ChipKind::Apu1: {
                 auto apu1_unique = nes_2a03::make_Apu1Instance(
                     _nes_blip,
-                    CPU_CLK_PER_S,
+                    CLOCKS_PER_S,
                     doc::FrequenciesRef{document.frequency_table}
                 );
                 apu1_maybe = apu1_unique.get();

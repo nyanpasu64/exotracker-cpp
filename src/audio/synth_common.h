@@ -26,10 +26,10 @@ using namespace chip_kinds;
 // Except 2A03 APU operates off CPU clock (master clock / 12 if NTSC).
 // https://wiki.nesdev.com/w/index.php/FDS_audio
 // FDS also operates off CPU clock, despite 0CC storing master clock in a constant.
-int const CPU_CLK_PER_S = 1'786'830;
+int constexpr CLOCKS_PER_S = 1'786'830;
 
 // NTSC is approximately 60 fps.
-int const TICKS_PER_S = 60;
+int constexpr TICKS_PER_S = 60;
 
 
 /// This type is used widely, so import to audio::synth.

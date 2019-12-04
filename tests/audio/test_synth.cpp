@@ -91,7 +91,7 @@ TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
     GetDocumentStub get_document{one_note_document(which_channel, high_note)};
 
     Apu1Driver driver{
-        audio::synth::CPU_CLK_PER_S, get_document.get_document().frequency_table
+        audio::synth::CLOCKS_PER_S, get_document.get_document().frequency_table
     };
 
     // Pick `high_note` that we know to have a period register <= 0xff.
