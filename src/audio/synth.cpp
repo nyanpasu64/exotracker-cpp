@@ -72,7 +72,7 @@ void OverallSynth::synthesize_overall(
         auto [event_id, prev_to_next] = _events.next_event();
 
         // Synthesize audio (synth's time passes).
-        {
+        if (prev_to_next > 0) {
             // Actually synthesize audio.
             for (auto & chip : _chip_instances) {
                 chip->run_chip_for(prev_to_tick, prev_to_next, _nes_blip, _temp_buffer);
