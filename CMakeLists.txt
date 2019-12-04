@@ -89,6 +89,7 @@ add_executable(exotracker-tests
         tests/test_blip_buffer.cpp
         tests/test_document.cpp
         tests/audio/test_event_queue.cpp
+        tests/audio/test_synth.cpp
 
         src/document.cpp
         src/audio/synth/sequencer.cpp

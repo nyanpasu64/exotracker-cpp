@@ -21,3 +21,9 @@
     do { if (!(expr)) { \
         throw std::logic_error("release_assert failed: `" #expr "` is false"); \
     } } while (0)
+
+#ifdef UNITTEST
+#define TEST_PUBLIC public
+#else
+#define TEST_PUBLIC private
+#endif

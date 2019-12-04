@@ -203,6 +203,7 @@ class Apu1Driver {
 
     using ChannelID = Apu1ChannelID;
 
+TEST_PUBLIC:
     ClockT const _clocks_per_sec;
     TuningOwned _tuning_table;
 

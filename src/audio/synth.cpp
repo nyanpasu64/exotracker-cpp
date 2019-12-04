@@ -49,6 +49,9 @@ OverallSynth::OverallSynth(
 void OverallSynth::synthesize_overall(
     gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block
 ) {
+    // Stereo support will be added at a later date.
+    release_assert(output_buffer.size() == mono_smp_per_block);
+
     doc::Document document = _get_document.get_document();
 
     // In all likelihood this function will not work if stereo_nchan != 1.
