@@ -127,26 +127,26 @@ TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
     // TODO add a FFT-based test to ensure the right frequency is output.
 }
 
+void run(GetDocumentStub & get_document, int smp_per_s, int nsamp) {
+    CAPTURE(smp_per_s);
+    CAPTURE(nsamp);
+
+    // (int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document)
+    audio::synth::OverallSynth synth{1, smp_per_s, get_document};
+
+    std::vector<audio::Amplitude> buffer;
+    buffer.resize(nsamp);
+    synth.synthesize_overall(/*mut*/ buffer, buffer.size());
+};
+
+
 TEST_CASE("Send random values into AudioInstance and look for assertion errors") {
-    using audio::Amplitude;
 
     doc::Note note{60};
     GetDocumentStub get_document{one_note_document(TestChannelID::Pulse1, note)};
 
     Apu1Driver driver{
         audio::synth::CLOCKS_PER_S, get_document.get_document().frequency_table
-    };
-
-    auto run = [&](int smp_per_s, int nsamp) {
-        CAPTURE(smp_per_s);
-        CAPTURE(nsamp);
-
-        // (int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document)
-        audio::synth::OverallSynth synth{1, smp_per_s, get_document};
-
-        std::vector<Amplitude> buffer;
-        buffer.resize(nsamp);
-        synth.synthesize_overall(/*mut*/ buffer, buffer.size());
     };
 
 #define INCREASE(x)  x = (x) * 3 / 2 + 3
@@ -156,15 +156,26 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
     // The largest failing value is 873.
     // Not all values fail. As smp_per_s decreases, it becomes more likely to fail.
     for (int smp_per_s = 1000; smp_per_s <= 250'000; INCREASE(smp_per_s)) {
-        run(smp_per_s, smp_per_s / 4);  // smp_per_s * 0.25 second
+        run(get_document, smp_per_s, smp_per_s / 4);  // smp_per_s * 0.25 second
     }
 
     // 44100Hz, zero samples
-    run(44100, 0);
+    run(get_document, 44100, 0);
 
     // 48000Hz, various durations
     for (int nsamp = 1; nsamp <= 100'000; INCREASE(nsamp)) {
-        run(48000, nsamp);
+        run(get_document, 48000, nsamp);
     }
-
 }
+
+TEST_CASE("Send all note pitches into AudioInstance and look for assertion errors") {
+    // 32000Hz, 4000 samples, various note pitches.
+    for (doc::ChromaticInt pitch = 0; pitch < doc::CHROMATIC_COUNT; pitch++) {
+        GetDocumentStub get_document{
+            one_note_document(TestChannelID::Pulse1, {pitch})
+        };
+        run(get_document, 32000, 4000);
+    }
+}
+
+// TODO add RapidCheck for randomized testing?

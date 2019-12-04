@@ -9,6 +9,7 @@
 #include <cpp11-on-multicore/bitfield.h>
 #include <gsl/span>
 
+#include <algorithm>
 #include <cmath>  // lround
 
 #ifdef UNITTEST
@@ -20,45 +21,6 @@ namespace audio::synth::music_driver::driver_2a03 {
 using namespace doc::tuning;
 
 // Pulse 1/2 driver
-
-/// given: frequency
-/// find: period_reg clamped between [$0, $7FF]
-static RegisterInt register_quantize(
-    FreqDouble const cycles_per_second, ClockT const clocks_per_second
-) {
-    /*
-    period [clock/cycle] = 16 * (period_reg + 1)
-    period [clock/s]/[cycle/s] = clocks_per_second / frequency
-
-    16 * (period_reg + 1) = clocks_per_second / frequency   </16, -1>
-    period_reg = clocks_per_second / frequency / 16, -clamped 1
-    */
-
-    int reg = lround(clocks_per_second / (cycles_per_second * 16) - 1);
-    if (reg < 0) {
-        reg = 0;
-    }
-    return reg;
-}
-
-#ifdef UNITTEST
-TEST_CASE("register_quantize()") {
-    // 0CC-FamiTracker uses 1789773 as the master clock rate.
-    // Given A440, it writes $0FD to the APU1 pulse period.
-    CHECK(register_quantize(440, 1789773) == 0x0FD);
-}
-#endif
-
-static TuningOwned make_tuning_table(
-    FrequenciesRef const frequencies,  // cycle/s
-    ClockT const clocks_per_second  // clock/s
-) {
-    TuningOwned out;
-    for (size_t i = 0; i < doc::CHROMATIC_COUNT; i++) {
-        out[i] = register_quantize(frequencies[i], clocks_per_second);
-    }
-    return out;
-}
 
 /// Convert [byte][bit]Bit indexing to [bit]Bit.
 constexpr static int BITS_PER_BYTE = 8;
@@ -79,6 +41,7 @@ class Apu1PulseDriver {
     bool _note_active = false;
     int _volume_index = 0;
 
+public:
     // Reading a ADD_BITFIELD_MEMBER does not sign-extended it.
     // The read value can only be negative
     // if the ADD_BITFIELD_MEMBER has the same length as the storage type
@@ -100,6 +63,9 @@ class Apu1PulseDriver {
         ADD_BITFIELD_ARRAY(bytes, /*offset*/ 0, /*bits*/ 8, /*numItems*/ BYTES)
     END_BITFIELD_TYPE()
 
+    static constexpr int MAX_PERIOD = decltype(Apu1Reg::period_reg)::Maximum;
+
+private:
     Apu1Reg _prev_state = 0;
     Apu1Reg _next_state = 0;
 
@@ -196,6 +162,69 @@ public:
         return;
     }
 };
+
+/// given: frequency
+/// find: period_reg clamped between [$0, $7FF]
+static RegisterInt register_quantize(
+    FreqDouble const cycles_per_second, ClockT const clocks_per_second
+) {
+    /*
+    period [clock/cycle] = 16 * (period_reg + 1)
+    period [clock/s]/[cycle/s] = clocks_per_second / frequency
+
+    16 * (period_reg + 1) = clocks_per_second / frequency   </16, -1>
+    period_reg = clocks_per_second / frequency / 16, -clamped 1
+    */
+
+    int reg = lround(clocks_per_second / (cycles_per_second * 16) - 1);
+    // Clamps to [lo, hi] inclusive.
+    reg = std::clamp(reg, 0, Apu1PulseDriver::MAX_PERIOD);
+    return reg;
+}
+
+#ifdef UNITTEST
+TEST_CASE("Ensure register_quantize() produces correct values.") {
+    // 0CC-FamiTracker uses 1789773 as the master clock rate.
+    // Given A440, it writes $0FD to the APU1 pulse period.
+    CHECK(register_quantize(440, 1789773) == 0x0FD);
+}
+#endif
+
+static TuningOwned make_tuning_table(
+    FrequenciesRef const frequencies,  // cycle/s
+    ClockT const clocks_per_second  // clock/s
+) {
+    TuningOwned out;
+    for (size_t i = 0; i < doc::CHROMATIC_COUNT; i++) {
+        out[i] = register_quantize(frequencies[i], clocks_per_second);
+    }
+    return out;
+}
+
+#ifdef UNITTEST
+TEST_CASE("Ensure make_tuning_table() produces only valid register values.") {
+    // 0CC-FamiTracker uses 1789773 as the master clock rate.
+    // Given A440, it writes $0FD to the APU1 pulse period.
+    CHECK(register_quantize(440, 1789773) == 0x0FD);
+
+    FrequenciesOwned freq;
+    std::fill(freq.begin(), freq.end(), 1);
+    freq[1] = 1'000;
+    freq[2] = 1'000'000;
+    freq[3] = 1'000'000'000;
+
+    TuningOwned tuning_table = make_tuning_table(freq, 1789773);
+    // 2A03 has 11-bit tuning registers.
+    for (RegisterInt reg : tuning_table) {
+        CHECK(0 <= reg);
+        CHECK(reg < (1 << 11));
+    }
+
+    // Ensure the clamping edge cases are correct.
+    CHECK(tuning_table[0] == (1 << 11) - 1);
+    CHECK(tuning_table[3] == 0);
+}
+#endif
 
 class Apu1Driver {
     // Apu1PulseDriver references _tuning_table, so disable moving this.
