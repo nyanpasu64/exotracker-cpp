@@ -22,6 +22,13 @@ enum class SynthEvent {
 };
 
 /// <'a>
+///
+/// Preconditions:
+/// - Sampling rate must be 1000 or more.
+///   Otherwise blip_buffer constructor/set_sample_rate() breaks.
+/// - Tick rate must be over 4 tick/second.
+///   Otherwise blip_buffer count_clocks(nsamp) breaks.
+/// - samp/s / ticks/sec < 65536. Otherwise _temp_buffer overflows.
 class OverallSynth : boost::noncopyable {
     // runtime constants
 public:
