@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <tuple>
 #include <utility>
@@ -111,6 +112,7 @@ using TickT = int32_t;
 struct TimeInPattern {
     BeatFraction anchor_beat;
     TickT tick_offset;
+    using TickLimits = std::numeric_limits<decltype(tick_offset)>;
 
     KEY(key_, (anchor_beat, tick_offset))
     COMPARABLE(key_, TimeInPattern)
@@ -122,12 +124,12 @@ struct TimeInPattern {
 
     /// A timestamp which lies before any notes anchored to the current beat.
     TimeInPattern begin_of_beat() const {
-        return {this->anchor_beat, INT16_MIN};
+        return {this->anchor_beat, TickLimits::min()};
     }
 
     /// A timestamp which lies before any notes anchored to the given beat.
     static TimeInPattern begin_of_beat(BeatFraction anchor_beat) {
-        return {anchor_beat, INT16_MIN};
+        return {anchor_beat, TickLimits::min()};
     }
 };
 
