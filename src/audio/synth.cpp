@@ -96,7 +96,7 @@ void OverallSynth::synthesize_overall(
         switch (event_id) {
             // implementation detail
             case SynthEvent::EndOfCallback: {
-                release_assert(samples_so_far == nsamp);
+                release_assert_equal(samples_so_far, nsamp);
                 release_assert(_nes_blip.samples_avail() == 0);
                 return;
             }
