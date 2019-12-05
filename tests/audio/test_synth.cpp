@@ -8,6 +8,7 @@
 #include "doctest.h"
 
 using audio::synth::music_driver::driver_2a03::Apu1Driver;
+using audio::synth::music_driver::driver_2a03::Apu1PulseDriver;
 
 
 class GetDocumentStub : public doc::GetDocument {
@@ -76,12 +77,54 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
     };
 }
 
+using audio::Amplitude;
+
+/// Constructs a new OverallSynth at the specified sampling rate,
+/// and runs it for the specified amount of time.
+/// Returns the generated audio.
+std::vector<Amplitude> run_new_synth(
+    GetDocumentStub & get_document, int smp_per_s, int nsamp
+) {
+    CAPTURE(smp_per_s);
+    CAPTURE(nsamp);
+
+    // (int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document)
+    audio::synth::OverallSynth synth{1, smp_per_s, get_document};
+
+    std::vector<Amplitude> buffer;
+    buffer.resize(nsamp);
+    synth.synthesize_overall(/*mut*/ buffer, buffer.size());
+
+    return buffer;
+};
+
+void check_signed_amplitude(gsl::span<Amplitude> buffer, Amplitude threshold) {
+    bool positive_found = false;
+    bool negative_found = false;
+
+    for (audio::Amplitude y : buffer) {
+        if (y >= threshold) {
+            positive_found = true;
+        }
+        if (y <= -threshold) {
+            negative_found = true;
+        }
+        if (positive_found && negative_found) {
+            break;
+        }
+    }
+    CHECK_UNARY(positive_found);
+    CHECK_UNARY(negative_found);
+
+    // TODO add a FFT/autocorrelation test to ensure the peak lies at the right frequency.
+    // This will require importing a FFT library.
+}
+
 /// Previously Apu1Driver/Apu1PulseDriver would not write registers upon startup,
 /// unless incoming notes set them to a nonzero value.
 /// When playing high notes (period <= 0xff),
 /// no sound would come out unless a low note played first.
 TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
-    using audio::Amplitude;
 
     TestChannelID which_channel;
     SUBCASE("") { which_channel = TestChannelID::Pulse1; }
@@ -99,46 +142,37 @@ TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
     // This ensures that the period register's high bits are all 0.
     CHECK(driver._tuning_table[high_note.value] <= 0xff);
 
-    // (int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document)
-    audio::synth::OverallSynth synth{1, 48000, get_document};
-
-    std::vector<Amplitude> buffer;
-    buffer.resize(4 * 1024);
-    synth.synthesize_overall(/*mut*/ buffer, buffer.size());
-
-    bool positive_found = false;
-    bool negative_found = false;
+    std::vector<Amplitude> buffer = run_new_synth(get_document, 48000, 4 * 1024);
     Amplitude const THRESHOLD = 1000;
-
-    for (audio::Amplitude y : buffer) {
-        if (y >= THRESHOLD) {
-            positive_found = true;
-        }
-        if (y <= -THRESHOLD) {
-            negative_found = true;
-        }
-        if (positive_found && negative_found) {
-            break;
-        }
-    }
-    CHECK_UNARY(positive_found);
-    CHECK_UNARY(negative_found);
-
-    // TODO add a FFT-based test to ensure the right frequency is output.
+    check_signed_amplitude(buffer, THRESHOLD);
 }
 
-void run(GetDocumentStub & get_document, int smp_per_s, int nsamp) {
-    CAPTURE(smp_per_s);
-    CAPTURE(nsamp);
+/// The 2A03's sweep unit will silence the bottom octave of notes,
+/// unless the negate flag is set.
+/// Make sure the bottom octave produces sound.
+TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
 
-    // (int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document)
-    audio::synth::OverallSynth synth{1, smp_per_s, get_document};
+    TestChannelID which_channel;
+    SUBCASE("") { which_channel = TestChannelID::Pulse1; }
+    SUBCASE("") { which_channel = TestChannelID::Pulse2; }
+    CAPTURE((int) which_channel);
 
-    std::vector<audio::Amplitude> buffer;
-    buffer.resize(nsamp);
-    synth.synthesize_overall(/*mut*/ buffer, buffer.size());
-};
+    doc::Note low_note{36};
+    GetDocumentStub get_document{one_note_document(which_channel, low_note)};
 
+    Apu1Driver driver{
+        audio::synth::CLOCKS_PER_S, get_document.get_document().frequency_table
+    };
+
+    // Pick `low_note` that we know to be in the bottom octave of notes.
+    CHECK(
+        driver._tuning_table[low_note.value] >= (Apu1PulseDriver::MAX_PERIOD + 1) / 2
+    );
+
+    std::vector<Amplitude> buffer = run_new_synth(get_document, 48000, 4 * 1024);
+    Amplitude const THRESHOLD = 1000;
+    check_signed_amplitude(buffer, THRESHOLD);
+}
 
 TEST_CASE("Send random values into AudioInstance and look for assertion errors") {
 
@@ -156,15 +190,15 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
     // The largest failing value is 873.
     // Not all values fail. As smp_per_s decreases, it becomes more likely to fail.
     for (int smp_per_s = 1000; smp_per_s <= 250'000; INCREASE(smp_per_s)) {
-        run(get_document, smp_per_s, smp_per_s / 4);  // smp_per_s * 0.25 second
+        run_new_synth(get_document, smp_per_s, smp_per_s / 4);  // smp_per_s * 0.25 second
     }
 
     // 44100Hz, zero samples
-    run(get_document, 44100, 0);
+    run_new_synth(get_document, 44100, 0);
 
     // 48000Hz, various durations
     for (int nsamp = 1; nsamp <= 100'000; INCREASE(nsamp)) {
-        run(get_document, 48000, nsamp);
+        run_new_synth(get_document, 48000, nsamp);
     }
 }
 
@@ -174,7 +208,7 @@ TEST_CASE("Send all note pitches into AudioInstance and look for assertion error
         GetDocumentStub get_document{
             one_note_document(TestChannelID::Pulse1, {pitch})
         };
-        run(get_document, 32000, 4000);
+        run_new_synth(get_document, 32000, 4000);
     }
 }
 
