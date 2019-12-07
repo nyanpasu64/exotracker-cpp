@@ -23,6 +23,7 @@ public:
 };
 
 enum class TestChannelID {
+    NONE,
     Pulse1,
     Pulse2,
 };
@@ -124,6 +125,22 @@ void check_signed_amplitude(gsl::span<Amplitude> buffer, Amplitude threshold) {
 /// unless incoming notes set them to a nonzero value.
 /// When playing high notes (period <= 0xff),
 /// no sound would come out unless a low note played first.
+TEST_CASE("Test that empty documents produce silence") {
+
+    TestChannelID which_channel = TestChannelID::NONE;
+    doc::Note random_note{60};
+    GetDocumentStub get_document{one_note_document(which_channel, random_note)};
+
+    std::vector<Amplitude> buffer = run_new_synth(get_document, 48000, 4 * 1024);
+    for (Amplitude y : buffer) {
+        CHECK(y == 0);
+    }
+}
+
+/// Previously Apu1Driver/Apu1PulseDriver would not write registers upon startup,
+/// unless incoming notes set them to a nonzero value.
+/// When playing high notes (period <= 0xff),
+/// no sound would come out unless a low note played first.
 TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
 
     TestChannelID which_channel;
@@ -169,7 +186,7 @@ TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
         driver._tuning_table[low_note.value] >= (Apu1PulseDriver::MAX_PERIOD + 1) / 2
     );
 
-    std::vector<Amplitude> buffer = run_new_synth(get_document, 48000, 4 * 1024);
+    std::vector<Amplitude> buffer = run_new_synth(get_document, 48000, 16 * 1024);
     Amplitude const THRESHOLD = 1000;
     check_signed_amplitude(buffer, THRESHOLD);
 }
