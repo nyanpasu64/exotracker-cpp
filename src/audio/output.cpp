@@ -91,7 +91,7 @@ AudioThreadHandle AudioThreadHandle::make(
         paNoFlag
     );
     AudioOptions audio_options {
-        .clocks_per_sound_update = 1,
+        .clocks_per_sound_update = 4,
     };
 
     // We cannot move/memcpy due to self-reference (stream holds reference to callback).
