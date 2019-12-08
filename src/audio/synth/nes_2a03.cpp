@@ -1,5 +1,6 @@
 #include "nes_2a03.h"
 #include "music_driver/driver_2a03.h"
+#include "audio/event_queue.h"
 #include "util.h"
 #include "util/macros.h"
 
@@ -25,6 +26,15 @@ const double APU2_VOLUME = 0.0;
 
 // unnamed namespace
 }
+
+enum class SampleEvent {
+    // EndOfCallback comes before Tick.
+    // If a callback ends at the same time as a tick occurs,
+    // the tick should happen next callback.
+    EndOfCallback,
+    Sample,
+    COUNT,
+};
 
 /// APU1 (2 pulses)
 template<typename Synth = MyBlipSynth>
@@ -54,7 +64,7 @@ private:
     /// They eat negligible CPU unless you give it very short periods
     /// (like triangle register 0).
     ClockT const _clocks_per_smp;
-    ClockT _clocks_after_tick = 0;
+    EventQueue<SampleEvent> _pq;
 
     // friend class NesApu2Synth;
 
@@ -72,6 +82,10 @@ public:
         // Make sure these parameters aren't swapped.
         release_assert(clocks_per_sound_update < clocks_per_sec);
         _apu1.Reset();
+
+        // Do *not* sample at t=0.
+        // You must run nsfplay synth to produce audio to sample.
+        _pq.set_timeout(SampleEvent::Sample, _clocks_per_smp);
     }
 
     // impl ChipInstance
@@ -118,12 +132,6 @@ public:
             clock += dclk;
         };
 
-        auto advance_maybe = [&](ClockT dclk) {
-            if (dclk > 0) {
-                advance(dclk);
-            }
-        };
-
         std::array<xgm::INT32, 2> stereo_out;
 
         /// Outputs audio from internal stereo [2]amplitude.
@@ -139,44 +147,32 @@ public:
                 take_sample();
             }
         } else {
-            ClockT clocks_until_smp;
-
-            // TODO add test where you increment by 1 clock when _clocks_per_smp is 4.
-            // In that edge case (which comes up after 5 seconds of regular operation),
-            // even advance(_clocks_after_tick) will overshoot nclk.
-            if (nclk < _clocks_after_tick) {
-                // Don't sample the synth at all. Put it off.
-                clocks_until_smp = _clocks_after_tick;
-            } else {
-                // This will not take a sample at t=0.
-                // This is deliberate. See the above comment about _apu1.Tick.
-                if (_clocks_after_tick > 0) {
-                    advance(_clocks_after_tick);
-                    take_sample();
+            _pq.set_timeout(SampleEvent::EndOfCallback, nclk);
+            while (true) {
+                auto ev = _pq.next_event();
+                if (ev.clk_elapsed > 0) {
+                    advance(ev.clk_elapsed);
                 }
-                _clocks_after_tick = _clocks_per_smp;
 
-                while (clock + _clocks_per_smp <= nclk) {
-                    advance(_clocks_per_smp);
-                    take_sample();
+                SampleEvent id = ev.event_id;
+                switch (id) {
+                    case SampleEvent::EndOfCallback: {
+                        release_assert(clock == nclk);
+                        goto end_while;
+                    }
+
+                    case SampleEvent::Sample: {
+                        take_sample();
+                        _pq.set_timeout(SampleEvent::Sample, _clocks_per_smp);
+                        break;
+                    }
+                    case SampleEvent::COUNT: break;
                 }
-                clocks_until_smp = _clocks_per_smp;
             }
-
-            ClockT clocks_before_tick = util::distance(clock, nclk);
-            release_assert(
-                0 <= clocks_before_tick && clocks_before_tick < clocks_until_smp
-            );
-
-            advance_maybe(clocks_before_tick);
-            release_assert(clock == nclk);
-            // do NOT call take_sample(). That will happen after _clocks_after_tick.
-
-            _clocks_after_tick = clocks_until_smp - clocks_before_tick;
-            release_assert(clocks_before_tick + _clocks_after_tick == _clocks_per_smp);
         }
 
-        return 0;
+        end_while:
+        return 0;  // Wrote 0 bytes to write_buffer.
     }
 };
 
