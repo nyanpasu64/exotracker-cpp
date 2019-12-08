@@ -132,8 +132,12 @@ TEST_CASE("Test that empty documents produce silence") {
     GetDocumentStub get_document{one_note_document(which_channel, random_note)};
 
     std::vector<Amplitude> buffer = run_new_synth(get_document, 48000, 4 * 1024);
-    for (Amplitude y : buffer) {
-        CHECK(y == 0);
+    for (size_t idx = 0; idx < buffer.size(); idx++) {
+        Amplitude y = buffer[idx];
+        if (y != 0) {
+            CAPTURE(idx);
+            CHECK(y == 0);
+        }
     }
 }
 
