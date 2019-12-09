@@ -118,6 +118,7 @@ public:
 
         assert(output.index < vec.size());
         RelativeRegisterWrite out = vec[output.index++];
+        assert(out.time_before == 0);
         return out.write;
     }
 
