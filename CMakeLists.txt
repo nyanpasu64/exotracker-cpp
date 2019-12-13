@@ -92,11 +92,14 @@ add_executable(exotracker-tests
         tests/test_document.cpp
         tests/audio/test_event_queue.cpp
         tests/audio/test_synth.cpp
+        tests/test_utils/parameterize.cpp
+        tests/test_utils/test_parameterize.cpp
 
         src/document.cpp
         src/audio/synth/sequencer.cpp
         src/audio/synth/music_driver/driver_2a03.cpp
 
+        # No tests yet, why is it included?
         src/gui/history.cpp
         )
 target_include_directories(exotracker-tests PUBLIC tests)
