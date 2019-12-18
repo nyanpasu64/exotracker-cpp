@@ -53,7 +53,16 @@ private:
 
     In OpenMPT, ticks/s can change within a song, so it would need to be a method.
     */
-    uint32_t const _clocks_per_tick = CLOCKS_PER_S / TICKS_PER_S;
+    ClockT const _clocks_per_tick = CLOCKS_PER_S / TICKS_PER_S;
+
+    /// Must be 1 or greater.
+    /// Increasing it past 1 causes compatible sound synths to only be sampled
+    /// (sent to Blip_Buffer) every n clocks.
+    ///
+    /// Not all sound synths may actually take this as a parameter.
+    /// In particular, N163 and VRC7 use time-division mixing,
+    /// which has high-frequency content and may produce lots of aliasing if downsampled.
+    ClockT const _clocks_per_sound_update;
 
     // fields
     doc::GetDocument &/*'a*/ _get_document;
@@ -80,7 +89,10 @@ public:
     ///   If it changes, discard returned OverallSynth and create a new one.
     /// - In get_document's list of chips, any APU2 must be preceded directly with APU1.
     OverallSynth(
-        int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document
+        int stereo_nchan,
+        int smp_per_s,
+        doc::GetDocument &/*'a*/ get_document,
+        AudioOptions audio_options
     );
 
 private:

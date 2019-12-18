@@ -1,7 +1,6 @@
 #include "output.h"
 
 #include "synth.h"
-#include "audio_common.h"
 
 #include <gsl/span>
 #include <cstdint>  // int16_t
@@ -14,13 +13,13 @@ namespace output {
 class OutputCallback : public pa::CallbackInterface, private synth::OverallSynth {
 
 public:
+    // Constructor
+    using synth::OverallSynth::OverallSynth;
+
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
     // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
     // interleaved=false was added to support ASIO's native representation.
-    static const bool interleaved = true;
-
-    // Constructor
-    using synth::OverallSynth::OverallSynth;
+    static constexpr bool interleaved = true;
 
     // impl pa::CallbackInterface
 
@@ -77,32 +76,38 @@ AudioThreadHandle AudioThreadHandle::make(
     portaudio::System & sys, doc::GetDocument & get_document
 ) {
     portaudio::DirectionSpecificStreamParameters outParams(
-                sys.defaultOutputDevice(),
-                STEREO_NCHAN,
-                AmplitudeFmt,
-                output::OutputCallback::interleaved,
-                sys.defaultOutputDevice().defaultLowOutputLatency(),
-                nullptr);
+        sys.defaultOutputDevice(),
+        STEREO_NCHAN,
+        AmplitudeFmt,
+        output::OutputCallback::interleaved,
+        sys.defaultOutputDevice().defaultLowOutputLatency(),
+        nullptr
+    );
     portaudio::StreamParameters params(
-                portaudio::DirectionSpecificStreamParameters::null(),
-                outParams,
-                48000.0,
-                (unsigned long) MONO_SMP_PER_BLOCK,
-                paNoFlag);
+        portaudio::DirectionSpecificStreamParameters::null(),
+        outParams,
+        48000.0,
+        (unsigned long) MONO_SMP_PER_BLOCK,
+        paNoFlag
+    );
+    AudioOptions audio_options {
+        .clocks_per_sound_update = 1,
+    };
 
     // We cannot move/memcpy due to self-reference (stream holds reference to callback).
     // C++17 guaranteed copy elision only works on prvalues, not locals.
     // So let constructor initialize fields in-place (our factory method cannot).
-    return AudioThreadHandle{outParams, params, get_document};
+    return AudioThreadHandle{outParams, params, get_document, audio_options};
 }
 
 AudioThreadHandle::AudioThreadHandle(
     portaudio::DirectionSpecificStreamParameters outParams,
     portaudio::StreamParameters params,
-    doc::GetDocument & get_document
+    doc::GetDocument & get_document,
+    AudioOptions audio_options
 ) :
     callback(std::make_unique<OutputCallback>(
-        outParams.numChannels(), (int)params.sampleRate(), get_document
+        outParams.numChannels(), (int)params.sampleRate(), get_document, audio_options
     )),
     stream(std::make_unique<SelfTerminatingStream>(params, *callback))
 {

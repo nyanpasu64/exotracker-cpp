@@ -8,11 +8,15 @@ namespace audio {
 namespace synth {
 
 OverallSynth::OverallSynth(
-    int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document
+    int stereo_nchan,
+    int smp_per_s,
+    doc::GetDocument &/*'a*/ get_document,
+    AudioOptions audio_options
 ) :
     _stereo_nchan(stereo_nchan),
-    _nes_blip(smp_per_s, CLOCKS_PER_S),
-    _get_document(get_document)
+    _clocks_per_sound_update(audio_options.clocks_per_sound_update),
+    _get_document(get_document),
+    _nes_blip(smp_per_s, CLOCKS_PER_S)
 {
     doc::Document document = _get_document.get_document();
 
@@ -28,7 +32,8 @@ OverallSynth::OverallSynth(
                 auto apu1_unique = nes_2a03::make_Apu1Instance(
                     _nes_blip,
                     CLOCKS_PER_S,
-                    doc::FrequenciesRef{document.frequency_table}
+                    doc::FrequenciesRef{document.frequency_table},
+                    _clocks_per_sound_update
                 );
                 apu1_maybe = apu1_unique.get();
                 _chip_instances.push_back(std::move(apu1_unique));

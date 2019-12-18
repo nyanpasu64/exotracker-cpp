@@ -166,8 +166,8 @@ public:
 
     /// Cannot cross tick boundaries. Can cross register-write boundaries.
     void run_chip_for(
-        ClockT prev_to_tick,
-        ClockT prev_to_next,
+        ClockT const prev_to_tick,
+        ClockT const prev_to_next,
         Blip_Buffer & nes_blip,
         gsl::span<Amplitude> temp_buffer
     );
@@ -191,7 +191,7 @@ private:
     /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
     /// The FDS will instead write lowpassed audio to write_buffer.
     virtual NsampWritten synth_run_clocks(
-        ClockT clk_offset, ClockT nclk, gsl::span<Amplitude> write_buffer
+        ClockT clk_begin, ClockT nclk, gsl::span<Amplitude> write_buffer
     ) = 0;
 };
 

@@ -5,8 +5,15 @@
 
 #include <cstdint>
 
+#include "event_queue.h"
+
 namespace audio {
 
 using Amplitude = int16_t;
+using event_queue::ClockT;
+
+struct AudioOptions {
+    ClockT clocks_per_sound_update;
+};
 
 }

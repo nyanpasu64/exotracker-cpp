@@ -5,6 +5,7 @@
 /// Synth code generates audio whenever the output callback runs.
 /// It does not operate independently.
 
+#include "audio_common.h"
 #include "document.h"
 #include "util/macros.h"
 
@@ -59,7 +60,8 @@ private:
     AudioThreadHandle(
         portaudio::DirectionSpecificStreamParameters outParams,
         portaudio::StreamParameters params,
-        doc::GetDocument & get_document
+        doc::GetDocument & get_document,
+        AudioOptions audio_options
     );
 };
 
