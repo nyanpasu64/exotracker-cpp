@@ -216,7 +216,7 @@ TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
     );
 
     std::vector<Amplitude> buffer = run_new_synth(
-        get_document, 48000, 16 * 1024, audio_options
+        get_document, 48000, 4 * 1024, audio_options
     );
     Amplitude const THRESHOLD = 1000;
     check_signed_amplitude(buffer, THRESHOLD);
@@ -260,7 +260,7 @@ TEST_CASE("Send all note pitches into AudioInstance and look for assertion error
             one_note_document(TestChannelID::Pulse1, {pitch})
         };
         run_new_synth(
-            get_document, 32000, 4000, AudioOptions{.clocks_per_sound_update = 1}
+            get_document, 32000, 1000, AudioOptions{.clocks_per_sound_update = 1}
         );
     }
 }
