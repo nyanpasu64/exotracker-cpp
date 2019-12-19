@@ -223,9 +223,6 @@ namespace xgm
     envelope_counter[0] = 0;
     envelope_counter[1] = 0;
 
-    for (i = 0x4000; i < 0x4008; i++)
-      Write (i, 0);
-
     Write (0x4015, 0);
     if (option[OPT_UNMUTE_ON_RESET])
       Write (0x4015, 0x0f);
@@ -234,6 +231,13 @@ namespace xgm
       Write (0x4001, 0x08);
       Write (0x4005, 0x08);
     }
+
+    // Silence valgrind warnings.
+    freq[0] = 0;
+    freq[1] = 0;
+
+    for (i = 0x4000; i < 0x4008; i++)
+      Write (i, 0);
 
     for (i = 0; i < 2; i++)
       out[i] = 0;
