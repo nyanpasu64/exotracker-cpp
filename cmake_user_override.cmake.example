@@ -1,0 +1,15 @@
+# Example: Enable asan/ubsan on debug builds
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
+endif()
+
+# Why not -fsanitize=memory?
+
+# Only works on clang, not gcc.
+
+# -fsanitize=address is incompatible with memory.
+
+# https://github.com/onqtam/doctest/issues/255
+# https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo
+# -fsanitize=memory spits out spurious errors unless you compile libc with it enabled

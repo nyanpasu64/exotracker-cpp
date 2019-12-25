@@ -6,7 +6,8 @@ project(exotracker)
 set(portaudio "portaudio_static")
 set(portaudiocpp "portaudiocpp_static")
 
-include(cmake_user_override.txt OPTIONAL)
+# This can be used to enable asan (-fsanitize=memory/undefined).
+include(cmake_user_override.cmake OPTIONAL)
 #End initialize environment
 
 
