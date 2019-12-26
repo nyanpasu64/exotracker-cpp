@@ -36,7 +36,7 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
     using namespace doc;
 
     Document::ChipList::transient_type chips;
-    SequenceEntry::ChipChannelEvents::transient_type chip_channel_events;
+    ChipChannelTo<EventList>::transient_type chip_channel_events;
 
     // chip 0
     {
@@ -45,7 +45,7 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
 
         chips.push_back(chip_kind);
         chip_channel_events.push_back([&]() {
-            SequenceEntry::ChannelToEvents::transient_type channel_events;
+            ChannelTo<EventList>::transient_type channel_events;
 
             EventList one_note = [&]() {
                 // .set_time(TimeInPattern, RowEvent)

@@ -39,7 +39,7 @@ Document dummy_document() {
     using Frac = BeatFraction;
 
     Document::ChipList::transient_type chips;
-    SequenceEntry::ChipChannelEvents::transient_type chip_channel_events;
+    ChipChannelTo<EventList>::transient_type chip_channel_events;
 
     // chip 0
     {
@@ -48,7 +48,7 @@ Document dummy_document() {
 
         chips.push_back(chip_kind);
         chip_channel_events.push_back([]() {
-            SequenceEntry::ChannelToEvents::transient_type channel_events;
+            ChannelTo<EventList>::transient_type channel_events;
 
             channel_events.push_back([]() {
                 // TimeInPattern, RowEvent

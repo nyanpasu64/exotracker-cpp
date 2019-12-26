@@ -186,6 +186,7 @@ struct TimedRowEvent {
     COMPARE_ONLY(TimedRowEvent, (time))
 };
 
+/// Pattern type.
 using EventList = immer::flex_vector<TimedRowEvent>;
 
 /// Owning wrapper for EventList (I wish C++ had extension methods),
@@ -251,6 +252,29 @@ public:
 using KV = KV_Internal<EventList>;
 using KVTransient = KV_Internal<EventList::transient_type>;
 
+/// Semantic typedef around a runtime-sized vector.
+/// K is an integer type type-erased without type-checking,
+/// and exists to document the domain space.
+/// It's semantically nonsensical to index a list of sound chips
+/// with a pixel coordinate integer.
+template<typename K, typename V>
+using DenseMap = immer::array<V>;
+
+using chip_kinds::ChipIndex;
+using chip_kinds::ChannelIndex;
+
+template<typename V>
+using ChipChannelTo = DenseMap<ChipIndex, DenseMap<ChannelIndex, V>>;
+
+template<typename V>
+using ChannelTo = DenseMap<ChannelIndex, V>;
+
+/// Represents the contents of one row in the sequence editor.
+/// Like FamiTracker, Exotracker will use a pattern system
+/// where each sequence row contains [for each channel] pattern ID.
+///
+/// The list of [chip/channel] [pattern ID] -> pattern data is stored separately
+/// (in PatternStore).
 struct SequenceEntry {
     /// Invariant: Must be positive and nonzero.
     BeatFraction nbeats;
@@ -266,9 +290,7 @@ struct SequenceEntry {
     - channel: (ChannelIndex = [0, CHIP_TO_NCHAN[chip]))
     - chip_channel_events[chip][channel]: EventList
     */
-    using ChannelToEvents = immer::array<EventList>;
-    using ChipChannelEvents = immer::array<ChannelToEvents>;
-    ChipChannelEvents chip_channel_events;
+    ChipChannelTo<EventList> chip_channel_events;
 };
 
 struct SequencerOptions {
