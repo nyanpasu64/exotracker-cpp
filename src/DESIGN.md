@@ -23,6 +23,20 @@ In audio code, "out parameters" are common since they don't require allocations 
 
 In function signatures, out parameters (mutable references primarily written to, not read from) are placed at the end of the argument list. This follows the [Google Style Guide](https://google.github.io/styleguide/cppguide.html#Output_Parameters).
 
+## Document format
+
+In FamiTracker, the list of valid patterns is not exposed to the user. You can often dredge up old patterns by manually changing pattern IDs in the sequence table. You can ask FT to "Remove unused patterns".
+
+In Exotracker, PatternID will be an opaque identifier not visible to the user. Non-shared patterns are shown on the GUI as a dash. Shared pattern are shown on the GUI as the SequenceIndex of its first usage. This will make "dredging up old patterns" impossible.
+
+I have never had a use for FT's design. However apparently other people use this feature.
+
+----
+
+File-size efficiency (deleting unused patterns when saving to disk) was never my goal. The mental model is that patterns belong to frames, aka sequence entries.
+
+There's no reason i couldn't implement both ft-style "sequence to pattern mapping" and filesystem-style "pattern IDs are hidden from the user" GUIs, on the same data format. And "delete unused patterns" would be a toggle option.
+
 ## Audio architecture
 
 Design notes at https://docs.google.com/document/d/17g5wqgpUPWItvHCY-0eCaqZSNdVKwouYoGbu-RTAjfo .
