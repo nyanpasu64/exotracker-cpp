@@ -1,8 +1,9 @@
 #include "synth.h"
 #include "util/macros.h"
 
-#include <cstddef>
-#include <stdexcept>
+#include <cstddef>  // size_t
+#include <stdexcept>  // std::logic_error will be used once I add APU2.
+#include <utility>  // std::move
 
 namespace audio {
 namespace synth {

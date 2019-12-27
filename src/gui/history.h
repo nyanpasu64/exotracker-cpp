@@ -5,7 +5,6 @@
 #include <immer/atom.hpp>
 #include <immer/box.hpp>
 #include <boost/core/noncopyable.hpp>
-#include <utility>
 #include <vector>
 #include <memory>
 
