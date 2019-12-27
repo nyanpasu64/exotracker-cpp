@@ -1,7 +1,7 @@
 #ifndef PATTERNEDITORPANEL_H
 #define PATTERNEDITORPANEL_H
 
-#include "document.h"
+#include "doc.h"
 #include "gui/history.h"
 
 #include <verdigris/wobjectdefs.h>

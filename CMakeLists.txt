@@ -71,7 +71,7 @@ add_library(exotracker-lib
         src/audio/synth/music_driver/driver_2a03.cpp
 
         # Etc.
-        src/document.cpp
+        src/doc.cpp
         )
 target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
@@ -96,7 +96,7 @@ add_executable(exotracker-tests
         tests/test_utils/parameterize.cpp
         tests/test_utils/test_parameterize.cpp
 
-        src/document.cpp
+        src/doc.cpp
         src/audio/synth/sequencer.cpp
         src/audio/synth/music_driver/driver_2a03.cpp
 

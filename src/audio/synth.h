@@ -3,7 +3,7 @@
 #include "synth/nes_2a03.h"
 #include "synth_common.h"
 #include "audio_common.h"
-#include "document.h"
+#include "doc.h"
 #include "util/enum_map.h"
 
 #include <memory>

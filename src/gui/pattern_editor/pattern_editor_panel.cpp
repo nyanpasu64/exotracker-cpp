@@ -88,7 +88,7 @@ struct Palette {
 
 static Palette palette;
 
-// See document.h for documentation of how patterns work.
+// See doc.h for documentation of how patterns work.
 
 struct ChannelDraw {
     chip_kinds::ChipIndex chip;

@@ -1,4 +1,4 @@
-#include "document.h"
+#include "doc.h"
 
 #include "audio/synth/chip_kinds_common.h"
 #include "util/macros.h"

@@ -6,7 +6,7 @@
 /// It does not operate independently.
 
 #include "audio_common.h"
-#include "document.h"
+#include "doc.h"
 #include "util/macros.h"
 
 #include <portaudiocpp/PortAudioCpp.hxx>

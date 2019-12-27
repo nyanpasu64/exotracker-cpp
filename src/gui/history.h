@@ -1,6 +1,6 @@
 #pragma once
 
-#include "document.h"
+#include "doc.h"
 
 #include <immer/atom.hpp>
 #include <immer/box.hpp>

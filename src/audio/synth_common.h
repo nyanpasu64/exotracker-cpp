@@ -4,7 +4,7 @@
 #include "make_blip_buffer.h"
 #include "event_queue.h"
 #include "audio_common.h"
-#include "document.h"
+#include "doc.h"
 #include "util/enum_map.h"
 #include "util/macros.h"
 

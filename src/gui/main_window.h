@@ -2,7 +2,7 @@
 #define MAINWINDOW_H
 
 #include "history.h"
-#include "document.h"
+#include "doc.h"
 
 #include <verdigris/wobjectdefs.h>
 

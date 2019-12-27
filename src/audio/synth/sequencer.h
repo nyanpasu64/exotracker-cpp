@@ -1,6 +1,6 @@
 #pragma once
 
-#include "document.h"
+#include "doc.h"
 #include "util/enum_map.h"
 
 #include <gsl/span>
