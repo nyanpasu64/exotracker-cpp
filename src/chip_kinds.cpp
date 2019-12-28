@@ -1,6 +1,6 @@
-#include "chip_kinds_common.h"
+#include "chip_kinds.h"
 
-namespace audio::synth::chip_kinds {
+namespace chip_kinds {
 
 const ChipToNchan CHIP_TO_NCHAN = []() {
     /// EnumMap<ChipKind, ChannelIndex>

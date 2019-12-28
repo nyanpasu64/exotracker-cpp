@@ -1,6 +1,6 @@
 #include "doc.h"
 
-#include "audio/synth/chip_kinds_common.h"
+#include "chip_kinds.h"
 #include "util/macros.h"
 
 namespace doc {

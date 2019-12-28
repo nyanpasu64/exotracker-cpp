@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace audio::synth::chip_kinds {
+namespace chip_kinds {
 
 /// Index into a list of active sound chips.
 using ChipIndex = uint32_t;

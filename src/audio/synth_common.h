@@ -1,10 +1,10 @@
 #pragma once
 
-#include "synth/chip_kinds_common.h"
 #include "make_blip_buffer.h"
 #include "event_queue.h"
 #include "audio_common.h"
 #include "doc.h"
+#include "chip_kinds.h"
 #include "util/enum_map.h"
 #include "util/macros.h"
 

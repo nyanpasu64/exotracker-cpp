@@ -3,12 +3,12 @@
 #include "event_list.h"
 #include "timed_events.h"
 #include "doc_common.h"  // DenseMap
-#include "audio/synth/chip_kinds_common.h"
+#include "chip_kinds.h"
 
 namespace doc::sequence {
 
-using audio::synth::chip_kinds::ChipIndex;
-using audio::synth::chip_kinds::ChannelIndex;
+using chip_kinds::ChipIndex;
+using chip_kinds::ChannelIndex;
 
 template<typename V>
 using ChipChannelTo = DenseMap<ChipIndex, DenseMap<ChannelIndex, V>>;

@@ -1,11 +1,7 @@
 #include "history.h"
 
-#include "audio/synth/chip_kinds_common.h"
-
 namespace gui {
 namespace history {
-
-namespace chip_kinds = audio::synth::chip_kinds;
 
 History::History(doc::Document initial_state) :
     current{doc::HistoryFrame{initial_state}}

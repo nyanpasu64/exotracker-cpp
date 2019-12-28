@@ -16,7 +16,7 @@
 #include "doc/timed_events.h"
 #include "doc/event_list.h"
 #include "doc/sequence.h"
-#include "audio/synth/chip_kinds_common.h"
+#include "chip_kinds.h"
 
 #include <immer/array.hpp>
 #include <immer/array_transient.hpp>
@@ -28,8 +28,6 @@ using namespace ::doc::events;
 using namespace ::doc::timed_events;
 using namespace ::doc::event_list;
 using namespace ::doc::sequence;
-
-namespace chip_kinds = audio::synth::chip_kinds;
 
 struct SequencerOptions {
     TickT ticks_per_beat;

@@ -1,6 +1,7 @@
 #include "audio/synth.h"
 #include "audio/synth/music_driver/driver_2a03.h"
 #include "doc.h"
+#include "chip_kinds.h"
 #include "test_utils/parameterize.h"
 
 #include <fmt/core.h>

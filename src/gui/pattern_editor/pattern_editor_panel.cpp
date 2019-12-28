@@ -1,5 +1,7 @@
 #include "pattern_editor_panel.h"
 
+#include "chip_kinds.h"
+
 #include <verdigris/wobjectimpl.h>
 
 #include <QApplication>
@@ -16,8 +18,6 @@
 
 namespace gui {
 namespace pattern_editor {
-
-namespace chip_kinds = doc::chip_kinds;
 
 W_OBJECT_IMPL(PatternEditorPanel)
 
