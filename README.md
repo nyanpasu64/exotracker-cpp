@@ -10,7 +10,7 @@ I have a [Google Drive folder of design notes](https://drive.google.com/drive/u/
 
 This project is built using CMake.
 
-At the moment, this project does not build on compilers other than MSVC 2019, because of the use of C++20 features. In particular, the spaceship operator `<=>` and `= default` are not implemented in other compilers. This issue should resolve itself when C++20 support lands in GCC and Clang.
+exotracker-cpp depends on C++17 support. On Linux, it compiles on GCC and Clang (not sure which versions). On Windows, it compiles on mingw-w64 GCC and MSVC 2019.
 
 ### Build Dependencies
 
