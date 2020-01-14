@@ -90,7 +90,7 @@ public:
 
     // impl ChipInstance
     void driver_tick(
-        doc::Document & document, chip_kinds::ChipIndex chip_index
+        doc::Document const & document, chip_kinds::ChipIndex chip_index
     ) override {
         // Sequencer's time passes.
         _driver.driver_tick(document, chip_index, /*out*/ _register_writes);

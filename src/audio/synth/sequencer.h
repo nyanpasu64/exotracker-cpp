@@ -96,7 +96,7 @@ public:
     // Owning a vector, but returning a span, avoids the double-indirection of vector&.
     /// Eventually, (document, ChipIndex, ChannelIdInt) will be passed in as well.
     EventsRef next_tick(
-        doc::Document & document, ChipIndex chip_index, ChannelIndex chan_index
+        doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
     );
 };
 
@@ -111,7 +111,7 @@ public:
 
     /// Eventually, (document, ChipIndex) will be passed in as well.
     EnumMap<ChannelID, EventsRef> sequencer_tick(
-        doc::Document & document, ChipIndex chip_index
+        doc::Document const & document, ChipIndex chip_index
     ) {
         EnumMap<ChannelID, EventsRef> channel_events;
 

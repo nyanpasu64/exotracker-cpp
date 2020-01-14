@@ -161,7 +161,7 @@ public:
     ///
     /// We take a Document& to avoid repeatedly mutating atomic refcounts (slow?)
     virtual void driver_tick(
-        doc::Document & document, chip_kinds::ChipIndex chip_index
+        doc::Document const & document, chip_kinds::ChipIndex chip_index
     ) = 0;
 
     /// Cannot cross tick boundaries. Can cross register-write boundaries.

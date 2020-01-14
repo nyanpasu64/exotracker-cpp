@@ -9,6 +9,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <utility>  // std::move
 
 #include "doctest.h"
 
@@ -20,7 +21,7 @@ class GetDocumentStub : public doc::GetDocument {
     doc::Document document;
 
 public:
-    GetDocumentStub(doc::Document document) : document(document) {}
+    GetDocumentStub(doc::Document && document) : document(std::move(document)) {}
 
     doc::Document const & get_document() const override {
         return document;
@@ -69,7 +70,7 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
         }());
     }
 
-    return Document {
+    return DocumentCopy {
         .chips = chips,
         .pattern = SequenceEntry {
             .nbeats = 4,

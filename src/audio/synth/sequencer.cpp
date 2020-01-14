@@ -176,7 +176,7 @@ ChannelSequencer::ChannelSequencer() {
 }
 
 EventsRef ChannelSequencer::next_tick(
-    doc::Document & document, ChipIndex chip_index, ChannelIndex chan_index
+    doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
 ) {
     _events_this_tick.clear();
 

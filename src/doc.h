@@ -17,6 +17,7 @@
 #include "doc/event_list.h"
 #include "doc/sequence.h"
 #include "chip_kinds.h"
+#include "util/copy_move.h"
 
 #include <vector>
 
@@ -32,7 +33,7 @@ struct SequencerOptions {
     TickT ticks_per_beat;
 };
 
-struct Document {
+struct DocumentCopy {
     /// vector<ChipIndex -> ChipKind>
     /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
     using ChipList = std::vector<chip_kinds::ChipKind>;
@@ -47,6 +48,23 @@ struct Document {
 
     SequencerOptions sequencer_options;
     FrequenciesOwned frequency_table;
+};
+
+struct Document : DocumentCopy {
+    // Expose clone, with explicit syntax.
+    Document clone() const {
+        return *this;
+    }
+
+    // Document(Document.clone())
+    Document(DocumentCopy const & other) : DocumentCopy(other) {}
+    Document(DocumentCopy && other) : DocumentCopy(std::move(other)) {}
+
+private:
+    DEFAULT_COPY(Document)
+
+public:
+    DEFAULT_MOVE(Document)
 };
 
 Document dummy_document();

@@ -26,7 +26,7 @@ _initDisplay;
 
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     QWidget(parent),
-    dummy_history{doc::Document{}},
+    dummy_history{doc::DocumentCopy{}},
     history{dummy_history}
 {
     setMinimumSize(128, 320);
@@ -100,7 +100,7 @@ struct ChannelDraw {
 template<typename Callback_of_ChannelDraw>
 void foreach_channel_draw(
     PatternEditorPanel const & pattern_editor,
-    doc::Document const document,
+    doc::Document const & document,
     Callback_of_ChannelDraw callback
 ) {
 
@@ -236,7 +236,7 @@ static void drawRowEvents(
 }
 
 static void drawPattern(PatternEditorPanel & self, const QRect &rect) {
-    doc::Document const document = self.history.get().get_document();
+    doc::Document const & document = self.history.get().get_document();
 
     self.pixmap_->fill(Qt::black);
 

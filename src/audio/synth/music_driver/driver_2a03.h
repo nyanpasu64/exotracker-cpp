@@ -254,7 +254,7 @@ public:
     }
 
     void driver_tick(
-        doc::Document & document,
+        doc::Document const & document,
         ChipIndex chip_index,
         RegisterWriteQueue &/*out*/ register_writes
     ) {

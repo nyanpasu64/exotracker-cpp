@@ -49,7 +49,7 @@ Document dummy_document() {
         }());
     }
 
-    return Document {
+    return DocumentCopy {
         .chips = chips,
         .pattern = SequenceEntry {
             .nbeats = 4,
