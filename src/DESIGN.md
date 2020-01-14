@@ -8,7 +8,15 @@ Classes have member variables prefixed with a single underscore, like `_var`, to
 
 src/gui/history.h has `gui::history::History`. There is only 1 instance, and it owns tracker pattern state. The pattern editor and audio thread read from `History`.
 
-Tracker pattern state is immutable, using data structures supplied by the immer library. This allows the audio thread to read it without blocking. The UI thread creates edited copies of the old state, using structural sharing to avoid copying unmodified data, then atomically updates `History.current`.
+## Document architecture
+
+The History class stores two copies of the current document, each located behind its own mutex. This operates analogously to double-buffered displays. Each can be designated as the front or back document. The "front document" is shown to the GUI and read by the audio thread, and never modified. The "back document" is not shown to the GUI or read by the audio thread, but mutated in response to user input.
+
+The interesting part is in `DocumentStore::history_apply_change()`. When the user edits the document, the program runs the edit function on the back document, swaps the roles of the documents (page flip), then runs the edit function on the new back document (which the audio thread may still be holding its mutex, so the GUI thread may block). This results in O(2*edit size) edit time instead of O(entire document) per edit. One risk of this design is that the two copies may desync; one way that may happen is if `command.redo()` is not deterministic.
+
+Each document is protected by a pseudo-rwlock (backed by a mutex) for two threads. The GUI does not acquire a lock when reading, but acquires a lock (exclusive reference) when writing. The audio thread acquires a lock when reading from the document; it cannot safely write, since the GUI can read simultaneously without locking the mutex.
+
+Since Document is mutable, it should almost never be copied (except when initializing the double-buffer), since a deep copy would be very slow. As a result, you need to explicitly call `Document.clone()` when you make a copy. By contrast, copying an immutable persistent data structure (my previous design) is merely a pointer copy and atomic refcount increase.
 
 ## Code style
 
@@ -19,11 +27,11 @@ I am following some Rust-inspired rules in the codebase.
 - Self-referential structs are disallowed, except when mandated by third-party libraries (blip_buffer and portaudio), in which case the copy and move constructors are disabled (or move constructor is manually fixed, in the case of Blip_Buffer).
 - Inheritance and storing data in base classes is discouraged.
 
-In audio code, "out parameters" are common since they don't require allocations (heap allocations can take a long time, pool allocations are faster).
+In audio code, "out parameters" are common since they don't require allocations. Heap allocations can take a long time, pool allocations (I don't know much) may be faster, writing into an existing buffer is free.
 
 In function signatures, out parameters (mutable references primarily written to, not read from) are placed at the end of the argument list. This follows the [Google Style Guide](https://google.github.io/styleguide/cppguide.html#Output_Parameters).
 
-## Document format
+## Document format (unfinished, subject to change)
 
 In FamiTracker, the list of valid patterns is not exposed to the user. You can often dredge up old patterns by manually changing pattern IDs in the sequence table. You can ask FT to "Remove unused patterns".
 

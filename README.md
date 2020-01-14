@@ -27,3 +27,4 @@ This program would not be possible without the assistance of:
 - [Ethan McCue](https://github.com/bowbahdoe) and [arximboldi](https://github.com/arximboldi) on immutable data structures
 - Saga Musix and manx (OpenMPT developers) on low-latency audio development
 - plgDavid on audio development and NES emulation
+- ax6 for the idea of storing 2 copies of the document instead of immutable data structures
