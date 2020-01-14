@@ -42,9 +42,6 @@ if (WIN32)
     endif ()
 endif ()
 
-# The immer library creates some extremely noisy warnings.
-add_compile_definitions(_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
-
 # Core library, does not use Qt
 add_library(exotracker-lib
         ## Audio
