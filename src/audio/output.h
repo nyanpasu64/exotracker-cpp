@@ -7,7 +7,7 @@
 
 #include "audio_common.h"
 #include "doc.h"
-#include "util/macros.h"
+#include "util/copy_move.h"
 
 #include <portaudiocpp/PortAudioCpp.hxx>
 

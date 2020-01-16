@@ -2,7 +2,7 @@
 #include "music_driver/driver_2a03.h"
 #include "audio/event_queue.h"
 #include "util.h"
-#include "util/macros.h"
+#include "util/release_assert.h"
 
 #include <nsfplay/xgm/devices/CPU/nes_cpu.h>
 #include <nsfplay/xgm/devices/Sound/nes_apu.h>

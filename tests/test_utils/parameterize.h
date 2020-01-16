@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/macros.h"
+#include "util/release_assert.h"
 
 #include <functional>
 #include <string>

@@ -1,7 +1,7 @@
 #include "doc.h"
 
 #include "chip_kinds.h"
-#include "util/macros.h"
+#include "util/release_assert.h"
 
 namespace doc {
 

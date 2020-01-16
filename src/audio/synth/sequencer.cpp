@@ -1,6 +1,6 @@
 #include "sequencer.h"
 
-#include "util/macros.h"  // release_assert
+#include "util/release_assert.h"
 
 #ifdef UNITTEST
 #include <doctest.h>

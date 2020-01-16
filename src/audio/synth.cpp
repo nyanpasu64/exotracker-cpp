@@ -1,5 +1,5 @@
 #include "synth.h"
-#include "util/macros.h"
+#include "util/release_assert.h"
 
 #include <cstddef>  // size_t
 #include <stdexcept>  // std::logic_error will be used once I add APU2.

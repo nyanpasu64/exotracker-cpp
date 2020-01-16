@@ -6,7 +6,7 @@
 #include "doc.h"
 #include "chip_kinds.h"
 #include "util/enum_map.h"
-#include "util/macros.h"
+#include "util/copy_move.h"
 
 #include <gsl/span>
 #include <boost/core/noncopyable.hpp>
