@@ -8,8 +8,8 @@ namespace doc {
 Document dummy_document() {
     using Frac = BeatFraction;
 
-    Document::ChipList::transient_type chips;
-    ChipChannelTo<EventList>::transient_type chip_channel_events;
+    Document::ChipList chips;
+    ChipChannelTo<EventList> chip_channel_events;
 
     // chip 0
     {
@@ -18,42 +18,42 @@ Document dummy_document() {
 
         chips.push_back(chip_kind);
         chip_channel_events.push_back([]() {
-            ChannelTo<EventList>::transient_type channel_events;
+            ChannelTo<EventList> channel_events;
 
             channel_events.push_back([]() {
                 // TimeInPattern, RowEvent
-                EventList events = KV{{}}
+                doc::EventList events;
+                KV{events}
                     .set_time({0, 0}, {60})
                     .set_time({{1, 3}, 0}, {62})
                     .set_time({{2, 3}, 0}, {64})
                     .set_time({1, 0}, {65})
-                    .set_time({1 + Frac{2, 3}, 0}, {62})
-                    .event_list;
+                    .set_time({1 + Frac{2, 3}, 0}, {62});
                 return events;
             }());
 
             channel_events.push_back([]() {
-                EventList events = KV{{}}
+                doc::EventList events;
+                KV{events}
                     .set_time({2, 0}, {48})
                     .set_time({2 + Frac{1, 4}, 0}, {NOTE_CUT})
                     .set_time({2 + Frac{2, 4}, 0}, {44})
                     .set_time({2 + Frac{3, 4}, 0}, {NOTE_CUT})
                     .set_time({3, -2}, {39})
-                    .set_time({3, 0}, {40})
-                    .event_list;
+                    .set_time({3, 0}, {40});
                 return events;
             }());
 
             release_assert(channel_events.size() == (int)ChannelID::COUNT);
-            return channel_events.persistent();
+            return channel_events;
         }());
     }
 
     return Document {
-        .chips = chips.persistent(),
+        .chips = chips,
         .pattern = SequenceEntry {
             .nbeats = 4,
-            .chip_channel_events = chip_channel_events.persistent(),
+            .chip_channel_events = chip_channel_events,
         },
         .sequencer_options = SequencerOptions{
             .ticks_per_beat = 24,

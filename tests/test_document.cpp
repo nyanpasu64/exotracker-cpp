@@ -7,7 +7,7 @@
 #include "doctest.h"
 
 namespace doc {
-std::ostream& operator<< (std::ostream& os, const RowEvent& value) {
+static std::ostream& operator<< (std::ostream& os, const RowEvent& value) {
     os << "RowEvent{";
     if (value.note.has_value()) {
         Note note = *value.note;
@@ -54,19 +54,14 @@ TEST_CASE("Test that TimeInPattern comparisons work properly.") {
 TEST_CASE ("Test that EventList and KV search is implemented properly.") {
     using namespace doc;
 
-    doc::EventList events = doc::EventList()
-            .push_back({{0, 0}, {}})
-            .push_back({{0, 1}, {1}})
-            .push_back({{{1, 3}, 0}, {3}})
-            .push_back({{{2, 3}, 0}, {6}})
-            .push_back({{1, 0}, {10}})
-            .push_back({{2, 0}, {20}});
+    doc::EventList events;
+    events.push_back({{0, 0}, {}});
+    events.push_back({{0, 1}, {1}});
+    events.push_back({{{1, 3}, 0}, {3}});
+    events.push_back({{{2, 3}, 0}, {6}});
+    events.push_back({{1, 0}, {10}});
+    events.push_back({{2, 0}, {20}});
 
-    CHECK(events.size() == 6);
-
-    // CHECK_UNARY provides much better compiler errors than CHECK.
-#undef CHECK
-#define CHECK CHECK_UNARY
     CHECK(KV{events}.greater_equal({-1, 0})->time == TimeInPattern{0, 0});
     CHECK(KV{events}.greater_equal({0, 0})->time == TimeInPattern{0, 0});
     CHECK(KV{events}.greater_equal({{1, 2}, 0})->time == TimeInPattern{{2, 3}, 0});

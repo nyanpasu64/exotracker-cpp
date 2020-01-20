@@ -18,8 +18,7 @@
 #include "doc/sequence.h"
 #include "chip_kinds.h"
 
-#include <immer/array.hpp>
-#include <immer/array_transient.hpp>
+#include <vector>
 
 namespace doc {
 
@@ -36,7 +35,7 @@ struct SequencerOptions {
 struct Document {
     /// vector<ChipIndex -> ChipKind>
     /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
-    using ChipList = immer::array<chip_kinds::ChipKind>;
+    using ChipList = std::vector<chip_kinds::ChipKind>;
     ChipList chips;
 
     chip_kinds::ChannelIndex chip_index_to_nchan(chip_kinds::ChipIndex index) const {
@@ -52,11 +51,6 @@ struct Document {
 
 Document dummy_document();
 
-struct HistoryFrame {
-    Document document;
-    // TODO add std::string diff_from_previous.
-};
-
 /// get_document() must be thread-safe in implementations.
 /// For example, if implemented by DocumentHistory,
 /// get_document() must not return invalid states while undoing/redoing.
@@ -65,11 +59,6 @@ public:
     virtual ~GetDocument() = default;
     virtual Document const & get_document() const = 0;
 };
-
-// immer::flex_vector (possibly other types)
-// is a class wrapping immer/detail/rbts/rrbtree.hpp.
-// immer's rrbtree is the size of a few pointers, and does not hold node data.
-// So immer types take up little space in their owning struct (comparable to shared_ptr).
 
 // namespace doc
 }

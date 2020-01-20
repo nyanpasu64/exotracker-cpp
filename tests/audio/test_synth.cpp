@@ -36,8 +36,8 @@ enum class TestChannelID {
 static doc::Document one_note_document(TestChannelID which_channel, doc::Note pitch) {
     using namespace doc;
 
-    Document::ChipList::transient_type chips;
-    ChipChannelTo<EventList>::transient_type chip_channel_events;
+    Document::ChipList chips;
+    ChipChannelTo<EventList> chip_channel_events;
 
     // chip 0
     {
@@ -46,13 +46,12 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
 
         chips.push_back(chip_kind);
         chip_channel_events.push_back([&]() {
-            ChannelTo<EventList>::transient_type channel_events;
+            ChannelTo<EventList> channel_events;
 
             EventList one_note = [&]() {
                 // .set_time(TimeInPattern, RowEvent)
-                EventList events = KV{{}}
-                    .set_time({0, 0}, {pitch})
-                    .event_list;
+                doc::EventList events;
+                KV{events}.set_time({0, 0}, {pitch});
                 return events;
             }();
 
@@ -66,15 +65,15 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
             );
 
             release_assert(channel_events.size() == (int)ChannelID::COUNT);
-            return channel_events.persistent();
+            return channel_events;
         }());
     }
 
     return Document {
-        .chips = chips.persistent(),
+        .chips = chips,
         .pattern = SequenceEntry {
             .nbeats = 4,
-            .chip_channel_events = chip_channel_events.persistent(),
+            .chip_channel_events = chip_channel_events,
         },
         .sequencer_options = SequencerOptions{
             .ticks_per_beat = 24,

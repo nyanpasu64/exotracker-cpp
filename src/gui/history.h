@@ -2,8 +2,6 @@
 
 #include "doc.h"
 
-#include <immer/atom.hpp>
-#include <immer/box.hpp>
 #include <boost/core/noncopyable.hpp>
 #include <vector>
 #include <memory>
@@ -23,18 +21,12 @@ struct Success {
 /// This class is approximately correct at best ;)
 class History : boost::noncopyable, public doc::GetDocument {
 public:
-    using UnsyncT = doc::HistoryFrame;
-    using BoxT = immer::box<UnsyncT>;
-
-private:
-    /// immer::atom<T> stores immer::box<T>, not T. This is why we parameterize with unboxed T.
-    immer::atom<UnsyncT> current;
-    std::vector<BoxT> undo_stack;
-    std::vector<BoxT> redo_stack;
+//    using UnsyncT = doc::HistoryFrame;
+    using UnsyncT = doc::Document;
 
 public:
     History(doc::Document initial_state);
-    virtual ~History() = default;
+    ~History() override = default;
 
     /// Called from UI or audio thread. Non-blocking and thread-safe.
     ///
@@ -45,10 +37,7 @@ public:
     ///
     /// But this is unlikely, since the main thread does not delete `current`
     /// but instead moves it to undo/redo (and redo is only cleared upon new actions).
-    BoxT const get() const;
-
-    /// Called from UI thread. Clear redo stack and push a new element into the history.
-    void push(BoxT item);
+    UnsyncT const & get() const;
 
     /// Called from UI thread. Switch `get()` to previous state.
     Success undo();
@@ -58,7 +47,7 @@ public:
 
     // impl doc::GetDocument
     doc::Document const & get_document() const override {
-        return get().get().document;
+        return get();
     }
 };
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <immer/array.hpp>
+#include <vector>
 
 namespace doc {
 
@@ -10,6 +10,6 @@ namespace doc {
 /// It's semantically nonsensical to index a list of sound chips
 /// with a pixel coordinate integer.
 template<typename K, typename V>
-using DenseMap = immer::array<V>;
+using DenseMap = std::vector<V>;
 
 }
