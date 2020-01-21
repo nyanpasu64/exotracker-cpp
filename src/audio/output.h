@@ -1,9 +1,21 @@
 #pragma once
 
 /// Sends audio to computer speakers.
+/// Intended for GUI mode with concurrent editing of the document during playback.
+/// AudioThreadHandle uses doc::GetDocument to handles audio/GUI locking
+/// and sends a raw `Document const &` to OverallSynth.
 ///
-/// Synth code generates audio whenever the output callback runs.
-/// It does not operate independently.
+/// In the absence of concurrent editing, you can use OverallSynth directly
+/// and avoid locking and unlocking std::mutex.
+///
+/// This has precedent: libopenmpt does not talk directly to an output device,
+/// but merely exposes a callback api with no knowledge of locks or portaudio.
+/// libopenmpt can be called via ffmpeg or foobar2000,
+/// which have their own non-speaker output mechanisms.
+///
+/// Synth code operates on a pull model;
+/// the synth callback generates audio whenever PortAudio calls the output callback.
+/// By contrast, FamiTracker's synth thread pushes to a queue with backpressure.
 
 #include "audio_common.h"
 #include "doc.h"
@@ -43,7 +55,9 @@ public:
     /// - In get_document's list of chips, any APU2 must be preceded directly with APU1.
     ///
     /// throws PaException or PaCppException or whatever else
-    static AudioThreadHandle make(pa::System & sys, doc::GetDocument & get_document);
+    static AudioThreadHandle make(
+        pa::System & sys, doc::GetDocument & get_document
+    );
 
 private:
     /*

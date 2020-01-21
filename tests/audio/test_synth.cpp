@@ -17,17 +17,6 @@ using audio::synth::music_driver::driver_2a03::Apu1Driver;
 using audio::synth::music_driver::driver_2a03::Apu1PulseDriver;
 
 
-class GetDocumentStub : public doc::GetDocument {
-    doc::Document document;
-
-public:
-    GetDocumentStub(doc::Document && document) : document(std::move(document)) {}
-
-    doc::Document const & get_document() const override {
-        return document;
-    }
-};
-
 enum class TestChannelID {
     NONE,
     Pulse1,
@@ -91,17 +80,17 @@ using audio::ClockT;
 /// and runs it for the specified amount of time.
 /// Returns the generated audio.
 std::vector<Amplitude> run_new_synth(
-    GetDocumentStub & get_document, int smp_per_s, int nsamp, AudioOptions audio_options
+    doc::Document const & document, int smp_per_s, int nsamp, AudioOptions audio_options
 ) {
     CAPTURE(smp_per_s);
     CAPTURE(nsamp);
 
-    // (int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ get_document)
-    audio::synth::OverallSynth synth{1, smp_per_s, get_document, audio_options};
+    // (int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ document)
+    audio::synth::OverallSynth synth{1, smp_per_s, document, audio_options};
 
     std::vector<Amplitude> buffer;
     buffer.resize(nsamp);
-    synth.synthesize_overall(/*mut*/ buffer, buffer.size());
+    synth.synthesize_overall(document, /*mut*/ buffer, buffer.size());
 
     return buffer;
 };
@@ -151,10 +140,10 @@ TEST_CASE("Test that empty documents produce silence") {
 
     TestChannelID which_channel = TestChannelID::NONE;
     doc::Note random_note{60};
-    GetDocumentStub get_document{one_note_document(which_channel, random_note)};
+    doc::Document document{one_note_document(which_channel, random_note)};
 
     std::vector<Amplitude> buffer = run_new_synth(
-        get_document, 48000, 4 * 1024, audio_options
+        document, 48000, 4 * 1024, audio_options
     );
     for (size_t idx = 0; idx < buffer.size(); idx++) {
         Amplitude y = buffer[idx];
@@ -177,10 +166,10 @@ TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
     PICK(all_channels(which_channel, all_audio_options(audio_options)));
 
     doc::Note high_note{72};
-    GetDocumentStub get_document{one_note_document(which_channel, high_note)};
+    doc::Document document{one_note_document(which_channel, high_note)};
 
     Apu1Driver driver{
-        audio::synth::CLOCKS_PER_S, get_document.get_document().frequency_table
+        audio::synth::CLOCKS_PER_S, document.frequency_table
     };
 
     // Pick `high_note` that we know to have a period register <= 0xff.
@@ -188,7 +177,7 @@ TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
     CHECK(driver._tuning_table[high_note.value] <= 0xff);
 
     std::vector<Amplitude> buffer = run_new_synth(
-        get_document, 48000, 4 * 1024, audio_options
+        document, 48000, 4 * 1024, audio_options
     );
     Amplitude const THRESHOLD = 1000;
     check_signed_amplitude(buffer, THRESHOLD);
@@ -205,10 +194,10 @@ TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
     PICK(all_channels(which_channel, all_audio_options(audio_options)));
 
     doc::Note low_note{36};
-    GetDocumentStub get_document{one_note_document(which_channel, low_note)};
+    doc::Document document{one_note_document(which_channel, low_note)};
 
     Apu1Driver driver{
-        audio::synth::CLOCKS_PER_S, get_document.get_document().frequency_table
+        audio::synth::CLOCKS_PER_S, document.frequency_table
     };
 
     // Pick `low_note` that we know to be in the bottom octave of notes.
@@ -217,7 +206,7 @@ TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
     );
 
     std::vector<Amplitude> buffer = run_new_synth(
-        get_document, 48000, 4 * 1024, audio_options
+        document, 48000, 4 * 1024, audio_options
     );
     Amplitude const THRESHOLD = 1000;
     check_signed_amplitude(buffer, THRESHOLD);
@@ -226,10 +215,10 @@ TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
 TEST_CASE("Send random values into AudioInstance and look for assertion errors") {
 
     doc::Note note{60};
-    GetDocumentStub get_document{one_note_document(TestChannelID::Pulse1, note)};
+    doc::Document document{one_note_document(TestChannelID::Pulse1, note)};
 
     Apu1Driver driver{
-        audio::synth::CLOCKS_PER_S, get_document.get_document().frequency_table
+        audio::synth::CLOCKS_PER_S, document.frequency_table
     };
 
     AudioOptions audio_options;
@@ -242,26 +231,26 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
     // The largest failing value is 873.
     // Not all values fail. As smp_per_s decreases, it becomes more likely to fail.
     for (int smp_per_s = 1000; smp_per_s <= 250'000; INCREASE(smp_per_s)) {
-        run_new_synth(get_document, smp_per_s, smp_per_s / 4, audio_options);  // smp_per_s * 0.25 second
+        run_new_synth(document, smp_per_s, smp_per_s / 4, audio_options);  // smp_per_s * 0.25 second
     }
 
     // 44100Hz, zero samples
-    run_new_synth(get_document, 44100, 0, audio_options);
+    run_new_synth(document, 44100, 0, audio_options);
 
     // 48000Hz, various durations
     for (int nsamp = 1; nsamp <= 100'000; INCREASE(nsamp)) {
-        run_new_synth(get_document, 48000, nsamp, audio_options);
+        run_new_synth(document, 48000, nsamp, audio_options);
     }
 }
 
 TEST_CASE("Send all note pitches into AudioInstance and look for assertion errors") {
     // 32000Hz, 4000 samples, various note pitches.
     for (doc::ChromaticInt pitch = 0; pitch < doc::CHROMATIC_COUNT; pitch++) {
-        GetDocumentStub get_document{
+        doc::Document document{
             one_note_document(TestChannelID::Pulse1, {pitch})
         };
         run_new_synth(
-            get_document, 32000, 1000, AudioOptions{.clocks_per_sound_update = 1}
+            document, 32000, 1000, AudioOptions{.clocks_per_sound_update = 1}
         );
     }
 }

@@ -11,16 +11,13 @@ namespace synth {
 OverallSynth::OverallSynth(
     int stereo_nchan,
     int smp_per_s,
-    doc::GetDocument &/*'a*/ get_document,
+    doc::Document const & document,
     AudioOptions audio_options
 ) :
     _stereo_nchan(stereo_nchan),
     _clocks_per_sound_update(audio_options.clocks_per_sound_update),
-    _get_document(get_document),
     _nes_blip(smp_per_s, CLOCKS_PER_S)
 {
-    doc::Document const & document = _get_document.get_document();
-
     // Optional non-owning reference to the previous chip, which may/not be APU1.
     // Passed to APU2.
     // If an APU2 is not immediately preceded by an APU1 (if apu1_maybe == nullptr),
@@ -53,12 +50,12 @@ OverallSynth::OverallSynth(
 }
 
 void OverallSynth::synthesize_overall(
-    gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block
+    doc::Document const & document,
+    gsl::span<Amplitude> output_buffer,
+    size_t const mono_smp_per_block
 ) {
     // Stereo support will be added at a later date.
     release_assert(output_buffer.size() == mono_smp_per_block);
-
-    doc::Document const & document = _get_document.get_document();
 
     // In all likelihood this function will not work if stereo_nchan != 1.
     // If I ever add a stereo console (SNES, maybe SN76489 like sneventracker),

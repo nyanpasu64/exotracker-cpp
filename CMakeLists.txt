@@ -62,7 +62,6 @@ add_library(exotracker-lib
         src/chip_kinds.cpp
 
         # Implementation files
-        src/audio/output.cpp
         src/audio/synth.cpp
 
         # 2A03 audio
@@ -80,6 +79,9 @@ target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
 
 # GUI editor, uses Qt
 add_executable(exotracker-bin
+        # GUI/audio thread-safe locking
+        src/audio/output.cpp
+
         # GUI
         src/gui/history.cpp
         src/gui/main_window.cpp

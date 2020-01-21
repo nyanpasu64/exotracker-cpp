@@ -65,8 +65,6 @@ private:
     ClockT const _clocks_per_sound_update;
 
     // fields
-    doc::GetDocument &/*'a*/ _get_document;
-
     EventQueue<SynthEvent> _events;
 
     // Audio written into this and read to output.
@@ -91,7 +89,7 @@ public:
     OverallSynth(
         int stereo_nchan,
         int smp_per_s,
-        doc::GetDocument &/*'a*/ get_document,
+        doc::Document const & document,
         AudioOptions audio_options
     );
 
@@ -106,7 +104,9 @@ public:
     /// output must have length length of mono_smp_per_block * stereo_nchan.
     /// It is treated as an array of interleaved samples, [smp#, * nchan + chan#] Amplitude.
     void synthesize_overall(
-        gsl::span<Amplitude> output_buffer, size_t const mono_smp_per_block
+        doc::Document const & document,
+        gsl::span<Amplitude> output_buffer,
+        size_t const mono_smp_per_block
     );
 };
 

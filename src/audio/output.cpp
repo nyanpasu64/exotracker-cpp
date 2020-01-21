@@ -9,12 +9,37 @@
 namespace audio {
 namespace output {
 
-/// TODO rename OutputCallback to PortAudioCallback.
+/// GUI-only audio synthesis callback.
+/// Uses GetDocument to obtain a document reference every callback.
+/// The document (possibly address too) will change when the user edits the document.
 class OutputCallback : public pa::CallbackInterface, private synth::OverallSynth {
+private:
+    doc::GetDocument &/*'a*/ _get_document;
 
 public:
-    // Constructor
-    using synth::OverallSynth::OverallSynth;
+    static std::unique_ptr<OutputCallback> make(
+        int stereo_nchan,
+        int smp_per_s,
+        doc::GetDocument &/*'a*/ get_document,
+        AudioOptions audio_options
+    ) {
+        // Outlives the return constructor call. Outlives all use of *doc_guard.
+        auto & document = get_document.get_document();
+        return std::make_unique<OutputCallback>(
+            stereo_nchan, smp_per_s, document, audio_options, get_document
+        );
+    }
+
+    OutputCallback(
+        int stereo_nchan,
+        int smp_per_s,
+        doc::Document const & document,
+        AudioOptions audio_options,
+        doc::GetDocument &/*'a*/ get_document
+    ) :
+        synth::OverallSynth(stereo_nchan, smp_per_s, document, audio_options),
+        _get_document(get_document)
+    {}
 
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
     // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
@@ -32,7 +57,8 @@ public:
         std::ptrdiff_t stereo_smp_per_block = synth._stereo_nchan * mono_smp_per_block;
         gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
 
-        synth.synthesize_overall(output, mono_smp_per_block);
+        auto & document = _get_document.get_document();
+        synth.synthesize_overall(document, output, mono_smp_per_block);
 
         return PaStreamCallbackResult::paContinue;
     }
@@ -106,7 +132,7 @@ AudioThreadHandle::AudioThreadHandle(
     doc::GetDocument & get_document,
     AudioOptions audio_options
 ) :
-    callback(std::make_unique<OutputCallback>(
+    callback(OutputCallback::make(
         outParams.numChannels(), (int)params.sampleRate(), get_document, audio_options
     )),
     stream(std::make_unique<SelfTerminatingStream>(params, *callback))
