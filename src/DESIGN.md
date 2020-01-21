@@ -50,7 +50,7 @@ Alternatives to this design:
 - Synthesizing 1 tick of audio at a time from the callback thread is also an acceptable option.
 - Synthesizing audio in a separate "synth thread", and splitting into fixed-size chunks queued up and read by the "output thread", is unacceptable since it generates latency. (This is how FamiTracker works.) Even with a length-0 queue, the synth thread can run 1 audio block ahead of the output thread.
 
-### Audio components (code is unfinished)
+### Audio components
 
 `OverallSynth` owns a list of sound chips: `vector<ChipIndex -> unique_ptr<ChipInstance subclass>>`. Which chips are loaded, and in what order, is determined by the current document's properties. Each `ChipInstance` subclass can appear more than once, allowing you to use the same chip multiple times (not possible on 0CC-FamiTracker).
 
@@ -132,13 +132,13 @@ Includes will be ordered from most coupled to least coupled. This ensures that t
 
 Dependencies may originate from Git repositories (either release/tag, or master), or release tarballs.
 
-To import dependencies from Git repositories, ~~follow the tutorial at https://www.atlassian.com/git/tutorials/git-subtree , under heading "Adding the sub-project as a remote".~~
+To import dependencies from Git repositories:
 
 ```sh
-git subtree [add|pull] --prefix folder_to_create \
-    remote_or_url branch_or_commit \
-    --squash
+git subrepo clone <remote-url> [<subdir>]
 ```
+
+*Older discussion about Git dependencies:*
 
 `git subtree` is useful in theory. In practice, it squashes the remote repo into a single commit, then performs a subtree merge (the remote repo becomes a subdir in exotracker's filesystem).
 
