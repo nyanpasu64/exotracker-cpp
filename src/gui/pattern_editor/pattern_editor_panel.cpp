@@ -236,7 +236,7 @@ static void drawRowEvents(
 }
 
 static void drawPattern(PatternEditorPanel & self, const QRect &rect) {
-    doc::Document const & document = self.history.get().get_document();
+    doc::Document const & document = *self.history.get().gui_get_document();
 
     self.pixmap_->fill(Qt::black);
 

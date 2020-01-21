@@ -76,19 +76,23 @@ add_library(exotracker-lib
         )
 target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
 target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
+target_compile_definitions(exotracker-lib PRIVATE EXO_LIB)
 
 # GUI editor, uses Qt
 add_executable(exotracker-bin
         # GUI/audio thread-safe locking
+        src/util/sync.cpp
         src/audio/output.cpp
 
         # GUI
         src/gui/history.cpp
+        src/gui/command_common.cpp
         src/gui/main_window.cpp
         src/gui/pattern_editor/pattern_editor_panel.cpp
         src/main.cpp
         )
 target_link_libraries(exotracker-bin PRIVATE exotracker-lib ${portaudio} ${portaudiocpp} Qt5::Widgets)
+target_compile_definitions(exotracker-bin PRIVATE EXO_BIN)
 
 # Unit tests
 add_executable(exotracker-tests

@@ -85,7 +85,7 @@ std::vector<Amplitude> run_new_synth(
     CAPTURE(smp_per_s);
     CAPTURE(nsamp);
 
-    // (int stereo_nchan, int smp_per_s, doc::GetDocument &/*'a*/ document)
+    // (int stereo_nchan, int smp_per_s, locked_doc::GetDocument &/*'a*/ document)
     audio::synth::OverallSynth synth{1, smp_per_s, document, audio_options};
 
     std::vector<Amplitude> buffer;

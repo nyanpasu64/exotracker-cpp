@@ -2,7 +2,7 @@
 
 /// Sends audio to computer speakers.
 /// Intended for GUI mode with concurrent editing of the document during playback.
-/// AudioThreadHandle uses doc::GetDocument to handles audio/GUI locking
+/// AudioThreadHandle uses locked_doc::GetDocument to handles audio/GUI locking
 /// and sends a raw `Document const &` to OverallSynth.
 ///
 /// In the absence of concurrent editing, you can use OverallSynth directly
@@ -19,6 +19,7 @@
 
 #include "audio_common.h"
 #include "doc.h"
+#include "locked_doc.h"
 #include "util/copy_move.h"
 
 #include <portaudiocpp/PortAudioCpp.hxx>
@@ -56,7 +57,7 @@ public:
     ///
     /// throws PaException or PaCppException or whatever else
     static AudioThreadHandle make(
-        pa::System & sys, doc::GetDocument & get_document
+        pa::System & sys, locked_doc::GetDocument & get_document
     );
 
 private:
@@ -74,7 +75,7 @@ private:
     AudioThreadHandle(
         portaudio::DirectionSpecificStreamParameters outParams,
         portaudio::StreamParameters params,
-        doc::GetDocument & get_document,
+        locked_doc::GetDocument & get_document,
         AudioOptions audio_options
     );
 };
