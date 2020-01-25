@@ -51,12 +51,22 @@ Design notes at https://docs.google.com/document/d/17g5wqgpUPWItvHCY-0eCaqZSNdVK
 
 There is only 1 audio thread, which runs callbacks called by PortAudio. This is how OpenMPT works as well.
 
-The audio system (`OverallSynth`) is driven by sound synthesis callbacks. Every time the audio callback calls `OverallSynth.synthesize_overall()`, it synthesizes a fixed number of samples, using `EventQueue` to know when to trigger new ticks (frame or vblank).
+The audio system (`OverallSynth`) is driven by sound synthesis callbacks (operates on a pull model). Every time PortAudio calls the audio callback which calls `OverallSynth.synthesize_overall()`, OverallSynth synthesizes a fixed number of samples, using `EventQueue` to know when to trigger new ticks (frame or vblank).
+
+By contrast, FamiTracker's synth thread pushes to a queue with backpressure.
 
 Alternatives to this design:
 
 - Synthesizing 1 tick of audio at a time from the callback thread is also an acceptable option.
 - Synthesizing audio in a separate "synth thread", and splitting into fixed-size chunks queued up and read by the "output thread", is unacceptable since it generates latency. (This is how FamiTracker works.) Even with a length-0 queue, the synth thread can run 1 audio block ahead of the output thread.
+
+### PortAudio audio output
+
+AudioThreadHandle sends audio to computer speakers, and is intended for GUI mode with concurrent editing of the document during playback. AudioThreadHandle uses doc::GetDocument to handles audio/GUI locking and sends a raw `Document const &` to OverallSynth.
+
+In the absence of concurrent editing, you can use OverallSynth directly and avoid locking and unlocking std::mutex.
+
+This has precedent: I believe libopenmpt does not talk directly to an output device, but merely exposes a callback api with no knowledge of locks or portaudio. (OpenMPT allows simple edits to patterns without locks! Complex edits require locking though.) libopenmpt can be called via ffmpeg or foobar2000, which have their own non-speaker output mechanisms.
 
 ### Audio components
 
