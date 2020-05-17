@@ -3,8 +3,7 @@ cmake_minimum_required(VERSION 3.8.0)
 project(exotracker)
 
 #Initialize environment
-set(portaudio "portaudio_static")
-set(portaudiocpp "portaudiocpp_static")
+set(RTAUDIO_BUILD_STATIC_LIBS TRUE)
 
 # This can be used to enable asan (-fsanitize=memory/undefined).
 include(cmake_user_override.cmake OPTIONAL)
@@ -15,20 +14,11 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
-# Disable PortAudio MME to avoid compiler warnings (and because MME is bad).
-set(PA_USE_WMME OFF CACHE BOOL "Enable support for MME" FORCE)
-if(find_portaudio)
-    find_package(portaudio REQUIRED)
-else()
-    add_subdirectory(
-        "3rdparty/portaudio"
-        EXCLUDE_FROM_ALL
-    )
-    add_subdirectory(
-        "3rdparty/portaudio/bindings/cpp"
-        EXCLUDE_FROM_ALL
-    )
-endif()
+set(RTAUDIO_BUILD_TESTING FALSE)
+add_subdirectory(
+    "3rdparty/rtaudio"
+    EXCLUDE_FROM_ALL
+)
 
 add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
 
@@ -71,7 +61,7 @@ add_library(exotracker-lib
         src/doc.cpp
         src/doc/events.cpp
         )
-target_link_libraries(exotracker-lib PRIVATE ${portaudio} ${portaudiocpp})
+target_link_libraries(exotracker-lib PRIVATE rtaudio)
 target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
 target_compile_definitions(exotracker-lib PRIVATE EXO_LIB)
 
@@ -88,7 +78,7 @@ add_executable(exotracker-bin
         src/gui/pattern_editor/pattern_editor_panel.cpp
         src/main.cpp
         )
-target_link_libraries(exotracker-bin PRIVATE exotracker-lib ${portaudio} ${portaudiocpp} Qt5::Widgets)
+target_link_libraries(exotracker-bin PRIVATE exotracker-lib rtaudio Qt5::Widgets)
 target_compile_definitions(exotracker-bin PRIVATE EXO_BIN)
 
 # Unit tests

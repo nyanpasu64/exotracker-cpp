@@ -2,7 +2,8 @@
 #include "gui/history.h"
 #include "audio.h"
 
-#include <portaudiocpp/PortAudioCpp.hxx>
+#include <fmt/core.h>
+#include <rtaudio/RtAudio.h>
 
 #include <QApplication>
 
@@ -11,6 +12,7 @@
 #include "win32_fonts.h"
 
 using std::unique_ptr;
+using fmt::print;
 using gui::MainWindow;
 
 int main(int argc, char *argv[])
@@ -20,20 +22,43 @@ int main(int argc, char *argv[])
 
     gui::history::History history{doc::dummy_document()};
 
-    portaudio::AutoSystem autoSys;
-    portaudio::System & sys = portaudio::System::instance();
+    RtAudio rt;
 
-    std::cout << "APIs {\n";
-    for (auto x = sys.hostApisBegin(), y = sys.hostApisEnd(); x != y; ++x) {
-        std::cout << x->name() << "\n";
+    std::cout << "Devices {\n";
+
+    // Determine the number of devices available
+    unsigned int n_devices = rt.getDeviceCount();
+
+    // Scan through devices for various capabilities
+    for (unsigned int i = 0; i < n_devices; i++) {
+        print("    {}: ", i);
+
+        RtAudio::DeviceInfo info = rt.getDeviceInfo(i);
+        if (info.probed == true) {
+            print(
+                "name={}, rate={}, out_nchan={}\n",
+                info.name,
+                info.preferredSampleRate,
+                info.outputChannels
+            );
+        } else {
+            print("probe failed\n");
+        }
     }
-    std::cout << "} APIs\n";
-    std::cout.flush();
-    std::cout << "Default API: " << sys.defaultHostApi().name() << "\n";
-    std::cout.flush();
+
+    std::cout << "}\n";
+    fflush(stdout);
+
+    if (n_devices == 0) {
+        std::cout << "No devices available\n";
+        return 1;
+    }
+
+    print("Default device index: {}\n", rt.getDefaultOutputDevice());
+    fflush(stdout);
 
     // Begin playing audio. Destroying this variable makes audio stop.
-    auto audio_handle = audio::output::AudioThreadHandle::make(sys, history);
+    auto audio_handle = audio::output::AudioThreadHandle::make(rt, history);
 
     unique_ptr<MainWindow> w = MainWindow::make(history);
     w->show();

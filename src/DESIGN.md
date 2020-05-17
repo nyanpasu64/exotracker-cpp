@@ -24,7 +24,7 @@ I am following some Rust-inspired rules in the codebase.
 
 - Polymorphic classes are non-copyable. Maybe non-polymorphic classes (not value structs) too.
 - Mutable aliasing is disallowed, except when mandated by third-party libraries (Blip_Synth points to Blip_Buffer, nsfplay APU2 points to APU1).
-- Self-referential structs are disallowed, except when mandated by third-party libraries (blip_buffer and portaudio), in which case the copy and move constructors are disabled (or move constructor is manually fixed, in the case of Blip_Buffer).
+- Self-referential structs are disallowed, except when mandated by third-party libraries (blip_buffer and rtaudio), in which case the copy and move constructors are disabled (or move constructor is manually fixed, in the case of Blip_Buffer).
 - Inheritance and storing data in base classes is discouraged.
 
 In audio code, "out parameters" are common since they don't require allocations. Heap allocations can take a long time, pool allocations (I don't know much) may be faster, writing into an existing buffer is free.
@@ -49,9 +49,9 @@ There's no reason i couldn't implement both ft-style "sequence to pattern mappin
 
 Design notes at https://docs.google.com/document/d/17g5wqgpUPWItvHCY-0eCaqZSNdVKwouYoGbu-RTAjfo .
 
-There is only 1 audio thread, which runs callbacks called by PortAudio. This is how OpenMPT works as well.
+There is only 1 audio thread, spawned by RtAudio and periodically running our callback. This is how OpenMPT works as well.
 
-The audio system (`OverallSynth`) is driven by sound synthesis callbacks (operates on a pull model). Every time PortAudio calls the audio callback which calls `OverallSynth.synthesize_overall()`, OverallSynth synthesizes a fixed number of samples, using `EventQueue` to know when to trigger new ticks (frame or vblank).
+The audio system (`OverallSynth`) is driven by sound synthesis callbacks (operates on a pull model). Every time RtAudio calls the audio callback which calls `OverallSynth.synthesize_overall()`, OverallSynth synthesizes a fixed number of samples, using `EventQueue` to know when to trigger new ticks (frame or vblank).
 
 By contrast, FamiTracker's synth thread pushes to a queue with backpressure.
 
@@ -60,13 +60,21 @@ Alternatives to this design:
 - Synthesizing 1 tick of audio at a time from the callback thread is also an acceptable option.
 - Synthesizing audio in a separate "synth thread", and splitting into fixed-size chunks queued up and read by the "output thread", is unacceptable since it generates latency. (This is how FamiTracker works.) Even with a length-0 queue, the synth thread can run 1 audio block ahead of the output thread.
 
-### PortAudio audio output
+### RtAudio audio output
 
 AudioThreadHandle sends audio to computer speakers, and is intended for GUI mode with concurrent editing of the document during playback. AudioThreadHandle uses doc::GetDocument to handles audio/GUI locking and sends a raw `Document const &` to OverallSynth.
 
 In the absence of concurrent editing, you can use OverallSynth directly and avoid locking and unlocking std::mutex.
 
-This has precedent: I believe libopenmpt does not talk directly to an output device, but merely exposes a callback api with no knowledge of locks or portaudio. (OpenMPT allows simple edits to patterns without locks! Complex edits require locking though.) libopenmpt can be called via ffmpeg or foobar2000, which have their own non-speaker output mechanisms.
+This has precedent: I believe libopenmpt does not talk directly to an output device, but merely exposes a callback api with no knowledge of locks or an audio library (here, RtAudio). (OpenMPT allows simple edits to patterns without locks! Complex edits require locking though.) libopenmpt can be called via ffmpeg or foobar2000, which have their own non-speaker output mechanisms.
+
+### Switching from PortAudio to RtAudio
+
+In PortAudio, there's 1 RAII object to initialize PortAudio (`AutoSystem`), one object representing the session (`System`), one object per stream (`Stream`).
+
+In RtAudio, the `RtAudio` object is both the interface to a list of devices, and stream connected to one device.
+
+Example of RtAudio usage in OpenMPT: https://github.com/OpenMPT/openmpt/blob/07f8c29b37f2bf9696e2f5ffb6eef0152e7fd4cf/sounddev/SoundDeviceRtAudio.cpp#L139
 
 ### Audio components
 
@@ -78,7 +86,7 @@ Each `ChipInstance` handles the channels/drivers/synthesis internally, so `Overa
 
 ----
 
-Each `ChipInstance` subclass `(Chip)Instance` has an associated `(Chip)ChannelID` enum (or enum class), also found as `(Chip)Instance::ChannelID`, specifying which channels that chip has. `(Chip)Instance` owns a sequencer (`ChipSequencer<(Chip)Instance::ChannelID>`), driver `(Chip)Driver`, and sound chip emulator (from nsfplay). 
+Each `ChipInstance` subclass `(Chip)Instance` has an associated `(Chip)ChannelID` enum (or enum class), also found as `(Chip)Instance::ChannelID`, specifying which channels that chip has. `(Chip)Instance` owns a sequencer (`ChipSequencer<(Chip)Instance::ChannelID>`), driver `(Chip)Driver`, and sound chip emulator (from nsfplay).
 
 Each sound chip module (`ChipInstance` subclass) can be run for a specific period of time (nclock: `ClockT`). The sound chip's synthesis callback (`ChipInstance::run_chip_for()`) is called by `OverallSynth`, and alternates running the synthesizer to generate audio for a duration in clock cycles (`ChipInstance::synth_run_clocks()`), and handling externally-imposed ticks or internally-timed register writes. On every tick (60 ticks/second), the synthesis callback returns, `OverallSynth` calls `ChipInstance::driver_tick()`, `ChipInstance`'s sound driver fetches event data from the sequencer and determines what registers to write to the chip (for new notes, instruments, vibrato, etc), and `OverallSynth` calls the synthesis callback again. On every register write, the synthesis callback writes to the registers of its sound chip (`ChipInstance::synth_write_memory()`) before resuming synthesis.
 
@@ -127,7 +135,7 @@ Concrete files in the "audio" folder (in order from common to derived). Each fil
 
 - audio_common.h (general audio types and functions, like Amplitude = s16)
 - output.h
-    - Depends on output-related libraries (portaudio).
+    - Depends on output-related libraries (RtAudio).
 - Application code depends on output.h.
 
 and

@@ -12,8 +12,9 @@ namespace output {
 /// GUI-only audio synthesis callback.
 /// Uses GetDocument to obtain a document reference every callback.
 /// The document (possibly address too) will change when the user edits the document.
-class OutputCallback : public pa::CallbackInterface, private synth::OverallSynth {
+class OutputCallback : public CallbackInterface {
 private:
+    synth::OverallSynth synth;
     locked_doc::GetDocument &/*'a*/ _get_document;
 
 public:
@@ -37,107 +38,93 @@ public:
         AudioOptions audio_options,
         locked_doc::GetDocument &/*'a*/ get_document
     ) :
-        synth::OverallSynth(stereo_nchan, smp_per_s, document, audio_options),
+        synth(synth::OverallSynth(stereo_nchan, smp_per_s, document, audio_options)),
         _get_document(get_document)
     {}
 
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
     // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
     // interleaved=false was added to support ASIO's native representation.
-    static constexpr bool interleaved = true;
+    static constexpr RtAudioStreamFlags rtaudio_flags = 0;  // not RTAUDIO_NONINTERLEAVED
 
-    // impl pa::CallbackInterface
-
-    // returns PaStreamCallbackResult.
-    int paCallbackFun(const void *inputBufferVoid, void *outputBufferVoid, unsigned long mono_smp_per_block,
-                      const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags) override {
-        synth::OverallSynth & synth = *this;
+    // impl RtAudioCallback
+    static int rtaudio_callback(
+        void *outputBufferVoid, void *inputBufferVoid,
+        unsigned int mono_smp_per_block,
+        double streamTime,
+        RtAudioStreamStatus status,
+        void *userData
+    ) {
+        auto self = static_cast<OutputCallback *>(userData);
+        synth::OverallSynth & synth = self->synth;
 
         // Convert output buffer from raw pointer into GSL span.
         std::ptrdiff_t stereo_smp_per_block = synth._stereo_nchan * mono_smp_per_block;
         gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
 
-        auto doc_guard = _get_document.get_document();
+        auto doc_guard = self->_get_document.get_document();
         synth.synthesize_overall(*doc_guard, output, mono_smp_per_block);
 
-        return PaStreamCallbackResult::paContinue;
+        return 0;
     }
 
-};
-
-
-/// Stream which stops and closes itself when destroyed.
-///
-/// Many classes inherit from pa::CallbackStream. I picked one I like.
-/// InterfaceCallbackStream and MemFunCallbackStream all take function pointers,
-/// there's no static dispatch.
-class SelfTerminatingStream : public pa::InterfaceCallbackStream {
-public:
-    using pa::InterfaceCallbackStream::InterfaceCallbackStream;
-
-    ~SelfTerminatingStream() override {
-        // Mimics portaudio/bindings/cpp/examples/sine.cxx and rust portaudio `Drop for Stream`.
-        try {
-            this->stop();
-        } catch (...) {}
-        try {
-            this->close();
-        } catch (...) {}
-    }
 };
 
 
 // When changing the output sample format,
 // be sure to change Amplitude (audio_common.h) and AmplitudeFmt at the same time!
 static_assert(std::is_same_v<Amplitude, int16_t>);
-const auto AmplitudeFmt = portaudio::SampleDataFormat::INT16;
+const RtAudioFormat AmplitudeFmt = RTAUDIO_SINT16;
 
-static int const STEREO_NCHAN = 1;
-static uintptr_t const MONO_SMP_PER_BLOCK = 64;
+static unsigned int const STEREO_NCHAN = 1;
+static unsigned int const MONO_SMP_PER_BLOCK = 64;
 
 
 /// Why factory method and not constructor?
 /// So we can calculate values (like sampling rate) used in multiple places.
 AudioThreadHandle AudioThreadHandle::make(
-    portaudio::System & sys, locked_doc::GetDocument & get_document
+    RtAudio & rt, locked_doc::GetDocument & get_document
 ) {
-    portaudio::DirectionSpecificStreamParameters outParams(
-        sys.defaultOutputDevice(),
-        STEREO_NCHAN,
-        AmplitudeFmt,
-        output::OutputCallback::interleaved,
-        sys.defaultOutputDevice().defaultLowOutputLatency(),
-        nullptr
-    );
-    portaudio::StreamParameters params(
-        portaudio::DirectionSpecificStreamParameters::null(),
-        outParams,
-        48000.0,
-        (unsigned long) MONO_SMP_PER_BLOCK,
-        paNoFlag
-    );
+    RtAudio::StreamParameters outParams;
+    outParams.deviceId = rt.getDefaultOutputDevice();
+    outParams.nChannels = STEREO_NCHAN;
+
+    RtAudio::StreamOptions stream_opt;
+    stream_opt.flags = OutputCallback::rtaudio_flags;
+
+    unsigned int sample_rate = 48000;
+    unsigned int mono_smp_per_block = MONO_SMP_PER_BLOCK;
     AudioOptions audio_options {
         .clocks_per_sound_update = 4,
     };
 
-    // We cannot move/memcpy due to self-reference (stream holds reference to callback).
-    // C++17 guaranteed copy elision only works on prvalues, not locals.
-    // So let constructor initialize fields in-place (our factory method cannot).
-    return AudioThreadHandle{outParams, params, get_document, audio_options};
+    std::unique_ptr<OutputCallback> callback = OutputCallback::make(
+        outParams.nChannels, (int)sample_rate, get_document, audio_options
+    );
+
+    rt.openStream(
+        &/*mut*/ outParams,
+        nullptr,
+        AmplitudeFmt,
+        sample_rate,
+        &/*mut*/ mono_smp_per_block,
+        OutputCallback::rtaudio_callback,
+        callback.get(),
+        &/*mut*/ stream_opt
+    );
+    rt.startStream();
+
+    return AudioThreadHandle{.rt=rt, .callback=std::move(callback)};
 }
 
-AudioThreadHandle::AudioThreadHandle(
-    portaudio::DirectionSpecificStreamParameters outParams,
-    portaudio::StreamParameters params,
-    locked_doc::GetDocument & get_document,
-    AudioOptions audio_options
-) :
-    callback(OutputCallback::make(
-        outParams.numChannels(), (int)params.sampleRate(), get_document, audio_options
-    )),
-    stream(std::make_unique<SelfTerminatingStream>(params, *callback))
-{
-    stream->start();
+AudioThreadHandle::~AudioThreadHandle() {
+    try {
+        rt.stopStream();
+    } catch (RtAudioError e) {
+        e.printMessage();
+    }
+
+    rt.closeStream();
 }
 
 // end namespaces

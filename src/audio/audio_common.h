@@ -13,6 +13,7 @@ using Amplitude = int16_t;
 using event_queue::ClockT;
 
 struct AudioOptions {
+    // Passed to synth only.
     ClockT clocks_per_sound_update;
 };
 
