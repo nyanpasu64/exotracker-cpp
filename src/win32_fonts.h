@@ -2,6 +2,9 @@
 
 
 #ifdef _WIN32
+
+#include <Windows.h>
+
 // Taken from https://github.com/qt/qtbase/blob/835c3e94f6089751421a19008d442faec9649ed8/src/platformsupport/fontdatabases/windows/qwindowsfontdatabase.cpp#L2064
 int defaultVerticalDPI()
 {
@@ -55,5 +58,8 @@ void win32_set_font() {
         QApplication::setFont(font);
     }
 
+}
+#else
+void win32_set_font() {
 }
 #endif

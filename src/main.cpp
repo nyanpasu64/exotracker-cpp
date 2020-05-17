@@ -2,29 +2,22 @@
 #include "gui/history.h"
 #include "audio.h"
 
-#include <QApplication>
 #include <portaudiocpp/PortAudioCpp.hxx>
 
-#ifdef _WIN32
-#include <Windows.h>
-#endif
+#include <QApplication>
 
 #include <iostream>
 
-using std::unique_ptr;
-using gui::MainWindow;
-
 #include "win32_fonts.h"
 
+using std::unique_ptr;
 using gui::MainWindow;
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-
-#ifdef _WIN32
     win32_set_font();
-#endif
+
     gui::history::History history{doc::dummy_document()};
 
     portaudio::AutoSystem autoSys;
