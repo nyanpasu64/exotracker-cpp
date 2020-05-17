@@ -28,6 +28,7 @@ int main(int argc, char *argv[])
         std::cout << x->name() << "\n";
     }
     std::cout << "} APIs\n";
+    std::cout.flush();
     std::cout << "Default API: " << sys.defaultHostApi().name() << "\n";
     std::cout.flush();
 
