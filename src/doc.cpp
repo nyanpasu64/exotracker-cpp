@@ -17,10 +17,10 @@ Document dummy_document() {
         using ChannelID = chip_kinds::Apu1ChannelID;
 
         chips.push_back(chip_kind);
-        chip_channel_events.push_back([]() {
+        chip_channel_events.push_back([] {
             ChannelTo<EventList> channel_events;
 
-            channel_events.push_back([]() {
+            channel_events.push_back([] {
                 // TimeInPattern, RowEvent
                 doc::EventList events;
                 KV{events}
@@ -32,7 +32,7 @@ Document dummy_document() {
                 return events;
             }());
 
-            channel_events.push_back([]() {
+            channel_events.push_back([] {
                 doc::EventList events;
                 KV{events}
                     .set_time({2, 0}, {48})

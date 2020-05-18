@@ -2,7 +2,7 @@
 
 namespace chip_kinds {
 
-const ChipToNchan CHIP_TO_NCHAN = []() {
+const ChipToNchan CHIP_TO_NCHAN = [] {
     /// EnumMap<ChipKind, ChannelIndex>
     ChipToNchan chip_to_nchan;
     chip_to_nchan.fill(0);
