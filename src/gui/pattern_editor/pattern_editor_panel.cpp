@@ -142,7 +142,9 @@ using history::History;
 static void drawRowBg(
     PatternEditorPanel & self, doc::Document const &document, QPainter & painter
 ) {
-    doc::SequenceEntry pattern = document.pattern;
+    // TODO follow audio thread's active pattern...
+    // How does the audio thread track its active row?
+    doc::SequenceEntry const & pattern = document.sequence[0];
 
     // In Qt, (0, 0) is top-left, dx is right, and dy is down.
     foreach_channel_draw(self, document, [&](ChannelDraw channel_draw) {
@@ -198,7 +200,7 @@ static void drawRowEvents(
 ) {
     using Frac = doc::BeatFraction;
 
-    doc::SequenceEntry pattern = document.pattern;
+    doc::SequenceEntry const & pattern = document.sequence[0];
 
     foreach_channel_draw(self, document, [&](ChannelDraw channel_draw) {
         auto [chip, channel, xleft, xright] = channel_draw;

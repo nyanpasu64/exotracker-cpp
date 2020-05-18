@@ -61,9 +61,11 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
 
     return DocumentCopy {
         .chips = chips,
-        .pattern = SequenceEntry {
-            .nbeats = 4,
-            .chip_channel_events = chip_channel_events,
+        .sequence = {
+            SequenceEntry {
+                .nbeats = 4,
+                .chip_channel_events = chip_channel_events,
+            }
         },
         .sequencer_options = SequencerOptions{
             .ticks_per_beat = 24,

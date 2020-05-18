@@ -80,6 +80,7 @@ class ChannelSequencer {
 
     // Idea: In ticked/timed code, never use "curr" in variable names.
     // Only ever use prev and next. This may reduce bugs, or not.
+    doc::SequenceIndex _next_seq_index = 0;
     int _next_tick = 0;
 
     /// TODO: Recomputed whenever next_tick() receives different EventList or parameters.
@@ -92,7 +93,7 @@ public:
 
     /// TODO
     void seek() {}
-    
+
     // Owning a vector, but returning a span, avoids the double-indirection of vector&.
     /// Eventually, (document, ChipIndex, ChannelIdInt) will be passed in as well.
     EventsRef next_tick(

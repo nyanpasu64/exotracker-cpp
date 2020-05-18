@@ -14,8 +14,9 @@ using events::RowEvent;
 using timed_events::TimeInPattern;
 using timed_events::TimedRowEvent;
 
-/// Pattern type.
+/// A pattern is a list of events, and does not carry information about its length.
 using EventList = std::vector<TimedRowEvent>;
+using Pattern = EventList;
 
 /// Mutable-reference wrapper for EventList (I wish C++ had extension methods),
 /// adding the ability to binary-search and treat it as a map.

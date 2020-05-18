@@ -33,6 +33,12 @@ struct SequencerOptions {
     TickT ticks_per_beat;
 };
 
+/// Document struct.
+///
+/// Usage:
+/// You can construct a DocumentCopy (not Document)
+/// via aggregate initialization or designated initializers.
+/// Afterwards, convert to Document to avoid accidental expensive copies.
 struct DocumentCopy {
     /// vector<ChipIndex -> ChipKind>
     /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
@@ -43,15 +49,14 @@ struct DocumentCopy {
         return chip_kinds::CHIP_TO_NCHAN[chips[index]];
     }
 
-    // TODO add multiple patterns.
-    SequenceEntry pattern;
+    Sequence sequence;
 
     SequencerOptions sequencer_options;
     FrequenciesOwned frequency_table;
 };
 
+/// Non-copyable version of Document. You must call clone() explicitly.
 struct Document : DocumentCopy {
-    // Expose clone, with explicit syntax.
     Document clone() const {
         return *this;
     }

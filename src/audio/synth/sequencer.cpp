@@ -180,7 +180,9 @@ EventsRef ChannelSequencer::next_tick(
 ) {
     _events_this_tick.clear();
 
-    doc::BeatFraction nbeats = document.pattern.nbeats;
+    doc::SequenceEntry const & current_entry = document.sequence[_next_seq_index];
+
+    doc::BeatFraction nbeats = current_entry.nbeats;
     doc::SequencerOptions options = document.sequencer_options;
     TickT pattern_ntick = doc::round_to_int(nbeats * options.ticks_per_beat);
 
@@ -189,7 +191,7 @@ EventsRef ChannelSequencer::next_tick(
     auto const nchan = document.chip_index_to_nchan(chip_index);
     release_assert(chan_index < nchan);
 
-    auto & chip_channel_events = document.pattern.chip_channel_events;
+    auto & chip_channel_events = current_entry.chip_channel_events;
 
     // [chip_index]
     release_assert(chip_channel_events.size() == nchip);
@@ -221,10 +223,13 @@ EventsRef ChannelSequencer::next_tick(
 
     _next_tick++;
     if (_next_tick >= pattern_ntick) {
-        // TODO switch to next pattern.
-        _next_tick = 0;
         // This code will make each pattern play for at least 1 tick.
         // Only insane patterns would have lengths rounding down to 0 ticks.
+        _next_tick = 0;
+        _next_seq_index++;
+        if (_next_seq_index >= document.sequence.size()) {
+            _next_seq_index = 0;
+        }
     }
     return _events_this_tick;
 }

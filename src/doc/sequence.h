@@ -16,8 +16,6 @@ using ChipChannelTo = DenseMap<ChipIndex, DenseMap<ChannelIndex, V>>;
 template<typename V>
 using ChannelTo = DenseMap<ChannelIndex, V>;
 
-using PatternID = uint8_t;
-
 /// Represents the contents of one row in the sequence editor.
 /// Like FamiTracker, Exotracker will use a pattern system
 /// where each sequence row contains [for each channel] pattern ID.
@@ -45,5 +43,10 @@ struct SequenceEntry {
     */
     ChipChannelTo<event_list::EventList> chip_channel_events;
 };
+
+using SequenceIndex = int;
+
+/// [SequenceIndex] SequenceEntry
+using Sequence = DenseMap<SequenceIndex, SequenceEntry>;
 
 }
