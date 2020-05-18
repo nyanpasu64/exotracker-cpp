@@ -13,7 +13,8 @@
 namespace doc::events {
 
 // These inline namespaces aren't strictly required, and could be removed if desired.
-inline namespace note {
+// Pick an underscored name so it doesn't clash with names I care about.
+inline namespace note_ {
     using ChromaticInt = int16_t;
     constexpr int CHROMATIC_COUNT = 128;
 
@@ -75,7 +76,7 @@ inline namespace tuning {
 }
 
 struct RowEvent {
-    std::optional<events::Note> note;
+    std::optional<Note> note;
     // TODO volumes and []effects
 
     EQUALABLE(RowEvent, (note))
