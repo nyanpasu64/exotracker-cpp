@@ -5,61 +5,110 @@
 
 namespace doc {
 
+static TimeInPattern at(BeatFraction anchor_beat) {
+    return TimeInPattern{anchor_beat, 0};
+}
+
+static TimeInPattern at_frac(int start, int num, int den) {
+    return TimeInPattern{start + BeatFraction(num, den), 0};
+}
+
+static Note pitch(int octave, int semitone) {
+    return Note{static_cast<ChromaticInt>(12 * octave + semitone)};
+}
+
 Document dummy_document() {
-    using Frac = BeatFraction;
+    // Excerpt from "Chrono Cross - Dream Fragments".
+    // This tests the ability to nudge notes both early and later,
+    // and even before the beginning of a pattern.
 
-    Document::ChipList chips;
-    ChipChannelTo<EventList> chip_channel_events;
+    // Global options
+    SequencerOptions sequencer_options{
+        .ticks_per_beat = 43,
+    };
 
-    // chip 0
-    {
-        auto const chip_kind = chip_kinds::ChipKind::Apu1;
-        using ChannelID = chip_kinds::Apu1ChannelID;
+    // We only have 1 chip.
+    auto const chip_kind = chip_kinds::ChipKind::Apu1;
+    using ChannelID = chip_kinds::Apu1ChannelID;
+    Document::ChipList chips{chip_kind};
 
-        chips.push_back(chip_kind);
-        chip_channel_events.push_back([] {
-            ChannelTo<EventList> channel_events;
+    Sequence sequence;
 
-            channel_events.push_back([] {
+    // seq ind 0
+    sequence.push_back([] {
+        ChipChannelTo<EventList> chip_channel_events;
+
+        chip_channel_events.push_back({
+            {
                 // TimeInPattern, RowEvent
-                doc::EventList events;
-                KV{events}
-                    .set_time({0, 0}, {60})
-                    .set_time({{1, 3}, 0}, {62})
-                    .set_time({{2, 3}, 0}, {64})
-                    .set_time({1, 0}, {65})
-                    .set_time({1 + Frac{2, 3}, 0}, {62});
-                return events;
-            }());
+                {at(0), {pitch(5, 7)}},
+                {at(1), {pitch(6, 2)}},
+                {at(4+0), {pitch(5, 7+2)}},
+                {at(4+1), {pitch(6, 2+2)}},
+            },
+            {
+                {at_frac(1, 1, 2), {pitch(7, -3)}},
+                {at_frac(2, 0, 2), {pitch(7, 6)}},
+                {at_frac(2, 1, 2), {pitch(7, 7)}},
+                {at_frac(3, 1, 2), {pitch(7, 9)}},
+                {at_frac(4, 1, 2), {pitch(7, 4)}},
+                {at_frac(5, 1, 2), {pitch(7, 2)}},
+                {at_frac(6, 1, 2), {pitch(7, 1)}},
+            },
+        });
+        release_assert(chip_channel_events[0].size() == (int)ChannelID::COUNT);
 
-            channel_events.push_back([] {
-                doc::EventList events;
-                KV{events}
-                    .set_time({2, 0}, {48})
-                    .set_time({2 + Frac{1, 4}, 0}, {NOTE_CUT})
-                    .set_time({2 + Frac{2, 4}, 0}, {44})
-                    .set_time({2 + Frac{3, 4}, 0}, {NOTE_CUT})
-                    .set_time({3, -2}, {39})
-                    .set_time({3, 0}, {40});
-                return events;
-            }());
+        return SequenceEntry {
+            .nbeats = 8,
+            .chip_channel_events = chip_channel_events,
+        };
+    }());
 
-            release_assert(channel_events.size() == (int)ChannelID::COUNT);
-            return channel_events;
-        }());
-    }
+    // seq ind 1
+    sequence.push_back([] {
+        ChipChannelTo<EventList> chip_channel_events;
+
+        chip_channel_events.push_back({
+            {
+                // TimeInPattern, RowEvent
+                {{0, -5}, {pitch(6, 4)}},
+                {{0, -2}, {pitch(6, 7)}},
+                {{0, 1}, {pitch(7, -1)}},
+                {at(1), {pitch(6, -1)}},
+                {at(2), {pitch(6, 4)}},
+                {at(3), {pitch(6, 7)}},
+                {{4, -5}, {pitch(6, 6)}},
+                {{4, -2}, {pitch(7, -2)}},
+                {{4, 1}, {pitch(7, 1)}},
+                {at(5), {pitch(6, 1)}},
+                {at(6), {pitch(6, -2)}},
+                {at(7), {pitch(6, 1)}},
+            },
+            {
+                {{0, 4}, {pitch(7, 4)}},
+                {at_frac(1, 1, 2), {pitch(7, -1)}},
+                {at(3), {pitch(7, 4)}},
+                {{4, 4}, {pitch(7, 6)}},
+                {at_frac(5, 2, 4), {pitch(7, 7)}},
+                {at_frac(5, 3, 4), {pitch(7, 6)}},
+                {at(6), {pitch(7, 4)}},
+                {{8, 3}, {pitch(6, 2)}},
+            },
+        });
+        release_assert(chip_channel_events[0].size() == (int)ChannelID::COUNT);
+
+        return SequenceEntry {
+            .nbeats = 8,
+            .chip_channel_events = chip_channel_events,
+        };
+    }());
+
+    // TODO add method to validate sequence invariants
 
     return DocumentCopy {
         .chips = chips,
-        .sequence = {
-            SequenceEntry {
-                .nbeats = 4,
-                .chip_channel_events = chip_channel_events,
-            }
-        },
-        .sequencer_options = SequencerOptions{
-            .ticks_per_beat = 24,
-        },
+        .sequence = sequence,
+        .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
     };
 }
