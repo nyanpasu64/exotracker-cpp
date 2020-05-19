@@ -10,7 +10,7 @@
 
 namespace locked_doc {
 
-using LockedDoc = sync::FakeRwLock<doc::Document>;
+using LockedDoc = util::sync::FakeRwLock<doc::Document>;
 using ReadPtr = LockedDoc::ReadPtr;
 using ReadGuard = LockedDoc::ReadGuard;
 

@@ -9,7 +9,8 @@
 #include <mutex>
 #include <optional>
 
-namespace sync {
+// `namespace sync` conflicts with `void sync(void)` in unistd.h (POSIX).
+namespace util::sync {
 
 template<typename Ptr>
 class [[nodiscard]] Guard {

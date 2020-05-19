@@ -1,5 +1,5 @@
 #include "sync.h"
 
-namespace sync {
+namespace util::sync {
 
 }
