@@ -40,7 +40,8 @@ struct FlattenedEventList {
         // 512 events ought to be enough for everybody!?
         // make that 1024 because i may add scripts which auto-generate
         // "note release" events before new notes begin
-        _delay_events.reserve(1024);
+        // Multiply by 3, since we're storing 3 patterns worth of events in this buffer.
+        _delay_events.reserve(1024 * 3);
     }
 };
 
