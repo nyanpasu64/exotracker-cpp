@@ -139,6 +139,9 @@ DelayEventsRefMut FlattenedEventList::load_events_mut(
         );
     }
 
+    // TODO return status saying "misordered events detected", then display error in GUI.
+    // The 6502 hardware driver will not handle misordered events properly;
+    // make_tick_times_monotonic() is merely a convenience for preview.
     make_tick_times_monotonic(DelayEventsRefMut{_delay_events});
 
     // Converts _delay_events from (tick, event) to (delay, event) format.

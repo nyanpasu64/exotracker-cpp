@@ -94,8 +94,7 @@ public:
     /// TODO
     void seek() {}
 
-    // Owning a vector, but returning a span, avoids the double-indirection of vector&.
-    /// Eventually, (document, ChipIndex, ChannelIdInt) will be passed in as well.
+    /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
     EventsRef next_tick(
         doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
     );
