@@ -120,7 +120,25 @@ static TickT time_to_ticks(doc::TimeInPattern time, doc::SequencerOptions option
 
 // impl FlattenedEventList
 
-DelayEventsRefMut FlattenedEventList::load_events_mut(
+using DelayEvent = TickOrDelayEvent;
+using DelayEventsRefMut = gsl::span<DelayEvent>;
+
+// TODO cache all inputs into load_events_mut(),
+// and add a method to increment cache.now().
+
+[[nodiscard]] DelayEventsRefMut get_events_mut(FlattenedEventList & self) {
+    return DelayEventsRefMut{self._delay_events}.subspan(self._next_event_idx);
+}
+
+struct EventListAndDuration {
+    // TODO replace with std::span, so you can truncate events before your "start beat".
+    doc::EventList const & event_list;
+    doc::BeatFraction nbeats;
+};
+
+/// Mutates self._delay_events, returns a reference.
+[[nodiscard]] DelayEventsRefMut load_events_mut(
+    FlattenedEventList & self,
     EventListAndDuration const pattern,
     doc::SequencerOptions options,
     TickT now
@@ -130,11 +148,11 @@ DelayEventsRefMut FlattenedEventList::load_events_mut(
     doc::EventList const & event_list = pattern.event_list;
     // Is it legal for patterns to hold events with anchor beat > pattern duration?
 
-    _delay_events.clear();
-    _delay_events.reserve(event_list.size());  // Does not shrink the vector.
+    self._delay_events.clear();
+    self._delay_events.reserve(event_list.size());  // Does not shrink the vector.
     for (doc::TimedRowEvent event : event_list) {
         TickT tick = time_to_ticks(event.time, options);
-        _delay_events.push_back(
+        self._delay_events.push_back(
             TickOrDelayEvent{.tick_or_delay = tick, .event = event.v}
         );
     }
@@ -142,22 +160,18 @@ DelayEventsRefMut FlattenedEventList::load_events_mut(
     // TODO return status saying "misordered events detected", then display error in GUI.
     // The 6502 hardware driver will not handle misordered events properly;
     // make_tick_times_monotonic() is merely a convenience for preview.
-    make_tick_times_monotonic(DelayEventsRefMut{_delay_events});
+    make_tick_times_monotonic(DelayEventsRefMut{self._delay_events});
 
     // Converts _delay_events from (tick, event) to (delay, event) format.
-    _next_event_idx = convert_tick_to_delay(now, DelayEventsRefMut{_delay_events});
+    self._next_event_idx = convert_tick_to_delay(now, DelayEventsRefMut{self._delay_events});
 
     // Returns reference to _delay_events.
-    return get_events_mut();
+    return get_events_mut(self);
 }
 
-DelayEventsRefMut FlattenedEventList::get_events_mut() {
-    return DelayEventsRefMut{_delay_events}.subspan(_next_event_idx);
-}
-
-void FlattenedEventList::pop_event() {
-    _next_event_idx++;
-    release_assert((size_t) _next_event_idx <= _delay_events.size());
+void pop_event(FlattenedEventList & self) {
+    self._next_event_idx++;
+    release_assert((size_t) self._next_event_idx <= self._delay_events.size());
 }
 
 ChannelSequencer::ChannelSequencer() {
@@ -207,15 +221,15 @@ EventsRef ChannelSequencer::next_tick(
     // Load list of upcoming events.
     // (In the future, mutate list instead of regenerating with different `now` every tick.
     // Use assertions to ensure that mutation and regeneration produce the same result.)
-    DelayEventsRefMut delay_events = _event_cache.load_events_mut(
-        {events, nbeats}, document.sequencer_options, _next_tick
+    DelayEventsRefMut delay_events = load_events_mut(
+        _event_cache, {events, nbeats}, document.sequencer_options, _next_tick
     );
 
     // Process all events occurring now.
     for (DelayEvent & delay_event : delay_events) {
         if (delay_event.delay() == 0) {
             _events_this_tick.push_back(delay_event.event);
-            _event_cache.pop_event();
+            pop_event(_event_cache);
         } else {
             // This has no effect now, but will be useful
             // once we reuse _event_cache across ticks.

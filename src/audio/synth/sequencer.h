@@ -31,23 +31,9 @@ struct TickOrDelayEvent {
     doc::RowEvent event;
 };
 
-using DelayEvent = TickOrDelayEvent;
-using DelayEventsRefMut = gsl::span<DelayEvent>;
-
 struct FlattenedEventList {
-    // types
-    struct EventListAndDuration {
-        doc::EventList const & event_list;
-        doc::BeatFraction nbeats;
-    };
-
-    // fields
     std::vector<TickOrDelayEvent> _delay_events;
     std::ptrdiff_t _next_event_idx;
-
-    // TODO cache all inputs into load_events_mut(),
-    // and add a method to increment cache.now().
-
     // impl
     FlattenedEventList() {
         // FamiTracker only supports 256 rows per channel. Who would fill them all?
@@ -56,15 +42,6 @@ struct FlattenedEventList {
         // "note release" events before new notes begin
         _delay_events.reserve(1024);
     }
-
-    /// returns mutable <'Self>.
-    [[nodiscard]] DelayEventsRefMut load_events_mut(
-        EventListAndDuration const pattern, doc::SequencerOptions options, TickT now
-    );
-
-    [[nodiscard]] DelayEventsRefMut get_events_mut();
-
-    void pop_event();
 };
 
 /*
