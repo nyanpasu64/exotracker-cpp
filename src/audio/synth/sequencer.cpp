@@ -221,16 +221,19 @@ EventsRef ChannelSequencer::next_tick(
 ) {
     _events_this_tick.clear();
 
-    doc::SequenceEntry const & current_entry = document.sequence[_curr_seq_index];
-
-    doc::BeatFraction nbeats = current_entry.nbeats;
-    doc::SequencerOptions options = document.sequencer_options;
-    TickT pattern_ntick = doc::round_to_int(nbeats * options.ticks_per_beat);
-
+    // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
     release_assert(chip_index < nchip);
     auto const nchan = document.chip_index_to_nchan(chip_index);
     release_assert(chan_index < nchan);
+
+    doc::SequencerOptions options = document.sequencer_options;
+    doc::MaybeSequenceIndex next_index = calc_next_index(document, _curr_seq_index);
+
+    // Process the current sequence entry.
+    doc::SequenceEntry const & current_entry = document.sequence[_curr_seq_index];
+    doc::BeatFraction nbeats = current_entry.nbeats;
+    TickT pattern_ntick = doc::round_to_int(nbeats * options.ticks_per_beat);
 
     auto & chip_channel_events = current_entry.chip_channel_events;
 
@@ -269,7 +272,6 @@ EventsRef ChannelSequencer::next_tick(
         _next_tick = 0;
         _prev_seq_index = {_curr_seq_index};
 
-        doc::MaybeSequenceIndex next_index = calc_next_index(document, _curr_seq_index);
         if (next_index.has_value()) {
             _curr_seq_index = *next_index;
         } else {
