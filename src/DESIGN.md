@@ -84,6 +84,8 @@ Each `ChipInstance` handles the channels/drivers/synthesis internally, so `Overa
 
 `ChipInstance` subclasses (sound chip objects) are defined in `synth/nes_2a03.cpp` etc. The header (`synth/nes_2a03.h` etc.) exposes factory functions returning `unique_ptr<ChipInstance>` base-class pointers. All methods except `ChipInstance::run_chip_for()` are pure virtual (implemented in subclasses).
 
+Data flows from doc.h (document) -> sequencer.h (notes each tick) -> driver_2a03.h (register writes each tick) -> nes_2a03.h (sound).
+
 ----
 
 Each `ChipInstance` subclass `(Chip)Instance` has an associated `(Chip)ChannelID` enum (or enum class), also found as `(Chip)Instance::ChannelID`, specifying which channels that chip has. `(Chip)Instance` owns a sequencer (`ChipSequencer<(Chip)Instance::ChannelID>`), driver `(Chip)Driver`, and sound chip emulator (from nsfplay).
@@ -110,7 +112,7 @@ Each `(Chip)Instance` subclass owns a `(Chip)Driver` owning several `(Chip)(Chan
 
 My current API provides no way for drivers to *read* from sound chips' address spaces. Channel drivers can use custom APIs to tell their owning chip driver how to handle chip-wide register writes: after all channel drivers are done running (and generating register writes), the chip driver knows the desired state of each channel and can generate more register writes. (For example, the 5B chip has a single 6-bit register telling the chip to enable/disable tone/noise for each of the 3 channels.)
 
-j0CC handles this differently. CAPU (hardware chip synth) Read() method, but it's completely unused. The 5B uses static globals, rather than a ChipDriver class, to write chip-wide registers.
+j0CC handles this differently. CAPU (hardware chip synth) has a Read() method, but it's completely unused. The 5B uses static globals, rather than a ChipDriver class, to write chip-wide registers.
 
 ## Rules for avoiding circular header inclusion
 
