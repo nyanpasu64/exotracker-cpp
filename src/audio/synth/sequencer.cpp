@@ -120,6 +120,7 @@ static TickT time_to_ticks(doc::TimeInPattern time, doc::SequencerOptions option
 
 // impl FlattenedEventList
 
+using TimedEventsRef = gsl::span<doc::TimedRowEvent const>;
 using DelayEvent = TickOrDelayEvent;
 using DelayEventsRefMut = gsl::span<DelayEvent>;
 
@@ -131,8 +132,7 @@ using DelayEventsRefMut = gsl::span<DelayEvent>;
 }
 
 struct EventListAndDuration {
-    // TODO replace with std::span, so you can truncate events before your "start beat".
-    doc::EventList const & event_list;
+    TimedEventsRef event_list;
     doc::BeatFraction nbeats;
 };
 
@@ -150,7 +150,7 @@ struct EventListAndDuration {
     */
     // TODO add EventList parameter for next pattern's "pickup events"???
 
-    doc::EventList const & event_list = pattern.event_list;
+    TimedEventsRef event_list = pattern.event_list;
     // Is it legal for patterns to hold events with anchor beat > pattern duration?
 
     self._delay_events.clear();
