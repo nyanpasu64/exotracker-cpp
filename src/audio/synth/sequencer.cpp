@@ -231,25 +231,84 @@ EventsRef ChannelSequencer::next_tick(
     doc::MaybeSequenceIndex next_index = calc_next_index(document, _curr_seq_index);
 
     // Process the current sequence entry.
-    doc::SequenceEntry const & current_entry = document.sequence[_curr_seq_index];
-    doc::BeatFraction nbeats = current_entry.nbeats;
-    TickT pattern_ntick = doc::round_to_int(nbeats * options.ticks_per_beat);
+    enum class TickAnchor { Begin, End };
 
-    auto & chip_channel_events = current_entry.chip_channel_events;
+    /// When calling parse_pattern() on the previous pattern,
+    /// it knows the playback point in ticks,
+    /// relative to the beginning of the current pattern
+    /// (aka the end of the previous pattern).
+    ///
+    /// parse_pattern() calls `RelativeTick{TickAnchor::End, offset}.compute_now(...)`
+    /// to find the playback tick relative to the beginning of the previous pattern.
+    /// So compute_now() must add the duration of the previous pattern.
+    struct RelativeTick {
+        TickAnchor anchor;
+        TickT offset;
 
-    // [chip_index]
-    release_assert(chip_channel_events.size() == nchip);
-    auto & channel_events = chip_channel_events[chip_index];
+        TickT compute_now(TickT pattern_duration) {
+            switch (anchor) {
+                case TickAnchor::End:
+                    return pattern_duration + offset;
+                case TickAnchor::Begin:
+                    return offset;
+                default:
+                    throw std::logic_error(fmt::format(
+                        "compute_now() received invalid anchor {}", anchor
+                    ));
+            }
+        }
+    };
 
-    // [chip_index][chan_index]
-    release_assert(channel_events.size() == nchan);
-    doc::EventList const & events = channel_events[chan_index];
+    /// Result from converting one pattern into a (delay, event) format.
+    /// Can be chained to parse more patterns afterwards.
+    struct ParsedPattern {
+        TickT pattern_ntick;
+        DelayEventsRefMut delay_events;
+    };
 
-    // Load list of upcoming events.
-    // (In the future, mutate list instead of regenerating with different `now` every tick.
-    // Use assertions to ensure that mutation and regeneration produce the same result.)
-    DelayEventsRefMut delay_events = load_events_mut(
-        _event_cache, {events, nbeats}, document.sequencer_options, _next_tick
+    auto parse_pattern = [options, chip_index, chan_index, nchip, nchan](
+        doc::Document const & document,
+        doc::SequenceIndex seq_idx,
+        RelativeTick tick_rel,
+        FlattenedEventList /*mut*/ & event_cache
+    ) -> ParsedPattern {
+        doc::SequenceEntry const & current_entry = document.sequence[seq_idx];
+        doc::BeatFraction nbeats = current_entry.nbeats;
+        TickT pattern_ntick = doc::round_to_int(nbeats * options.ticks_per_beat);
+
+        auto & chip_channel_events = current_entry.chip_channel_events;
+
+        // [chip_index]
+        release_assert(chip_channel_events.size() == nchip);
+        auto & channel_events = chip_channel_events[chip_index];
+
+        // [chip_index][chan_index]
+        release_assert(channel_events.size() == nchan);
+        doc::EventList const & events = channel_events[chan_index];
+
+        // Load list of upcoming events.
+        // (In the future, mutate list instead of regenerating with different `now` every tick.
+        // Use assertions to ensure that mutation and regeneration produce the same result.)
+        TickT now_tick = tick_rel.compute_now(pattern_ntick);
+        DelayEventsRefMut delay_events = load_events_mut(
+            event_cache, {events, nbeats}, document.sequencer_options, now_tick
+        );
+        return ParsedPattern{pattern_ntick, delay_events};
+    };
+
+    auto maybe_parse_pattern = [&parse_pattern](
+        doc::Document const & document,
+        doc::MaybeSequenceIndex seq_idx,
+        RelativeTick tick,
+        FlattenedEventList /*mut*/ & event_cache
+    ) -> ParsedPattern {
+        return seq_idx.has_value()
+            ? parse_pattern(document, *seq_idx, tick, event_cache)
+            : ParsedPattern{.pattern_ntick=0, .delay_events={}};
+    };
+
+    auto [pattern_ntick, delay_events] = parse_pattern(
+        document, _curr_seq_index, {TickAnchor::Begin, _next_tick}, /*mut*/ _event_cache
     );
 
     // Process all events occurring now.
