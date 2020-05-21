@@ -4,6 +4,7 @@ project(exotracker)
 
 #Initialize environment
 set(RTAUDIO_BUILD_STATIC_LIBS TRUE)
+set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Build (rtaudio, fmt, ...?) as shared library")
 
 # This can be used to enable asan (-fsanitize=memory/undefined).
 include(cmake_user_override.cmake OPTIONAL)
