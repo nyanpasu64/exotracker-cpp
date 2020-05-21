@@ -67,9 +67,9 @@ endif (CMAKE_COMPILER_IS_GNUCXX)
 # Add debug flags
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-D__RTAUDIO_DEBUG__)
-  if (CMAKE_COMPILER_IS_GNUCXX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
-  endif (CMAKE_COMPILER_IS_GNUCXX)
+#  if (CMAKE_COMPILER_IS_GNUCXX)
+#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+#  endif (CMAKE_COMPILER_IS_GNUCXX)
 endif ()
 
 # Read libtool version info from configure.ac
