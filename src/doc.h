@@ -49,6 +49,7 @@ struct DocumentCopy {
         return chip_kinds::CHIP_TO_NCHAN[chips[index]];
     }
 
+    // Sequence.size() in [1..MAX_SEQUENCE_LEN] inclusive (not enforced yet).
     Sequence sequence;
 
     SequencerOptions sequencer_options;

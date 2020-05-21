@@ -5,6 +5,8 @@
 #include "doc_common.h"  // DenseMap
 #include "chip_kinds.h"
 
+#include <optional>
+
 namespace doc::sequence {
 
 using chip_kinds::ChipIndex;
@@ -44,7 +46,11 @@ struct SequenceEntry {
     ChipChannelTo<event_list::EventList> chip_channel_events;
 };
 
-using SequenceIndex = int;
+using SequenceIndex = uint32_t;
+
+using MaybeSequenceIndex = std::optional<SequenceIndex>;
+
+constexpr SequenceIndex MAX_SEQUENCE_LEN = 65535;
 
 /// [SequenceIndex] SequenceEntry
 using Sequence = DenseMap<SequenceIndex, SequenceEntry>;

@@ -143,7 +143,12 @@ struct EventListAndDuration {
     doc::SequencerOptions options,
     TickT now
 ) {
-    // TODO add EventList parameter for next pattern's "pickup events"
+    /* TODO add parameter: BeatFraction start_beat.
+    - Drop all events prior.
+    - Convert all events into ticks.
+    - Subtract time_to_ticks(start_beat) from all event times.
+    */
+    // TODO add EventList parameter for next pattern's "pickup events"???
 
     doc::EventList const & event_list = pattern.event_list;
     // Is it legal for patterns to hold events with anchor beat > pattern duration?
@@ -192,12 +197,31 @@ ChannelSequencer::ChannelSequencer() {
     _events_this_tick.reserve(4);
 }
 
+doc::MaybeSequenceIndex calc_next_index(
+    doc::Document const & document, doc::SequenceIndex seq_index
+) {
+    // exotracker will have no pattern-jump effects.
+    // Instead, each "order entry" has a length field, and a "what to do next" field.
+
+    // If seq entry jumps to another seq index, return that one instead.
+
+    seq_index++;
+    if (seq_index >= document.sequence.size()) {
+        // If seq entry can halt song afterwards, return -1.
+        return {};
+    }
+    return {seq_index};
+
+    // If seq entry can jump partway into a pattern,
+    // change function to return both a pattern and a beat.
+}
+
 EventsRef ChannelSequencer::next_tick(
     doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
 ) {
     _events_this_tick.clear();
 
-    doc::SequenceEntry const & current_entry = document.sequence[_next_seq_index];
+    doc::SequenceEntry const & current_entry = document.sequence[_curr_seq_index];
 
     doc::BeatFraction nbeats = current_entry.nbeats;
     doc::SequencerOptions options = document.sequencer_options;
@@ -243,9 +267,14 @@ EventsRef ChannelSequencer::next_tick(
         // This code will make each pattern play for at least 1 tick.
         // Only insane patterns would have lengths rounding down to 0 ticks.
         _next_tick = 0;
-        _next_seq_index++;
-        if (_next_seq_index >= document.sequence.size()) {
-            _next_seq_index = 0;
+        _prev_seq_index = {_curr_seq_index};
+
+        doc::MaybeSequenceIndex next_index = calc_next_index(document, _curr_seq_index);
+        if (next_index.has_value()) {
+            _curr_seq_index = *next_index;
+        } else {
+            // TODO halt playback
+            _curr_seq_index = 0;
         }
     }
     return _events_this_tick;
