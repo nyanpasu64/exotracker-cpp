@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 namespace doc {
@@ -11,5 +12,7 @@ namespace doc {
 /// with a pixel coordinate integer.
 template<typename K, typename V>
 using DenseMap = std::vector<V>;
+
+using InstrumentIndex = uint8_t;
 
 }

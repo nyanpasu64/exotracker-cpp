@@ -8,6 +8,7 @@
 #include "doc/timed_events.h"
 #include "doc/event_list.h"
 #include "doc/sequence.h"
+#include "doc/instr.h"
 #include "chip_common.h"
 #include "util/copy_move.h"
 
@@ -20,6 +21,7 @@ using namespace ::doc::events;
 using namespace ::doc::timed_events;
 using namespace ::doc::event_list;
 using namespace ::doc::sequence;
+using namespace ::doc::instr;
 
 struct SequencerOptions {
     TickT ticks_per_beat;
@@ -46,6 +48,8 @@ struct DocumentCopy {
 
     SequencerOptions sequencer_options;
     FrequenciesOwned frequency_table;
+
+    Instruments instruments;
 };
 
 /// Non-copyable version of Document. You must call clone() explicitly.

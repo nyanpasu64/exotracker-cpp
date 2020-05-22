@@ -3,6 +3,8 @@
 #include "chip_kinds.h"
 #include "util/release_assert.h"
 
+#include <cmath>
+
 namespace doc {
 
 static TimeInPattern at(BeatFraction anchor_beat) {
@@ -41,13 +43,14 @@ Document dummy_document() {
         chip_channel_events.push_back({
             {
                 // TimeInPattern, RowEvent
-                {at(0), {pitch(5, 7)}},
+                {at(0), {.note=pitch(5, 7), .instr=0}},
                 {at(1), {pitch(6, 2)}},
                 {at(4+0), {pitch(5, 7+2)}},
                 {at(4+1), {pitch(6, 2+2)}},
             },
             {
-                {at_frac(1, 1, 2), {pitch(7, -3)}},
+                {at_frac(0, 3, 4), {NOTE_CUT}},
+                {at_frac(1, 1, 2), {.note=pitch(7, -3), .instr=0}},
                 {at_frac(2, 0, 2), {pitch(7, 6)}},
                 {at_frac(2, 1, 2), {pitch(7, 7)}},
                 {at_frac(3, 1, 2), {pitch(7, 9)}},
@@ -105,11 +108,27 @@ Document dummy_document() {
 
     // TODO add method to validate sequence invariants
 
+    auto instrument = [] {
+        auto volume = [] {
+            std::vector<ByteEnvelope::IntT> volume;
+            for (int i = 0; ; i++) {
+                volume.push_back(15 * pow(0.5, i / 20.0));
+                if (volume.back() == 0) {
+                    break;
+                }
+            }
+            return volume;
+        };
+
+        return Instrument{.volume={volume()}, .pitch={{}}, .wave_index={{1, 2}}};
+    }();
+
     return DocumentCopy {
         .chips = chips,
         .sequence = sequence,
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
+        .instruments = {instrument}
     };
 }
 

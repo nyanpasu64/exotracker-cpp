@@ -2,6 +2,7 @@
 
 /// Notes have pitches. That's about it.
 
+#include "doc_common.h"
 #include "util/compare.h"
 
 #include <gsl/span>
@@ -77,6 +78,7 @@ inline namespace tuning {
 
 struct RowEvent {
     std::optional<Note> note;
+    std::optional<InstrumentIndex> instr = {};
     // TODO volumes and []effects
 
     EQUALABLE(RowEvent, (note))
