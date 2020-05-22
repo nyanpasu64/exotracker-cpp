@@ -1,5 +1,5 @@
 #include "nes_2a03.h"
-#include "music_driver/driver_2a03.h"
+#include "nes_2a03_driver.h"
 #include "audio/event_queue.h"
 #include "util.h"
 #include "util/release_assert.h"
@@ -41,7 +41,7 @@ template<typename Synth = MyBlipSynth>
 class Apu1Instance : public BaseApu1Instance {
 private:
     // fields
-    music_driver::driver_2a03::Apu1Driver _driver;
+    nes_2a03_driver::Apu1Driver _driver;
 
     // NesApu2Synth::apu2 (xgm::NES_DMC) holds a reference to apu1 (xgm::NES_APU).
     xgm::NES_APU _apu1;

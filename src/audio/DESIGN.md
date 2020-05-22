@@ -21,9 +21,9 @@ output.cpp includes synth.h.
     - synth/nes_2a03.h (impl ChipInstance)
         - synth_common.h
 
-synth/nes_2a03.cpp includes synth/music_driver/driver_2a03.h.
+synth/nes_2a03.cpp includes synth/nes_2a03_driver.h.
 
-- synth/music_driver/driver_2a03.h
+- synth/nes_2a03_driver.h
     - synth/music_driver_common.h (nearly empty)
         - synth_common.h
         - sequencer.h
@@ -38,4 +38,4 @@ Dependencies:
 
 Currently, all of the above are defined in synth_common.h. This means that editing the ChipKind enum (to add more chips) will rebuild
 
-chip_kinds.h contains a list of sound chips, etc. It can be used by synth.h and music_driver.h. synth/music_driver/driver_2a03.h has no reason to view the overall list of sound chips, and the channels available to other sound chips. But it's simpler than moving Apu1ChannelID to an APU1-specific file.
+chip_kinds.h contains a list of sound chips, etc. It can be used by synth.h and music_driver.h. synth/nes_2a03_driver.h has no reason to view the overall list of sound chips, and the channels available to other sound chips. But it's simpler than moving Apu1ChannelID to an APU1-specific file.

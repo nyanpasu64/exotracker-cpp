@@ -1,5 +1,5 @@
 #include "audio/synth.h"
-#include "audio/synth/music_driver/driver_2a03.h"
+#include "audio/synth/nes_2a03_driver.h"
 #include "doc.h"
 #include "chip_kinds.h"
 #include "test_utils/parameterize.h"
@@ -13,8 +13,8 @@
 
 #include "doctest.h"
 
-using audio::synth::music_driver::driver_2a03::Apu1Driver;
-using audio::synth::music_driver::driver_2a03::Apu1PulseDriver;
+using audio::synth::nes_2a03_driver::Apu1Driver;
+using audio::synth::nes_2a03_driver::Apu1PulseDriver;
 
 
 enum class TestChannelID {

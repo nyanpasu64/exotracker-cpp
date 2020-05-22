@@ -56,7 +56,7 @@ add_library(exotracker-lib
         3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
         3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
         src/audio/synth/nes_2a03.cpp
-        src/audio/synth/music_driver/driver_2a03.cpp
+        src/audio/synth/nes_2a03_driver.cpp
 
         # Etc.
         src/doc.cpp
@@ -94,7 +94,7 @@ add_executable(exotracker-tests
 
         src/doc/events.cpp
         src/audio/synth/sequencer.cpp
-        src/audio/synth/music_driver/driver_2a03.cpp
+        src/audio/synth/nes_2a03_driver.cpp
 
         # No tests yet, why is it included?
         src/gui/history.cpp

@@ -98,7 +98,7 @@ Each `ChipInstance` handles the channels/drivers/synthesis internally, so `Overa
 
 `ChipInstance` subclasses (sound chip objects) are defined in `synth/nes_2a03.cpp` etc. The header (`synth/nes_2a03.h` etc.) exposes factory functions returning `unique_ptr<ChipInstance>` base-class pointers. All methods except `ChipInstance::run_chip_for()` are pure virtual (implemented in subclasses).
 
-Data flows from doc.h (document) -> sequencer.h (notes each tick) -> driver_2a03.h (register writes each tick) -> nes_2a03.h (sound).
+Data flows from doc.h (document) -> sequencer.h (notes each tick) -> nes_2a03_driver.h (register writes each tick) -> nes_2a03.h (sound).
 
 ----
 
