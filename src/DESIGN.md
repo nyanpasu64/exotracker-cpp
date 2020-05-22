@@ -76,6 +76,20 @@ In RtAudio, the `RtAudio` object is both the interface to a list of devices, and
 
 Example of RtAudio usage in OpenMPT: https://github.com/OpenMPT/openmpt/blob/07f8c29b37f2bf9696e2f5ffb6eef0152e7fd4cf/sounddev/SoundDeviceRtAudio.cpp#L139
 
+### RtAudio mono issues
+
+On some platforms (Windows WASAPI), sending a mono audio stream only sends sound to the left ear. In this situation, RtAudio does not upmix mono to stereo. Bug report at https://github.com/thestk/rtaudio/issues/243 .
+
+RtAudio:
+
+- On Windows (I think it's WASAPI but the device name doesn't say which API was used), a mono stream only plays in the left speaker.
+- On Linux PulseAudio, a mono stream plays in both speakers.
+
+PortAudio:
+
+- On all platforms (Windows DirectSound, WASAPI, Linux ALSA), a mono stream plays in both speakers.
+- In portaudio/src/hostapi/wasapi/pa_win_wasapi.c, `GetMonoToStereoMixer()` gets called whenever I open a WASAPI output stream in mono, and `PaWasapiSubStream` `monoMixer` gets called whenever I write to the stream. This means that portaudio has code to broadcast mono to stereo.
+
 ### Audio components
 
 `OverallSynth` owns a list of sound chips: `vector<ChipIndex -> unique_ptr<ChipInstance subclass>>`. Which chips are loaded, and in what order, is determined by the current document's properties. Each `ChipInstance` subclass can appear more than once, allowing you to use the same chip multiple times (not possible on 0CC-FamiTracker).
