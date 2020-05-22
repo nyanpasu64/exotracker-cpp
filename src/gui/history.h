@@ -76,14 +76,6 @@ public:
 
     // impl locked_doc::GetDocument
     /// Called from UI or audio thread. Non-blocking and thread-safe.
-    ///
-    /// If the audio thread calls get(),
-    /// the main thread deletes its copy of `current` leaving the audio thread the last owner,
-    /// and the audio thread deletes the resulting Immer object,
-    /// it may have unpredictable delays due to some nested elements being on the C++ heap.
-    ///
-    /// But this is unlikely, since the main thread does not delete `current`
-    /// but instead moves it to undo/redo (and redo is only cleared upon new actions).
     DocumentStore::ReadGuard get_document() const override {
         return _store.get_document();
     }

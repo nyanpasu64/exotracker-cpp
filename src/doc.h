@@ -3,14 +3,6 @@
 /// Patterns contain rows at times (TimeInPattern).
 /// TimeInPattern contains both a fractional anchor beat, and an offset in frames.
 /// Rows can contain notes, effects, or both.
-///
-/// We use the C++ Immer library to implement immutable persistent data structures.
-///
-/// According to https://sinusoid.es/immer/containers.html#_CPPv2NK5immer6vectorixE9size_type ,
-/// indexing into an Immer container returns a `const &`,
-/// which becomes mutable when copied to a local.
-/// Therefore when designing immer::type<Inner>, Inner can be a mutable struct,
-/// std collection, or another immer::type.
 
 #include "doc/events.h"
 #include "doc/timed_events.h"
