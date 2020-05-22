@@ -39,11 +39,6 @@ enum class SampleEvent {
 /// APU1 (2 pulses)
 template<typename Synth = MyBlipSynth>
 class Apu1Instance : public BaseApu1Instance {
-public:
-    // types
-    STATIC(ChipKind chip_kind(), ChipKind::Apu1)
-    using ChannelID = Apu1ChannelID;
-
 private:
     // fields
     music_driver::driver_2a03::Apu1Driver _driver;
@@ -90,7 +85,7 @@ public:
 
     // impl ChipInstance
     void driver_tick(
-        doc::Document const & document, chip_kinds::ChipIndex chip_index
+        doc::Document const & document, chip_common::ChipIndex chip_index
     ) override {
         // Sequencer's time passes.
         _driver.driver_tick(document, chip_index, /*out*/ _register_writes);

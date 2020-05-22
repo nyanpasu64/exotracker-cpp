@@ -4,7 +4,7 @@
 #include "event_queue.h"
 #include "audio_common.h"
 #include "doc.h"
-#include "chip_kinds.h"
+#include "chip_common.h"
 #include "util/enum_map.h"
 #include "util/copy_move.h"
 
@@ -16,7 +16,7 @@
 namespace audio {
 namespace synth {
 
-using namespace chip_kinds;
+using namespace chip_common;
 
 // https://wiki.nesdev.com/w/index.php/CPU
 // >Emulator authors may wish to emulate the NTSC NES/Famicom CPU at 21441960 Hz...
@@ -145,7 +145,6 @@ class ChipInstance : boost::noncopyable {
 public:
     // fields
     RegisterWriteQueue _register_writes;
-    STATIC_DECL(ChipKind chip_kind())
 
     // type-erased dependent values:
     //  defined in subclasses, enforced via runtime release_assert.
@@ -161,7 +160,7 @@ public:
     ///
     /// We take a Document& to avoid repeatedly mutating atomic refcounts (slow?)
     virtual void driver_tick(
-        doc::Document const & document, chip_kinds::ChipIndex chip_index
+        doc::Document const & document, chip_common::ChipIndex chip_index
     ) = 0;
 
     /// Cannot cross tick boundaries. Can cross register-write boundaries.

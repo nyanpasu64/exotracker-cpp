@@ -1,4 +1,5 @@
 #include "synth.h"
+#include "chip_kinds.h"
 #include "util/release_assert.h"
 
 #include <cstddef>  // size_t
@@ -7,6 +8,8 @@
 
 namespace audio {
 namespace synth {
+
+using chip_kinds::ChipKind;
 
 OverallSynth::OverallSynth(
     int stereo_nchan,

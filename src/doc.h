@@ -8,7 +8,7 @@
 #include "doc/timed_events.h"
 #include "doc/event_list.h"
 #include "doc/sequence.h"
-#include "chip_kinds.h"
+#include "chip_common.h"
 #include "util/copy_move.h"
 
 #include <vector>
@@ -37,8 +37,8 @@ struct DocumentCopy {
     using ChipList = std::vector<chip_kinds::ChipKind>;
     ChipList chips;
 
-    chip_kinds::ChannelIndex chip_index_to_nchan(chip_kinds::ChipIndex index) const {
-        return chip_kinds::CHIP_TO_NCHAN[chips[index]];
+    chip_common::ChannelIndex chip_index_to_nchan(chip_common::ChipIndex index) const {
+        return chip_common::CHIP_TO_NCHAN[(size_t)chips[index]];
     }
 
     // Sequence.size() in [1..MAX_SEQUENCE_LEN] inclusive (not enforced yet).

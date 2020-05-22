@@ -3,14 +3,14 @@
 #include "event_list.h"
 #include "timed_events.h"
 #include "doc_common.h"  // DenseMap
-#include "chip_kinds.h"
+#include "chip_common.h"
 
 #include <optional>
 
 namespace doc::sequence {
 
-using chip_kinds::ChipIndex;
-using chip_kinds::ChannelIndex;
+using chip_common::ChipIndex;
+using chip_common::ChannelIndex;
 
 template<typename V>
 using ChipChannelTo = DenseMap<ChipIndex, DenseMap<ChannelIndex, V>>;

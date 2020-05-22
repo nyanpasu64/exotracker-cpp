@@ -90,8 +90,8 @@ static Palette palette;
 // See doc.h for documentation of how patterns work.
 
 struct ChannelDraw {
-    chip_kinds::ChipIndex chip;
-    chip_kinds::ChannelIndex channel;
+    chip_common::ChipIndex chip;
+    chip_common::ChannelIndex channel;
     int xleft;
     int xright;
 };
@@ -108,12 +108,12 @@ void foreach_channel_draw(
 
     // local
     for (
-        chip_kinds::ChipIndex chip_index = 0;
+        chip_common::ChipIndex chip_index = 0;
         chip_index < document.chips.size();
         chip_index++
     ) {
         for (
-            chip_kinds::ChannelIndex channel_index = 0;
+            chip_common::ChannelIndex channel_index = 0;
             channel_index < document.chip_index_to_nchan(chip_index);
             channel_index++
         ) {

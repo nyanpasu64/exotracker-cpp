@@ -47,7 +47,7 @@ add_library(exotracker-lib
         src/audio/synth/sequencer.cpp
         src/audio/synth/music_driver_common.cpp
 
-        src/chip_kinds.cpp
+        src/chip_common.cpp
 
         # Implementation files
         src/audio/synth.cpp

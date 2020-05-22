@@ -3,6 +3,8 @@
 #pragma once
 
 #include "../music_driver_common.h"
+#include "../sequencer.h"
+#include "chip_kinds.h"
 
 #include "util/macros.h"
 
@@ -19,6 +21,7 @@
 namespace audio::synth::music_driver::driver_2a03 {
 
 using namespace doc::tuning;
+using chip_kinds::Apu1ChannelID;
 
 // Pulse 1/2 driver
 

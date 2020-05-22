@@ -1,10 +1,15 @@
 #include "chip_kinds.h"
+#include "chip_common.h"
 
-namespace chip_kinds {
+namespace chip_common {
 
-const ChipToNchan CHIP_TO_NCHAN = [] {
+using namespace chip_kinds;
+
+using ChipToNchanSized = EnumMap<ChipKind, ChannelIndex>;
+
+const ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
     /// EnumMap<ChipKind, ChannelIndex>
-    ChipToNchan chip_to_nchan;
+    ChipToNchanSized chip_to_nchan;
     chip_to_nchan.fill(0);
 
 #define INITIALIZE(chip)  chip_to_nchan[ChipKind::chip] = enum_count<chip ## ChannelID>;
@@ -20,5 +25,7 @@ const ChipToNchan CHIP_TO_NCHAN = [] {
 
     return chip_to_nchan;
 }();
+
+const ChipToNchan CHIP_TO_NCHAN = &CHIP_TO_NCHAN_SIZED[0];
 
 }

@@ -1,19 +1,13 @@
 #pragma once
 
-#include "util/enum_map.h"
+#include "chip_common.h"
 
 #include <cstdint>
 
 namespace chip_kinds {
 
-/// Index into a list of active sound chips.
-using ChipIndex = uint32_t;
-using ChannelIndex = uint32_t;
-
-ChipIndex constexpr MAX_NCHIP = 100;
-
 /// List of sound chips supported.
-enum class ChipKind {
+enum class ChipKind : uint32_t {
     Apu1,
 //    Apu2,
 
@@ -25,8 +19,5 @@ enum class Apu1ChannelID {
     Pulse2,
     COUNT,
 };
-
-using ChipToNchan = EnumMap<ChipKind, ChannelIndex>;
-extern const ChipToNchan CHIP_TO_NCHAN;
 
 }

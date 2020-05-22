@@ -1,6 +1,7 @@
 #pragma once
 
 #include "doc.h"
+#include "chip_common.h"
 #include "util/enum_map.h"
 
 #include <gsl/span>
@@ -9,7 +10,7 @@
 
 namespace audio::synth::sequencer {
 
-using namespace chip_kinds;
+using namespace chip_common;
 
 using EventsRef = gsl::span<doc::RowEvent const>;
 
