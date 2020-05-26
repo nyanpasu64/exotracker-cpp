@@ -3,6 +3,7 @@
 #pragma once
 
 #include "music_driver_common.h"
+#include "envelope.h"
 #include "sequencer.h"
 #include "chip_kinds.h"
 
@@ -33,13 +34,26 @@ class Apu1PulseDriver {
 
     bool _first_tick_occurred = false;
 
-    // TODO add InstrEnvelope class
-    // with array, index, and "should tick" or "reached end" methods.
-    bool _note_active = false;
-    int _volume_index = 0;
+#define Apu1PulseDriver_FOREACH_RAW(X, APPL) \
+    X(APPL(volume)); \
+    X(APPL(arpeggio)); \
+    X(APPL(wave_index));
+
+#define ITER_NAME(name)  _ ## name ## _iter
+#define ID(name)  name
+
+#define DEFINE_ITERATORS(name) \
+    envelope::EnvelopeIterator<decltype(doc::Instrument::name)> ITER_NAME(name)
+
+    Apu1PulseDriver_FOREACH_RAW(DEFINE_ITERATORS, ID)
+
+#define Apu1PulseDriver_FOREACH(X) \
+    Apu1PulseDriver_FOREACH_RAW(X, ITER_NAME)
+
+    doc::Note _prev_note;
 
 public:
-    // Reading a ADD_BITFIELD_MEMBER does not sign-extended it.
+    // Reading a ADD_BITFIELD_MEMBER does not sign-extend it.
     // The read value can only be negative
     // if the ADD_BITFIELD_MEMBER has the same length as the storage type
     // (AKA the type returned by member accesses).
@@ -60,6 +74,8 @@ public:
         ADD_BITFIELD_ARRAY(bytes, /*offset*/ 0, /*bits*/ 8, /*numItems*/ BYTES)
     END_BITFIELD_TYPE()
 
+    static constexpr int MAX_VOLUME = decltype(Apu1Reg::volume)::Maximum;
+    static_assert (MAX_VOLUME == 15, "huh?");
     static constexpr int MAX_PERIOD = decltype(Apu1Reg::period_reg)::Maximum;
 
 private:
@@ -71,14 +87,20 @@ public:
     Apu1PulseDriver(PulseNum pulse_num, TuningRef tuning_table) :
         _pulse_num(pulse_num),
         _base_address(0x4000 + 0x4 * pulse_num),
-        _tuning_table(tuning_table)
+        _tuning_table(tuning_table),
+        _volume_iter(&doc::Instrument::volume, MAX_VOLUME),
+        _arpeggio_iter(&doc::Instrument::arpeggio, 0),
+        _wave_index_iter(&doc::Instrument::wave_index, 0),
+        _prev_note({0})
     {}
 
     // TODO add a $4015 reference parameter,
     // so after Apu1PulseDriver writes to channels,
     // Apu1Driver can toggle hardware envelopes.
     void tick(
-        sequencer::EventsRef events, RegisterWriteQueue &/*out*/ register_writes
+        doc::Document const & document,
+        sequencer::EventsRef events,
+        RegisterWriteQueue &/*out*/ register_writes
     );
 };
 
@@ -122,8 +144,12 @@ public:
         EnumMap<ChannelID, sequencer::EventsRef> channel_events =
             _chip_sequencer.sequencer_tick(document, chip_index);
 
-        _pulse1_driver.tick(channel_events[ChannelID::Pulse1], /*mut*/ register_writes);
-        _pulse2_driver.tick(channel_events[ChannelID::Pulse2], /*mut*/ register_writes);
+        _pulse1_driver.tick(
+            document, channel_events[ChannelID::Pulse1], /*mut*/ register_writes
+        );
+        _pulse2_driver.tick(
+            document, channel_events[ChannelID::Pulse2], /*mut*/ register_writes
+        );
 
         // TODO write $4015 to register_writes, if I ever add envelope functionality.
     }

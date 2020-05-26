@@ -44,6 +44,7 @@ add_library(exotracker-lib
         # Common files (tightly coupled)
         src/audio/audio_common.cpp
         src/audio/synth_common.cpp
+        src/audio/synth/envelope.cpp
         src/audio/synth/sequencer.cpp
         src/audio/synth/music_driver_common.cpp
 
@@ -93,6 +94,7 @@ add_executable(exotracker-tests
         tests/test_utils/test_parameterize.cpp
 
         src/doc/events.cpp
+        src/audio/synth/envelope.cpp
         src/audio/synth/sequencer.cpp
         src/audio/synth/nes_2a03_driver.cpp
 

@@ -120,7 +120,9 @@ Document dummy_document() {
             return volume;
         };
 
-        return Instrument{.volume={volume()}, .pitch={{}}, .wave_index={{1, 2}}};
+        return Instrument{
+            .volume={volume()}, .pitch={{}}, .arpeggio={{7, 0}}, .wave_index={{2, 2}}
+        };
     }();
 
     return DocumentCopy {

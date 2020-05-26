@@ -48,46 +48,45 @@ TuningOwned make_tuning_table(
 }
 
 void Apu1PulseDriver::tick(
-    sequencer::EventsRef events, RegisterWriteQueue & register_writes
+    doc::Document const & document,
+    sequencer::EventsRef events,
+    RegisterWriteQueue & register_writes
 ) {
-    bool new_note = false;
-
     for (doc::RowEvent event : events) {
         if (event.note.has_value()) {
             doc::Note note = *event.note;
 
             if (note.is_valid_note()) {
-                _note_active = true;
-                new_note = true;
-                _volume_index = 0;
+                #define NOTE_ON(iter)  iter.note_on(event.instr)
+                Apu1PulseDriver_FOREACH(NOTE_ON)
+                _prev_note = note;
 
-                // Changing pitch may write to $4003, which resets phase and creates a click.
-                // There is a way to avoid this click: http://forums.nesdev.com/viewtopic.php?t=231
-                // I did not implement that method, so I get clicks.
-                _next_state.period_reg = _tuning_table[note.value];
-            } else {
-                _note_active = false;
-                new_note = false;
+            } else if (note.is_release()) {
+                #define RELEASE(iter)  iter.release(document)
+                Apu1PulseDriver_FOREACH(RELEASE)
+
+            } else if (note.is_cut()) {
+                #define NOTE_CUT(iter)  iter.note_cut()
+                Apu1PulseDriver_FOREACH(NOTE_CUT)
             }
+        } else if (event.instr.has_value()) {
+            #define SWITCH_INSTRUMENT(iter)  iter.switch_instrument(*event.instr);
+            Apu1PulseDriver_FOREACH(SWITCH_INSTRUMENT)
         }
     }
 
-    int volume;
-    if (_note_active) {
-        volume = 0xc - (_volume_index / 1) - 3 * _pulse_num;
+    _next_state.volume = _volume_iter.next(document);
+    _next_state.duty = _wave_index_iter.next(document);
 
-        if (!new_note) {
-            // Advance envelope. TODO move to InstrEnvelope or SynthEnvelope class.
-            if (volume > 0) {
-                _volume_index += 1;
-            }
-        }
-    } else {
-        volume = 0;
+    if (_next_state.volume) {
+        // Changing pitch may write to $4003, which resets phase and creates a click.
+        // There is a way to avoid this click: http://forums.nesdev.com/viewtopic.php?t=231
+        // I did not implement that method, so I get clicks.
+        _next_state.period_reg = _tuning_table[
+            _prev_note.value + _arpeggio_iter.next(document)
+        ];
     }
 
-    _next_state.volume = volume;
-    _next_state.duty = 0x1 + _pulse_num;
 
     /*
     - https://wiki.nesdev.com/w/index.php/APU#Pulse_.28.244000-4007.29

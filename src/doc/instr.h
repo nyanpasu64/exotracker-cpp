@@ -31,6 +31,7 @@ struct Instrument {
     // TODO implement envelope reuse.
     ByteEnvelope volume;
     ShortEnvelope pitch;
+    ByteEnvelope arpeggio;
     ByteEnvelope wave_index;
 };
 
