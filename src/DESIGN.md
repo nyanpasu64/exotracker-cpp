@@ -90,6 +90,8 @@ PortAudio:
 - On all platforms (Windows DirectSound, WASAPI, Linux ALSA), a mono stream plays in both speakers.
 - In portaudio/src/hostapi/wasapi/pa_win_wasapi.c, `GetMonoToStereoMixer()` gets called whenever I open a WASAPI output stream in mono, and `PaWasapiSubStream` `monoMixer` gets called whenever I write to the stream. This means that portaudio has code to broadcast mono to stereo.
 
+I have worked around this issue by upmixing mono to stereo myself in `OutputCallback::rtaudio_callback()`.
+
 ### Audio components
 
 `OverallSynth` owns a list of sound chips: `vector<ChipIndex -> unique_ptr<ChipInstance subclass>>`. Which chips are loaded, and in what order, is determined by the current document's properties. Each `ChipInstance` subclass can appear more than once, allowing you to use the same chip multiple times (not possible on 0CC-FamiTracker).

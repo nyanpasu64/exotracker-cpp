@@ -3,11 +3,20 @@
 #include "synth.h"
 
 #include <gsl/span>
+#include <gsl/gsl_algorithm>
 #include <cstdint>  // int16_t
 #include <type_traits>  // is_same_v
 
 namespace audio {
 namespace output {
+
+// When changing the output sample format,
+// be sure to change Amplitude (audio_common.h) and AmplitudeFmt at the same time!
+static_assert(std::is_same_v<Amplitude, int16_t>);
+const RtAudioFormat AmplitudeFmt = RTAUDIO_SINT16;
+
+static unsigned int const STEREO_NCHAN = 2;
+
 
 /// GUI-only audio synthesis callback.
 /// Uses GetDocument to obtain a document reference every callback.
@@ -45,7 +54,7 @@ public:
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
     // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
     // interleaved=false was added to support ASIO's native representation.
-    static constexpr RtAudioStreamFlags rtaudio_flags = 0;  // not RTAUDIO_NONINTERLEAVED
+    static constexpr RtAudioStreamFlags rtaudio_flags = RTAUDIO_NONINTERLEAVED;
 
     // impl RtAudioCallback
     static int rtaudio_callback(
@@ -60,10 +69,20 @@ public:
 
         // Convert output buffer from raw pointer into GSL span.
         std::ptrdiff_t stereo_smp_per_block = synth._stereo_nchan * mono_smp_per_block;
-        gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
 
-        auto doc_guard = self->_get_document.get_document();
-        synth.synthesize_overall(*doc_guard, output, mono_smp_per_block);
+        static_assert(
+            (STEREO_NCHAN == 2) && (rtaudio_flags | RTAUDIO_NONINTERLEAVED),
+            "rtaudio_callback() assumes planar stereo"
+        );
+        gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
+        gsl::span left = output.subspan(0, mono_smp_per_block);
+        gsl::span right = output.subspan(mono_smp_per_block, mono_smp_per_block);
+
+        {
+            auto doc_guard = self->_get_document.get_document();
+            synth.synthesize_overall(*doc_guard, left, mono_smp_per_block);
+        }
+        gsl::copy(left, right);
 
         return 0;
     }
@@ -71,12 +90,6 @@ public:
 };
 
 
-// When changing the output sample format,
-// be sure to change Amplitude (audio_common.h) and AmplitudeFmt at the same time!
-static_assert(std::is_same_v<Amplitude, int16_t>);
-const RtAudioFormat AmplitudeFmt = RTAUDIO_SINT16;
-
-static unsigned int const STEREO_NCHAN = 1;
 static unsigned int const MONO_SMP_PER_BLOCK = 64;
 
 
@@ -112,6 +125,14 @@ AudioThreadHandle AudioThreadHandle::make(
         callback.get(),
         &/*mut*/ stream_opt
     );
+    /*
+    What does RtAudio::openStream() mutate?
+
+    outParams: Not mutated. If nChannels decreased, would result in out-of-bounds writes.
+    mono_smp_per_block: Mutated by DirectSound, but callback doesn't store the old value.
+    stream_opt: Only numberOfBuffers is mutated. If flags mutated, would result in garbled audio.
+    */
+
     rt.startStream();
 
     return AudioThreadHandle{.rt=rt, .callback=std::move(callback)};
