@@ -57,7 +57,7 @@ public:
     ///
     /// throws PaException or PaCppException or whatever else
     static AudioThreadHandle make(
-        RtAudio & rt, locked_doc::GetDocument & get_document
+        RtAudio & rt, unsigned int device, locked_doc::GetDocument & get_document
     );
 
     ~AudioThreadHandle();

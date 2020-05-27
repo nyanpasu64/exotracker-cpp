@@ -83,10 +83,10 @@ static unsigned int const MONO_SMP_PER_BLOCK = 64;
 /// Why factory method and not constructor?
 /// So we can calculate values (like sampling rate) used in multiple places.
 AudioThreadHandle AudioThreadHandle::make(
-    RtAudio & rt, locked_doc::GetDocument & get_document
+    RtAudio & rt, unsigned int device, locked_doc::GetDocument & get_document
 ) {
     RtAudio::StreamParameters outParams;
-    outParams.deviceId = rt.getDefaultOutputDevice();
+    outParams.deviceId = device;
     outParams.nChannels = STEREO_NCHAN;
 
     RtAudio::StreamOptions stream_opt;

@@ -57,8 +57,10 @@ int main(int argc, char *argv[])
     print("Default device index: {}\n", rt.getDefaultOutputDevice());
     fflush(stdout);
 
+    unsigned int device = rt.getDefaultOutputDevice();
+
     // Begin playing audio. Destroying this variable makes audio stop.
-    auto audio_handle = audio::output::AudioThreadHandle::make(rt, history);
+    auto audio_handle = audio::output::AudioThreadHandle::make(rt, device, history);
 
     unique_ptr<MainWindow> w = MainWindow::make(history);
     w->show();
