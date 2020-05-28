@@ -1,6 +1,8 @@
 #include "chip_kinds.h"
 #include "chip_common.h"
 
+#include <stdexcept>  // std::logic_error
+
 namespace chip_common {
 
 using namespace chip_kinds;
