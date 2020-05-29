@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_set>
 
+#include <ostream>
 #include "doctest.h"
 
 using SubcaseName = std::string;
