@@ -28,8 +28,8 @@ private:
 
 public:
     static std::unique_ptr<OutputCallback> make(
-        int stereo_nchan,
-        int smp_per_s,
+        uint32_t stereo_nchan,
+        uint32_t smp_per_s,
         locked_doc::GetDocument &/*'a*/ get_document,
         AudioOptions audio_options
     ) {
@@ -41,8 +41,8 @@ public:
     }
 
     OutputCallback(
-        int stereo_nchan,
-        int smp_per_s,
+        uint32_t stereo_nchan,
+        uint32_t smp_per_s,
         doc::Document const & document,
         AudioOptions audio_options,
         locked_doc::GetDocument &/*'a*/ get_document
@@ -68,7 +68,7 @@ public:
         synth::OverallSynth & synth = self->synth;
 
         // Convert output buffer from raw pointer into GSL span.
-        std::ptrdiff_t stereo_smp_per_block = synth._stereo_nchan * mono_smp_per_block;
+        size_t stereo_smp_per_block = size_t(synth._stereo_nchan) * mono_smp_per_block;
 
         static_assert(
             (STEREO_NCHAN == 2) && (rtaudio_flags | RTAUDIO_NONINTERLEAVED),
@@ -112,7 +112,7 @@ AudioThreadHandle AudioThreadHandle::make(
     };
 
     std::unique_ptr<OutputCallback> callback = OutputCallback::make(
-        outParams.nChannels, (int)sample_rate, get_document, audio_options
+        outParams.nChannels, sample_rate, get_document, audio_options
     );
 
     rt.openStream(

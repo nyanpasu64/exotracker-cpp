@@ -12,8 +12,8 @@ namespace synth {
 using chip_kinds::ChipKind;
 
 OverallSynth::OverallSynth(
-    int stereo_nchan,
-    int smp_per_s,
+    uint32_t stereo_nchan,
+    uint32_t smp_per_s,
     doc::Document const & document,
     AudioOptions audio_options
 ) :

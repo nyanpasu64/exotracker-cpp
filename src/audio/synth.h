@@ -6,6 +6,7 @@
 #include "doc.h"
 #include "util/enum_map.h"
 
+#include <cstdint>
 #include <memory>
 
 namespace audio {
@@ -32,7 +33,7 @@ enum class SynthEvent {
 class OverallSynth : boost::noncopyable {
     // runtime constants
 public:
-    int const _stereo_nchan;
+    uint32_t const _stereo_nchan;
 
 private:
     /*
@@ -87,8 +88,8 @@ public:
     ///   If it changes, discard returned OverallSynth and create a new one.
     /// - In get_document's list of chips, any APU2 must be preceded directly with APU1.
     OverallSynth(
-        int stereo_nchan,
-        int smp_per_s,
+        uint32_t stereo_nchan,
+        uint32_t smp_per_s,
         doc::Document const & document,
         AudioOptions audio_options
     );

@@ -32,7 +32,7 @@ TEST_CASE("Simple demo of blip_buffer") {
     blip.end_frame(30);
 
     // Writes to samples[0 : <=buf_size].
-    int count = blip.read_samples(out_buffer, buf_size);
+    auto count = size_t(blip.read_samples(out_buffer, buf_size));
     CHECK(count > 0);
 
     // Assert that the result is not silent.

@@ -33,7 +33,7 @@ class EnvelopeIterator {
     // which initializes _prev_value as well.
 
     /// Time index into envelope.
-    std::optional<int32_t> _next_position;
+    std::optional<uint32_t> _next_position;
 
 public:
     EnvelopeIterator(EnvelopePtr field, IntT default_value) :

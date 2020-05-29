@@ -6,6 +6,7 @@
 
 #include <fmt/core.h>
 
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -82,7 +83,7 @@ using audio::ClockT;
 /// and runs it for the specified amount of time.
 /// Returns the generated audio.
 std::vector<Amplitude> run_new_synth(
-    doc::Document const & document, int smp_per_s, int nsamp, AudioOptions audio_options
+    doc::Document const & document, uint32_t smp_per_s, int nsamp, AudioOptions audio_options
 ) {
     CAPTURE(smp_per_s);
     CAPTURE(nsamp);

@@ -80,7 +80,7 @@ static ptrdiff_t convert_tick_to_delay(
 
     // If this were Rust, I'd store ret_i and prev in an enum instead,
     // and prev wouldn't need to be initialized to a dummy variable.
-    for (ptrdiff_t curr_idx = 0; curr_idx < n; curr_idx++) {
+    for (size_t curr_idx = 0; curr_idx < n; curr_idx++) {
         TickT input = tick_or_delay(tick_times[curr_idx]);
         TickT & output = tick_or_delay(tick_times[curr_idx]);
 
@@ -298,7 +298,7 @@ EventsRef ChannelSequencer::next_tick(
         }
 
         operator RelativePatternsRef() const {
-            return RelativePatternsRef{_arr, ptrdiff_t(_size)};
+            return RelativePatternsRef{_arr, _size};
         }
     } parsed_patterns;
 
