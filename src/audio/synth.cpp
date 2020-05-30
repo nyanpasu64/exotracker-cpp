@@ -130,14 +130,14 @@ void OverallSynth::synthesize_overall(
                 ChipIndex const nchip = (ChipIndex) _chip_instances.size();
 
                 for (ChipIndex chip_index = 0; chip_index < nchip; chip_index++) {
-                    auto & chip = _chip_instances[chip_index];
+                    auto & chip = *_chip_instances[chip_index];
 
-                    RegisterWriteQueue & register_writes = chip->_register_writes;
+                    RegisterWriteQueue & register_writes = chip._register_writes;
                     release_assert(register_writes.num_unread() == 0);
                     register_writes.clear();
 
                     // chip's time passes.
-                    chip->driver_tick(document, chip_index);
+                    chip.driver_tick(document, chip_index);
                 }
 
                 _events.set_timeout(SynthEvent::Tick, _clocks_per_tick);
