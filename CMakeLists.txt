@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.8.0)
 
+#Remove /W3 from MSVC global flags.
+cmake_policy(SET CMP0092 NEW)
 project(exotracker)
 
 #Initialize environment
@@ -31,7 +33,8 @@ add_subdirectory(
 add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
 
 # Configure global settings
-include_directories(src 3rdparty 3rdparty/fmt_/include)
+include_directories(src)
+include_directories(SYSTEM 3rdparty 3rdparty/fmt_/include)
 set(CMAKE_CXX_STANDARD 20)
 if (WIN32)
     add_compile_definitions(UNICODE _UNICODE)
@@ -42,12 +45,47 @@ if (WIN32)
     endif ()
 endif ()
 
+# https://foonathan.net/2018/10/cmake-warnings/
+# more warning flags at https://stackoverflow.com/questions/5088460
+set(options-3rdparty $<$<CXX_COMPILER_ID:MSVC>:/W3>)
+set(
+    options
+    $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+        -Wall -Wextra -Wconversion -Wno-unused -Wno-unused-parameter
+        -Werror=return-type
+    >
+    $<$<CXX_COMPILER_ID:MSVC>:
+#        /W3
+        /W4
+        /wd4100  # allow unused parameters
+        /wd4505  # allow unused functions
+        /wd4456  # allow shadowing
+
+        # Loosen warnings on external libraries.
+        /experimental:external /external:anglebrackets
+        /external:W3
+        /wd4251  # Qt has DLL linkage warnings when using /external:anglebrackets
+        # Omit /external:templates- since Blip_Buffer has compile-time if statements
+    >
+    # /W4 causes lots of warnings in blip-buffer and Qt.
+    # /experimental:external /external:anglebrackets causes lots of C4251 warnings:
+    #   https://developercommunity.visualstudio.com/content/problem/1057450/experimentalexternal-generates-c4251-warnings-when.html
+    # And /external:wd<warning> to disable warnings doesn't work:
+    #   https://developercommunity.visualstudio.com/content/problem/1057493/externalwd-option-not-recognized.html
+)
+
+add_library(lib-3rdparty STATIC
+    3rdparty/Blip_Buffer/Blip_Buffer.cpp
+    3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
+    3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
+)
+target_compile_options(lib-3rdparty PRIVATE ${options-3rdparty})
+
 # Core library, does not use Qt
 add_library(exotracker-lib
         ## Audio
 
         # Library (widely used, uncoupled)
-        3rdparty/Blip_Buffer/Blip_Buffer.cpp
         src/audio/event_queue.cpp
 
         # Common files (tightly coupled)
@@ -63,8 +101,6 @@ add_library(exotracker-lib
         src/audio/synth.cpp
 
         # 2A03 audio
-        3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
-        3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
         src/audio/synth/nes_2a03.cpp
         src/audio/synth/nes_2a03_driver.cpp
 
@@ -72,7 +108,8 @@ add_library(exotracker-lib
         src/doc.cpp
         src/doc/events.cpp
         )
-target_link_libraries(exotracker-lib PRIVATE rtaudio)
+target_compile_options(exotracker-lib PRIVATE "${options}")
+target_link_libraries(exotracker-lib PRIVATE lib-3rdparty rtaudio)
 target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
 target_compile_definitions(exotracker-lib PRIVATE EXO_LIB)
 
@@ -89,6 +126,7 @@ add_executable(exotracker-bin
         src/gui/pattern_editor/pattern_editor_panel.cpp
         src/main.cpp
         )
+target_compile_options(exotracker-bin PRIVATE "${options}")
 target_link_libraries(exotracker-bin PRIVATE exotracker-lib rtaudio Qt5::Widgets)
 target_compile_definitions(exotracker-bin PRIVATE EXO_BIN)
 
@@ -110,6 +148,7 @@ add_executable(exotracker-tests
         # No tests yet, why is it included?
         src/gui/history.cpp
         )
+target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests PRIVATE exotracker-lib)
 target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
