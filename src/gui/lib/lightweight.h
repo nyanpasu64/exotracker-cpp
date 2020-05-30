@@ -38,14 +38,6 @@
     require_semicolon
 
 
-#define append_layout(qlayout_nullptr) \
-    auto * parentL = l; \
-    auto * l = new qlayout_nullptr; \
-    parentL->addLayout(l); \
-    \
-    require_semicolon
-
-
 #define append_widget(qwidget_parent) \
     auto * parent = w; \
     auto * w = new qwidget_parent; \
@@ -53,6 +45,14 @@
     auto * parentL = l; \
     void * l = nullptr; (void)l; \
     parentL->addWidget(w); \
+    \
+    require_semicolon
+
+
+#define append_layout(qlayout_nullptr) \
+    auto * parentL = l; \
+    auto * l = new qlayout_nullptr; \
+    parentL->addLayout(l); \
     \
     require_semicolon
 
