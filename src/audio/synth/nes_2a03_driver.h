@@ -26,7 +26,7 @@ constexpr static int BITS_PER_BYTE = 8;
 #define BYTE(byte) (BITS_PER_BYTE * (byte))
 
 class Apu1PulseDriver {
-    using PulseNum = Range<0, 2, uint32_t>;
+    using PulseNum = Range<0, 2, uint16_t>;
 
     PulseNum const _pulse_num;
     Address const _base_address;
@@ -86,7 +86,7 @@ public:
     // impl
     Apu1PulseDriver(PulseNum pulse_num, TuningRef tuning_table) :
         _pulse_num(pulse_num),
-        _base_address(0x4000 + 0x4 * pulse_num),
+        _base_address(Address(0x4000 + 0x4 * pulse_num)),
         _tuning_table(tuning_table),
         _volume_iter(&doc::Instrument::volume, MAX_VOLUME),
         _arpeggio_iter(&doc::Instrument::arpeggio, 0),

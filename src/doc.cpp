@@ -112,7 +112,7 @@ Document dummy_document() {
         auto volume = [] {
             std::vector<ByteEnvelope::IntT> volume;
             for (int i = 0; ; i++) {
-                volume.push_back(15 * pow(0.5, i / 20.0));
+                volume.push_back(ByteEnvelope::IntT(15 * pow(0.5, i / 20.0)));
                 if (volume.back() == 0) {
                     break;
                 }
