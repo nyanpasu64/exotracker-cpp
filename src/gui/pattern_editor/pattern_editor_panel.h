@@ -40,46 +40,46 @@ public slots:
 
 public:
     // Upon construction, history = dummy_history, until a document is created and assigned.
-    history::History dummy_history;
+    history::History _dummy_history;
 
     /// Stores document and undo/redo history.
     /// Is read by PatternEditorPanel running in main thread.
     /// When switching documents, can be reassigned by MainWindow(?) running in main thread.
-    std::reference_wrapper<history::History> history;
+    std::reference_wrapper<history::History> _history;
 
-    doc::BeatFraction row_duration_beats = {1, 4};
-    bool is_zoomed = false;
+    doc::BeatFraction _row_duration_beats = {1, 4};
+    bool _is_zoomed = false;
 
     // Visual state.
-    std::unique_ptr<QPixmap> pixmap_;
+    std::unique_ptr<QPixmap> _pixmap;
 
-    QFont stepFont_, headerFont_;
-    int stepFontWidth_, stepFontHeight_, stepFontAscend_, stepFontLeading_;
+    QFont _stepFont, _headerFont;
+    int _stepFontWidth, _stepFontHeight, _stepFontAscend, _stepFontLeading;
 
     // screenPos = pos - viewportPos.
     // pos = viewportPos + screenPos.
-    QPoint viewportPos;
+    QPoint _viewportPos;
 
-    int dxWidth = 64;
-    int dyHeightPerRow = 16;
+    int _dxWidth = 64;
+    int _dyHeightPerRow = 16;
 
-    int widthSpace_, widthSpaceDbl_;
-    int stepNumWidth_;
-    int baseTrackWidth_;
-    int toneNameWidth_, instWidth_;
-    int volWidth_;
-    int effWidth_, effIDWidth_, effValWidth_;
+    int _widthSpace, _widthSpaceDbl;
+    int _stepNumWidth;
+    int _baseTrackWidth;
+    int _toneNameWidth, _instWidth;
+    int _volWidth;
+    int _effWidth, _effIDWidth, _effValWidth;
 
     // impl
 
     /// Called by main function.
     void set_history(history::History & history) {
-        this->history = history;
+        _history = history;
     }
 
     /// Unsure if useful or not.
     void unset_history() {
-        this->history = dummy_history;
+        _history = _dummy_history;
     }
 
 protected:

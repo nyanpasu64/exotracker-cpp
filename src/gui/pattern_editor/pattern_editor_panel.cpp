@@ -26,35 +26,35 @@ _initDisplay;
 
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     QWidget(parent),
-    dummy_history{doc::DocumentCopy{}},
-    history{dummy_history}
+    _dummy_history{doc::DocumentCopy{}},
+    _history{_dummy_history}
 {
     setMinimumSize(128, 320);
 
     /* Font */
-    headerFont_ = QApplication::font();
-    headerFont_.setPointSize(10);
-    stepFont_ = QFont("mononoki", 10);
-    stepFont_.setStyleHint(QFont::TypeWriter);
-    stepFont_.setStyleStrategy(QFont::ForceIntegerMetrics);
+    _headerFont = QApplication::font();
+    _headerFont.setPointSize(10);
+    _stepFont = QFont("mononoki", 10);
+    _stepFont.setStyleHint(QFont::TypeWriter);
+    _stepFont.setStyleStrategy(QFont::ForceIntegerMetrics);
 
     // Check font size
-    QFontMetrics metrics(stepFont_);
-    stepFontWidth_ = metrics.horizontalAdvance('0');
-    stepFontAscend_ = metrics.ascent();
-    stepFontLeading_ = metrics.descent() / 2;
-    stepFontHeight_ = stepFontAscend_ + stepFontLeading_;
+    QFontMetrics metrics(_stepFont);
+    _stepFontWidth = metrics.horizontalAdvance('0');
+    _stepFontAscend = metrics.ascent();
+    _stepFontLeading = metrics.descent() / 2;
+    _stepFontHeight = _stepFontAscend + _stepFontLeading;
 
     /* Width & height */
-    widthSpace_ = stepFontWidth_ / 5 * 2;
-    widthSpaceDbl_ = widthSpace_ * 2;
-    stepNumWidth_ = stepFontWidth_ * 2 + widthSpace_;
-    toneNameWidth_ = stepFontWidth_ * 3;
-    instWidth_ = stepFontWidth_ * 2;
-    volWidth_ = stepFontWidth_ * 2;
-    effIDWidth_ = stepFontWidth_ * 2;
-    effValWidth_ = stepFontWidth_ * 2;
-    effWidth_ = effIDWidth_ + effValWidth_ + widthSpaceDbl_;
+    _widthSpace = _stepFontWidth / 5 * 2;
+    _widthSpaceDbl = _widthSpace * 2;
+    _stepNumWidth = _stepFontWidth * 2 + _widthSpace;
+    _toneNameWidth = _stepFontWidth * 3;
+    _instWidth = _stepFontWidth * 2;
+    _volWidth = _stepFontWidth * 2;
+    _effIDWidth = _stepFontWidth * 2;
+    _effValWidth = _stepFontWidth * 2;
+    _effWidth = _effIDWidth + _effValWidth + _widthSpaceDbl;
 
     initDisplay(*this);
 
@@ -64,7 +64,7 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
 
 _initDisplay
 {
-    self.pixmap_ = std::make_unique<QPixmap>(self.geometry().size());
+    self._pixmap = std::make_unique<QPixmap>(self.geometry().size());
 }
 
 void PatternEditorPanel::resizeEvent(QResizeEvent *event)
@@ -118,7 +118,7 @@ void foreach_channel_draw(
             channel_index++
         ) {
             int xleft = x_accum;
-            int dx_width = pattern_editor.dxWidth;
+            int dx_width = pattern_editor._dxWidth;
             int xright = xleft + dx_width;
 
             callback(ChannelDraw{chip_index, channel_index, xleft, xright});
@@ -160,11 +160,11 @@ static void drawRowBg(
         doc::BeatFraction curr_beats = 0;
         for (;
             curr_beats < pattern.nbeats;
-            curr_beats += self.row_duration_beats, row += 1)
+            curr_beats += self._row_duration_beats, row += 1)
         {
             // Compute row height.
-            int ytop = self.dyHeightPerRow * row;
-            int dy_height = self.dyHeightPerRow;
+            int ytop = self._dyHeightPerRow * row;
+            int dy_height = self._dyHeightPerRow;
             int ybottom = ytop + dy_height;
             // End loop(row)
 
@@ -220,9 +220,9 @@ static void drawRowEvents(
 
             // Compute where to draw row.
             Frac beat = time.anchor_beat;
-            Frac beats_per_row = self.row_duration_beats;
+            Frac beats_per_row = self._row_duration_beats;
             Frac row = beat / beats_per_row;
-            int yPx = doc::round_to_int(self.dyHeightPerRow * row);
+            int yPx = doc::round_to_int(self._dyHeightPerRow * row);
             QPoint left_top{xleft, yPx};
             QPoint right_top{xright, yPx};
 
@@ -238,14 +238,14 @@ static void drawRowEvents(
 }
 
 static void drawPattern(PatternEditorPanel & self, const QRect &rect) {
-    doc::Document const & document = *self.history.get().gui_get_document();
+    doc::Document const & document = *self._history.get().gui_get_document();
 
-    self.pixmap_->fill(Qt::black);
+    self._pixmap->fill(Qt::black);
 
-    QPainter paintOffScreen(self.pixmap_.get());
+    QPainter paintOffScreen(self._pixmap.get());
 
-    paintOffScreen.translate(-self.viewportPos);
-    paintOffScreen.setFont(self.stepFont_);
+    paintOffScreen.translate(-self._viewportPos);
+    paintOffScreen.setFont(self._stepFont);
 
     // First draw the row background. It lies in a regular grid.
     // TODO only redraw `rect`??? how 2 partial redraw???
@@ -258,7 +258,7 @@ static void drawPattern(PatternEditorPanel & self, const QRect &rect) {
 
     // Draw pixmap onto this widget.
     QPainter paintOnScreen(&self);
-    paintOnScreen.drawPixmap(rect, *self.pixmap_);
+    paintOnScreen.drawPixmap(rect, *self._pixmap);
 }
 
 
