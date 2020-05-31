@@ -20,8 +20,8 @@ DocumentStore::ReadGuard DocumentStore::get_document() const {
     // The below comments may not be fully correct?
 
     while (true) {
-        auto which_doc = _front_index.load(std::memory_order_acquire);
-        auto maybe_doc = _documents[which_doc].try_read();
+        auto front_index = _front_index.load(std::memory_order_acquire);
+        auto maybe_doc = _documents[front_index].try_read();
         if (maybe_doc) {
             return std::move(*maybe_doc);
         }
@@ -36,9 +36,6 @@ void DocumentStore::history_apply_change(command::Command command) {
     auto gui_write_document = [&]() -> LockedDoc::WriteGuard {
         return _documents[_front_index.load(std::memory_order_relaxed) ^ 1].gui_write();
     };
-    auto swap_docs = [&]() -> void {
-        _front_index.fetch_xor(1, std::memory_order_acq_rel);
-    };
 
     {
         // Should not block.
@@ -46,14 +43,15 @@ void DocumentStore::history_apply_change(command::Command command) {
         // TODO apply command.redo(*back) or something
     }
 
-    swap_docs();
+    // swap docs
+    _front_index.fetch_xor(1, std::memory_order_acq_rel);
 
     {
         // Blocks if audio thread is using the current back buffer
         // (previous front buffer).
         LockedDoc::WriteGuard back_lock = gui_write_document();
         // TODO apply command.redo(back) or something
-}
+    }
 }
 
 // namespaces
