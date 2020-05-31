@@ -39,8 +39,9 @@ public:
     EnvelopeIterator(EnvelopePtr field, IntT default_value) :
         _field(field),
         _default_value(default_value),
-        _curr_instr({}),
-        _next_position({})
+        _curr_instr(),
+        _next_position()
+        // On MSVC and Clang, optional_field({}) initializes to 0.
     {}
 
     /*
