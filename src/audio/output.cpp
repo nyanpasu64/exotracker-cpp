@@ -75,8 +75,8 @@ public:
             "rtaudio_callback() assumes planar stereo"
         );
         gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
-        gsl::span left = output.subspan(0, mono_smp_per_block);
-        gsl::span right = output.subspan(mono_smp_per_block, mono_smp_per_block);
+        auto left = output.subspan(0, mono_smp_per_block);
+        auto right = output.subspan(mono_smp_per_block, mono_smp_per_block);
 
         {
             auto doc_guard = self->_get_document.get_document();
