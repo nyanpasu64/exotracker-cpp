@@ -84,7 +84,10 @@ using audio::ClockT;
 /// and runs it for the specified amount of time.
 /// Returns the generated audio.
 std::vector<Amplitude> run_new_synth(
-    doc::Document const & document, uint32_t smp_per_s, int nsamp, AudioOptions audio_options
+    doc::Document const & document,
+    uint32_t smp_per_s,
+    blip_nsamp_t nsamp,
+    AudioOptions audio_options
 ) {
     CAPTURE(smp_per_s);
     CAPTURE(nsamp);
@@ -178,7 +181,7 @@ TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
 
     // Pick `high_note` that we know to have a period register <= 0xff.
     // This ensures that the period register's high bits are all 0.
-    CHECK(driver._tuning_table[high_note.value] <= 0xff);
+    CHECK(driver._tuning_table[(size_t) high_note.value] <= 0xff);
 
     std::vector<Amplitude> buffer = run_new_synth(
         document, 48000, 4 * 1024, audio_options
@@ -206,7 +209,8 @@ TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
 
     // Pick `low_note` that we know to be in the bottom octave of notes.
     CHECK(
-        driver._tuning_table[low_note.value] >= (Apu1PulseDriver::MAX_PERIOD + 1) / 2
+        driver._tuning_table[(size_t) low_note.value]
+        >= (Apu1PulseDriver::MAX_PERIOD + 1) / 2
     );
 
     std::vector<Amplitude> buffer = run_new_synth(
@@ -234,7 +238,7 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
     // >assert( length_ == msec ); // ensure length is same as that passed in
     // The largest failing value is 873.
     // Not all values fail. As smp_per_s decreases, it becomes more likely to fail.
-    for (int smp_per_s = 1000; smp_per_s <= 250'000; INCREASE(smp_per_s)) {
+    for (uint32_t smp_per_s = 1000; smp_per_s <= 250'000; INCREASE(smp_per_s)) {
         run_new_synth(document, smp_per_s, smp_per_s / 4, audio_options);  // smp_per_s * 0.25 second
     }
 
@@ -242,7 +246,7 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
     run_new_synth(document, 44100, 0, audio_options);
 
     // 48000Hz, various durations
-    for (int nsamp = 1; nsamp <= 100'000; INCREASE(nsamp)) {
+    for (uint32_t nsamp = 1; nsamp <= 100'000; INCREASE(nsamp)) {
         run_new_synth(document, 48000, nsamp, audio_options);
     }
 }

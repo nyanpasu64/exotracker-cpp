@@ -12,7 +12,6 @@ enum class ChipEvent {
     COUNT,
 };
 
-using SampleT = blip_nsamp_t;
 }
 
 void ChipInstance::run_chip_for(
@@ -58,7 +57,7 @@ void ChipInstance::run_chip_for(
     SampleT nsamp_total = 0;
 
     // Total samples we should receive from run_chip_for().
-    SampleT const nsamp_expected = nes_blip.count_samples((blip_nclock_t) prev_to_next);
+    SampleT const nsamp_expected = nes_blip.count_samples(prev_to_next);
 
     while (true) {
         auto ev = reg_q.next_event();

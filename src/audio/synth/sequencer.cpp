@@ -67,7 +67,7 @@ static void make_tick_times_monotonic(gsl::span<TickOrDelayT> /*inout*/ tick_tim
 /// - output.tick_times[ret_i] = input.tick_times[ret_i] - now
 /// - output.tick_times[i in [ret_i+1..n)] = input.tick_times[i] - input.tick_times[i-1]
 template<typename TickOrDelayT>
-static ptrdiff_t convert_tick_to_delay(
+static size_t convert_tick_to_delay(
     TickT const now, gsl::span<TickOrDelayT> /*inout*/ tick_times
 ) {
     auto n = tick_times.size();
@@ -90,7 +90,7 @@ static ptrdiff_t convert_tick_to_delay(
         } else
         if (ret_i == IDX_UNSET && input >= now) {
             // input.tick_times[ret_i..n) >= now
-            ret_i = curr_idx;
+            ret_i = (ptrdiff_t) curr_idx;
 
             // output.tick_times[ret_i] = input.tick_times[ret_i] - now
             output = input - now;
@@ -106,10 +106,10 @@ static ptrdiff_t convert_tick_to_delay(
 
     // ret_i: [0, n] inclusive
     if (ret_i == IDX_UNSET) {
-        ret_i = n;
+        return n;
     }
 
-    return ret_i;
+    return (size_t) ret_i;
 }
 
 // TODO add support for grooves.

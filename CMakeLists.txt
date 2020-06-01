@@ -75,7 +75,6 @@ set(
 )
 
 add_library(lib-3rdparty STATIC
-    3rdparty/Blip_Buffer/Blip_Buffer.cpp
     3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
     3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
 )
@@ -84,6 +83,7 @@ target_compile_options(lib-3rdparty PRIVATE ${options-3rdparty})
 # Core library, does not use Qt
 add_library(exotracker-lib
         ## Audio
+        3rdparty/Blip_Buffer/Blip_Buffer.cpp
 
         # Library (widely used, uncoupled)
         src/audio/event_queue.cpp

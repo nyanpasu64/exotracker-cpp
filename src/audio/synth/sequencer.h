@@ -34,7 +34,7 @@ struct TickOrDelayEvent {
 
 struct FlattenedEventList {
     std::vector<TickOrDelayEvent> _delay_events;
-    std::ptrdiff_t _next_event_idx;
+    std::size_t _next_event_idx;
     // impl
     FlattenedEventList() {
         // FamiTracker only supports 256 rows per channel. Who would fill them all?

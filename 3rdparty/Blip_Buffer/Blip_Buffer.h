@@ -28,10 +28,10 @@
     typedef unsigned blip_ulong;
 
 // Time unit at source clock rate
-typedef blip_long blip_nclock_t;
+typedef blip_ulong blip_nclock_t;
 
 // Output samples are 16-bit signed, with a range of -32768 to 32767
-typedef blip_long blip_nsamp_t;
+typedef blip_ulong blip_nsamp_t;
 typedef short blip_amplitude_t;
 enum { blip_sample_max = 32767 };
 
@@ -42,10 +42,10 @@ public:
     // Set output sample rate and buffer length in milliseconds (1/1000 sec, defaults
     // to 1/4 second), then clear buffer. Returns NULL on success, otherwise if there
     // isn't enough memory, returns error without affecting current buffer setup.
-    blargg_err_t set_sample_rate( blip_long samples_per_sec, int msec_length = 1000 / 4 );
+    blargg_err_t set_sample_rate( blip_ulong samples_per_sec, blip_ulong msec_length = 1000 / 4 );
 
     // Set number of source time units per second
-    void clock_rate( blip_long );
+    void clock_rate( blip_ulong );
 
     // End current time frame of specified duration and make its samples available
     // (along with any still-unread samples) for reading with read_samples(). Begins
@@ -61,16 +61,16 @@ public:
 // Additional optional features
 
     // Current output sample rate
-    blip_long sample_rate() const;
+    blip_ulong sample_rate() const;
 
     // Length of buffer, in milliseconds
-    int length() const;
+    blip_ulong length() const;
 
     // Number of source time units per second
-    blip_long clock_rate() const;
+    blip_ulong clock_rate() const;
 
     // Set frequency high-pass filter frequency, where higher values reduce bass more
-    void bass_freq( int frequency );
+    void bass_freq( blip_ulong frequency );
 
     // Number of samples delay from synthesis to samples read out
     int output_latency() const;
@@ -103,40 +103,40 @@ public:
     int clear_modified() { int b = modified_; modified_ = 0; return b; }
     typedef blip_ulong blip_resampled_time_t;
     void remove_silence( blip_nsamp_t count );
-    blip_resampled_time_t resampled_duration( int t ) const     { return t * factor_; }
+    blip_resampled_time_t resampled_duration( blip_ulong t ) const     { return t * factor_; }
     blip_resampled_time_t resampled_time( blip_nclock_t t ) const { return t * factor_ + offset_; }
-    blip_resampled_time_t clock_rate_factor( blip_long clock_rate ) const;
+    blip_resampled_time_t clock_rate_factor( blip_ulong clock_rate ) const;
 
 protected:
     Blip_Buffer();
 
 public:
-    Blip_Buffer(blip_long smp_per_s, blip_long clk_per_s);
+    Blip_Buffer(blip_ulong smp_per_s, blip_ulong clk_per_s);
     ~Blip_Buffer();
 
     Blip_Buffer(Blip_Buffer &&);
 
     // Deprecated
     typedef blip_resampled_time_t resampled_time_t;
-    blargg_err_t sample_rate( blip_long r ) { return set_sample_rate( r ); }
-    blargg_err_t sample_rate( blip_long r, int msec ) { return set_sample_rate( r, msec ); }
+    blargg_err_t sample_rate( blip_ulong r ) { return set_sample_rate( r ); }
+    blargg_err_t sample_rate( blip_ulong r, blip_ulong msec ) { return set_sample_rate( r, msec ); }
 private:
     // noncopyable
     Blip_Buffer( const Blip_Buffer& );
     Blip_Buffer& operator = ( const Blip_Buffer& );
 public:
-    typedef blip_nclock_t buf_t_;
+    typedef blip_long buf_t_;
     blip_ulong factor_;
     blip_resampled_time_t offset_;
     buf_t_* buffer_;
-    blip_long buffer_size_;
+    blip_nsamp_t buffer_size_;
     blip_long reader_accum_;
     int bass_shift_;
 private:
-    blip_long sample_rate_;
-    blip_long clock_rate_;
-    int bass_freq_;
-    int length_;
+    blip_ulong sample_rate_;
+    blip_ulong clock_rate_;
+    blip_ulong bass_freq_;
+    blip_ulong length_;
     int modified_;
     friend class Blip_Reader;
 };
@@ -504,12 +504,12 @@ inline blip_eq_t::blip_eq_t( double t ) :
 inline blip_eq_t::blip_eq_t( double t, blip_long rf, blip_long sr, blip_long cf ) :
         treble( t ), rolloff_freq( rf ), sample_rate( sr ), cutoff_freq( cf ) { }
 
-inline int  Blip_Buffer::length() const         { return length_; }
+inline blip_ulong  Blip_Buffer::length() const         { return length_; }
 inline blip_nsamp_t Blip_Buffer::samples_avail() const  { return (blip_nsamp_t) (offset_ >> BLIP_BUFFER_ACCURACY); }
-inline blip_long Blip_Buffer::sample_rate() const    { return sample_rate_; }
+inline blip_ulong Blip_Buffer::sample_rate() const    { return sample_rate_; }
 inline int  Blip_Buffer::output_latency() const { return blip_widest_impulse_ / 2; }
-inline blip_long Blip_Buffer::clock_rate() const     { return clock_rate_; }
-inline void Blip_Buffer::clock_rate( blip_long cps ) { factor_ = clock_rate_factor( clock_rate_ = cps ); }
+inline blip_ulong Blip_Buffer::clock_rate() const     { return clock_rate_; }
+inline void Blip_Buffer::clock_rate( blip_ulong cps ) { factor_ = clock_rate_factor( clock_rate_ = cps ); }
 
 inline int Blip_Reader::begin( Blip_Buffer& blip_buf )
 {

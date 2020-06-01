@@ -35,6 +35,8 @@ int constexpr TICKS_PER_S = 60;
 /// This type is used widely, so import to audio::synth.
 using event_queue::ClockT;
 
+using SampleT = uint32_t;
+
 using Address = uint16_t;
 using Byte = uint8_t;
 
@@ -180,7 +182,7 @@ protected:
     /// If the synth generates audio via Blip_Synth, nsamp_returned == 0.
     /// If the synth writes audio into `write_buffer`,
     /// nsamp_returned == how many samples were written.
-    using NsampWritten = blip_nsamp_t;
+    using NsampWritten = SampleT;
 
 private:
     /// Cannot cross tick boundaries, nor register-write boundaries.

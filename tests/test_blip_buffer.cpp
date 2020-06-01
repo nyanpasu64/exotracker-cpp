@@ -59,16 +59,18 @@ TEST_CASE("Counting cycles to ensure we get a "
           "perfectly predictable number of samples out of blip_buffer") {
     Blip_Buffer blip{SAMPLES_PER_SEC, CPU_CLK_PER_S};
 
-    for (int samples_wanted = 0; samples_wanted < 10000; samples_wanted += 13) {
+    for (
+        blip_nsamp_t samples_wanted = 0; samples_wanted < 10000; samples_wanted += 13
+    ) {
 
-        int cycles_needed = blip.count_clocks(samples_wanted);
+        blip_nclock_t cycles_needed = blip.count_clocks(samples_wanted);
         CHECK(blip.count_samples(cycles_needed) == samples_wanted);
 
         blip.end_frame(cycles_needed);
         CHECK(blip.samples_avail() == samples_wanted);
 
         // Writes to samples[0 : <=buf_size].
-        int count = blip.read_samples(out_buffer, buf_size);
+        blip_nsamp_t count = blip.read_samples(out_buffer, buf_size);
         CHECK(count == samples_wanted);
 
     }
