@@ -6,6 +6,13 @@ project(exotracker)
 set(RTAUDIO_BUILD_STATIC_LIBS TRUE)
 set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Build (rtaudio, fmt, ...?) as shared library")
 
+# On MSVC, CMake defaults to dynamic msvcrt (and exotracker uses that default).
+# But if you link RtAudio statically, it forces static msvcrt for itself
+# (but not targets including RtAudio).
+# This causes LNK2038 errors: https://github.com/thestk/rtaudio/issues/256
+# I patched RtAudio so you can specify whether to make msvcrt static or dynamic.
+set(RTAUDIO_STATIC_MSVCRT FALSE)
+
 # This can be used to enable asan (-fsanitize=memory/undefined).
 include(cmake_user_override.cmake OPTIONAL)
 #End initialize environment
