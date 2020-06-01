@@ -37,6 +37,8 @@ if (WIN32)
     add_compile_definitions(UNICODE _UNICODE)
     if (MSVC)
         add_compile_options(/EHsc)
+        # rtaudio_c.cpp uses strncpy and the like. I don't actually use that file lol
+        add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
     endif ()
 endif ()
 

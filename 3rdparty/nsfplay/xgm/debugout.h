@@ -11,13 +11,6 @@
 #define NOMINMAX
 #endif // NOMINMAX
 
-// Prevent _vsnprintf from raising compiler warnings.
-// this doesn't work
-#define _CRT_SECURE_NO_WARNINGS
-// this works
-#pragma warning(disable: 4996)
-
-
 #include <crtdbg.h>
 #define _CRTDBG_MAP_ALLOC
 #include <windows.h>
