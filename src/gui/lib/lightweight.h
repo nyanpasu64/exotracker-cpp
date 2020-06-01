@@ -5,9 +5,10 @@
 // Once C++20 rolls around, add (...) -> `addWidget/addLayout(w __VA_OPT__(,) __VA_ARGS__)`.
 
 
-//#define set_layout(qlayout_w) \
-//    auto * l = new qlayout_w; \
-
+/*
+#define set_layout(qlayout_w) \
+    auto * l = new qlayout_w; \
+*/
 
 #define add_central_widget_no_layout(qwidget_parent) \
     auto * parent = w; \

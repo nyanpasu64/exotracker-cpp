@@ -91,7 +91,7 @@ public:
         _volume_iter(&doc::Instrument::volume, MAX_VOLUME),
         _arpeggio_iter(&doc::Instrument::arpeggio, 0),
         _wave_index_iter(&doc::Instrument::wave_index, 0),
-        _prev_note({0})
+        _prev_note(0)
     {}
 
     // TODO add a $4015 reference parameter,

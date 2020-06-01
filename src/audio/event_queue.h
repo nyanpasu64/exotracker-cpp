@@ -127,7 +127,7 @@ public:
     }
 
 private:
-    inline void advance_time(int dtime) {
+    inline void advance_time(ClockT dtime) {
         for (auto & time_clk : time_until) {
             if (time_clk != NEVER) {
                 time_clk -= dtime;

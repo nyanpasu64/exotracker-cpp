@@ -22,7 +22,7 @@ static RegisterInt register_quantize(
     period_reg = clocks_per_second / frequency / 16, -clamped 1
     */
 
-    int reg = lround(clocks_per_second / (cycles_per_second * 16) - 1);
+    int reg = (int) lround(clocks_per_second / (cycles_per_second * 16) - 1);
     // Clamps to [lo, hi] inclusive.
     reg = std::clamp(reg, 0, Apu1PulseDriver::MAX_PERIOD);
     return reg;
@@ -82,8 +82,9 @@ void Apu1PulseDriver::tick(
         // Changing pitch may write to $4003, which resets phase and creates a click.
         // There is a way to avoid this click: http://forums.nesdev.com/viewtopic.php?t=231
         // I did not implement that method, so I get clicks.
+        auto note = _prev_note.value + _arpeggio_iter.next(document);
         _next_state.period_reg = _tuning_table[
-            _prev_note.value + _arpeggio_iter.next(document)
+            (size_t) std::clamp(note, 0, doc::CHROMATIC_COUNT - 1)
         ];
     }
 
