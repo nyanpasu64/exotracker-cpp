@@ -223,8 +223,8 @@ ChannelSequencer::ChannelSequencer() {
     _events_this_tick.reserve(4);
 }
 
-doc::MaybeSequenceIndex calc_next_index(
-    doc::Document const & document, doc::SequenceIndex seq_index
+doc::MaybeSeqEntryIndex calc_next_index(
+    doc::Document const & document, doc::SeqEntryIndex seq_index
 ) {
     // exotracker will have no pattern-jump effects.
     // Instead, each "order entry" has a length field, and a "what to do next" field.
@@ -254,7 +254,7 @@ EventsRef ChannelSequencer::next_tick(
     release_assert(chan_index < nchan);
 
     doc::SequencerOptions options = document.sequencer_options;
-    doc::MaybeSequenceIndex next_seq_index = calc_next_index(document, _curr_seq_index);
+    doc::MaybeSeqEntryIndex next_seq_index = calc_next_index(document, _curr_seq_index);
 
     // Process the current sequence entry.
     enum class TickAnchor { Begin, End };
@@ -305,7 +305,7 @@ EventsRef ChannelSequencer::next_tick(
     auto parse_pattern = [
         &document, &parsed_patterns, options, chip_index, chan_index, nchip, nchan
     ](
-        doc::SequenceIndex seq_idx, RelativeTick tick_rel
+        doc::SeqEntryIndex seq_idx, RelativeTick tick_rel
     ) {
         doc::SequenceEntry const & current_entry = document.sequence[seq_idx];
         doc::BeatFraction nbeats = current_entry.nbeats;
@@ -329,7 +329,7 @@ EventsRef ChannelSequencer::next_tick(
     };
 
     auto maybe_parse_pattern = [&parse_pattern](
-        doc::MaybeSequenceIndex seq_idx, RelativeTick tick_rel
+        doc::MaybeSeqEntryIndex seq_idx, RelativeTick tick_rel
     ) {
         if (seq_idx.has_value()) {
             parse_pattern(*seq_idx, tick_rel);

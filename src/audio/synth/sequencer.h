@@ -57,8 +57,8 @@ class ChannelSequencer {
     using EventsThisTickOwned = std::vector<doc::RowEvent>;
     EventsThisTickOwned _events_this_tick;
 
-    doc::MaybeSequenceIndex _prev_seq_index = {};
-    doc::SequenceIndex _curr_seq_index = 0;
+    doc::MaybeSeqEntryIndex _prev_seq_index = {};
+    doc::SeqEntryIndex _curr_seq_index = 0;
     // next seq index is inferred from the document, not part of the sequencer state.
 
     // Idea: In ticked/timed code, never use "curr" in variable names.

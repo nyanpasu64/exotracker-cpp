@@ -46,13 +46,13 @@ struct SequenceEntry {
     ChipChannelTo<event_list::EventList> chip_channel_events;
 };
 
-using SequenceIndex = uint32_t;
+using SeqEntryIndex = uint32_t;
 
-using MaybeSequenceIndex = std::optional<SequenceIndex>;
+using MaybeSeqEntryIndex = std::optional<SeqEntryIndex>;
 
-constexpr SequenceIndex MAX_SEQUENCE_LEN = 65535;
+constexpr SeqEntryIndex MAX_SEQUENCE_LEN = 65535;
 
 /// [SequenceIndex] SequenceEntry
-using Sequence = DenseMap<SequenceIndex, SequenceEntry>;
+using Sequence = DenseMap<SeqEntryIndex, SequenceEntry>;
 
 }
