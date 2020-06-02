@@ -9,7 +9,7 @@
 
 namespace doc::timed_events {
 
-using FractionInt = int64_t;
+using FractionInt = int32_t;
 using BeatFraction = boost::rational<FractionInt>;
 
 template <typename T> int sgn(T val) {
