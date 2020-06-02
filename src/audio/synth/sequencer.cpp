@@ -233,8 +233,8 @@ doc::MaybeSeqEntryIndex calc_next_index(
 
     seq_index++;
     if (seq_index >= document.sequence.size()) {
-        // If seq entry can halt song afterwards, return -1.
-        return {};
+        // If seq entry can halt song afterwards, return {}.
+        return 0;
     }
     return {seq_index};
 
