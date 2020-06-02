@@ -3,6 +3,8 @@
 #include "doc.h"
 #include "chip_common.h"
 #include "util/enum_map.h"
+#include "util/release_assert.h"
+#include "util/compare.h"
 
 #include <gsl/span>
 
@@ -13,36 +15,84 @@ namespace audio::synth::sequencer {
 using namespace chip_common;
 
 using EventsRef = gsl::span<doc::RowEvent const>;
+using EventIndex = uint32_t;
 
 /// Why signed? Events can have negative offsets and play before their anchor beat,
 /// or even before the owning pattern starts. This is a feature(tm).
 using TickT = int32_t;
 
-/// This struct can either represent a tick or delay.
-///
-/// FlattenedEventList._delay_events is std::vector<TickOrDelayEvent>.
-///
-/// FlattenedEventList::load_events_mut() first uses it to store ticks,
-/// then converts it to delays before returning.
-struct TickOrDelayEvent {
-    TickT tick_or_delay;
-    TickT & delay() {
-        return tick_or_delay;
+struct BeatPlusTick {
+    int32_t beat;
+    int32_t dtick;
+
+    COMPARABLE(BeatPlusTick, (beat, dtick))
+
+    BeatPlusTick & operator+=(BeatPlusTick const & other) {
+        beat += other.beat;
+        dtick += other.dtick;
+        return *this;
     }
-    doc::RowEvent event;
+
+    BeatPlusTick & operator-=(BeatPlusTick const & other) {
+        beat -= other.beat;
+        dtick -= other.dtick;
+        return *this;
+    }
 };
 
-struct FlattenedEventList {
-    std::vector<TickOrDelayEvent> _delay_events;
-    std::size_t _next_event_idx;
-    // impl
-    FlattenedEventList() {
-        // FamiTracker only supports 256 rows per channel. Who would fill them all?
-        // 512 events ought to be enough for everybody!?
-        // make that 1024 because i may add scripts which auto-generate
-        // "note release" events before new notes begin
-        // Multiply by 3, since we're storing 3 patterns worth of events in this buffer.
-        _delay_events.reserve(1024 * 3);
+struct RealTime {
+    doc::SeqEntryIndex seq_entry = 0;
+    // Idea: In ticked/timed code, never use "curr" in variable names.
+    // Only ever use prev and next. This may reduce bugs, or not.
+    BeatPlusTick next_tick = {0, 0};
+};
+
+struct EventIterator {
+    // Not read yet, but will be used to handle document mutations in the future.
+    doc::MaybeSeqEntryIndex prev_seq_entry = {};
+
+    doc::SeqEntryIndex seq_entry = 0;
+    EventIndex event_idx = 0;
+};
+
+/// How many patterns EventIterator is ahead of RealTime.
+/// Should be 0 within patterns, 1 if we're playing notes delayed past a pattern,
+/// and -1 if we're playing notes pushed before a pattern.
+///
+/// You can't just compare sequence entry numbers, because of looping.
+class PatternOffset {
+    int _event_minus_now = 0;
+
+public:
+    using Success = bool;
+
+    /// you really shouldn't need this, but whatever.
+    auto event_minus_now() {
+        return _event_minus_now;
+    }
+
+    Success advance_event() {
+        if (event_is_ahead()) {
+            return false;
+        }
+        _event_minus_now += 1;
+        return true;
+    }
+
+    Success advance_now() {
+        if (event_is_behind()) {
+            return false;
+        }
+        _event_minus_now -= 1;
+        return true;
+    }
+
+    bool event_is_ahead() const {
+        return _event_minus_now > 0;
+    }
+
+    bool event_is_behind() const {
+        return _event_minus_now < 0;
     }
 };
 
@@ -57,17 +107,17 @@ class ChannelSequencer {
     using EventsThisTickOwned = std::vector<doc::RowEvent>;
     EventsThisTickOwned _events_this_tick;
 
-    doc::MaybeSeqEntryIndex _prev_seq_index = {};
-    doc::SeqEntryIndex _curr_seq_index = 0;
-    // next seq index is inferred from the document, not part of the sequencer state.
+    /// Time in document. Used for playback, and possibly GUI scrolling.
+    /// Mutations are not affected by _next_event.
+    RealTime _now;
 
-    // Idea: In ticked/timed code, never use "curr" in variable names.
-    // Only ever use prev and next. This may reduce bugs, or not.
-    TickT _next_tick = 0;
+    /// Next event in document to be played.
+    /// May not even be in the same pattern as _now.
+    /// Mutations are affected by _now.
+    EventIterator _next_event;
 
-    /// TODO: Recomputed whenever next_tick() receives different EventList or parameters.
-    /// For now, recomputed every tick.
-    FlattenedEventList _event_cache;
+    /// Track whether EventIterator is at an earlier/later pattern than RealTime.
+    PatternOffset _pattern_offset;
 
 public:
     // impl

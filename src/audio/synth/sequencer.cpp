@@ -12,198 +12,18 @@
 
 namespace audio::synth::sequencer {
 
-static TickT & tick_or_delay(TickT & self) {
-    return self;
-}
-
-static TickT & tick_or_delay(TickOrDelayEvent & self) {
-    return self.tick_or_delay;
-}
-
-// Taken from https://stackoverflow.com/a/28139075
-template <typename T>
-struct reversion_wrapper { T& iterable; };
-
-template <typename T>
-auto begin (reversion_wrapper<T> w) { return std::rbegin(w.iterable); }
-
-template <typename T>
-auto end (reversion_wrapper<T> w) { return std::rend(w.iterable); }
-
-template <typename T>
-reversion_wrapper<T> reverse (T&& iterable) { return { iterable }; }
-
-/// Each event cannot occur later than events following it.
-/// Move each event ahead in time to enforce this rule.
-template<typename TickOrDelayT>
-static void make_tick_times_monotonic(gsl::span<TickOrDelayT> /*inout*/ tick_times) {
-    TickT latest_tick = std::numeric_limits<TickT>::max();
-
-    // Iterate over events in reversed order.
-    for (TickOrDelayT &/*mut*/ tick_obj : reverse(tick_times)) {
-        TickT & tick = tick_or_delay(tick_obj);
-
-        // Each event cannot occur later than events following it.
-        // Move each event ahead in time to enforce this rule.
-        tick = latest_tick = std::min(tick, latest_tick);
-    }
-}
-
-/// Converts a list of times from "absolute time" to "delay from previous time".
-///
-/// Input:
-/// - n = input.tick_times.size()
-/// - input.tick_times[i] = timestamp.
-/// - input.tick_times is weakly increasing (<= holds).
-///     - Call make_tick_times_monotonic() first.
-///
-/// Return value:
-/// - ret_i: [0..n] inclusive
-/// - input.tick_times[0..ret_i) < now
-/// - input.tick_times[ret_i..n) >= now
-///
-/// Mutate input:
-/// - output.tick_times[0..ret_i) are unspecified.
-/// - output.tick_times[ret_i] = input.tick_times[ret_i] - now
-/// - output.tick_times[i in [ret_i+1..n)] = input.tick_times[i] - input.tick_times[i-1]
-template<typename TickOrDelayT>
-static size_t convert_tick_to_delay(
-    TickT const now, gsl::span<TickOrDelayT> /*inout*/ tick_times
-) {
-    auto n = tick_times.size();
-
-    ptrdiff_t const IDX_UNSET = -1;
-    ptrdiff_t ret_i = IDX_UNSET;
-
-    // If we forget to initialize this variable, the results should be obviously wrong.
-    TickT prev = std::numeric_limits<TickT>::max() / 2;
-
-    // If this were Rust, I'd store ret_i and prev in an enum instead,
-    // and prev wouldn't need to be initialized to a dummy variable.
-    for (size_t curr_idx = 0; curr_idx < n; curr_idx++) {
-        TickT input = tick_or_delay(tick_times[curr_idx]);
-        TickT & output = tick_or_delay(tick_times[curr_idx]);
-
-        if (ret_i == IDX_UNSET && input < now) {
-            // input.tick_times[0..ret_i) < now
-            // output.tick_times[0..ret_i) are unspecified.
-        } else
-        if (ret_i == IDX_UNSET && input >= now) {
-            // input.tick_times[ret_i..n) >= now
-            ret_i = (ptrdiff_t) curr_idx;
-
-            // output.tick_times[ret_i] = input.tick_times[ret_i] - now
-            output = input - now;
-            prev = input;
-        } else
-        if (ret_i != IDX_UNSET) {
-            // output.tick_times[i in [ret_i+1..n)] = input.tick_times[i] - input.tick_times[i-1]
-            output = input - prev;
-            prev = input;
-        } else
-            release_assert(false);
-    }
-
-    // ret_i: [0, n] inclusive
-    if (ret_i == IDX_UNSET) {
-        return n;
-    }
-
-    return (size_t) ret_i;
-}
-
 // TODO add support for grooves.
-// This function's API will change *dramatically*
+// We need to remove usages of `doc::round_to_int()`
 // once we allow changing the speed mid-song.
+
+// Unused for now.
+[[maybe_unused]]
 static TickT time_to_ticks(doc::TimeInPattern time, doc::SequencerOptions options) {
     return doc::round_to_int(time.anchor_beat * options.ticks_per_beat)
         + time.tick_offset;
 }
 
-// impl FlattenedEventList
-
 using TimedEventsRef = gsl::span<doc::TimedRowEvent const>;
-using DelayEvent = TickOrDelayEvent;
-using DelayEventsRefMut = gsl::span<DelayEvent>;
-
-// TODO cache all inputs into load_events_mut(),
-// and add a method to increment cache.now().
-
-[[nodiscard]] DelayEventsRefMut get_events_mut(FlattenedEventList & self) {
-    return DelayEventsRefMut{self._delay_events}.subspan(self._next_event_idx);
-}
-
-struct RelativePattern {
-    TimedEventsRef event_list;
-
-    /// Length of pattern, in ticks.
-    TickT pattern_ntick;
-
-    /// Now, in ticks, relative to the pattern's beginning.
-    TickT now_minus_begin;
-};
-
-using RelativePatternsRef = gsl::span<RelativePattern const>;
-
-/// Mutates self._delay_events, returns a reference.
-[[nodiscard]] DelayEventsRefMut load_events_mut(
-    FlattenedEventList & self,
-    RelativePatternsRef patterns,
-    doc::SequencerOptions options
-) {
-    /* TODO add parameter: BeatFraction start_beat.
-    - Drop all events prior.
-    - Convert all events into ticks.
-    - Subtract time_to_ticks(start_beat) from all event times.
-    */
-
-    // Is it legal for patterns to hold events with anchor beat > pattern duration?
-    self._delay_events.clear();
-    // Does not shrink the vector.
-    self._delay_events.reserve([&] {
-        size_t num_events = 0;
-        for (RelativePattern pattern : patterns) {
-            num_events += pattern.event_list.size();
-        }
-        return num_events;
-    }());
-
-    // _delay_events[:].tick_or_delay is "event tick - now tick".
-    // So "now" is 0.
-    TickT const now = 0;
-
-    for (RelativePattern pattern : patterns) {
-        TimedEventsRef event_list = pattern.event_list;
-
-        // Now, relative to beginning of the pattern.
-        TickT now_minus_begin = pattern.now_minus_begin;
-
-        for (doc::TimedRowEvent event : event_list) {
-            // Event, relative to beginning of pattern.
-            TickT event_minus_begin = time_to_ticks(event.time, options);
-            TickT tick = event_minus_begin - now_minus_begin;
-            self._delay_events.push_back(
-                TickOrDelayEvent{.tick_or_delay = tick, .event = event.v}
-            );
-        }
-    }
-
-    // TODO return status saying "misordered events detected", then display error in GUI.
-    // The 6502 hardware driver will not handle misordered events properly;
-    // make_tick_times_monotonic() is merely a convenience for preview.
-    make_tick_times_monotonic(DelayEventsRefMut{self._delay_events});
-
-    // Converts _delay_events from (tick, event) to (delay, event) format.
-    self._next_event_idx = convert_tick_to_delay(now, DelayEventsRefMut{self._delay_events});
-
-    // Returns reference to _delay_events.
-    return get_events_mut(self);
-}
-
-void pop_event(FlattenedEventList & self) {
-    self._next_event_idx++;
-    release_assert((size_t) self._next_event_idx <= self._delay_events.size());
-}
 
 ChannelSequencer::ChannelSequencer() {
     /*
@@ -223,20 +43,20 @@ ChannelSequencer::ChannelSequencer() {
     _events_this_tick.reserve(4);
 }
 
-doc::MaybeSeqEntryIndex calc_next_index(
-    doc::Document const & document, doc::SeqEntryIndex seq_index
+doc::MaybeSeqEntryIndex calc_next_entry(
+    doc::Document const & document, doc::SeqEntryIndex seq_entry_index
 ) {
     // exotracker will have no pattern-jump effects.
     // Instead, each "order entry" has a length field, and a "what to do next" field.
 
     // If seq entry jumps to another seq index, return that one instead.
 
-    seq_index++;
-    if (seq_index >= document.sequence.size()) {
+    seq_entry_index++;
+    if (seq_entry_index >= document.sequence.size()) {
         // If seq entry can halt song afterwards, return {}.
         return 0;
     }
-    return {seq_index};
+    return {seq_entry_index};
 
     // If seq entry can jump partway into a pattern,
     // change function to return both a pattern and a beat.
@@ -253,64 +73,58 @@ EventsRef ChannelSequencer::next_tick(
     auto const nchan = document.chip_index_to_nchan(chip_index);
     release_assert(chan_index < nchan);
 
-    doc::SequencerOptions options = document.sequencer_options;
-    doc::MaybeSeqEntryIndex next_seq_index = calc_next_index(document, _curr_seq_index);
+    doc::SequencerOptions const options = document.sequencer_options;
+    TickT const ticks_per_beat = options.ticks_per_beat;
 
-    // Process the current sequence entry.
-    enum class TickAnchor { Begin, End };
+    auto frac_to_tick = [ticks_per_beat](doc::BeatFraction beat) -> BeatPlusTick {
+        doc::FractionInt ibeat = beat.numerator() / beat.denominator();
+        doc::BeatFraction fbeat = beat - ibeat;
 
-    /// When calling parse_pattern() on the previous pattern,
-    /// it knows the playback point in ticks,
-    /// relative to the beginning of the current pattern
-    /// (aka the end of the previous pattern).
-    ///
-    /// parse_pattern() calls `RelativeTick{TickAnchor::End, offset}.now_minus_begin(...)`
-    /// to find the playback tick relative to the beginning of the previous pattern.
-    /// So now_minus_begin() must add the duration of the previous pattern.
-    struct RelativeTick {
-        TickAnchor anchor;
-        TickT now_minus_anchor;
+        doc::FractionInt dtick = doc::round_to_int(fbeat * ticks_per_beat);
+        return BeatPlusTick{.beat=ibeat, .dtick=dtick};
+    };
 
-        TickT now_minus_begin(TickT end_minus_begin) {
-            switch (anchor) {
-                case TickAnchor::End:
-                    return now_minus_anchor + end_minus_begin;
-                case TickAnchor::Begin:
-                    return now_minus_anchor;
-                default:
-                    throw std::logic_error(fmt::format(
-                        "now_minus_begin() received invalid anchor {}", anchor
-                    ));
-            }
+    auto distance = [ticks_per_beat](BeatPlusTick from, BeatPlusTick to) -> TickT {
+        return ticks_per_beat * (to.beat - from.beat) + to.dtick - from.dtick;
+    };
+
+    BeatPlusTick const now_pattern_len = [&] {
+        doc::SequenceEntry const & now_entry = document.sequence[_now.seq_entry];
+        return frac_to_tick(now_entry.nbeats);
+    }();
+
+    auto advance_event_seq_entry = [this, &document]() {
+        _next_event.event_idx = 0;
+        _next_event.prev_seq_entry = _next_event.seq_entry;
+
+        auto next_seq_entry = calc_next_entry(document, _next_event.seq_entry);
+        if (next_seq_entry.has_value()) {
+            _next_event.seq_entry = *next_seq_entry;
+        } else {
+            // TODO halt playback
+            _next_event.seq_entry = 0;
         }
     };
 
-    struct {
-        RelativePattern _arr[3];
-        size_t _size = 0;
-
-        void push_back(RelativePattern v) {
-            _arr[_size++] = v;
+    auto check_invariants = [this]() {
+        // If two sequential patterns are different,
+        // assert that they don't take up the same region in time.
+        // But if they're the same, they could be different occurrences of a loop.
+        if (_next_event.seq_entry != _now.seq_entry) {
+            release_assert(_pattern_offset.event_minus_now() != 0);
         }
+    };
 
-        RelativePattern const & back() const {
-            return _arr[_size - 1];
-        }
+    TimedEventsRef events;
+    BeatPlusTick ev_pattern_len;
 
-        operator RelativePatternsRef() const {
-            return RelativePatternsRef{_arr, _size};
-        }
-    } parsed_patterns;
-
-    auto parse_pattern = [
-        &document, &parsed_patterns, options, chip_index, chan_index, nchip, nchan
-    ](
-        doc::SeqEntryIndex seq_idx, RelativeTick tick_rel
-    ) {
-        doc::SequenceEntry const & current_entry = document.sequence[seq_idx];
-        doc::BeatFraction nbeats = current_entry.nbeats;
-        TickT pattern_ntick = doc::round_to_int(nbeats * options.ticks_per_beat);
-
+    auto get_events = [
+        this, &document, chip_index, chan_index, nchip, nchan, &frac_to_tick,
+        // mutate these
+        &events, &ev_pattern_len
+    ]() {
+        doc::SequenceEntry const & current_entry =
+            document.sequence[_next_event.seq_entry];
         auto & chip_channel_events = current_entry.chip_channel_events;
 
         // [chip_index]
@@ -319,76 +133,133 @@ EventsRef ChannelSequencer::next_tick(
 
         // [chip_index][chan_index]
         release_assert(channel_events.size() == nchan);
-        TimedEventsRef events = channel_events[chan_index];
+        events = channel_events[chan_index];
 
-        // Load list of upcoming events.
-        // (In the future, mutate list instead of regenerating with different `now` every tick.
-        // Use assertions to ensure that mutation and regeneration produce the same result.)
-        TickT now_minus_begin = tick_rel.now_minus_begin(pattern_ntick);
-        parsed_patterns.push_back(RelativePattern{events, pattern_ntick, now_minus_begin});
+        ev_pattern_len = frac_to_tick(current_entry.nbeats);
     };
 
-    auto maybe_parse_pattern = [&parse_pattern](
-        doc::MaybeSeqEntryIndex seq_idx, RelativeTick tick_rel
-    ) {
-        if (seq_idx.has_value()) {
-            parse_pattern(*seq_idx, tick_rel);
+    check_invariants();
+    get_events();
+
+    while (true) {
+        while (_next_event.event_idx >= events.size()) {
+            // Current pattern is empty.
+
+            if (!_pattern_offset.advance_event()) {
+                // _next_event is already 1 pattern past real time.
+                // No unvisited events in previous, current, or next pattern. Quit.
+                goto end_loop;
+            }
+
+            advance_event_seq_entry();
+            check_invariants();
+            get_events();
         }
-    };
 
-    // Mutate parsed_patterns.
-    maybe_parse_pattern(
-        _prev_seq_index,
-        RelativeTick{.anchor=TickAnchor::End, .now_minus_anchor=_next_tick}
-    );
-    parse_pattern(
-        _curr_seq_index,
-        RelativeTick{.anchor=TickAnchor::Begin, .now_minus_anchor=_next_tick}
-    );
+        doc::TimedRowEvent next_ev = events[_next_event.event_idx];
 
-    TickT pattern_ntick = parsed_patterns.back().pattern_ntick;
-    maybe_parse_pattern(
-        next_seq_index,
-        RelativeTick{
-            //   now - next.begin
-            .anchor=TickAnchor::Begin,
-            // = now - curr.end
-            .now_minus_anchor = _next_tick - pattern_ntick
-        }
-    );
+        BeatPlusTick now = _now.next_tick;
+        BeatPlusTick next_ev_time = frac_to_tick(next_ev.time.anchor_beat);
+        next_ev_time.dtick += next_ev.time.tick_offset;
 
-    // Access parsed_patterns.
-    DelayEventsRefMut delay_events = load_events_mut(
-        _event_cache, parsed_patterns, document.sequencer_options
-    );
+        // Only scanning for events in the next pattern
+        // reduces worst-case CPU usage in the 6502 driver.
+        // Only supporting overhang in the last beat
+        // reduces the risk of integer overflow.
 
-    // Process all events occurring now.
-    for (DelayEvent & delay_event : delay_events) {
-        if (delay_event.delay() == 0) {
-            _events_this_tick.push_back(delay_event.event);
-            pop_event(_event_cache);
+        if (_pattern_offset.event_is_ahead()) {
+            // Don't look too far ahead.
+            // Ensure _now is within 1 beat of finishing the pattern.
+            // Otherwise don't bother playing any notes.
+            if (!(now.beat + 1 >= now_pattern_len.beat)) {
+                break;
+            }
+
+            now -= now_pattern_len;
+
+        } else if (_pattern_offset.event_is_behind()) {
+            next_ev_time -= ev_pattern_len;
+
         } else {
-            // This has no effect now, but will be useful
-            // once we reuse _event_cache across ticks.
-            delay_event.delay() -= 1;
-            break;
+            // Ensure _now is within 1 beat of the next event.
+            // Otherwise don't bother playing any notes.
+            if (!(now.beat + 1 >= next_ev_time.beat)) {
+                break;
+            }
         }
+
+        TickT now_to_event = distance(now, next_ev_time);
+        if (now_to_event < 0) {
+            fmt::print(
+                "invalid document: event at seq {} time {} is in the past!\n",
+                _next_event.seq_entry,
+                next_ev.time.anchor_beat
+            );
+        }
+        if (now_to_event <= 0) {
+            _events_this_tick.push_back(next_ev.v);
+
+            // _next_event.event_idx may be out of bounds.
+            // The next iteration of the outer loop will fix this.
+            _next_event.event_idx++;
+            continue;
+        }
+
+        break;
+        // This reminds me of EventQueue.
+        // But that doesn't support inserting overdue events in the past
+        // (due to tracker user error).
     }
+    end_loop:
 
-    _next_tick++;
-    if (_next_tick >= pattern_ntick) {
-        // This code will make each pattern play for at least 1 tick.
-        // Only insane patterns would have lengths rounding down to 0 ticks.
-        _next_tick = 0;
-        _prev_seq_index = {_curr_seq_index};
+    auto & now_tick = _now.next_tick;
+    now_tick.dtick++;
+    // if tempo changes suddenly,
+    // it's possible now_tick.dtick could exceed ticks_per_beat.
+    // I'm not sure if it happens. let's not assert for now.
+    // How about asserting that now_tick.dtick / ticks_per_beat
+    // can never exceed 1? Not sure.
 
-        if (next_seq_index.has_value()) {
-            _curr_seq_index = *next_seq_index;
+    auto dbeat = now_tick.dtick / ticks_per_beat;
+    release_assert(0 <= dbeat);
+    release_assert(dbeat <= 1);
+
+    now_tick.beat += now_tick.dtick / ticks_per_beat;
+    now_tick.dtick %= ticks_per_beat;
+    // You can't assert that now_tick.beat <= pattern_len.beat.
+    // That could happen on a speed=1 zero-length pattern (pathological but not worth crashing on).
+    // Nor can you assert that if now_tick.beat == pattern_len.beat, now_tick.dtick <= pattern_len.dtick.
+    // That could happen on a speed>1 zero-length pattern.
+
+    // If we reach the end of the pattern, advance to the next.
+    // Even if the next pattern has zero length, don't advance again.
+    if (now_tick >= now_pattern_len) {
+        // If advancing now would leave events from 2 patterns ago in the queue,
+        // we need to drop them.
+        if (!_pattern_offset.advance_now()) {
+            fmt::print(
+                "invalid document: event at sequence entry {} extends past 2 patterns!\n",
+                _next_event.seq_entry
+            );
+
+            // These commented-out operations are not strictly necessary.
+            // release_assert(_pattern_offset.advance_event());
+            advance_event_seq_entry();
+            // release_assert(_pattern_offset.advance_time());
+        }
+        now_tick = {0, 0};
+
+        auto next_seq_entry = calc_next_entry(document, _now.seq_entry);
+        if (next_seq_entry.has_value()) {
+            _now.seq_entry = *next_seq_entry;
         } else {
             // TODO halt playback
-            _curr_seq_index = 0;
+            _now.seq_entry = 0;
         }
+
+        check_invariants();
     }
+
     return _events_this_tick;
 }
 
@@ -401,89 +272,7 @@ EventsRef ChannelSequencer::next_tick(
 // "Rethinking Software Testing: Perspectives from the world of Hardware"
 // https://software.rajivprab.com/2019/04/28/rethinking-software-testing-perspectives-from-the-world-of-hardware/
 
-static TickT distance(TickT a, TickT b) {
-    return b - a;
-}
-
-TEST_CASE("convert_tick_to_delay on an empty input") {
-    std::vector<TickT> tick_vec;
-    gsl::span<TickT> tick_times{tick_vec};
-
-    CHECK(convert_tick_to_delay(TickT{-100}, tick_times) == 0);
-    CHECK(convert_tick_to_delay(TickT{0}, tick_times) == 0);
-    CHECK(convert_tick_to_delay(TickT{100}, tick_times) == 0);
-}
-
-TEST_CASE("convert_tick_to_delay on dense input") {
-    std::vector<TickT> tick_vec{0, 1, 2, 3, 4};
-    gsl::span<TickT> tick_times{tick_vec};
-
-    CHECK(convert_tick_to_delay(TickT{2}, tick_times) == 2);
-    CHECK(tick_times[2] == 0);
-    CHECK(tick_times[3] == 1);
-    CHECK(tick_times[4] == 1);
-}
-
-TEST_CASE("convert_tick_to_delay with repeated input") {
-    std::vector<TickT> tick_vec{0, 1, 2, 2, 2};
-    gsl::span<TickT> tick_times{tick_vec};
-
-    CHECK(convert_tick_to_delay(TickT{2}, tick_times) == 2);
-    CHECK(tick_times[2] == 0);
-    CHECK(tick_times[3] == 0);
-    CHECK(tick_times[4] == 0);
-}
-
-TEST_CASE("convert_tick_to_delay with gaps") {
-    std::vector<TickT> tick_vec{0, 5, 10, 15};
-    gsl::span<TickT> tick_times{tick_vec};
-
-    CHECK(convert_tick_to_delay(TickT{7}, tick_times) == 2);
-    CHECK(tick_times[2] == 10 - 7);
-    CHECK(tick_times[3] == 15 - 10);
-}
-
-TEST_CASE("convert_tick_to_delay with negative input") {
-    {
-        std::vector<TickT> tick_vec{-20, -10, 0};
-        gsl::span<TickT> tick_times{tick_vec};
-
-        CHECK(convert_tick_to_delay(TickT{-15}, tick_times) == 1);
-        CHECK(tick_times[1] == distance(-15, -10));
-        CHECK(tick_times[2] == distance(-10, 0));
-    }
-    {
-        std::vector<TickT> tick_vec{-20, -10, 0};
-        gsl::span<TickT> tick_times{tick_vec};
-
-        CHECK(convert_tick_to_delay(TickT{10}, tick_times) == 3);
-    }
-    {
-        std::vector<TickT> tick_vec{0, 10};
-        gsl::span<TickT> tick_times{tick_vec};
-
-        CHECK(convert_tick_to_delay(TickT{-10}, tick_times) == 0);
-        CHECK(tick_times[0] == distance(-10, 0));
-        CHECK(tick_times[1] == distance(0, 10));
-    }
-}
-
-TEST_CASE("convert_tick_to_delay returns 0") {
-    std::vector<TickT> tick_vec{5, 10, 20};
-    gsl::span<TickT> tick_times{tick_vec};
-
-    CHECK(convert_tick_to_delay(TickT{0}, tick_times) == 0);
-    CHECK(tick_times[0] == distance(0, 5));
-    CHECK(tick_times[1] == distance(5, 10));
-    CHECK(tick_times[2] == distance(10, 20));
-}
-
-TEST_CASE("convert_tick_to_delay returns n") {
-    std::vector<TickT> tick_vec{5, 10, 20};
-    gsl::span<TickT> tick_times{tick_vec};
-
-    CHECK(convert_tick_to_delay(TickT{30}, tick_times) == 3);
-}
+// (tests removed)
 
 #endif
 
