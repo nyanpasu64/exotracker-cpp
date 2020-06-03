@@ -16,7 +16,7 @@ static TimeInPattern at(BeatFraction anchor_beat) {
     return TimeInPattern{anchor_beat, 0};
 }
 
-static TimeInPattern at_frac(int start, int num, int den) {
+static TimeInPattern at(int start, int num, int den) {
     return TimeInPattern{start + BeatFraction(num, den), 0};
 }
 
@@ -55,14 +55,14 @@ Document dream_fragments() {
                 {at(4+1), {pitch(6, 2+2)}},
             },
             {
-                {at_frac(0, 3, 4), {NOTE_CUT}},
-                {at_frac(1, 1, 2), {.note=pitch(7, -3), .instr=0}},
-                {at_frac(2, 0, 2), {pitch(7, 6)}},
-                {at_frac(2, 1, 2), {pitch(7, 7)}},
-                {at_frac(3, 1, 2), {pitch(7, 9)}},
-                {at_frac(4, 1, 2), {pitch(7, 4)}},
-                {at_frac(5, 1, 2), {pitch(7, 2)}},
-                {at_frac(6, 1, 2), {pitch(7, 1)}},
+                {at(0, 3, 4), {NOTE_CUT}},
+                {at(1, 1, 2), {.note=pitch(7, -3), .instr=0}},
+                {at(2, 0, 2), {pitch(7, 6)}},
+                {at(2, 1, 2), {pitch(7, 7)}},
+                {at(3, 1, 2), {pitch(7, 9)}},
+                {at(4, 1, 2), {pitch(7, 4)}},
+                {at(5, 1, 2), {pitch(7, 2)}},
+                {at(6, 1, 2), {pitch(7, 1)}},
             },
         });
         release_assert(chip_channel_events[0].size() == (int)ChannelID::COUNT);
@@ -95,11 +95,11 @@ Document dream_fragments() {
             },
             {
                 {{0, 4}, {pitch(7, 4)}},
-                {at_frac(1, 1, 2), {pitch(7, -1)}},
+                {at(1, 1, 2), {pitch(7, -1)}},
                 {at(3), {pitch(7, 4)}},
                 {{4, 4}, {pitch(7, 6)}},
-                {at_frac(5, 2, 4), {pitch(7, 7)}},
-                {at_frac(5, 3, 4), {pitch(7, 6)}},
+                {at(5, 2, 4), {pitch(7, 7)}},
+                {at(5, 3, 4), {pitch(7, 6)}},
                 {at(6), {pitch(7, 4)}},
                 {{8, 3}, {pitch(6, 2)}},
             },
