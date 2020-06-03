@@ -38,7 +38,7 @@ Document dream_fragments() {
     // We only have 1 chip.
     auto const chip_kind = chip_kinds::ChipKind::Apu1;
     using ChannelID = chip_kinds::Apu1ChannelID;
-    Document::ChipList chips{chip_kind};
+    ChipList chips{chip_kind};
 
     Sequence sequence;
 
@@ -132,11 +132,11 @@ Document dream_fragments() {
     }();
 
     return DocumentCopy {
-        .chips = chips,
-        .sequence = sequence,
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
-        .instruments = {instrument}
+        .instruments = {instrument},
+        .chips = chips,
+        .sequence = sequence,
     };
 }
 

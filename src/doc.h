@@ -27,6 +27,9 @@ struct SequencerOptions {
     TickT ticks_per_beat;
 };
 
+using chip_kinds::ChipKind;
+using ChipList = std::vector<chip_kinds::ChipKind>;
+
 /// Document struct.
 ///
 /// Usage:
@@ -34,22 +37,22 @@ struct SequencerOptions {
 /// via aggregate initialization or designated initializers.
 /// Afterwards, convert to Document to avoid accidental expensive copies.
 struct DocumentCopy {
-    /// vector<ChipIndex -> ChipKind>
-    /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
-    using ChipList = std::vector<chip_kinds::ChipKind>;
-    ChipList chips;
-
-    chip_common::ChannelIndex chip_index_to_nchan(chip_common::ChipIndex index) const {
-        return chip_common::CHIP_TO_NCHAN[(size_t)chips[index]];
-    }
-
-    // Sequence.size() in [1..MAX_SEQUENCE_LEN] inclusive (not enforced yet).
-    Sequence sequence;
-
     SequencerOptions sequencer_options;
     FrequenciesOwned frequency_table;
 
     Instruments instruments;
+
+    /// vector<ChipIndex -> ChipKind>
+    /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
+    ChipList chips;
+
+    // Sequence.size() in [1..MAX_SEQUENCE_LEN] inclusive (not enforced yet).
+    Sequence sequence;
+
+    // Methods
+    chip_common::ChannelIndex chip_index_to_nchan(chip_common::ChipIndex index) const {
+        return chip_common::CHIP_TO_NCHAN[(size_t)chips[index]];
+    }
 };
 
 /// Non-copyable version of Document. You must call clone() explicitly.

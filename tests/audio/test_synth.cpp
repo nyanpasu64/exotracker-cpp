@@ -27,7 +27,7 @@ enum class TestChannelID {
 static doc::Document one_note_document(TestChannelID which_channel, doc::Note pitch) {
     using namespace doc;
 
-    Document::ChipList chips;
+    ChipList chips;
     ChipChannelTo<EventList> chip_channel_events;
 
     // chip 0
@@ -61,6 +61,11 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
     }
 
     return DocumentCopy {
+        .sequencer_options = SequencerOptions{
+            .ticks_per_beat = 24,
+        },
+        .frequency_table = equal_temperament(),
+        .instruments = {},
         .chips = chips,
         .sequence = {
             SequenceEntry {
@@ -68,11 +73,6 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
                 .chip_channel_events = chip_channel_events,
             }
         },
-        .sequencer_options = SequencerOptions{
-            .ticks_per_beat = 24,
-        },
-        .frequency_table = equal_temperament(),
-        .instruments = {},
     };
 }
 
