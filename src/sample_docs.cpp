@@ -140,11 +140,142 @@ Document dream_fragments() {
     };
 }
 
-std::string const DEFAULT_DOC = "dream-fragments";
+/// Excerpt from "Chrono Trigger - World Revolution".
+/// This tests multiple sequence entries (patterns) of uneven lengths.
+Document world_revolution() {
+    SequencerOptions sequencer_options{.ticks_per_beat = 23};
+
+    Instruments instruments;
+
+    InstrumentIndex BASS = 0;
+    instruments[BASS] = Instrument {
+        .volume = {{7, 7, 7, 7, 7, 3}},
+        .pitch = {{}},
+        .arpeggio = {{}},
+        .wave_index = {{1, 1, 1, 0}},
+    };
+
+    InstrumentIndex TRUMPET = 1;
+    instruments[TRUMPET] = Instrument {
+        .volume = {{5, 6, 7, 8, 8, 9}},
+        .pitch = {{}},
+        .arpeggio = {{}},
+        .wave_index = {{1, 1, 0}},
+    };
+
+    ChipList chips{ChipKind::Apu1};
+
+    Sequence sequence;
+
+    auto generate_bass = [&](int nbeats) -> EventList {
+        EventList out;
+        out.push_back({at(0), {{}, BASS}});
+
+        for (int beat = 0; beat < nbeats; beat++) {
+            int note = (beat / 4 % 2 == 0)
+                ? pitch(0, 5).value
+                : pitch(0, 7).value;
+            out.push_back({at(beat), {pitch(3, note)}});
+            out.push_back({at(beat, 1, 4), {pitch(3, note + 7)}});
+            out.push_back({at(beat, 2, 4), {pitch(3, note + 12)}});
+            out.push_back({at(beat, 3, 4), {pitch(3, note + 7)}});
+        }
+        return out;
+    };
+
+    sequence.push_back([&] {
+        ChipChannelTo<EventList> chip_channel_events;
+        chip_channel_events.push_back({
+            EventList{
+                // TimeInPattern, RowEvent
+                // 0
+                {at(0), {pitch(6, 0), TRUMPET}},
+                {at(0, 4, 8), {pitch(6, -1)}},
+                {at(0, 6, 8), {pitch(6, 0)}},
+                {at(0, 7, 8), {pitch(6, -1)}},
+                {at(1), {pitch(5, 9)}},
+                {at(1, 1, 2), {pitch(5, 7)}},
+                {at(2), {pitch(5, 9)}},
+                {at(2, 1, 2), {pitch(5, 2)}},
+                {at(3), {pitch(5, 4)}},
+                {at(3, 1, 2), {pitch(5, 7)}},
+                // 4
+                {at(4), {pitch(5, 9)}},
+                {at(6), {pitch(5, 7)}},
+                {at(7), {pitch(5, 9)}},
+                {at(7, 1, 2), {pitch(6, -1)}},
+                // 8
+                {at(8), {pitch(6, 0)}},
+                {at(8, 4, 8), {pitch(6, -1)}},
+                {at(8, 6, 8), {pitch(6, 0)}},
+                {at(8, 7, 8), {pitch(6, -1)}},
+                {at(9), {pitch(5, 9)}},
+                {at(9, 1, 2), {pitch(5, 7)}},
+                {at(10), {pitch(5, 9)}},
+                {at(10, 1, 2), {pitch(6, -1)}},
+                {at(11), {pitch(6, 0)}},
+                {at(11, 1, 2), {pitch(6, 2)}},
+                // 12
+                {at(12), {pitch(6, 4)}},
+                {at(14), {pitch(6, 2)}},
+                {at(15), {pitch(5, 9)}},
+                {at(15, 1, 2), {pitch(6, -1)}},
+            },
+            generate_bass(16),
+        });
+
+        return SequenceEntry {
+            .nbeats = 16,
+            .chip_channel_events = chip_channel_events,
+        };
+    }());
+
+    sequence.push_back([&] {
+        ChipChannelTo<EventList> chip_channel_events;
+        chip_channel_events.push_back({
+            EventList{
+                // TimeInPattern, RowEvent
+                // 0
+                {at(0), {pitch(6, 0), TRUMPET}},
+                {at(0, 4, 8), {pitch(6, -1)}},
+                {at(0, 6, 8), {pitch(6, 0)}},
+                {at(0, 7, 8), {pitch(6, -1)}},
+                {at(1), {pitch(5, 9)}},
+                {at(1, 1, 2), {pitch(5, 7)}},
+                {at(2), {pitch(5, 9)}},
+                {at(2, 1, 2), {pitch(5, 2)}},
+                {at(3), {pitch(5, 4)}},
+                {at(3, 1, 2), {pitch(5, 7)}},
+                // 4
+                {at(4), {pitch(5, 9)}},
+                {at(5), {pitch(6, -1)}},
+                {at(6), {pitch(6, 0)}},
+                {at(7), {pitch(6, 2)}},
+            },
+            generate_bass(8),
+        });
+
+        return SequenceEntry {
+            .nbeats = 8,
+            .chip_channel_events = chip_channel_events,
+        };
+    }());
+
+    return DocumentCopy{
+        .sequencer_options = sequencer_options,
+        .frequency_table = equal_temperament(),
+        .instruments = instruments,
+        .chips = chips,
+        .sequence = sequence,
+    };
+}
+
+std::string const DEFAULT_DOC = "world-revolution";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
     std::map<std::string, doc::Document> out;
     out.insert({"dream-fragments", dream_fragments()});
+    out.insert({"world-revolution", world_revolution()});
     return out;
 }();
 
