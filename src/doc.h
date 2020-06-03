@@ -69,7 +69,5 @@ public:
     DEFAULT_MOVE(Document)
 };
 
-Document dummy_document();
-
 // namespace doc
 }

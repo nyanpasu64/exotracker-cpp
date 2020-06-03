@@ -105,7 +105,6 @@ add_library(exotracker-lib
         src/audio/synth/nes_2a03_driver.cpp
 
         # Etc.
-        src/doc.cpp
         src/doc/events.cpp
         )
 target_compile_options(exotracker-lib PRIVATE "${options}")
@@ -120,6 +119,7 @@ add_executable(exotracker-bin
         src/audio/output.cpp
 
         # GUI
+        src/sample_docs.cpp
         src/gui/history.cpp
         src/gui/command_common.cpp
         src/gui/main_window.cpp

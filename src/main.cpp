@@ -1,6 +1,7 @@
 #include "gui/main_window.h"
 #include "gui/history.h"
 #include "audio.h"
+#include "sample_docs.h"
 
 #include <fmt/core.h>
 #include <rtaudio/RtAudio.h>
@@ -20,7 +21,8 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     win32_set_font();
 
-    gui::history::History history{doc::dummy_document()};
+    auto const & document = sample_docs::DOCUMENTS.at(sample_docs::DEFAULT_DOC);
+    gui::history::History history{document.clone()};
 
     RtAudio rt;
 

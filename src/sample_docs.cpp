@@ -1,11 +1,16 @@
-#include "doc.h"
+#include "sample_docs.h"
 
+#include "doc.h"
 #include "chip_kinds.h"
 #include "util/release_assert.h"
 
 #include <cmath>
 
-namespace doc {
+namespace sample_docs {
+
+using namespace doc;
+
+namespace {
 
 static TimeInPattern at(BeatFraction anchor_beat) {
     return TimeInPattern{anchor_beat, 0};
@@ -19,11 +24,12 @@ static Note pitch(int octave, int semitone) {
     return Note{static_cast<ChromaticInt>(12 * octave + semitone)};
 }
 
-Document dummy_document() {
-    // Excerpt from "Chrono Cross - Dream Fragments".
-    // This tests the ability to nudge notes both early and later,
-    // and even before the beginning of a pattern.
+}
 
+/// Excerpt from "Chrono Cross - Dream Fragments".
+/// This tests the ability to nudge notes both early and later,
+/// and even before the beginning of a pattern.
+Document dream_fragments() {
     // Global options
     SequencerOptions sequencer_options{
         .ticks_per_beat = 43,
@@ -133,5 +139,13 @@ Document dummy_document() {
         .instruments = {instrument}
     };
 }
+
+std::string const DEFAULT_DOC = "dream-fragments";
+
+std::map<std::string, doc::Document> const DOCUMENTS = [] {
+    std::map<std::string, doc::Document> out;
+    out.insert({"dream-fragments", dream_fragments()});
+    return out;
+}();
 
 }
