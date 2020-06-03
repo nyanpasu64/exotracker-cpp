@@ -1,4 +1,4 @@
-/****************************************************************************
+﻿/****************************************************************************
  *  Copyright (C) 2016-2018 Woboq GmbH
  *  Olivier Goffart <ogoffart at woboq.com>
  *  https://woboq.com/
@@ -111,6 +111,16 @@ constexpr void foldMethods(F&& f) {
     foldState<L, SignalStateTag, T>(f);
     foldState<L, SlotStateTag, T>(f);
     foldState<L, MethodStateTag, T>(f);
+}
+
+template<class T>
+constexpr auto fetchExplicitName(const StringView& defaultName, ...) {
+    return defaultName;
+}
+
+template<class T>
+constexpr auto fetchExplicitName(const StringView&, int) -> decltype (w_explicitObjectName(static_cast<T*>(nullptr))) {
+    return w_explicitObjectName(static_cast<T*>(nullptr));
 }
 
 /// Helper to get information about the notify signal of the property within object T
@@ -561,17 +571,17 @@ struct LayoutBuilder {
     uint intCount{};
 
     constexpr void addString(const StringView& s) {
-        stringSize += s.size();
+        stringSize += s.size() + 1;
         stringCount += 1;
         intCount += 1;
     }
     constexpr void addStringUntracked(const StringView& s) {
-        stringSize += s.size();
+        stringSize += s.size() + 1;
         stringCount += 1;
     }
     template<uint Flag = IsUnresolvedType>
     constexpr void addTypeString(const StringView& s) {
-        stringSize += s.size();
+        stringSize += s.size() + 1;
         stringCount += 1;
         intCount += 1;
     }
@@ -601,28 +611,31 @@ struct DataBuilder {
 
     constexpr void addString(const StringView& s) {
         for (auto c : s) *stringCharP++ = c;
+        *stringCharP++ = '\0';
         *stringOffestP++ = stringOffset;
-        *stringLengthP++ = s.size() - 1;
+        *stringLengthP++ = s.size();
         *intP++ = stringCount;
-        stringOffset += s.size() - sizeof(QByteArrayData);
+        stringOffset += 1 + s.size() - qptrdiff(sizeof(QByteArrayData));
         stringCount += 1;
         intCount += 1;
     }
     constexpr void addStringUntracked(const StringView& s) {
         for (auto c : s) *stringCharP++ = c;
+        *stringCharP++ = '\0';
         *stringOffestP++ = stringOffset;
-        *stringLengthP++ = s.size() - 1;
-        stringOffset += s.size() - sizeof(QByteArrayData);
+        *stringLengthP++ = s.size();
+        stringOffset += 1 + s.size() - qptrdiff(sizeof(QByteArrayData));
         stringCount += 1;
     }
 
     template<uint Flag = IsUnresolvedType>
     constexpr void addTypeString(const StringView& s) {
         for (auto c : s) *stringCharP++ = c;
+        *stringCharP++ = '\0';
         *stringOffestP++ = stringOffset;
-        *stringLengthP++ = s.size() - 1;
+        *stringLengthP++ = s.size();
         *intP++ = Flag | stringCount;
-        stringOffset += s.size() - sizeof(QByteArrayData);
+        stringOffset += 1 + s.size() - qptrdiff(sizeof(QByteArrayData));
         stringCount += 1;
         intCount += 1;
     }
@@ -1072,11 +1085,14 @@ QT_WARNING_POP
 
 #define W_OBJECT_IMPL_COMMON(INLINE, ...) \
     W_MACRO_TEMPLATE_STUFF(__VA_ARGS__) struct W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__)::W_MetaObjectCreatorHelper { \
-        struct Name { static constexpr auto value = w_internal::viewLiteral(W_MACRO_STRIGNIFY(W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__))); }; \
-        using ObjectInfo = w_internal::ObjectInfo<W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__)::W_ThisType, Name>; \
+        struct Name { \
+            static constexpr auto defaultName = w_internal::viewLiteral(W_MACRO_STRIGNIFY(W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__))); \
+            static constexpr auto value = w_internal::fetchExplicitName<typename W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__)::W_ThisType>(defaultName, 0); \
+        }; \
+        using ObjectInfo = w_internal::ObjectInfo<typename W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__)::W_ThisType, Name>; \
     }; \
     W_MACRO_TEMPLATE_STUFF(__VA_ARGS__) INLINE const QT_INIT_METAOBJECT QMetaObject W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__)::staticMetaObject = \
-        w_internal::FriendHelper::createMetaObject<W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__)::W_ThisType>();
+        w_internal::FriendHelper::createMetaObject<typename W_MACRO_FIRST_REMOVEPAREN(__VA_ARGS__)::W_ThisType>();
 
 /// \macro W_OBJECT_IMPL(TYPE [, TEMPLATE_STUFF])
 /// This macro expand to the code that instantiate the QMetaObject. It must be placed outside of
