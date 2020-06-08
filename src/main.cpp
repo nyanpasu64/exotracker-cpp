@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     auto arg = std::get<Arguments>(std::move(maybe_arg));
 
     using sample_docs::DOCUMENTS;
-    if (!DOCUMENTS.contains(arg.doc_name)) {
+    if (!DOCUMENTS.count(arg.doc_name)) {
         fmt::print(
             stderr, "Invalid document name \"{}\". Valid names are:\n\n", arg.doc_name
         );
