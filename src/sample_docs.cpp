@@ -29,7 +29,7 @@ static Note pitch(int octave, int semitone) {
 /// Excerpt from "Chrono Cross - Dream Fragments".
 /// This tests the ability to nudge notes both early and later,
 /// and even before the beginning of a pattern.
-Document dream_fragments() {
+static Document dream_fragments() {
     // Global options
     SequencerOptions sequencer_options{
         .ticks_per_beat = 43,
@@ -142,7 +142,7 @@ Document dream_fragments() {
 
 /// Excerpt from "Chrono Trigger - World Revolution".
 /// This tests multiple sequence entries (patterns) of uneven lengths.
-Document world_revolution() {
+static Document world_revolution() {
     SequencerOptions sequencer_options{.ticks_per_beat = 23};
 
     Instruments instruments;
@@ -270,12 +270,64 @@ Document world_revolution() {
     };
 }
 
+/// Test song, populated with note cuts, releases, and stuff.
+static Document render_test() {
+    SequencerOptions sequencer_options{.ticks_per_beat = 24};
+
+    Instruments instruments;
+
+    for (int8_t i = 0; i <= 2; i++) {
+        instruments[i] = Instrument {
+            .volume = {{15}},
+            .pitch = {{}},
+            .arpeggio = {{}},
+            .wave_index = {{i}},
+        };
+    }
+
+    ChipList chips{ChipKind::Apu1};
+
+    Sequence sequence;
+
+    sequence.push_back([&] {
+        ChipChannelTo<EventList> chip_channel_events;
+
+        EventList ch1;
+        for (int i = 0; i <= 10; i++) {
+            // Play MIDI pitches 0, 12... 120.
+            ch1.push_back({at(i), {pitch(i, 0)}});
+            ch1.push_back({at(i, 1, 2), {i % 2 == 0 ? NOTE_CUT : NOTE_RELEASE}});
+        }
+        ch1[0].v.instr = 2;
+
+        EventList ch2;
+        ch2.push_back({at(2), {NOTE_CUT}});
+        ch2.push_back({at(4), {NOTE_RELEASE}});
+
+        chip_channel_events.push_back({ch1, ch2});
+
+        return SequenceEntry {
+            .nbeats = 10 + 1,
+            .chip_channel_events = chip_channel_events,
+        };
+    }());
+
+    return DocumentCopy{
+        .sequencer_options = sequencer_options,
+        .frequency_table = equal_temperament(),
+        .instruments = instruments,
+        .chips = chips,
+        .sequence = sequence,
+    };
+}
+
 std::string const DEFAULT_DOC = "world-revolution";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
     std::map<std::string, doc::Document> out;
     out.insert({"dream-fragments", dream_fragments()});
     out.insert({"world-revolution", world_revolution()});
+    out.insert({"render-test", render_test()});
     return out;
 }();
 
