@@ -169,8 +169,6 @@ Document world_revolution() {
 
     auto generate_bass = [&](int nbeats) -> EventList {
         EventList out;
-        out.push_back({at(0), {{}, BASS}});
-
         for (int beat = 0; beat < nbeats; beat++) {
             int note = (beat / 4 % 2 == 0)
                 ? pitch(0, 5).value
@@ -180,6 +178,8 @@ Document world_revolution() {
             out.push_back({at(beat, 2, 4), {pitch(3, note + 12)}});
             out.push_back({at(beat, 3, 4), {pitch(3, note + 7)}});
         }
+
+        out[0].v.instr = BASS;
         return out;
     };
 
