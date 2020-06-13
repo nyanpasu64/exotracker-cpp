@@ -8,16 +8,6 @@ Classes have member variables prefixed with a single underscore, like `_var`, to
 
 src/gui/history.h has `gui::history::History`. There is only 1 instance, and it owns tracker pattern state. The pattern editor and audio thread read from `History`.
 
-## Document architecture
-
-The History class stores two copies of the current document, each located behind its own mutex. This operates analogously to double-buffered displays. Each can be designated as the front or back document. The "front document" is shown to the GUI and read by the audio thread, and never modified. The "back document" is not shown to the GUI or read by the audio thread, but mutated in response to user input.
-
-The interesting part is in `DocumentStore::history_apply_change()`. When the user edits the document, the program runs the edit function on the back document, swaps the roles of the documents (page flip), then runs the edit function on the new back document (which the audio thread may still be holding its mutex, so the GUI thread may block). This results in O(2*edit size) edit time instead of O(entire document) per edit. One risk of this design is that the two copies may desync; one way that may happen is if `command.redo()` is not deterministic.
-
-Each document is protected by a pseudo-rwlock (backed by a mutex) for two threads. The GUI does not acquire a lock when reading, but acquires a lock (exclusive reference) when writing. The audio thread acquires a lock when reading from the document; it cannot safely write, since the GUI can read simultaneously without locking the mutex.
-
-Since Document is mutable, it should almost never be copied (except when initializing the double-buffer), since a deep copy would be very slow. As a result, you need to explicitly call `Document.clone()` when you make a copy. By contrast, copying an immutable persistent data structure (my previous design) is merely a pointer copy and atomic refcount increase.
-
 ## Code style
 
 I am following some Rust-inspired rules in the codebase.
@@ -30,6 +20,49 @@ I am following some Rust-inspired rules in the codebase.
 In audio code, "out parameters" are common since they don't require allocations. Heap allocations can take a long time, pool allocations (I don't know much) may be faster, writing into an existing buffer is free.
 
 In function signatures, out parameters (mutable references primarily written to, not read from) are placed at the end of the argument list. This follows the [Google Style Guide](https://google.github.io/styleguide/cppguide.html#Output_Parameters).
+
+## GUI drawing
+
+QPainter has a highly imperative/stateful drawing API (`setPen()` and `setBrush()`).
+
+QPainter's coordinates work as follows:
+
+- The origin lies at the top left, +x points right, and +y points down.
+
+- (0, 0) lies at the center of a pixel, not at fenceposts. I think this was a mistake, for the following reasons:
+    - If you create a `QRect` from (0, 0) to (16, 16), drawing it takes up 17 pixels on-screen. QRect's size-based constructor sets the bottom-right endpoint by subtracting 1 from horizontal and vertical size.
+
+    - `QPainter::fillRect(QPoint{0, 0}, QPoint{16, 16})` takes up 17 pixels on-screen.
+
+    - `QPainter::fillRect(QPoint{0, 0}, QSize{16, 16})` takes up 16 pixels on-screen.
+
+    - https://bugreports.qt.io/browse/QTBUG-38642
+
+        > When you draw an outline at 10,10 20x20 the [outline] will span a rectangle which is [positioned] at 9.5, 9.5 spanning 21x21 pixels (assuming 1px wide pens). The interior of that rectangle is [positioned] at 10.5,10.5 19x19.
+
+        This is so confusing.
+        
+    - https://bugreports.qt.io/browse/QTBUG-38653
+    
+- The Qt website pretends that QRect is defined in terms of grid intersections rather than pixels, leading to a confusing explanation. https://doc.qt.io/qt-5/qrect.html#coordinates
+
+    - > We recommend that you use x() + width() and y() + height() to find the true bottom-right corner, and avoid right() and bottom(). Another solution is to use QRectF: The QRectF class defines a rectangle in the plane using floating point accuracy for coordinates, and the QRectF::right() and QRectF::bottom() functions do return the right and bottom coordinates.
+
+I instead chose a mental model where coordinates lie at fenceposts/gridlines between pixels. When drawing an axis-aligned line 1 or more pixels thick, you can pick which side it lies on. I haven't figured out how to handle lines "centered" on pixels, or non-axis-aligned lines yet.
+
+This makes it easier to allocate parts of the screen to draw channels with no overlaps or gaps between them. I can say that the first channel takes up horizontal region [0, 128] (where the endpoints lie between pixels, so inclusive/exclusive doesn't matter). This region includes pixel centers [0, 128) (including 0 but not 128).
+
+As a result, I have defined several functions to implement my drawing model in terms of QPainter.
+
+## Document architecture
+
+The History class stores two copies of the current document, each located behind its own mutex. This operates analogously to double-buffered displays. Each can be designated as the front or back document. The "front document" is shown to the GUI and read by the audio thread, and never modified. The "back document" is not shown to the GUI or read by the audio thread, but mutated in response to user input.
+
+The interesting part is in `DocumentStore::history_apply_change()`. When the user edits the document, the program runs the edit function on the back document, swaps the roles of the documents (page flip), then runs the edit function on the new back document (which the audio thread may still be holding its mutex, so the GUI thread may block). This results in O(2*edit size) edit time instead of O(entire document) per edit. One risk of this design is that the two copies may desync; one way that may happen is if `command.redo()` is not deterministic.
+
+Each document is protected by a pseudo-rwlock (backed by a mutex) for two threads. The GUI does not acquire a lock when reading, but acquires a lock (exclusive reference) when writing. The audio thread acquires a lock when reading from the document; it cannot safely write, since the GUI can read simultaneously without locking the mutex.
+
+Since Document is mutable, it should almost never be copied (except when initializing the double-buffer), since a deep copy would be very slow. As a result, you need to explicitly call `Document.clone()` when you make a copy. By contrast, copying an immutable persistent data structure (my previous design) is merely a pointer copy and atomic refcount increase.
 
 ## Document format (unfinished, subject to change)
 
@@ -183,6 +216,8 @@ To import dependencies from Git repositories:
 ```sh
 git subrepo clone <remote-url> [<subdir>]
 ```
+
+This will clone the full repository. If you want partial repository clones (either excluding files, or only cloning subdirectories), I haven't figured out the best approach yet.
 
 *Older discussion about Git dependencies:*
 
