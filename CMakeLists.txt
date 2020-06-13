@@ -123,6 +123,7 @@ add_executable(exotracker-bin
         src/gui/history.cpp
         src/gui/command_common.cpp
         src/gui/main_window.cpp
+        src/gui/lib/format.cpp
         src/gui/pattern_editor/pattern_editor_panel.cpp
         src/main.cpp
         )
