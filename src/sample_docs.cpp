@@ -276,12 +276,12 @@ static Document render_test() {
 
     Instruments instruments;
 
-    for (int8_t i = 0; i <= 2; i++) {
+    for (size_t i = 0; i <= 2; i++) {
         instruments[i] = Instrument {
             .volume = {{15}},
             .pitch = {{}},
             .arpeggio = {{}},
-            .wave_index = {{i}},
+            .wave_index = {{int8_t(i)}},
         };
     }
 
