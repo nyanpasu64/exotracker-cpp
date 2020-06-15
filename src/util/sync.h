@@ -33,7 +33,7 @@ public:
     static std::optional<Guard> try_make(std::mutex & mutex, Ptr value) {
         Guard guard{mutex, value};
         if (guard._guard.try_lock()) {
-            return std::move(guard);
+            return guard;
         } else {
             return {};
         }

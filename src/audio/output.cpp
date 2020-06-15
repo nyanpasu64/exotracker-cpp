@@ -141,7 +141,7 @@ AudioThreadHandle AudioThreadHandle::make(
 AudioThreadHandle::~AudioThreadHandle() {
     try {
         rt.stopStream();
-    } catch (RtAudioError e) {
+    } catch (RtAudioError & e) {
         e.printMessage();
     }
 
