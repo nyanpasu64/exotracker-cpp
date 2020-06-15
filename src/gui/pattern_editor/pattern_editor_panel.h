@@ -20,13 +20,32 @@
 #include <QUndoStack>
 #include <QString>
 #include <QPoint>
-#include <memory>
-#include <vector>
-#include <functional>
 
+#include <functional>  // std::reference_wrapper
 
 namespace gui {
 namespace pattern_editor {
+
+struct PatternFontMetrics {
+    /// Width of a standard character (like 'M').
+    int width;
+
+    /// Distance above the baseline of tall characters.
+    /// May come from uppercase character, or font metadata.
+    int ascent;
+    int descent;
+};
+
+enum class ColumnCollapse {
+    Full,
+    HideEffects,
+    NotesOnly,
+};
+
+// This is undefined behavior. I don't care.
+#ifndef PatternEditorPanel_INTERNAL
+#define PatternEditorPanel_INTERNAL private
+#endif
 
 class PatternEditorPanel : public QWidget
 {
@@ -38,7 +57,7 @@ signals:
 
 public slots:
 
-public:
+PatternEditorPanel_INTERNAL:
     // Upon construction, history = dummy_history, until a document is created and assigned.
     history::History _dummy_history;
 
@@ -47,31 +66,29 @@ public:
     /// When switching documents, can be reassigned by MainWindow(?) running in main thread.
     std::reference_wrapper<history::History> _history;
 
+    // Editing state, set by user interactions.
+    ColumnCollapse column_collapse = ColumnCollapse::Full;
     doc::BeatFraction _row_duration_beats = {1, 4};
     bool _is_zoomed = false;
 
-    // Visual state.
-    std::unique_ptr<QPixmap> _pixmap;
+    // screen_pos = pos - viewport_pos.
+    // pos = viewport_pos + screen_pos.
+    QPoint _viewport_pos = {0, 0};
 
-    QFont _stepFont, _headerFont;
-    int _stepFontWidth, _stepFontHeight, _stepFontAscend, _stepFontLeading;
+    // Private state, set by changing settings.
+    QFont _header_font;
+    QFont _pattern_font;
 
-    // screenPos = pos - viewportPos.
-    // pos = viewportPos + screenPos.
-    QPoint _viewportPos;
+    // Cached private state. Be sure to update when changing fonts.
+    PatternFontMetrics _pattern_font_metrics;
+    int _dy_height_per_row;
 
-    int _dxWidth = 64;
-    int _dyHeightPerRow = 16;
-
-    int _widthSpace, _widthSpaceDbl;
-    int _stepNumWidth;
-    int _baseTrackWidth;
-    int _toneNameWidth, _instWidth;
-    int _volWidth;
-    int _effWidth, _effIDWidth, _effValWidth;
+    // Cached image.
+    QImage _image;
+    QImage _temp_image;
 
     // impl
-
+public:
     /// Called by main function.
     void set_history(history::History & history) {
         _history = history;
