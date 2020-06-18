@@ -960,8 +960,10 @@ static void draw_pattern_foreground(
 }
 
 
-static void draw_pattern(PatternEditorPanel & self, const QRect &repaint_rect) {
+static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
     doc::Document const & document = *self._history.get().gui_get_document();
+
+    // TODO maybe only draw repaint_rect? And use Qt::IntersectClip?
 
     self._image.fill(palette.overall_bg);
 
@@ -978,8 +980,8 @@ static void draw_pattern(PatternEditorPanel & self, const QRect &repaint_rect) {
 
             GridRect outer_rect = canvas_rect;
             outer_rect.set_bottom(header::HEIGHT);
-
             painter.setClipRect(outer_rect);
+
             draw_header(
                 self,
                 document,
@@ -992,14 +994,16 @@ static void draw_pattern(PatternEditorPanel & self, const QRect &repaint_rect) {
         {
             PainterScope scope{painter};
 
-            GridRect outer_rect = canvas_rect;
-            outer_rect.set_top(header::HEIGHT);
-            painter.setClipRect(outer_rect);
-
-            GridRect inner_rect{QPoint{0, 0}, outer_rect.size()};
+            // Pattern body, relative to entire widget.
+            GridRect absolute_rect = canvas_rect;
+            absolute_rect.set_top(header::HEIGHT);
+            painter.setClipRect(absolute_rect);
 
             // translate(offset) = the given offset is added to points.
-            painter.translate(QPoint{0, header::HEIGHT});
+            painter.translate(absolute_rect.left_top());
+
+            // Pattern body, relative to top-left corner.
+            GridRect inner_rect{QPoint{0, 0}, absolute_rect.size()};
 
             // First draw the row background. It lies in a regular grid.
 
@@ -1007,13 +1011,13 @@ static void draw_pattern(PatternEditorPanel & self, const QRect &repaint_rect) {
             // By setting the clip region, or skipping certain channels?
 
             // TODO When does Qt redraw a small rect? On non-compositing desktops?
+            // On non-compositing KDE, Qt doesn't redraw when dragging a window on top.
             draw_pattern_background(self, document, columns, painter, inner_rect);
 
             // Then for each channel, draw all notes in that channel lying within view.
             // Notes may be positioned at fractional beats that do not lie in the grid.
             draw_pattern_foreground(self, document, columns, painter, inner_rect);
         }
-
     }
 
     {
