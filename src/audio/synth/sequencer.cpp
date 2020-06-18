@@ -190,10 +190,14 @@ EventsRef ChannelSequencer::next_tick(
 
         TickT now_to_event = distance(now, next_ev_time);
         if (now_to_event < 0) {
+            auto time = next_ev.time;
             fmt::print(
-                "invalid document: event at seq {} time {} is in the past!\n",
+                stderr,
+                "invalid document: event at seq {} time {}/{} + {} is in the past!\n",
                 _next_event.seq_entry,
-                next_ev.time.anchor_beat
+                time.anchor_beat.numerator(),
+                time.anchor_beat.denominator(),
+                time.tick_offset
             );
         }
         if (now_to_event <= 0) {
@@ -238,6 +242,7 @@ EventsRef ChannelSequencer::next_tick(
         // we need to drop them.
         if (!_pattern_offset.advance_now()) {
             fmt::print(
+                stderr,
                 "invalid document: event at sequence entry {} extends past 2 patterns!\n",
                 _next_event.seq_entry
             );
