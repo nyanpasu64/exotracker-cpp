@@ -20,6 +20,10 @@ static TimeInPattern at(int start, int num, int den) {
     return TimeInPattern{start + BeatFraction(num, den), 0};
 }
 
+static TimeInPattern at_delay(int start, int num, int den, TickT tick_offset) {
+    return TimeInPattern{start + BeatFraction(num, den), tick_offset};
+}
+
 static Note pitch(int octave, int semitone) {
     return Note{static_cast<ChromaticInt>(12 * octave + semitone)};
 }
@@ -295,8 +299,8 @@ static Document render_test() {
         EventList ch1;
         for (int i = 0; i <= 10; i++) {
             // Play MIDI pitches 0, 12... 120.
-            ch1.push_back({at(i), {pitch(i, 0)}});
-            ch1.push_back({at(i, 1, 2), {i % 2 == 0 ? NOTE_CUT : NOTE_RELEASE}});
+            ch1.push_back({at_delay(i, 0, 2, 4 * (i - 5)), {pitch(i, 0)}});
+            ch1.push_back({at_delay(i, 1, 2, 4 * (i - 5)), {i % 2 == 0 ? NOTE_CUT : NOTE_RELEASE}});
         }
         ch1[0].v.instr = 2;
 
