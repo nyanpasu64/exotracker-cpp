@@ -149,8 +149,8 @@ struct PatternAppearance {
 
 static PatternAppearance cfg;
 
-void calc_font_metrics(PatternEditorPanel & self) {
-    QFontMetrics metrics{cfg.pattern_font};
+static PatternFontMetrics calc_single_font_metrics(QFont & font) {
+    QFontMetrics metrics{font};
 
     // height() == ascent() + descent().
     // lineSpacing() == height() + (leading() often is 0).
@@ -168,11 +168,15 @@ void calc_font_metrics(PatternEditorPanel & self) {
 #endif
 
     // Only width used so far. Instead of ascent/descent, we look at _pixels_per_row.
-    self._pattern_font_metrics = PatternFontMetrics{
+    return PatternFontMetrics{
         .width=width + font_tweaks::WIDTH_ADJUST,
         .ascent=metrics.ascent(),
         .descent=metrics.descent()
     };
+}
+
+static void calc_font_metrics(PatternEditorPanel & self) {
+    self._pattern_font_metrics = calc_single_font_metrics(cfg.pattern_font);
 
     self._pixels_per_row = std::max(
         font_tweaks::PIXELS_ABOVE_TEXT
