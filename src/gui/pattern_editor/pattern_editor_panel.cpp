@@ -81,6 +81,12 @@ void create_image(PatternEditorPanel & self) {
 
 namespace columns {
     constexpr int EXTRA_WIDTH_DIVISOR = 3;
+
+    // TODO switch to 3-digit ruler/space in decimal mode?
+    constexpr int RULER_DIGITS = 2;
+
+    // If I label fractional beats, this needs to increase to 3 or more.
+    constexpr int RULER_WIDTH_CHARS = 2;
 }
 
 // TODO make it a class for user configurability
@@ -273,7 +279,10 @@ struct Column {
     SubColumns subcolumns;  // all endpoints lie within [left_px, left_px + width]
 };
 
-using ColumnLayout = std::vector<Column>;
+struct ColumnLayout {
+    SubColumn ruler;
+    std::vector<Column> cols;
+};
 
 /// Compute where on-screen to draw each pattern column.
 static ColumnLayout gen_column_layout(
@@ -284,7 +293,6 @@ static ColumnLayout gen_column_layout(
     int const width_per_char = self._pattern_font_metrics.width;
     int const extra_width = width_per_char / columns::EXTRA_WIDTH_DIVISOR;
 
-    ColumnLayout column_layout;
     int x_px = 0;
 
     auto add_padding = [&x_px, extra_width] () {
@@ -310,6 +318,15 @@ static ColumnLayout gen_column_layout(
         }
         sub.right_px = x_px;
     };
+
+    // SubColumnType doesn't matter.
+    SubColumn ruler{subcolumn_types::Note{}};
+
+    begin_sub(ruler);
+    center_sub(ruler, columns::RULER_WIDTH_CHARS);
+    end_sub(ruler);
+
+    ColumnLayout column_layout{.ruler = ruler, .cols = {}};
 
     for (
         chip_common::ChipIndex chip_index = 0;
@@ -367,7 +384,7 @@ static ColumnLayout gen_column_layout(
             x_px += channel_divider_width;
             end_sub(subcolumns[subcolumns.size() - 1], false);
 
-            column_layout.push_back(Column{
+            column_layout.cols.push_back(Column{
                 .chip = chip_index,
                 .channel = channel_index,
                 .left_px = orig_left_px,
@@ -416,7 +433,7 @@ static void draw_header(
     }
 
     // Draw each channel's outline and text.
-    for (Column const & column : columns) {
+    for (Column const & column : columns.cols) {
         auto chip = column.chip;
         auto channel = column.channel;
 
@@ -655,7 +672,7 @@ static void draw_pattern_background(
     COMPUTE_DIVIDER_COLOR(effect, cfg.effect_bg, cfg.effect)
 
     auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
-        for (Column const & column : columns) {
+        for (Column const & column : columns.cols) {
             auto xleft = column.left_px;
             auto xright = column.right_px;
 
@@ -830,7 +847,7 @@ static void draw_pattern_foreground(
     };
 
     auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
-        for (Column const & column : columns) {
+        for (Column const & column : columns.cols) {
             auto xleft = column.left_px;
             auto xright = column.right_px;
 
