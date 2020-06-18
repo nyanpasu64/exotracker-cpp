@@ -73,6 +73,8 @@ signals:
 public slots:
 
 PatternEditorPanel_INTERNAL:
+    // # Non-user-facing state.
+
     // Upon construction, history = dummy_history, until a document is created and assigned.
     history::History _dummy_history;
 
@@ -80,17 +82,6 @@ PatternEditorPanel_INTERNAL:
     /// Is read by PatternEditorPanel running in main thread.
     /// When switching documents, can be reassigned by MainWindow(?) running in main thread.
     std::reference_wrapper<history::History> _history;
-
-    // Editing state, set by user interactions.
-    ColumnCollapse column_collapse = ColumnCollapse::Full;
-    doc::BeatFraction _beats_per_row = {1, 4};
-    bool _is_zoomed = false;
-
-    // TODO cursor_x
-    PatternAndBeat _cursor_y;
-
-    // Non-empty if free scrolling is enabled.
-    std::optional<PatternAndBeat> _free_scroll_position;
 
     // Private state, set by changing settings.
     QFont _header_font;
@@ -103,8 +94,20 @@ PatternEditorPanel_INTERNAL:
     int _pixels_per_row;
 
     // Cached image.
-    QImage _image;
+    QImage _image;  // TODO remove?
     QImage _temp_image;
+
+    // # Editing state, set by user interactions.
+
+    ColumnCollapse column_collapse = ColumnCollapse::Full;
+    doc::BeatFraction _beats_per_row = {1, 4};
+    bool _is_zoomed = false;
+
+    // TODO cursor_x
+    PatternAndBeat _cursor_y;
+
+    // Non-empty if free scrolling is enabled.
+    std::optional<PatternAndBeat> _free_scroll_position;
 
     // impl
 public:
