@@ -108,7 +108,7 @@ static constexpr QColor gray(int value) {
 
 // TODO Palette should use QColor, not QPen.
 // Line widths should be configured elsewhere, possibly based on DPI.
-struct PatternPalette {
+struct PatternAppearance {
     QColor overall_bg = gray(48);
 
     /// Vertical line to the right of each channel.
@@ -142,7 +142,7 @@ struct PatternPalette {
     qreal subcolumn_divider_blend = 0.15;
 };
 
-static PatternPalette palette;
+static PatternAppearance cfg;
 
 void calc_font_metrics(PatternEditorPanel & self) {
     QFontMetrics metrics{self._pattern_font};
@@ -378,7 +378,7 @@ static ColumnLayout gen_column_layout(
 
 
 // TODO bundle parameters into `ctx: Context`.
-// columns, palette, and document are identical between different drawing phases.
+// columns, cfg, and document are identical between different drawing phases.
 // inner_rect is not.
 
 static void draw_header(
@@ -641,11 +641,11 @@ static void draw_pattern_background(
     GridRect const inner_rect
 ) {
     #define COMPUTE_DIVIDER_COLOR(OUT, BG, FG) \
-        QColor OUT##_divider = lerp_colors(BG, FG, palette.subcolumn_divider_blend);
+        QColor OUT##_divider = lerp_colors(BG, FG, cfg.subcolumn_divider_blend);
 
-    COMPUTE_DIVIDER_COLOR(instrument, palette.instrument_bg, palette.instrument)
-    COMPUTE_DIVIDER_COLOR(volume, palette.volume_bg, palette.volume)
-    COMPUTE_DIVIDER_COLOR(effect, palette.effect_bg, palette.effect)
+    COMPUTE_DIVIDER_COLOR(instrument, cfg.instrument_bg, cfg.instrument)
+    COMPUTE_DIVIDER_COLOR(volume, cfg.volume_bg, cfg.volume)
+    COMPUTE_DIVIDER_COLOR(effect, cfg.effect_bg, cfg.effect)
 
     auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
         for (layout::Column const & column : columns) {
@@ -696,11 +696,11 @@ static void draw_pattern_background(
 
                     // Don't draw the note column's divider line,
                     // since it lies right next to the previous channel's channel divider.
-                    CASE_NO_FG(st::Note, palette.note_bg)
-                    CASE(st::Instrument, palette.instrument_bg, instrument_divider)
-                    CASE(st::Volume, palette.volume_bg, volume_divider)
-                    CASE(st::EffectName, palette.effect_bg, effect_divider)
-                    CASE_NO_FG(st::EffectValue, palette.effect_bg)
+                    CASE_NO_FG(st::Note, cfg.note_bg)
+                    CASE(st::Instrument, cfg.instrument_bg, instrument_divider)
+                    CASE(st::Volume, cfg.volume_bg, volume_divider)
+                    CASE(st::EffectName, cfg.effect_bg, effect_divider)
+                    CASE_NO_FG(st::EffectValue, cfg.effect_bg)
 
                     #undef CASE
                     #undef CASE_NO_FG
@@ -717,14 +717,14 @@ static void draw_pattern_background(
 
                 // Draw divider down right side.
                 // TODO draw globally, not per cell.
-                painter.setPen(palette.channel_divider);
+                painter.setPen(cfg.channel_divider);
                 draw_right_border(painter, right_top, right_bottom);
 
                 // Draw gridline along top of row.
                 if (curr_beats.denominator() == 1) {
-                    painter.setPen(palette.gridline_beat);
+                    painter.setPen(cfg.gridline_beat);
                 } else {
-                    painter.setPen(palette.gridline_non_beat);
+                    painter.setPen(cfg.gridline_non_beat);
                 }
                 draw_top_border(
                     painter, left_top, HORIZ_GRIDLINE(right_top, painter.pen().width())
@@ -855,13 +855,13 @@ static void draw_pattern_foreground(
 
                 if (beat.denominator() == 1) {
                     // Highlighted notes
-                    note_color = palette.note_line_beat;
+                    note_color = cfg.note_line_beat;
                 } else if (row.denominator() == 1) {
                     // Non-highlighted notes
-                    note_color = palette.note_line_non_beat;
+                    note_color = cfg.note_line_non_beat;
                 } else {
                     // Off-grid misaligned notes (not possible in traditional trackers)
-                    note_color = palette.note_line_fractional;
+                    note_color = cfg.note_line_fractional;
                 }
 
                 // Draw text.
@@ -913,7 +913,7 @@ static void draw_pattern_foreground(
                     }
                     CASE(st::Instrument) {
                         if (row_event.instr) {
-                            painter.setPen(palette.instrument);
+                            painter.setPen(cfg.instrument);
                             auto s = format_hex_2(uint8_t(*row_event.instr));
                             draw(s);
                         }
@@ -959,7 +959,7 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
 
     // TODO maybe only draw repaint_rect? And use Qt::IntersectClip?
 
-    self._image.fill(palette.overall_bg);
+    self._image.fill(cfg.overall_bg);
 
     {
         auto painter = QPainter(&self._image);
