@@ -249,33 +249,31 @@ namespace subcolumn_types {
 using subcolumn_types::SubColumnType;
 using SubColumnIndex = uint32_t;
 
-namespace layout {
-    /// One colum that the cursor can move into.
-    struct SubColumn {
-        SubColumnType type;
+/// One colum that the cursor can move into.
+struct SubColumn {
+    SubColumnType type;
 
-        // Determines the boundaries for click/selection handling.
-        int left_px = 0;
-        int right_px = 0;
+    // Determines the boundaries for click/selection handling.
+    int left_px = 0;
+    int right_px = 0;
 
-        // Center for text rendering.
-        qreal center_px = 0.0;
+    // Center for text rendering.
+    qreal center_px = 0.0;
 
-        SubColumn(SubColumnType type) : type{type} {}
-    };
+    SubColumn(SubColumnType type) : type{type} {}
+};
 
-    using SubColumns = std::vector<SubColumn>;
+using SubColumns = std::vector<SubColumn>;
 
-    struct Column {
-        chip_common::ChipIndex chip;
-        chip_common::ChannelIndex channel;
-        int left_px;
-        int right_px;
-        SubColumns subcolumns;  // all endpoints lie within [left_px, left_px + width]
-    };
-}
+struct Column {
+    chip_common::ChipIndex chip;
+    chip_common::ChannelIndex channel;
+    int left_px;
+    int right_px;
+    SubColumns subcolumns;  // all endpoints lie within [left_px, left_px + width]
+};
 
-using ColumnLayout = std::vector<layout::Column>;
+using ColumnLayout = std::vector<Column>;
 
 /// Compute where on-screen to draw each pattern column.
 static ColumnLayout gen_column_layout(
@@ -293,20 +291,20 @@ static ColumnLayout gen_column_layout(
         x_px += extra_width;
     };
 
-    auto begin_sub = [&x_px, add_padding] (layout::SubColumn & sub, bool pad = true) {
+    auto begin_sub = [&x_px, add_padding] (SubColumn & sub, bool pad = true) {
         sub.left_px = x_px;
         if (pad) {
             add_padding();
         }
     };
 
-    auto center_sub = [&x_px, width_per_char] (layout::SubColumn & sub, int nchar) {
+    auto center_sub = [&x_px, width_per_char] (SubColumn & sub, int nchar) {
         int dwidth = width_per_char * nchar;
         sub.center_px = x_px + dwidth / qreal(2.0);
         x_px += dwidth;
     };
 
-    auto end_sub = [&x_px, add_padding] (layout::SubColumn & sub, bool pad = true) {
+    auto end_sub = [&x_px, add_padding] (SubColumn & sub, bool pad = true) {
         if (pad) {
             add_padding();
         }
@@ -325,7 +323,7 @@ static ColumnLayout gen_column_layout(
         ) {
             int const orig_left_px = x_px;
 
-            layout::SubColumns subcolumns;
+            SubColumns subcolumns;
             // TODO change doc to list how many effect colums there are
 
             auto append_subcolumn = [&subcolumns, begin_sub, center_sub, end_sub] (
@@ -334,7 +332,7 @@ static ColumnLayout gen_column_layout(
                 bool pad_left = true,
                 bool pad_right = true
             ) {
-                layout::SubColumn sub{type};
+                SubColumn sub{type};
 
                 begin_sub(sub, pad_left);
                 center_sub(sub, nchar);
@@ -369,7 +367,7 @@ static ColumnLayout gen_column_layout(
             x_px += channel_divider_width;
             end_sub(subcolumns[subcolumns.size() - 1], false);
 
-            column_layout.push_back(layout::Column{
+            column_layout.push_back(Column{
                 .chip = chip_index,
                 .channel = channel_index,
                 .left_px = orig_left_px,
@@ -418,7 +416,7 @@ static void draw_header(
     }
 
     // Draw each channel's outline and text.
-    for (layout::Column const & column : columns) {
+    for (Column const & column : columns) {
         auto chip = column.chip;
         auto channel = column.channel;
 
@@ -657,7 +655,7 @@ static void draw_pattern_background(
     COMPUTE_DIVIDER_COLOR(effect, cfg.effect_bg, cfg.effect)
 
     auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
-        for (layout::Column const & column : columns) {
+        for (Column const & column : columns) {
             auto xleft = column.left_px;
             auto xright = column.right_px;
 
@@ -681,7 +679,7 @@ static void draw_pattern_background(
                 QPoint right_bottom{xright, ybottom};
 
                 // Draw background of cell.
-                for (layout::SubColumn const & sub : column.subcolumns) {
+                for (SubColumn const & sub : column.subcolumns) {
                     GridRect sub_rect{
                         QPoint{sub.left_px, ytop}, QPoint{sub.right_px, ybottom}
                     };
@@ -799,7 +797,7 @@ static void draw_pattern_foreground(
     constexpr qreal Y_OFFSET = 0.0;
 
     auto draw_note_cut = [&self, &painter, rect_height, rect_width] (
-        layout::SubColumn const & subcolumn, QColor color
+        SubColumn const & subcolumn, QColor color
     ) {
         qreal x1f = subcolumn.center_px - rect_width / 2;
         qreal x2f = x1f + rect_width;
@@ -814,7 +812,7 @@ static void draw_pattern_foreground(
     };
 
     auto draw_release = [&self, &painter, rect_height, rect_width] (
-        layout::SubColumn const & subcolumn, QColor color
+        SubColumn const & subcolumn, QColor color
     ) {
         qreal x1f = subcolumn.center_px - rect_width / 2;
         qreal x2f = x1f + rect_width;
@@ -832,7 +830,7 @@ static void draw_pattern_foreground(
     };
 
     auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
-        for (layout::Column const & column : columns) {
+        for (Column const & column : columns) {
             auto xleft = column.left_px;
             auto xright = column.right_px;
 
