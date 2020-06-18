@@ -432,7 +432,46 @@ static void draw_header(
         painter.fillRect(inner_rect, QBrush{grad});
     }
 
-    // Draw each channel's outline and text.
+    auto draw_header_border = [&self, &painter] (GridRect channel_rect) {
+        // Draw border.
+        painter.setPen(self.palette().shadow().color());
+        // In 0CC, each "gray gridline" belongs to the previous (left) channel.
+        // So each channel only draws its right border.
+        draw_top_border(painter, channel_rect);
+        draw_right_border(painter, channel_rect);
+        draw_bottom_border(painter, channel_rect);
+
+        // Draw highlight.
+        int pen_width = painter.pen().width();
+
+        GridRect inner_rect{channel_rect};
+        inner_rect.x2() -= pen_width;
+        inner_rect.y1() += pen_width;
+        inner_rect.y2() -= pen_width;
+
+        painter.setPen(Qt::white);
+        draw_top_border(painter, inner_rect);
+        draw_left_border(painter, inner_rect);
+    };
+
+    // Draw the ruler's header outline.
+    {
+        GridRect channel_rect{inner_rect};
+        channel_rect.set_left(columns.ruler.left_px);
+        channel_rect.set_right(columns.ruler.right_px);
+
+        // Unlike other channels, the ruler has no black border to its left.
+        // So draw it manually.
+        painter.setPen(self.palette().shadow().color());
+        draw_left_border(painter, channel_rect);
+
+        int pen_width = painter.pen().width();
+        channel_rect.x1() += pen_width;
+
+        draw_header_border(channel_rect);
+    }
+
+    // Draw each channel's header outline and text.
     for (Column const & column : columns.cols) {
         auto chip = column.chip;
         auto channel = column.channel;
@@ -459,25 +498,7 @@ static void draw_header(
             QString("%1, %2 asdfasdfasdf").arg(chip).arg(channel)
         );
 
-        // Draw border.
-        painter.setPen(self.palette().shadow().color());
-        // In 0CC, each "gray gridline" belongs to the previous (left) channel.
-        // So each channel only draws its right border.
-        draw_top_border(painter, channel_rect);
-        draw_right_border(painter, channel_rect);
-        draw_bottom_border(painter, channel_rect);
-
-        // Draw highlight.
-        int pen_width = painter.pen().width();
-
-        GridRect inner_rect{channel_rect};
-        inner_rect.x2() -= pen_width;
-        inner_rect.y1() += pen_width;
-        inner_rect.y2() -= pen_width;
-
-        painter.setPen(Qt::white);
-        draw_top_border(painter, inner_rect);
-        draw_left_border(painter, inner_rect);
+        draw_header_border(channel_rect);
     }
 }
 
