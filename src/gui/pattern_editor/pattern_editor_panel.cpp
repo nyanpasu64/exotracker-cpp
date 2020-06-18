@@ -38,9 +38,7 @@ W_OBJECT_IMPL(PatternEditorPanel)
 
 /*
 TODO:
-- Extract font calculation to calc_font_metrics(),
-  to be called whenever fonts change (set_font()?).
-- Also recompute font metrics when screen DPI changes.
+- Recompute font metrics when fonts change (set_font()?) or screen DPI changes.
 - QPainter::setPen(QColor) sets the pen width to 1 pixel.
   If we add custom pen width support (wider at large font metrics),
   this overload must be banned.
@@ -101,6 +99,40 @@ namespace header {
     constexpr int TEXT_Y = 20;
 }
 
+void calc_font_metrics(PatternEditorPanel & self) {
+    QFontMetrics metrics{self._pattern_font};
+
+    // height() == ascent() + descent().
+    // lineSpacing() == height() + (leading() often is 0).
+    // In FamiTracker, all pattern text is uppercase,
+    // so GridRect{metrics.boundingRect('Q')} is sufficient.
+    // Here, we use ascent()/descent() to support lowercase characters in theory.
+
+    // averageCharWidth() doesn't work well.
+    // In the case of Verdana, it's too narrow to even fit numbers.
+    constexpr auto width_char = QChar{'M'};
+#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
+    int width = metrics.horizontalAdvance(width_char);
+#else
+    int width = metrics.width(width_char);
+#endif
+
+    // Only width used so far. Instead of ascent/descent, we look at _pixels_per_row.
+    self._pattern_font_metrics = PatternFontMetrics{
+        .width=width + font_tweaks::WIDTH_ADJUST,
+        .ascent=metrics.ascent(),
+        .descent=metrics.descent()
+    };
+
+    self._pixels_per_row = std::max(
+        font_tweaks::PIXELS_ABOVE_TEXT
+            + self._pattern_font_metrics.ascent
+            + self._pattern_font_metrics.descent
+            + font_tweaks::PIXELS_BELOW_TEXT,
+        1
+    );
+}
+
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     QWidget(parent),
     _dummy_history{doc::DocumentCopy{}},
@@ -114,51 +146,14 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     _pattern_font = QFont("dejavu sans mono", 9);
     _pattern_font.setStyleHint(QFont::TypeWriter);
 
-    // Process pattern font metrics
-    {
-        QFontMetrics metrics{_pattern_font};
-        qDebug() << metrics.ascent();
-        qDebug() << metrics.descent();
-        qDebug() << metrics.height();
-
-        // height() == ascent() + descent().
-        // lineSpacing() == height() + (leading() often is 0).
-        // In FamiTracker, all pattern text is uppercase,
-        // so GridRect{metrics.boundingRect('Q')} is sufficient.
-        // Here, we use ascent()/descent() to support lowercase characters in theory.
-
-        // averageCharWidth() doesn't work well.
-        // In the case of Verdana, it's too narrow to even fit numbers.
-        constexpr auto width_char = QChar{'M'};
-#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
-        int width = metrics.horizontalAdvance(width_char);
-#else
-        int width = metrics.width(width_char);
-#endif
-
-        _pattern_font_metrics = PatternFontMetrics{
-            .width=width + font_tweaks::WIDTH_ADJUST,
-            .ascent=metrics.ascent(),
-            .descent=metrics.descent()
-        };
-
-        _pixels_per_row = std::max(
-            font_tweaks::PIXELS_ABOVE_TEXT
-                + _pattern_font_metrics.ascent
-                + _pattern_font_metrics.descent
-                + font_tweaks::PIXELS_BELOW_TEXT,
-            1
-        );
-    }
-
+    calc_font_metrics(*this);
     create_image(*this);
 
     // setAttribute(Qt::WA_Hover);  (generates paint events when mouse cursor enters/exits)
     // setContextMenuPolicy(Qt::CustomContextMenu);
 }
 
-void PatternEditorPanel::resizeEvent(QResizeEvent *event)
-{
+void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
 
     create_image(*this);
@@ -1028,8 +1023,7 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
 }
 
 
-void PatternEditorPanel::paintEvent(QPaintEvent *event)
-{
+void PatternEditorPanel::paintEvent(QPaintEvent *event) {
     draw_pattern(*this, event->rect());
 }
 

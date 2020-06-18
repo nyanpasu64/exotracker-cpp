@@ -16,6 +16,8 @@ void DrawText::draw_text(QPainter & painter, const qreal x, const qreal y, Qt::A
         left -= right;
     }
 
+    // Qt::AlignTop properly adds space above lowercase characters.
+    // But for tall Unicode characters, the baseline will end up too low.
     if (align & Qt::AlignTop) {
         // do nothing
     }
