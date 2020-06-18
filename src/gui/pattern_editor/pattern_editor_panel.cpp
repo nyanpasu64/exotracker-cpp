@@ -19,6 +19,7 @@
 
 #include <algorithm>  // std::max
 #include <optional>
+#include <tuple>
 #include <type_traits>  // is_same_v
 #include <variant>
 #include <vector>
@@ -529,8 +530,7 @@ enum class Direction {
     Reverse,
 };
 
-template<Direction direction>
-class SequenceIterator {
+struct SequenceIteratorState {
     PatternEditorPanel const & _widget;
     doc::Document const & _document;
 
@@ -542,25 +542,64 @@ class SequenceIterator {
     SeqEntryIndex _curr_seq_entry_index;
     PxInt _curr_pattern_pos;  // Represents top if Forward, bottom if Reverse.
 
-    // impl
-    SequenceIterator(
-        PatternEditorPanel const & widget,
-        doc::Document const & document,
-        PxInt screen_bottom,
-        SeqEntryIndex curr_seq_entry_index,
-        PxInt curr_pattern_pos
-    ) :
-        _widget{widget},
-        _document{document},
-        _screen_bottom{screen_bottom},
-        _curr_seq_entry_index{curr_seq_entry_index},
-        _curr_pattern_pos{curr_pattern_pos}
-    {}
-
-    static PxInt cursor_pos(PxInt screen_height) {
+    static PxInt centered_cursor_pos(PxInt screen_height) {
         return screen_height / 2;
     }
 
+public:
+    static std::tuple<SequenceIteratorState, PxInt> make(
+        PatternEditorPanel const & widget,  // holds reference
+        doc::Document const & document,  // holds reference
+        PxInt const screen_height
+    ) {
+        PxInt const cursor_from_pattern_top =
+            pixels_from_beat(widget, widget._cursor_y.curr_beat);
+
+        PatternAndBeat scroll_position;
+        PxInt pattern_top_from_screen_top;
+        PxInt cursor_from_screen_top;
+
+        if (widget._free_scroll_position.has_value()) {
+            // Free scrolling.
+            scroll_position = *widget._free_scroll_position;
+
+            PxInt const screen_top_from_pattern_top =
+                pixels_from_beat(widget, scroll_position.curr_beat);
+            pattern_top_from_screen_top = -screen_top_from_pattern_top;
+            cursor_from_screen_top =
+                cursor_from_pattern_top + pattern_top_from_screen_top;
+        } else {
+            // Cursor-locked scrolling.
+            scroll_position = widget._cursor_y;
+
+            cursor_from_screen_top = centered_cursor_pos(screen_height);
+            pattern_top_from_screen_top =
+                cursor_from_screen_top - cursor_from_pattern_top;
+        }
+
+        SequenceIteratorState out {
+            widget,
+            document,
+            screen_height,
+            scroll_position.seq_entry_index,
+            pattern_top_from_screen_top,
+        };
+        return {out, cursor_from_screen_top};
+    }
+};
+
+template<Direction direction>
+class SequenceIterator : private SequenceIteratorState {
+public:
+    explicit SequenceIterator(SequenceIteratorState state) :
+        SequenceIteratorState{state}
+    {
+        if constexpr (direction == Direction::Reverse) {
+            _curr_seq_entry_index--;
+        }
+    }
+
+private:
     bool valid_seq_entry() const {
         return _curr_seq_entry_index < _document.sequence.size();
     }
@@ -588,49 +627,6 @@ class SequenceIterator {
         } else {
             return _curr_pattern_pos + curr_pattern_height();
         }
-    }
-
-public:
-    static SequenceIterator make(
-        PatternEditorPanel const & widget,  // holds reference
-        doc::Document const & document,  // holds reference
-        PxInt const screen_height
-    ) {
-        PatternAndBeat scroll_position;
-        PxInt pattern_top_from_screen_top;
-
-        if (widget._free_scroll_position.has_value()) {
-            // Free scrolling.
-            scroll_position = *widget._free_scroll_position;
-
-            PxInt screen_top_from_pattern_top =
-                pixels_from_beat(widget, scroll_position.curr_beat);
-
-            pattern_top_from_screen_top = -screen_top_from_pattern_top;
-
-        } else {
-            // Cursor-locked scrolling.
-            scroll_position = widget._cursor_y;
-
-            PxInt cursor_from_pattern_top =
-                pixels_from_beat(widget, scroll_position.curr_beat);
-            PxInt cursor_from_screen_top = cursor_pos(screen_height);
-
-            pattern_top_from_screen_top =
-                cursor_from_screen_top - cursor_from_pattern_top;
-        }
-
-        SequenceIterator<direction> out {
-            widget,
-            document,
-            screen_height,
-            scroll_position.seq_entry_index,
-            pattern_top_from_screen_top,
-        };
-        if (direction == Direction::Reverse) {
-            out._curr_seq_entry_index--;
-        }
-        return out;
     }
 
 private:
@@ -787,10 +783,8 @@ static void draw_pattern_background(
         }
     };
 
-    auto draw_patterns = [&] <Direction direction> () {
-        auto it = SequenceIterator<direction>::make(
-            self, document, inner_rect.height()
-        );
+    auto draw_patterns = [&] <Direction direction> (SequenceIteratorState const & seq) {
+        auto it = SequenceIterator<direction>{seq};
         while (auto pos = it.next()) {
             PainterScope scope{painter};
             painter.translate(0, pos->top);
@@ -798,10 +792,13 @@ static void draw_pattern_background(
         }
     };
 
+    auto [seq, cursor_y] =
+        SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
+
     // this syntax has got to be a joke, right?
     // C++ needs the turbofish so badly
-    draw_patterns.template operator()<Direction::Forward>();
-    draw_patterns.template operator()<Direction::Reverse>();
+    draw_patterns.template operator()<Direction::Forward>(seq);
+    draw_patterns.template operator()<Direction::Reverse>(seq);
 
     // Draw divider down right side of each column.
     painter.setPen(cfg.channel_divider);
@@ -997,18 +994,20 @@ static void draw_pattern_foreground(
         }
     };
 
-    auto draw_patterns = [&] <Direction direction> () {
-        auto it = SequenceIterator<direction>::make(
-            self, document, inner_rect.height()
-        );
+    auto draw_patterns = [&] <Direction direction> (SequenceIteratorState const & seq) {
+        auto it = SequenceIterator<direction>{seq};
         while (auto pos = it.next()) {
             PainterScope scope{painter};
             painter.translate(0, pos->top);
             draw_seq_entry(document.sequence[pos->seq_entry_index]);
         }
     };
-    draw_patterns.template operator()<Direction::Forward>();
-    draw_patterns.template operator()<Direction::Reverse>();
+
+    auto [seq, cursor_y] =
+        SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
+
+    draw_patterns.template operator()<Direction::Forward>(seq);
+    draw_patterns.template operator()<Direction::Reverse>(seq);
 }
 
 
