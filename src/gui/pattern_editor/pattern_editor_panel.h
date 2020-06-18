@@ -21,6 +21,7 @@
 #include <QString>
 #include <QPoint>
 
+#include <cstdint>
 #include <functional>  // std::reference_wrapper
 
 namespace gui {
@@ -42,10 +43,24 @@ enum class ColumnCollapse {
     NotesOnly,
 };
 
+using doc::SeqEntryIndex;
+using RowIndex = uint32_t;
+
+struct PatternAndBeat {
+    SeqEntryIndex seq_entry_index = 0;
+//    RowIndex row_index = 0;
+    doc::BeatFraction curr_beat = 0;
+};
+
 // This is undefined behavior. I don't care.
 #ifndef PatternEditorPanel_INTERNAL
 #define PatternEditorPanel_INTERNAL private
 #endif
+
+// I'm starting to regret subclassing QWidget,
+// which intermixes my fields with QWidget fields.
+// I should've, idk, defined my own class,
+// and subclassed QWidget to contain an instance of my class?
 
 class PatternEditorPanel : public QWidget
 {
@@ -71,9 +86,11 @@ PatternEditorPanel_INTERNAL:
     doc::BeatFraction _beats_per_row = {1, 4};
     bool _is_zoomed = false;
 
-    // screen_pos = pos - viewport_pos.
-    // pos = viewport_pos + screen_pos.
-    QPoint _viewport_pos = {0, 0};
+    // TODO cursor_x
+    PatternAndBeat _cursor_y;
+
+    // Non-empty if free scrolling is enabled.
+    std::optional<PatternAndBeat> _free_scroll_position;
 
     // Private state, set by changing settings.
     QFont _header_font;

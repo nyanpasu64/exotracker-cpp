@@ -18,6 +18,7 @@
 #include <QRect>
 
 #include <algorithm>  // std::max
+#include <optional>
 #include <type_traits>  // is_same_v
 #include <variant>
 #include <vector>
@@ -46,6 +47,7 @@ TODO:
 - On high DPI, font metrics automatically scale,
   but dimensions measured in pixels (like header height) don't.
 - Should we remove _image and draw directly to the widget?
+- Follow audio thread's location (pattern/row), when audio thread is playing.
 */
 
 void create_image(PatternEditorPanel & self) {
@@ -462,6 +464,173 @@ struct PatternPalette {
 static PatternPalette palette;
 
 
+namespace {
+
+// yay inconsistency
+using PxInt = int;
+//using PxNat = uint32_t;
+
+/// Convert a pattern (technically sequence entry) duration to a display height.
+PxInt pixels_from_beat(PatternEditorPanel const & widget, doc::BeatFraction beat) {
+    PxInt out = doc::round_to_int(
+        beat / widget._beats_per_row * widget._pixels_per_row
+    );
+    return out;
+}
+
+struct SeqEntryPosition {
+    SeqEntryIndex seq_entry_index;
+    // top and bottom lie on gridlines like GridRect, not pixels like QRect.
+    PxInt top;
+    PxInt bottom;
+};
+
+enum class Direction {
+    Forward,
+    Reverse,
+};
+
+template<Direction direction>
+class SequenceIterator {
+    PatternEditorPanel const & _widget;
+    doc::Document const & _document;
+
+    // Screen pixels (non-negative, but mark as signed to avoid conversion errors)
+    static constexpr PxInt _screen_top = 0;
+    const PxInt _screen_bottom;
+
+    // Initialized from _scroll_position.
+    SeqEntryIndex _curr_seq_entry_index;
+    PxInt _curr_pattern_pos;  // Represents top if Forward, bottom if Reverse.
+
+    // impl
+    SequenceIterator(
+        PatternEditorPanel const & widget,
+        doc::Document const & document,
+        PxInt screen_bottom,
+        SeqEntryIndex curr_seq_entry_index,
+        PxInt curr_pattern_pos
+    ) :
+        _widget{widget},
+        _document{document},
+        _screen_bottom{screen_bottom},
+        _curr_seq_entry_index{curr_seq_entry_index},
+        _curr_pattern_pos{curr_pattern_pos}
+    {}
+
+    static PxInt cursor_pos(PxInt screen_height) {
+        return screen_height / 2;
+    }
+
+    bool valid_seq_entry() const {
+        return _curr_seq_entry_index < _document.sequence.size();
+    }
+
+    /// Precondition: valid_seq_entry() is true.
+    inline PxInt curr_pattern_height() const {
+        return pixels_from_beat(
+            _widget, _document.sequence[_curr_seq_entry_index].nbeats
+        );
+    }
+
+    /// Precondition: valid_seq_entry() is true.
+    inline PxInt curr_pattern_top() const {
+        if constexpr (direction == Direction::Forward) {
+            return _curr_pattern_pos;
+        } else {
+            return _curr_pattern_pos - curr_pattern_height();
+        }
+    }
+
+    /// Precondition: valid_seq_entry() is true.
+    inline PxInt curr_pattern_bottom() const {
+        if constexpr (direction == Direction::Reverse) {
+            return _curr_pattern_pos;
+        } else {
+            return _curr_pattern_pos + curr_pattern_height();
+        }
+    }
+
+public:
+    static SequenceIterator make(
+        PatternEditorPanel const & widget,  // holds reference
+        doc::Document const & document,  // holds reference
+        PxInt const screen_height
+    ) {
+        PatternAndBeat scroll_position;
+        PxInt pattern_top_from_screen_top;
+
+        if (widget._free_scroll_position.has_value()) {
+            // Free scrolling.
+            scroll_position = *widget._free_scroll_position;
+
+            PxInt screen_top_from_pattern_top =
+                pixels_from_beat(widget, scroll_position.curr_beat);
+
+            pattern_top_from_screen_top = -screen_top_from_pattern_top;
+
+        } else {
+            // Cursor-locked scrolling.
+            scroll_position = widget._cursor_y;
+
+            PxInt cursor_from_pattern_top =
+                pixels_from_beat(widget, scroll_position.curr_beat);
+            PxInt cursor_from_screen_top = cursor_pos(screen_height);
+
+            pattern_top_from_screen_top =
+                cursor_from_screen_top - cursor_from_pattern_top;
+        }
+
+        SequenceIterator<direction> out {
+            widget,
+            document,
+            screen_height,
+            scroll_position.seq_entry_index,
+            pattern_top_from_screen_top,
+        };
+        if (direction == Direction::Reverse) {
+            out._curr_seq_entry_index--;
+        }
+        return out;
+    }
+
+private:
+    inline SeqEntryPosition peek() const {
+        return SeqEntryPosition {
+            .seq_entry_index = _curr_seq_entry_index,
+            .top = curr_pattern_top(),
+            .bottom = curr_pattern_bottom(),
+        };
+    }
+
+public:
+    std::optional<SeqEntryPosition> next() {
+        if constexpr (direction == Direction::Forward) {
+            if (!valid_seq_entry() || _curr_pattern_pos >= _screen_bottom) {
+                return std::nullopt;
+            }
+
+            SeqEntryPosition out = peek();
+            _curr_pattern_pos += curr_pattern_height();
+            _curr_seq_entry_index++;
+            return out;
+
+        } else {
+            if (!valid_seq_entry() || _curr_pattern_pos <= _screen_top) {
+                return std::nullopt;
+            }
+
+            SeqEntryPosition out = peek();
+            _curr_pattern_pos -= curr_pattern_height();
+            _curr_seq_entry_index--;  // May overflow to UINT32_MAX. Not UB.
+            return out;
+        }
+    }
+};
+
+}
+
+
 /// Vertical channel dividers are drawn at fixed locations. Horizontal gridlines and events are not.
 /// So draw horizontal lines after of channel dividers.
 /// This macro prevents horizontal gridlines from covering up channel dividers.
@@ -477,10 +646,6 @@ static void draw_pattern_background(
     QPainter & painter,
     GridRect const inner_rect
 ) {
-    // TODO follow audio thread's active pattern...
-    // How does the audio thread track its active row?
-    doc::SequenceEntry const & pattern = document.sequence[0];
-
     #define COMPUTE_DIVIDER_COLOR(OUT, BG, FG) \
         QColor OUT##_divider = lerp_colors(BG, FG, palette.subcolumn_divider_blend);
 
@@ -488,87 +653,110 @@ static void draw_pattern_background(
     COMPUTE_DIVIDER_COLOR(volume, palette.volume_bg, palette.volume)
     COMPUTE_DIVIDER_COLOR(effect, palette.effect_bg, palette.effect)
 
-    for (layout::Column const & column : columns) {
-        auto xleft = column.left_px;
-        auto xright = column.right_px;
+    auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
+        for (layout::Column const & column : columns) {
+            auto xleft = column.left_px;
+            auto xright = column.right_px;
 
-        // Draw rows.
-        // Begin loop(row)
-        int row = 0;
-        doc::BeatFraction curr_beats = 0;
-        for (;
-            curr_beats < pattern.nbeats;
-            curr_beats += self._beats_per_row, row += 1)
-        {
-            // Compute row height.
-            int ytop = self._pixels_per_row * row;
-            int dy_height = self._pixels_per_row;
-            int ybottom = ytop + dy_height;
-            // End loop(row)
+            // Draw rows.
+            // Begin loop(row)
+            int row = 0;
+            doc::BeatFraction curr_beats = 0;
+            for (;
+                curr_beats < seq_entry.nbeats;
+                curr_beats += self._beats_per_row, row += 1)
+            {
+                // Compute row height.
+                int ytop = self._pixels_per_row * row;
+                int dy_height = self._pixels_per_row;
+                int ybottom = ytop + dy_height;
+                // End loop(row)
 
-            QPoint left_top{xleft, ytop};
-            // QPoint left_bottom{xleft, ybottom};
-            QPoint right_top{xright, ytop};
-            QPoint right_bottom{xright, ybottom};
+                QPoint left_top{xleft, ytop};
+                // QPoint left_bottom{xleft, ybottom};
+                QPoint right_top{xright, ytop};
+                QPoint right_bottom{xright, ybottom};
 
-            // Draw background of cell.
-            for (layout::SubColumn const & sub : column.subcolumns) {
-                GridRect sub_rect{
-                    QPoint{sub.left_px, ytop}, QPoint{sub.right_px, ybottom}
-                };
+                // Draw background of cell.
+                for (layout::SubColumn const & sub : column.subcolumns) {
+                    GridRect sub_rect{
+                        QPoint{sub.left_px, ytop}, QPoint{sub.right_px, ybottom}
+                    };
 
-                // Unrecognized columns are red to indicate an error.
-                // This shouldn't happen, but whatever.
-                QColor bg{255, 0, 0};
-                QColor fg{QColor::Invalid};
+                    // Unrecognized columns are red to indicate an error.
+                    // This shouldn't happen, but whatever.
+                    QColor bg{255, 0, 0};
+                    QColor fg{QColor::Invalid};
 
-                #define CASE(VARIANT, BG, FG) \
-                    if (std::holds_alternative<VARIANT>(sub.type)) { \
-                        bg = BG; \
-                        fg = FG; \
+                    #define CASE(VARIANT, BG, FG) \
+                        if (std::holds_alternative<VARIANT>(sub.type)) { \
+                            bg = BG; \
+                            fg = FG; \
+                        }
+                    #define CASE_NO_FG(VARIANT, BG) \
+                        if (std::holds_alternative<VARIANT>(sub.type)) { \
+                            bg = BG; \
+                        }
+
+                    namespace st = subcolumn_types;
+
+                    // Don't draw the note column's divider line,
+                    // since it lies right next to the previous channel's channel divider.
+                    CASE_NO_FG(st::Note, palette.note_bg)
+                    CASE(st::Instrument, palette.instrument_bg, instrument_divider)
+                    CASE(st::Volume, palette.volume_bg, volume_divider)
+                    CASE(st::EffectName, palette.effect_bg, effect_divider)
+                    CASE_NO_FG(st::EffectValue, palette.effect_bg)
+
+                    #undef CASE
+                    #undef CASE_NO_FG
+
+                    // Paint background color.
+                    painter.fillRect(sub_rect, bg);
+
+                    // Paint left border.
+                    if (fg.isValid()) {
+                        painter.setPen(fg);
+                        draw_left_border(painter, sub_rect);
                     }
-                #define CASE_NO_FG(VARIANT, BG) \
-                    if (std::holds_alternative<VARIANT>(sub.type)) { \
-                        bg = BG; \
-                    }
-
-                namespace st = subcolumn_types;
-
-                // Don't draw the note column's divider line,
-                // since it lies right next to the previous channel's channel divider.
-                CASE_NO_FG(st::Note, palette.note_bg)
-                CASE(st::Instrument, palette.instrument_bg, instrument_divider)
-                CASE(st::Volume, palette.volume_bg, volume_divider)
-                CASE(st::EffectName, palette.effect_bg, effect_divider)
-                CASE_NO_FG(st::EffectValue, palette.effect_bg)
-
-                #undef CASE
-                #undef CASE_NO_FG
-
-                // Paint background color.
-                painter.fillRect(sub_rect, bg);
-
-                // Paint left border.
-                if (fg.isValid()) {
-                    painter.setPen(fg);
-                    draw_left_border(painter, sub_rect);
                 }
-            }
 
-            // Draw divider down right side.
-            // TODO draw globally, not per cell.
-            painter.setPen(palette.channel_divider);
-            draw_right_border(painter, right_top, right_bottom);
+                // Draw divider down right side.
+                // TODO draw globally, not per cell.
+                painter.setPen(palette.channel_divider);
+                draw_right_border(painter, right_top, right_bottom);
 
-            // Draw gridline along top of row.
-            if (curr_beats.denominator() == 1) {
-                painter.setPen(palette.gridline_beat);
-            } else {
-                painter.setPen(palette.gridline_non_beat);
+                // Draw gridline along top of row.
+                if (curr_beats.denominator() == 1) {
+                    painter.setPen(palette.gridline_beat);
+                } else {
+                    painter.setPen(palette.gridline_non_beat);
+                }
+                draw_top_border(
+                    painter, left_top, HORIZ_GRIDLINE(right_top, painter.pen().width())
+                );
             }
-            draw_top_border(
-                painter, left_top, HORIZ_GRIDLINE(right_top, painter.pen().width())
-            );
+        }
+    };
+
+    {
+        auto it = SequenceIterator<Direction::Forward>::make(
+            self, document, inner_rect.height()
+        );
+        while (auto pos = it.next()) {
+            PainterScope scope{painter};
+            painter.translate(0, pos->top);
+            draw_seq_entry(document.sequence[pos->seq_entry_index]);
+        }
+    }
+    {
+        auto it = SequenceIterator<Direction::Reverse>::make(
+            self, document, inner_rect.height()
+        );
+        while (auto pos = it.next()) {
+            PainterScope scope{painter};
+            painter.translate(0, pos->top);
+            draw_seq_entry(document.sequence[pos->seq_entry_index]);
         }
     }
 }
@@ -640,109 +828,133 @@ static void draw_pattern_foreground(
         draw_top_border(painter, GridRect::from_corners(x1, ybot, x2, ybot));
     };
 
-    doc::SequenceEntry const & pattern = document.sequence[0];
+    auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
+        for (layout::Column const & column : columns) {
+            auto xleft = column.left_px;
+            auto xright = column.right_px;
 
-    for (layout::Column const & column : columns) {
-        auto xleft = column.left_px;
-        auto xright = column.right_px;
+            // https://bugs.llvm.org/show_bug.cgi?id=33236
+            // the original C++17 spec broke const struct unpacking.
+            for (
+                doc::TimedRowEvent timed_event
+                : seq_entry.chip_channel_events[column.chip][column.channel]
+            ) {
+                doc::TimeInPattern time = timed_event.time;
+                // TODO draw the event
+                doc::RowEvent row_event = timed_event.v;
 
-        // https://bugs.llvm.org/show_bug.cgi?id=33236
-        // the original C++17 spec broke const struct unpacking.
-        for (
-            doc::TimedRowEvent timed_event
-            : pattern.chip_channel_events[column.chip][column.channel]
-        ) {
-            doc::TimeInPattern time = timed_event.time;
-            // TODO draw the event
-            doc::RowEvent row_event = timed_event.v;
+                // Compute where to draw row.
+                Frac beat = time.anchor_beat;
+                Frac row = beat / self._beats_per_row;
+                int yPx = doc::round_to_int(self._pixels_per_row * row);
 
-            // Compute where to draw row.
-            Frac beat = time.anchor_beat;
-            Frac beats_per_row = self._beats_per_row;
-            Frac row = beat / beats_per_row;
-            int yPx = doc::round_to_int(self._pixels_per_row * row);
+                // Move painter relative to current row (not cell).
+                PainterScope scope{painter};
+                painter.translate(0, yPx);
 
-            // Move painter relative to current row (not cell).
-            PainterScope scope{painter};
-            painter.translate(0, yPx);
+                // Draw top line.
+                // TODO add coarse/fine highlight fractions
+                QPoint left_top{xleft, 0};
+                QPoint right_top{xright, 0};
 
-            // Draw top line.
-            // TODO add coarse/fine highlight fractions
-            QPoint left_top{xleft, 0};
-            QPoint right_top{xright, 0};
+                QColor note_color;
 
-            QColor note_color;
-            if (beat.denominator() == 1) {
-                note_color = palette.note_line_beat;
-            } else if (row.denominator() == 1) {
-                note_color = palette.note_line_non_beat;
-            } else {
-                note_color = palette.note_line_fractional;
-            }
+                if (beat.denominator() == 1) {
+                    // Highlighted notes
+                    note_color = palette.note_line_beat;
+                } else if (row.denominator() == 1) {
+                    // Non-highlighted notes
+                    note_color = palette.note_line_non_beat;
+                } else {
+                    // Off-grid misaligned notes (not possible in traditional trackers)
+                    note_color = palette.note_line_fractional;
+                }
 
-            // Draw text.
-            for (auto const & subcolumn : column.subcolumns) {
-                namespace st = subcolumn_types;
+                // Draw text.
+                for (auto const & subcolumn : column.subcolumns) {
+                    namespace st = subcolumn_types;
 
-                auto draw = [&](QString & text) {
-                    // Clear background using unmodified copy free of rendered text.
-                    // Unlike alpha transparency, this doesn't break ClearType
-                    // and may be faster as well.
-                    // Multiply by 1.5 or 2-ish if character tails are not being cleared.
-                    auto clear_height = self._pixels_per_row;
+                    auto draw = [&](QString & text) {
+                        // Clear background using unmodified copy free of rendered text.
+                        // Unlike alpha transparency, this doesn't break ClearType
+                        // and may be faster as well.
+                        // Multiply by 1.5 or 2-ish if character tails are not being cleared.
+                        auto clear_height = self._pixels_per_row;
 
-                    GridRect target_rect{
-                        QPoint{subcolumn.left_px, 0},
-                        QPoint{subcolumn.right_px, clear_height},
+                        GridRect target_rect{
+                            QPoint{subcolumn.left_px, 0},
+                            QPoint{subcolumn.right_px, clear_height},
+                        };
+                        auto sample_rect = painter.combinedTransform().mapRect(target_rect);
+                        painter.drawImage(target_rect, self._temp_image.copy(sample_rect));
+
+                        // Text is being drawn relative to top-left of current row (not cell).
+                        // subcolumn.center_px is relative to screen left (not cell).
+                        draw_text.draw_text(
+                            painter,
+                            subcolumn.center_px,
+                            font_tweaks::PIXELS_ABOVE_TEXT,
+                            Qt::AlignTop | Qt::AlignHCenter,
+                            text
+                        );
                     };
-                    auto sample_rect = painter.combinedTransform().mapRect(target_rect);
-                    painter.drawImage(target_rect, self._temp_image.copy(sample_rect));
 
-                    // Text is being drawn relative to top-left of current row (not cell).
-                    // subcolumn.center_px is relative to screen left (not cell).
-                    draw_text.draw_text(
-                        painter,
-                        subcolumn.center_px,
-                        font_tweaks::PIXELS_ABOVE_TEXT,
-                        Qt::AlignTop | Qt::AlignHCenter,
-                        text
-                    );
-                };
+                    #define CASE(VARIANT) \
+                        if (std::holds_alternative<VARIANT>(subcolumn.type))
 
-                #define CASE(VARIANT) \
-                    if (std::holds_alternative<VARIANT>(subcolumn.type))
+                    CASE(st::Note) {
+                        if (row_event.note) {
+                            auto note = *row_event.note;
 
-                CASE(st::Note) {
-                    if (row_event.note) {
-                        auto note = *row_event.note;
-
-                        if (note.is_cut()) {
-                            draw_note_cut(subcolumn, note_color);
-                        } else if (note.is_release()) {
-                            draw_release(subcolumn, note_color);
-                        } else {
-                            painter.setPen(note_color);
-                            QString s = gui_fmt::midi_to_note_name(note_cfg, note);
+                            if (note.is_cut()) {
+                                draw_note_cut(subcolumn, note_color);
+                            } else if (note.is_release()) {
+                                draw_release(subcolumn, note_color);
+                            } else {
+                                painter.setPen(note_color);
+                                QString s = gui_fmt::midi_to_note_name(note_cfg, note);
+                                draw(s);
+                            }
+                        }
+                    }
+                    CASE(st::Instrument) {
+                        if (row_event.instr) {
+                            painter.setPen(palette.instrument);
+                            auto s = format_hex_2(uint8_t(*row_event.instr));
                             draw(s);
                         }
                     }
-                }
-                CASE(st::Instrument) {
-                    if (row_event.instr) {
-                        painter.setPen(palette.instrument);
-                        auto s = format_hex_2(uint8_t(*row_event.instr));
-                        draw(s);
-                    }
+
+                    #undef CASE
                 }
 
-                #undef CASE
+                // Draw top border. Do it after each note clears the background.
+                painter.setPen(note_color);
+                draw_top_border(
+                    painter, left_top, HORIZ_GRIDLINE(right_top, painter.pen().width())
+                );
             }
+        }
+    };
 
-            // Draw top border. Do it after each note clears the background.
-            painter.setPen(note_color);
-            draw_top_border(
-                painter, left_top, HORIZ_GRIDLINE(right_top, painter.pen().width())
-            );
+    {
+        auto it = SequenceIterator<Direction::Forward>::make(
+            self, document, inner_rect.height()
+        );
+        while (auto pos = it.next()) {
+            PainterScope scope{painter};
+            painter.translate(0, pos->top);
+            draw_seq_entry(document.sequence[pos->seq_entry_index]);
+        }
+    }
+    {
+        auto it = SequenceIterator<Direction::Reverse>::make(
+            self, document, inner_rect.height()
+        );
+        while (auto pos = it.next()) {
+            PainterScope scope{painter};
+            painter.translate(0, pos->top);
+            draw_seq_entry(document.sequence[pos->seq_entry_index]);
         }
     }
 }
@@ -788,8 +1000,6 @@ static void draw_pattern(PatternEditorPanel & self, const QRect &repaint_rect) {
 
             // translate(offset) = the given offset is added to points.
             painter.translate(QPoint{0, header::HEIGHT});
-
-            painter.translate(-self._viewport_pos);
 
             // First draw the row background. It lies in a regular grid.
 
