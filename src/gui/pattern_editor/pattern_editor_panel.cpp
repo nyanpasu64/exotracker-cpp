@@ -692,31 +692,28 @@ static void draw_pattern_background(
     COMPUTE_DIVIDER_COLOR(volume, cfg.volume_bg, cfg.volume)
     COMPUTE_DIVIDER_COLOR(effect, cfg.effect_bg, cfg.effect)
 
+    int row_right_px = columns.ruler.right_px;
+    if (columns.cols.size()) {
+        row_right_px = columns.cols[columns.cols.size() - 1].right_px;
+    }
+
     auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
-        for (Column const & column : columns.cols) {
-            auto xleft = column.left_px;
-            auto xright = column.right_px;
+        // Draw rows.
+        // Begin loop(row)
+        int row = 0;
+        doc::BeatFraction curr_beats = 0;
+        for (;
+            curr_beats < seq_entry.nbeats;
+            curr_beats += self._beats_per_row, row += 1)
+        {
+            // Compute row height.
+            int ytop = self._pixels_per_row * row;
+            int dy_height = self._pixels_per_row;
+            int ybottom = ytop + dy_height;
+            // End loop(row)
 
-            // Draw rows.
-            // Begin loop(row)
-            int row = 0;
-            doc::BeatFraction curr_beats = 0;
-            for (;
-                curr_beats < seq_entry.nbeats;
-                curr_beats += self._beats_per_row, row += 1)
-            {
-                // Compute row height.
-                int ytop = self._pixels_per_row * row;
-                int dy_height = self._pixels_per_row;
-                int ybottom = ytop + dy_height;
-                // End loop(row)
-
-                QPoint left_top{xleft, ytop};
-                // QPoint left_bottom{xleft, ybottom};
-                QPoint right_top{xright, ytop};
-                QPoint right_bottom{xright, ybottom};
-
-                // Draw background of cell.
+            // Draw background of cell.
+            for (Column const & column : columns.cols) {
                 for (SubColumn const & sub : column.subcolumns) {
                     GridRect sub_rect{
                         QPoint{sub.left_px, ytop}, QPoint{sub.right_px, ybottom}
@@ -759,22 +756,15 @@ static void draw_pattern_background(
                         draw_left_border(painter, sub_rect);
                     }
                 }
-
-                // Draw divider down right side.
-                // TODO draw globally, not per cell.
-                painter.setPen(cfg.channel_divider);
-                draw_right_border(painter, right_top, right_bottom);
-
-                // Draw gridline along top of row.
-                if (curr_beats.denominator() == 1) {
-                    painter.setPen(cfg.gridline_beat);
-                } else {
-                    painter.setPen(cfg.gridline_non_beat);
-                }
-                draw_top_border(
-                    painter, left_top, HORIZ_GRIDLINE(right_top, painter.pen().width())
-                );
             }
+
+            // Draw gridline along top of row.
+            if (curr_beats.denominator() == 1) {
+                painter.setPen(cfg.gridline_beat);
+            } else {
+                painter.setPen(cfg.gridline_non_beat);
+            }
+            draw_top_border(painter, QPoint{0, ytop}, QPoint{row_right_px, ytop});
         }
     };
 
@@ -797,6 +787,20 @@ static void draw_pattern_background(
             painter.translate(0, pos->top);
             draw_seq_entry(document.sequence[pos->seq_entry_index]);
         }
+    }
+
+    auto draw_divider = [&painter, &inner_rect] (auto column) {
+        auto xright = column.right_px;
+
+        QPoint right_top{xright, inner_rect.top()};
+        QPoint right_bottom{xright, inner_rect.bottom()};
+
+        draw_right_border(painter, right_top, right_bottom);
+    };
+
+    draw_divider(columns.ruler);
+    for (Column const & column : columns.cols) {
+        draw_divider(column);
     }
 }
 
