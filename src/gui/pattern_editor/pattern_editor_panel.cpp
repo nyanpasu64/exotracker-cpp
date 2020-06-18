@@ -140,11 +140,13 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
             .descent=metrics.descent()
         };
 
-        _dy_height_per_row =
+        _pixels_per_row = std::max(
             font_tweaks::PIXELS_ABOVE_TEXT
-            + _pattern_font_metrics.ascent
-            + _pattern_font_metrics.descent
-            + font_tweaks::PIXELS_BELOW_TEXT;
+                + _pattern_font_metrics.ascent
+                + _pattern_font_metrics.descent
+                + font_tweaks::PIXELS_BELOW_TEXT,
+            1
+        );
     }
 
     create_image(*this);
@@ -496,11 +498,11 @@ static void draw_pattern_background(
         doc::BeatFraction curr_beats = 0;
         for (;
             curr_beats < pattern.nbeats;
-            curr_beats += self._row_duration_beats, row += 1)
+            curr_beats += self._beats_per_row, row += 1)
         {
             // Compute row height.
-            int ytop = self._dy_height_per_row * row;
-            int dy_height = self._dy_height_per_row;
+            int ytop = self._pixels_per_row * row;
+            int dy_height = self._pixels_per_row;
             int ybottom = ytop + dy_height;
             // End loop(row)
 
@@ -599,7 +601,7 @@ static void draw_pattern_foreground(
     DrawText draw_text{painter.font()};
 
     // Dimensions of the note cut/release rectangles.
-    int const rect_height = std::max(qRound(self._dy_height_per_row / 8.0), 2);
+    int const rect_height = std::max(qRound(self._pixels_per_row / 8.0), 2);
     qreal const rect_width = 2.25 * self._pattern_font_metrics.width;
 
     // Shift the rectangles vertically a bit, when rounding off sizes.
@@ -616,7 +618,7 @@ static void draw_pattern_foreground(
         // Round to integer, so note release has integer gap between lines.
         painter.setPen(QPen{color, qreal(rect_height)});
 
-        qreal y = self._dy_height_per_row * qreal(0.5) + Y_OFFSET;
+        qreal y = self._pixels_per_row * qreal(0.5) + Y_OFFSET;
         painter.drawLine(QPointF{x1f, y}, QPointF{x2f, y});
     };
 
@@ -631,7 +633,7 @@ static void draw_pattern_foreground(
         // Round to integer, so note release has integer gap between lines.
         painter.setPen(QPen{color, qreal(rect_height)});
 
-        int ytop = qRound(0.5 * self._dy_height_per_row - 0.5 * rect_height + Y_OFFSET);
+        int ytop = qRound(0.5 * self._pixels_per_row - 0.5 * rect_height + Y_OFFSET);
         int ybot = ytop + rect_height;
 
         draw_bottom_border(painter, GridRect::from_corners(x1, ytop, x2, ytop));
@@ -656,9 +658,9 @@ static void draw_pattern_foreground(
 
             // Compute where to draw row.
             Frac beat = time.anchor_beat;
-            Frac beats_per_row = self._row_duration_beats;
+            Frac beats_per_row = self._beats_per_row;
             Frac row = beat / beats_per_row;
-            int yPx = doc::round_to_int(self._dy_height_per_row * row);
+            int yPx = doc::round_to_int(self._pixels_per_row * row);
 
             // Move painter relative to current row (not cell).
             PainterScope scope{painter};
@@ -687,7 +689,7 @@ static void draw_pattern_foreground(
                     // Unlike alpha transparency, this doesn't break ClearType
                     // and may be faster as well.
                     // Multiply by 1.5 or 2-ish if character tails are not being cleared.
-                    auto clear_height = self._dy_height_per_row;
+                    auto clear_height = self._pixels_per_row;
 
                     GridRect target_rect{
                         QPoint{subcolumn.left_px, 0},

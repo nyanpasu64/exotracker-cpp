@@ -68,7 +68,7 @@ PatternEditorPanel_INTERNAL:
 
     // Editing state, set by user interactions.
     ColumnCollapse column_collapse = ColumnCollapse::Full;
-    doc::BeatFraction _row_duration_beats = {1, 4};
+    doc::BeatFraction _beats_per_row = {1, 4};
     bool _is_zoomed = false;
 
     // screen_pos = pos - viewport_pos.
@@ -81,7 +81,9 @@ PatternEditorPanel_INTERNAL:
 
     // Cached private state. Be sure to update when changing fonts.
     PatternFontMetrics _pattern_font_metrics;
-    int _dy_height_per_row;
+
+    // TODO mark as uint32_t if possible cleanly
+    int _pixels_per_row;
 
     // Cached image.
     QImage _image;
