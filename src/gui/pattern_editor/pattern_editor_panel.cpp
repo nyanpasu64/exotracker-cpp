@@ -125,6 +125,9 @@ struct PatternAppearance {
     QColor gridline_beat = gray(128);
     QColor gridline_non_beat = gray(80);
 
+    /// Cursor color.
+    QColor cursor_row{0, 224, 255};
+
     /// Foreground line color, also used as note text color.
     QColor note_line_beat{255, 255, 96};
     QColor note_line_non_beat{0, 255, 0};
@@ -1008,6 +1011,18 @@ static void draw_pattern_foreground(
 
     draw_patterns.template operator()<Direction::Forward>(seq);
     draw_patterns.template operator()<Direction::Reverse>(seq);
+
+    // Draw cursor.
+    // The cursor is drawn on top of channel dividers and note lines/text.
+    if (columns.cols.size()) {
+        int row_left_px = columns.cols[0].left_px;
+        int row_right_px = columns.cols[columns.cols.size() - 1].right_px;
+
+        painter.setPen(cfg.cursor_row);
+        draw_top_border(
+            painter, QPoint{row_left_px, cursor_y}, QPoint{row_right_px, cursor_y}
+        );
+    }
 }
 
 
