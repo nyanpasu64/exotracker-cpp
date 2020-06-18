@@ -83,10 +83,6 @@ PatternEditorPanel_INTERNAL:
     /// When switching documents, can be reassigned by MainWindow(?) running in main thread.
     std::reference_wrapper<history::History> _history;
 
-    // Private state, set by changing settings.
-    QFont _header_font;
-    QFont _pattern_font;
-
     // Cached private state. Be sure to update when changing fonts.
     PatternFontMetrics _pattern_font_metrics;
 

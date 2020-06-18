@@ -140,12 +140,17 @@ struct PatternAppearance {
     /// At 0, dividers are the same color as the background.
     /// At 1, dividers are the same color as foreground text.
     qreal subcolumn_divider_blend = 0.15;
+
+    /// Fonts to use.
+    /// Initialized in PatternEditorPanel() constructor.
+    QFont header_font;
+    QFont pattern_font;
 };
 
 static PatternAppearance cfg;
 
 void calc_font_metrics(PatternEditorPanel & self) {
-    QFontMetrics metrics{self._pattern_font};
+    QFontMetrics metrics{cfg.pattern_font};
 
     // height() == ascent() + descent().
     // lineSpacing() == height() + (leading() often is 0).
@@ -186,10 +191,10 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     setMinimumSize(128, 320);
 
     /* Font */
-    _header_font = QApplication::font();
+    cfg.header_font = QApplication::font();
 
-    _pattern_font = QFont("dejavu sans mono", 9);
-    _pattern_font.setStyleHint(QFont::TypeWriter);
+    cfg.pattern_font = QFont("dejavu sans mono", 9);
+    cfg.pattern_font.setStyleHint(QFont::TypeWriter);
 
     calc_font_metrics(*this);
     create_image(*this);
@@ -388,7 +393,7 @@ static void draw_header(
     QPainter & painter,
     GridRect const inner_rect
 ) {
-    painter.setFont(self._header_font);
+    painter.setFont(cfg.header_font);
 
     // Draw the header background.
     {
@@ -779,7 +784,7 @@ static void draw_pattern_foreground(
         temp_painter.drawImage(0, 0, self._image);
     }
 
-    painter.setFont(self._pattern_font);
+    painter.setFont(cfg.pattern_font);
     DrawText draw_text{painter.font()};
 
     // Dimensions of the note cut/release rectangles.
