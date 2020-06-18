@@ -90,15 +90,6 @@ namespace columns {
     constexpr int RULER_WIDTH_CHARS = 2;
 }
 
-// TODO make it a class for user configurability
-namespace font_tweaks {
-    constexpr int WIDTH_ADJUST = 0;
-
-    // To move text down, increase PIXELS_ABOVE_TEXT and decrease PIXELS_BELOW_TEXT.
-    constexpr int PIXELS_ABOVE_TEXT = 1;
-    constexpr int PIXELS_BELOW_TEXT = -1;
-}
-
 namespace header {
     constexpr int HEIGHT = 40;
 
@@ -112,6 +103,14 @@ constexpr qreal BG_COLORIZE = 0.05;
 static constexpr QColor gray(int value) {
     return QColor{value, value, value};
 }
+
+struct FontTweaks {
+    int width_adjust = 0;
+
+    // To move text down, increase pixels_above_text and decrease pixels_below_text.
+    int pixels_above_text = 1;
+    int pixels_below_text = -1;
+};
 
 // TODO Palette should use QColor, not QPen.
 // Line widths should be configured elsewhere, possibly based on DPI.
@@ -155,6 +154,8 @@ struct PatternAppearance {
     /// Initialized in PatternEditorPanel() constructor.
     QFont header_font;
     QFont pattern_font;
+
+    FontTweaks font_tweaks;
 };
 
 static PatternAppearance cfg;
@@ -179,7 +180,7 @@ static PatternFontMetrics calc_single_font_metrics(QFont & font) {
 
     // Only width used so far. Instead of ascent/descent, we look at _pixels_per_row.
     return PatternFontMetrics{
-        .width=width + font_tweaks::WIDTH_ADJUST,
+        .width=width + cfg.font_tweaks.width_adjust,
         .ascent=metrics.ascent(),
         .descent=metrics.descent()
     };
@@ -189,10 +190,10 @@ static void calc_font_metrics(PatternEditorPanel & self) {
     self._pattern_font_metrics = calc_single_font_metrics(cfg.pattern_font);
 
     self._pixels_per_row = std::max(
-        font_tweaks::PIXELS_ABOVE_TEXT
+        cfg.font_tweaks.pixels_above_text
             + self._pattern_font_metrics.ascent
             + self._pattern_font_metrics.descent
-            + font_tweaks::PIXELS_BELOW_TEXT,
+            + cfg.font_tweaks.pixels_below_text,
         1
     );
 }
@@ -723,7 +724,7 @@ static void draw_pattern_background(
                 draw_text.draw_text(
                     painter,
                     columns.ruler.center_px,
-                    ytop + font_tweaks::PIXELS_ABOVE_TEXT,
+                    ytop + cfg.font_tweaks.pixels_above_text,
                     Qt::AlignTop | Qt::AlignHCenter,
                     s
                 );
@@ -953,7 +954,7 @@ static void draw_pattern_foreground(
                         draw_text.draw_text(
                             painter,
                             subcolumn.center_px,
-                            font_tweaks::PIXELS_ABOVE_TEXT,
+                            cfg.font_tweaks.pixels_above_text,
                             Qt::AlignTop | Qt::AlignHCenter,
                             text
                         );
