@@ -84,7 +84,7 @@ PatternEditorPanel_INTERNAL:
 
     // # Editing state, set by user interactions.
 
-    ColumnCollapse column_collapse = ColumnCollapse::Full;
+    ColumnCollapse _column_collapse = ColumnCollapse::Full;
     doc::BeatFraction _beats_per_row = {1, 4};
     bool _is_zoomed = false;
 
