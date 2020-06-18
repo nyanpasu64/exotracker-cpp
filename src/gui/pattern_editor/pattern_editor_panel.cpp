@@ -712,6 +712,25 @@ static void draw_pattern_background(
             int ybottom = ytop + dy_height;
             // End loop(row)
 
+            // Draw ruler labels (numbers).
+            if (curr_beats.denominator() == 1) {
+                // Draw current beat.
+                QString s = format_hex_2((uint8_t) curr_beats.numerator());
+
+                painter.setFont(cfg.pattern_font);
+                painter.setPen(cfg.note_line_beat);
+
+                DrawText draw_text{cfg.pattern_font};
+                draw_text.draw_text(
+                    painter,
+                    columns.ruler.center_px,
+                    ytop + font_tweaks::PIXELS_ABOVE_TEXT,
+                    Qt::AlignTop | Qt::AlignHCenter,
+                    s
+                );
+            }
+            // Don't label non-beat rows for the time being.
+
             // Draw background of cell.
             for (Column const & column : columns.cols) {
                 for (SubColumn const & sub : column.subcolumns) {
