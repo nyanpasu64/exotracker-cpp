@@ -787,8 +787,8 @@ static void draw_pattern_background(
         }
     };
 
-    {
-        auto it = SequenceIterator<Direction::Forward>::make(
+    auto draw_patterns = [&] <Direction direction> () {
+        auto it = SequenceIterator<direction>::make(
             self, document, inner_rect.height()
         );
         while (auto pos = it.next()) {
@@ -796,17 +796,15 @@ static void draw_pattern_background(
             painter.translate(0, pos->top);
             draw_seq_entry(document.sequence[pos->seq_entry_index]);
         }
-    }
-    {
-        auto it = SequenceIterator<Direction::Reverse>::make(
-            self, document, inner_rect.height()
-        );
-        while (auto pos = it.next()) {
-            PainterScope scope{painter};
-            painter.translate(0, pos->top);
-            draw_seq_entry(document.sequence[pos->seq_entry_index]);
-        }
-    }
+    };
+
+    // this syntax has got to be a joke, right?
+    // C++ needs the turbofish so badly
+    draw_patterns.template operator()<Direction::Forward>();
+    draw_patterns.template operator()<Direction::Reverse>();
+
+    // Draw divider down right side of each column.
+    painter.setPen(cfg.channel_divider);
 
     auto draw_divider = [&painter, &inner_rect] (auto column) {
         auto xright = column.right_px;
@@ -999,8 +997,8 @@ static void draw_pattern_foreground(
         }
     };
 
-    {
-        auto it = SequenceIterator<Direction::Forward>::make(
+    auto draw_patterns = [&] <Direction direction> () {
+        auto it = SequenceIterator<direction>::make(
             self, document, inner_rect.height()
         );
         while (auto pos = it.next()) {
@@ -1008,17 +1006,9 @@ static void draw_pattern_foreground(
             painter.translate(0, pos->top);
             draw_seq_entry(document.sequence[pos->seq_entry_index]);
         }
-    }
-    {
-        auto it = SequenceIterator<Direction::Reverse>::make(
-            self, document, inner_rect.height()
-        );
-        while (auto pos = it.next()) {
-            PainterScope scope{painter};
-            painter.translate(0, pos->top);
-            draw_seq_entry(document.sequence[pos->seq_entry_index]);
-        }
-    }
+    };
+    draw_patterns.template operator()<Direction::Forward>();
+    draw_patterns.template operator()<Direction::Reverse>();
 }
 
 
