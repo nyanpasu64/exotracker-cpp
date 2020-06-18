@@ -51,37 +51,6 @@ TODO:
 - Follow audio thread's location (pattern/row), when audio thread is playing.
 */
 
-void create_image(PatternEditorPanel & self) {
-    /*
-    https://www.qt.io/blog/2009/12/16/qt-graphics-and-performance-an-overview
-
-    QImage is designed and optimized for I/O,
-    and for direct pixel access and manipulation,
-    while QPixmap is designed and optimized for showing images on screen.
-
-    I've measured ARGB32_Premultiplied onto RGB32 to be about 2-4x faster
-    than drawing an ARGB32 non-premultiplied depending on the usecase.
-
-    By default a QPixmap is treated as opaque.
-    When doing QPixmap::fill(Qt::transparent),
-    it will be made into a pixmap with alpha channel which is slower to draw.
-
-    Before moving onto something else, I'll just give a small warning
-    on the functions setAlphaChannel and setMask
-    and the innocently looking alphaChannel() and mask().
-    These functions are part of the Qt 3 legacy
-    that we didn't quite manage to clean up when moving to Qt 4.
-    In the past the alpha channel of a pixmap, or its mask,
-    was stored separately from the pixmap data.
-    */
-
-    QPixmap pixmap{QSize{1, 1}};
-    // On Windows, it's QImage::Format_RGB32.
-    auto format = pixmap.toImage().format();
-    self._image = QImage(self.geometry().size(), format);
-    self._temp_image = QImage(self.geometry().size(), format);
-}
-
 namespace columns {
     constexpr int EXTRA_WIDTH_DIVISOR = 3;
 
@@ -198,6 +167,37 @@ static void calc_font_metrics(PatternEditorPanel & self) {
             + cfg.font_tweaks.pixels_below_text,
         1
     );
+}
+
+void create_image(PatternEditorPanel & self) {
+    /*
+    https://www.qt.io/blog/2009/12/16/qt-graphics-and-performance-an-overview
+
+    QImage is designed and optimized for I/O,
+    and for direct pixel access and manipulation,
+    while QPixmap is designed and optimized for showing images on screen.
+
+    I've measured ARGB32_Premultiplied onto RGB32 to be about 2-4x faster
+    than drawing an ARGB32 non-premultiplied depending on the usecase.
+
+    By default a QPixmap is treated as opaque.
+    When doing QPixmap::fill(Qt::transparent),
+    it will be made into a pixmap with alpha channel which is slower to draw.
+
+    Before moving onto something else, I'll just give a small warning
+    on the functions setAlphaChannel and setMask
+    and the innocently looking alphaChannel() and mask().
+    These functions are part of the Qt 3 legacy
+    that we didn't quite manage to clean up when moving to Qt 4.
+    In the past the alpha channel of a pixmap, or its mask,
+    was stored separately from the pixmap data.
+    */
+
+    QPixmap pixmap{QSize{1, 1}};
+    // On Windows, it's QImage::Format_RGB32.
+    auto format = pixmap.toImage().format();
+    self._image = QImage(self.geometry().size(), format);
+    self._temp_image = QImage(self.geometry().size(), format);
 }
 
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
