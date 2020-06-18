@@ -13,8 +13,7 @@
 #include <cstdint>
 #include <functional>  // std::reference_wrapper
 
-namespace gui {
-namespace pattern_editor {
+namespace gui::pattern_editor {
 
 struct PatternFontMetrics {
     /// Width of a standard character (like 'M').
@@ -114,6 +113,5 @@ protected:
 
 #endif // PATTERNEDITORPANEL_H
 
-// namespaces
-}
+// namespace
 }

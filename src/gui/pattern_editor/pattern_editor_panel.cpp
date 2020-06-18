@@ -26,8 +26,7 @@
 #include <variant>
 #include <vector>
 
-namespace gui {
-namespace pattern_editor {
+namespace gui::pattern_editor {
 
 using gui::lib::color::lerp;
 using gui::lib::color::lerp_colors;
@@ -1101,6 +1100,5 @@ void PatternEditorPanel::paintEvent(QPaintEvent *event) {
     draw_pattern(*this, event->rect());
 }
 
-// namespaces
-}
+// namespace
 }
