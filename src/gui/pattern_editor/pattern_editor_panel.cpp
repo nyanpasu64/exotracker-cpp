@@ -99,6 +99,51 @@ namespace header {
     constexpr int TEXT_Y = 20;
 }
 
+constexpr QColor BLACK{0, 0, 0};
+constexpr qreal BG_COLORIZE = 0.05;
+
+static constexpr QColor gray(int value) {
+    return QColor{value, value, value};
+}
+
+// TODO Palette should use QColor, not QPen.
+// Line widths should be configured elsewhere, possibly based on DPI.
+struct PatternPalette {
+    QColor overall_bg = gray(48);
+
+    /// Vertical line to the right of each channel.
+    QColor channel_divider = gray(160);
+
+    /// Background gridline color.
+    QColor gridline_beat = gray(128);
+    QColor gridline_non_beat = gray(80);
+
+    /// Foreground line color, also used as note text color.
+    QColor note_line_beat{255, 255, 96};
+    QColor note_line_non_beat{0, 255, 0};
+    QColor note_line_fractional{0, 224, 255};
+    QColor note_bg = lerp_colors(BLACK, note_line_beat, BG_COLORIZE);
+
+    /// Instrument text color.
+    QColor instrument{128, 255, 128};
+    QColor instrument_bg = lerp_colors(BLACK, instrument, BG_COLORIZE);
+
+    // Volume text color.
+    QColor volume{0, 255, 255};
+    QColor volume_bg = lerp_colors(BLACK, volume, BG_COLORIZE);
+
+    // Effect name color.
+    QColor effect{255, 128, 128};
+    QColor effect_bg = lerp_colors(BLACK, effect, BG_COLORIZE);
+
+    /// How bright to make subcolumn dividers.
+    /// At 0, dividers are the same color as the background.
+    /// At 1, dividers are the same color as foreground text.
+    qreal subcolumn_divider_blend = 0.15;
+};
+
+static PatternPalette palette;
+
 void calc_font_metrics(PatternEditorPanel & self) {
     QFontMetrics metrics{self._pattern_font};
 
@@ -411,52 +456,6 @@ static void draw_header(
         draw_left_border(painter, inner_rect);
     }
 }
-
-
-constexpr QColor BLACK{0, 0, 0};
-constexpr qreal BG_COLORIZE = 0.05;
-
-static constexpr QColor gray(int value) {
-    return QColor{value, value, value};
-}
-
-// TODO Palette should use QColor, not QPen.
-// Line widths should be configured elsewhere, possibly based on DPI.
-struct PatternPalette {
-    QColor overall_bg = gray(48);
-
-    /// Vertical line to the right of each channel.
-    QColor channel_divider = gray(160);
-
-    /// Background gridline color.
-    QColor gridline_beat = gray(128);
-    QColor gridline_non_beat = gray(80);
-
-    /// Foreground line color, also used as note text color.
-    QColor note_line_beat{255, 255, 96};
-    QColor note_line_non_beat{0, 255, 0};
-    QColor note_line_fractional{0, 224, 255};
-    QColor note_bg = lerp_colors(BLACK, note_line_beat, BG_COLORIZE);
-
-    /// Instrument text color.
-    QColor instrument{128, 255, 128};
-    QColor instrument_bg = lerp_colors(BLACK, instrument, BG_COLORIZE);
-
-    // Volume text color.
-    QColor volume{0, 255, 255};
-    QColor volume_bg = lerp_colors(BLACK, volume, BG_COLORIZE);
-
-    // Effect name color.
-    QColor effect{255, 128, 128};
-    QColor effect_bg = lerp_colors(BLACK, effect, BG_COLORIZE);
-
-    /// How bright to make subcolumn dividers.
-    /// At 0, dividers are the same color as the background.
-    /// At 1, dividers are the same color as foreground text.
-    qreal subcolumn_divider_blend = 0.15;
-};
-
-static PatternPalette palette;
 
 
 namespace {
