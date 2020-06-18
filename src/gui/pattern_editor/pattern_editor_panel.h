@@ -7,19 +7,8 @@
 #include <verdigris/wobjectdefs.h>
 
 #include <QWidget>
-#include <QPixmap>
-#include <QFont>
+#include <QImage>
 #include <QPaintEvent>
-#include <QResizeEvent>
-#include <QMouseEvent>
-#include <QHoverEvent>
-#include <QWheelEvent>
-#include <QEvent>
-#include <QRect>
-#include <QColor>
-#include <QUndoStack>
-#include <QString>
-#include <QPoint>
 
 #include <cstdint>
 #include <functional>  // std::reference_wrapper

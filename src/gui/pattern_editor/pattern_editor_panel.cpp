@@ -10,9 +10,11 @@
 #include <verdigris/wobjectimpl.h>
 
 #include <QApplication>
+#include <QColor>
 #include <QDebug>  // unused
-#include <QGradient>
+#include <QFont>
 #include <QFontMetrics>
+#include <QGradient>
 #include <QPainter>
 #include <QPoint>
 #include <QRect>
