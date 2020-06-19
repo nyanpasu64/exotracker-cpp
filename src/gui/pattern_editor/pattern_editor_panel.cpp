@@ -128,7 +128,7 @@ struct PatternAppearance {
     FontTweaks font_tweaks;
 };
 
-static PatternAppearance cfg;
+static PatternAppearance visual;
 
 static PatternFontMetrics calc_single_font_metrics(QFont & font) {
     QFontMetrics metrics{font};
@@ -150,20 +150,20 @@ static PatternFontMetrics calc_single_font_metrics(QFont & font) {
 
     // Only width used so far. Instead of ascent/descent, we look at _pixels_per_row.
     return PatternFontMetrics{
-        .width=width + cfg.font_tweaks.width_adjust,
+        .width=width + visual.font_tweaks.width_adjust,
         .ascent=metrics.ascent(),
         .descent=metrics.descent()
     };
 }
 
 static void calc_font_metrics(PatternEditorPanel & self) {
-    self._pattern_font_metrics = calc_single_font_metrics(cfg.pattern_font);
+    self._pattern_font_metrics = calc_single_font_metrics(visual.pattern_font);
 
     self._pixels_per_row = std::max(
-        cfg.font_tweaks.pixels_above_text
+        visual.font_tweaks.pixels_above_text
             + self._pattern_font_metrics.ascent
             + self._pattern_font_metrics.descent
-            + cfg.font_tweaks.pixels_below_text,
+            + visual.font_tweaks.pixels_below_text,
         1
     );
 }
@@ -207,10 +207,10 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     setMinimumSize(128, 320);
 
     /* Font */
-    cfg.header_font = QApplication::font();
+    visual.header_font = QApplication::font();
 
-    cfg.pattern_font = QFont("dejavu sans mono", 9);
-    cfg.pattern_font.setStyleHint(QFont::TypeWriter);
+    visual.pattern_font = QFont("dejavu sans mono", 9);
+    visual.pattern_font.setStyleHint(QFont::TypeWriter);
 
     calc_font_metrics(*this);
     create_image(*this);
@@ -418,7 +418,7 @@ static void draw_header(
     QPainter & painter,
     GridRect const inner_rect
 ) {
-    painter.setFont(cfg.header_font);
+    painter.setFont(visual.header_font);
 
     // Draw the header background.
     {
@@ -687,11 +687,11 @@ static void draw_pattern_background(
     GridRect const inner_rect
 ) {
     #define COMPUTE_DIVIDER_COLOR(OUT, BG, FG) \
-        QColor OUT##_divider = lerp_colors(BG, FG, cfg.subcolumn_divider_blend);
+        QColor OUT##_divider = lerp_colors(BG, FG, visual.subcolumn_divider_blend);
 
-    COMPUTE_DIVIDER_COLOR(instrument, cfg.instrument_bg, cfg.instrument)
-    COMPUTE_DIVIDER_COLOR(volume, cfg.volume_bg, cfg.volume)
-    COMPUTE_DIVIDER_COLOR(effect, cfg.effect_bg, cfg.effect)
+    COMPUTE_DIVIDER_COLOR(instrument, visual.instrument_bg, visual.instrument)
+    COMPUTE_DIVIDER_COLOR(volume, visual.volume_bg, visual.volume)
+    COMPUTE_DIVIDER_COLOR(effect, visual.effect_bg, visual.effect)
 
     int row_right_px = columns.ruler.right_px;
     if (columns.cols.size()) {
@@ -718,14 +718,14 @@ static void draw_pattern_background(
                 // Draw current beat.
                 QString s = format_hex_2((uint8_t) curr_beats.numerator());
 
-                painter.setFont(cfg.pattern_font);
-                painter.setPen(cfg.note_line_beat);
+                painter.setFont(visual.pattern_font);
+                painter.setPen(visual.note_line_beat);
 
-                DrawText draw_text{cfg.pattern_font};
+                DrawText draw_text{visual.pattern_font};
                 draw_text.draw_text(
                     painter,
                     columns.ruler.center_px,
-                    ytop + cfg.font_tweaks.pixels_above_text,
+                    ytop + visual.font_tweaks.pixels_above_text,
                     Qt::AlignTop | Qt::AlignHCenter,
                     s
                 );
@@ -758,11 +758,11 @@ static void draw_pattern_background(
 
                     // Don't draw the note column's divider line,
                     // since it lies right next to the previous channel's channel divider.
-                    CASE_NO_FG(st::Note, cfg.note_bg)
-                    CASE(st::Instrument, cfg.instrument_bg, instrument_divider)
-                    CASE(st::Volume, cfg.volume_bg, volume_divider)
-                    CASE(st::EffectName, cfg.effect_bg, effect_divider)
-                    CASE_NO_FG(st::EffectValue, cfg.effect_bg)
+                    CASE_NO_FG(st::Note, visual.note_bg)
+                    CASE(st::Instrument, visual.instrument_bg, instrument_divider)
+                    CASE(st::Volume, visual.volume_bg, volume_divider)
+                    CASE(st::EffectName, visual.effect_bg, effect_divider)
+                    CASE_NO_FG(st::EffectValue, visual.effect_bg)
 
                     #undef CASE
                     #undef CASE_NO_FG
@@ -780,9 +780,9 @@ static void draw_pattern_background(
 
             // Draw gridline along top of row.
             if (curr_beats.denominator() == 1) {
-                painter.setPen(cfg.gridline_beat);
+                painter.setPen(visual.gridline_beat);
             } else {
-                painter.setPen(cfg.gridline_non_beat);
+                painter.setPen(visual.gridline_non_beat);
             }
             draw_top_border(painter, QPoint{0, ytop}, QPoint{row_right_px, ytop});
         }
@@ -806,7 +806,7 @@ static void draw_pattern_background(
     draw_patterns.template operator()<Direction::Reverse>(seq);
 
     // Draw divider down right side of each column.
-    painter.setPen(cfg.channel_divider);
+    painter.setPen(visual.channel_divider);
 
     auto draw_divider = [&painter, &inner_rect] (auto column) {
         auto xright = column.right_px;
@@ -847,7 +847,7 @@ static void draw_pattern_foreground(
         temp_painter.drawImage(0, 0, self._image);
     }
 
-    painter.setFont(cfg.pattern_font);
+    painter.setFont(visual.pattern_font);
     DrawText draw_text{painter.font()};
 
     // Dimensions of the note cut/release rectangles.
@@ -923,13 +923,13 @@ static void draw_pattern_foreground(
 
                 if (beat.denominator() == 1) {
                     // Highlighted notes
-                    note_color = cfg.note_line_beat;
+                    note_color = visual.note_line_beat;
                 } else if (row.denominator() == 1) {
                     // Non-highlighted notes
-                    note_color = cfg.note_line_non_beat;
+                    note_color = visual.note_line_non_beat;
                 } else {
                     // Off-grid misaligned notes (not possible in traditional trackers)
-                    note_color = cfg.note_line_fractional;
+                    note_color = visual.note_line_fractional;
                 }
 
                 // Draw text.
@@ -955,7 +955,7 @@ static void draw_pattern_foreground(
                         draw_text.draw_text(
                             painter,
                             subcolumn.center_px,
-                            cfg.font_tweaks.pixels_above_text,
+                            visual.font_tweaks.pixels_above_text,
                             Qt::AlignTop | Qt::AlignHCenter,
                             text
                         );
@@ -981,7 +981,7 @@ static void draw_pattern_foreground(
                     }
                     CASE(st::Instrument) {
                         if (row_event.instr) {
-                            painter.setPen(cfg.instrument);
+                            painter.setPen(visual.instrument);
                             auto s = format_hex_2(uint8_t(*row_event.instr));
                             draw(s);
                         }
@@ -1020,7 +1020,7 @@ static void draw_pattern_foreground(
         int row_left_px = columns.cols[0].left_px;
         int row_right_px = columns.cols[columns.cols.size() - 1].right_px;
 
-        painter.setPen(cfg.cursor_row);
+        painter.setPen(visual.cursor_row);
         draw_top_border(
             painter, QPoint{row_left_px, cursor_y}, QPoint{row_right_px, cursor_y}
         );
@@ -1033,7 +1033,7 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
 
     // TODO maybe only draw repaint_rect? And use Qt::IntersectClip?
 
-    self._image.fill(cfg.overall_bg);
+    self._image.fill(visual.overall_bg);
 
     {
         auto painter = QPainter(&self._image);
