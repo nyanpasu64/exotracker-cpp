@@ -204,6 +204,12 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     _dummy_history{doc::DocumentCopy{}},
     _history{_dummy_history}
 {
+    // Upon application startup, pattern editor panel is focused.
+    setFocus();
+
+    // Focus widget on click.
+    setFocusPolicy(Qt::ClickFocus);
+
     setMinimumSize(128, 320);
 
     /* Font */
