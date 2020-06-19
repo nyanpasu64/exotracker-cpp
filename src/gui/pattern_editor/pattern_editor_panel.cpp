@@ -15,6 +15,7 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QGradient>
+#include <QKeySequence>
 #include <QPainter>
 #include <QPoint>
 #include <QRect>
@@ -42,7 +43,7 @@ W_OBJECT_IMPL(PatternEditorPanel)
 TODO:
 - Recompute font metrics when fonts change (set_font()?) or screen DPI changes.
 - QPainter::setPen(QColor) sets the pen width to 1 pixel.
-  If we add custom pen width support (wider at large font metrics),
+  If we add custom pen width support (based on font metrics/DPI/user config),
   this overload must be banned.
 - On high DPI, font metrics automatically scale,
   but dimensions measured in pixels (like header height) don't.
@@ -67,6 +68,7 @@ namespace header {
     constexpr int TEXT_Y = 20;
 }
 
+// # Colors
 constexpr QColor BLACK{0, 0, 0};
 constexpr qreal BG_COLORIZE = 0.05;
 
@@ -82,8 +84,6 @@ struct FontTweaks {
     int pixels_below_text = -1;
 };
 
-// TODO Palette should use QColor, not QPen.
-// Line widths should be configured elsewhere, possibly based on DPI.
 struct PatternAppearance {
     QColor overall_bg = gray(48);
 
@@ -129,6 +129,73 @@ struct PatternAppearance {
 };
 
 static PatternAppearance visual;
+
+// # Shortcuts
+constexpr Qt::Key chord(int modifier, Qt::Key key) {
+    return static_cast<Qt::Key>(modifier | int(key));
+}
+
+struct ShortcutConfig {
+    constexpr static Qt::Key up{Qt::Key_Up};
+    constexpr static Qt::Key down{Qt::Key_Down};
+//    constexpr static Qt::Key left{Qt::Key_Left};
+//    constexpr static Qt::Key right{Qt::Key_Right};
+
+    Qt::Key prev_beat{chord(Qt::CTRL, Qt::Key_Up)};
+    Qt::Key next_beat{chord(Qt::CTRL, Qt::Key_Down)};
+
+    Qt::Key prev_event{chord(Qt::CTRL | Qt::ALT, Qt::Key_Up)};
+    Qt::Key next_event{chord(Qt::CTRL | Qt::ALT, Qt::Key_Down)};
+
+    Qt::Key scroll_prev{Qt::Key_PageUp};
+    Qt::Key scroll_next{Qt::Key_PageDown};
+
+    Qt::Key prev_pattern{chord(Qt::CTRL, Qt::Key_PageUp)};
+    Qt::Key next_pattern{chord(Qt::CTRL, Qt::Key_PageUp)};
+
+    // TODO nudge_prev/next via alt+up/down
+
+    // TODO horizontal shortcuts
+};
+
+static ShortcutConfig shortcut_keys;
+
+// # Constructor
+static void setup_shortcuts(PatternEditorPanel & self) {
+    auto init_shortcut = [&] (QShortcut & shortcut, QKeySequence const & key) {
+        shortcut.setContext(Qt::WidgetShortcut);
+        shortcut.setKey(key);
+    };
+
+    auto init_pair = [&] (ShortcutPair & pair, Qt::Key key) {
+        auto shift_key = chord(Qt::SHIFT, key);
+
+        init_shortcut(pair.key, key);
+        init_shortcut(pair.shift_key, shift_key);
+    };
+
+    #define X(KEY) \
+        init_pair(self._shortcuts.KEY, shortcut_keys.KEY);
+    SHORTCUT_PAIRS(X, )
+    #undef X
+
+    // Copy, don't borrow, local lambdas.
+    #define X(KEY) \
+        QObject::connect( \
+            &self._shortcuts.KEY.key, \
+            &QShortcut::activated, \
+            &self, \
+            [=, &self] () { self.KEY##_pressed(false); } \
+        ); \
+        QObject::connect( \
+            &self._shortcuts.KEY.shift_key, \
+            &QShortcut::activated, \
+            &self, \
+            [=, &self] () { self.KEY##_pressed(true); } \
+        );
+    SHORTCUT_PAIRS(X, )
+    #undef X
+}
 
 static PatternFontMetrics calc_single_font_metrics(QFont & font) {
     QFontMetrics metrics{font};
@@ -202,7 +269,8 @@ void create_image(PatternEditorPanel & self) {
 PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     QWidget(parent),
     _dummy_history{doc::DocumentCopy{}},
-    _history{_dummy_history}
+    _history{_dummy_history},
+    _shortcuts{this}
 {
     // Upon application startup, pattern editor panel is focused.
     setFocus();
@@ -219,6 +287,7 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
     visual.pattern_font.setStyleHint(QFont::TypeWriter);
 
     calc_font_metrics(*this);
+    setup_shortcuts(*this);
     create_image(*this);
 
     // setAttribute(Qt::WA_Hover);  (generates paint events when mouse cursor enters/exits)
@@ -231,6 +300,7 @@ void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
     create_image(*this);
 }
 
+// # Column layout
 // See doc.h for documentation of how patterns work.
 
 struct ChannelDraw {
@@ -412,11 +482,11 @@ static ColumnLayout gen_column_layout(
 // (not just visible columns) for keyboard-based movement rather than rendering.
 // Either flat or nested, not sure yet.
 
+// # Pattern drawing
 
 // TODO bundle parameters into `ctx: Context`.
 // columns, cfg, and document are identical between different drawing phases.
 // inner_rect is not.
-
 static void draw_header(
     PatternEditorPanel & self,
     doc::Document const &document,
@@ -1101,10 +1171,30 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
     }
 }
 
-
 void PatternEditorPanel::paintEvent(QPaintEvent *event) {
     draw_pattern(*this, event->rect());
 }
+
+// # Cursor movement
+
+void PatternEditorPanel::up_pressed(bool shift_held) {
+    qDebug() << "up pressed, shift_held =" << shift_held;
+}
+
+void PatternEditorPanel::down_pressed(bool shift_held) {}
+
+void PatternEditorPanel::prev_beat_pressed(bool shift_held) {}
+void PatternEditorPanel::next_beat_pressed(bool shift_held) {}
+
+void PatternEditorPanel::prev_event_pressed(bool shift_held) {}
+void PatternEditorPanel::next_event_pressed(bool shift_held) {}
+
+void PatternEditorPanel::scroll_prev_pressed(bool shift_held) {}
+void PatternEditorPanel::scroll_next_pressed(bool shift_held) {}
+
+void PatternEditorPanel::prev_pattern_pressed(bool shift_held) {}
+void PatternEditorPanel::next_pattern_pressed(bool shift_held) {}
+
 
 // namespace
 }
