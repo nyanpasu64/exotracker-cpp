@@ -784,7 +784,55 @@ static void draw_pattern_background(
         row_right_px = columns.cols[columns.cols.size() - 1].right_px;
     }
 
-    auto draw_pattern_bg = [&](doc::SequenceEntry const & seq_entry) {
+    auto draw_pattern_bg = [&] (SeqEntryPosition const & pos) {
+        doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
+
+        // Draw background of cell.
+        for (Column const & column : columns.cols) {
+            for (SubColumn const & sub : column.subcolumns) {
+                GridRect sub_rect{
+                    QPoint{sub.left_px, pos.top}, QPoint{sub.right_px, pos.bottom}
+                };
+
+                // Unrecognized columns are red to indicate an error.
+                // This shouldn't happen, but whatever.
+                QColor bg{255, 0, 0};
+                QColor fg{QColor::Invalid};
+
+                #define CASE(VARIANT, BG, FG) \
+                    if (std::holds_alternative<VARIANT>(sub.type)) { \
+                        bg = BG; \
+                        fg = FG; \
+                    }
+                #define CASE_NO_FG(VARIANT, BG) \
+                    if (std::holds_alternative<VARIANT>(sub.type)) { \
+                        bg = BG; \
+                    }
+
+                namespace st = subcolumn_types;
+
+                // Don't draw the note column's divider line,
+                // since it lies right next to the previous channel's channel divider.
+                CASE_NO_FG(st::Note, visual.note_bg)
+                CASE(st::Instrument, visual.instrument_bg, instrument_divider)
+                CASE(st::Volume, visual.volume_bg, volume_divider)
+                CASE(st::EffectName, visual.effect_bg, effect_divider)
+                CASE_NO_FG(st::EffectValue, visual.effect_bg)
+
+                #undef CASE
+                #undef CASE_NO_FG
+
+                // Paint background color.
+                painter.fillRect(sub_rect, bg);
+
+                // Paint left border.
+                if (fg.isValid()) {
+                    painter.setPen(fg);
+                    draw_left_border(painter, sub_rect);
+                }
+            }
+        }
+
         // Draw rows.
         // Begin loop(row)
         int row = 0;
@@ -794,56 +842,8 @@ static void draw_pattern_background(
             curr_beats += self._beats_per_row, row += 1)
         {
             // Compute row height.
-            int ytop = self._pixels_per_row * row;
-            int dy_height = self._pixels_per_row;
-            int ybottom = ytop + dy_height;
+            int ytop = pos.top + self._pixels_per_row * row;
             // End loop(row)
-
-            // Draw background of cell.
-            for (Column const & column : columns.cols) {
-                for (SubColumn const & sub : column.subcolumns) {
-                    GridRect sub_rect{
-                        QPoint{sub.left_px, ytop}, QPoint{sub.right_px, ybottom}
-                    };
-
-                    // Unrecognized columns are red to indicate an error.
-                    // This shouldn't happen, but whatever.
-                    QColor bg{255, 0, 0};
-                    QColor fg{QColor::Invalid};
-
-                    #define CASE(VARIANT, BG, FG) \
-                        if (std::holds_alternative<VARIANT>(sub.type)) { \
-                            bg = BG; \
-                            fg = FG; \
-                        }
-                    #define CASE_NO_FG(VARIANT, BG) \
-                        if (std::holds_alternative<VARIANT>(sub.type)) { \
-                            bg = BG; \
-                        }
-
-                    namespace st = subcolumn_types;
-
-                    // Don't draw the note column's divider line,
-                    // since it lies right next to the previous channel's channel divider.
-                    CASE_NO_FG(st::Note, visual.note_bg)
-                    CASE(st::Instrument, visual.instrument_bg, instrument_divider)
-                    CASE(st::Volume, visual.volume_bg, volume_divider)
-                    CASE(st::EffectName, visual.effect_bg, effect_divider)
-                    CASE_NO_FG(st::EffectValue, visual.effect_bg)
-
-                    #undef CASE
-                    #undef CASE_NO_FG
-
-                    // Paint background color.
-                    painter.fillRect(sub_rect, bg);
-
-                    // Paint left border.
-                    if (fg.isValid()) {
-                        painter.setPen(fg);
-                        draw_left_border(painter, sub_rect);
-                    }
-                }
-            }
 
             // Draw gridline along top of row.
             if (curr_beats.denominator() == 1) {
@@ -855,7 +855,9 @@ static void draw_pattern_background(
         }
     };
 
-    auto draw_row_numbers = [&] (doc::SequenceEntry const & seq_entry) {
+    auto draw_row_numbers = [&] (SeqEntryPosition const & pos) {
+        doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
+
         // Draw rows.
         // Begin loop(row)
         int row = 0;
@@ -864,7 +866,7 @@ static void draw_pattern_background(
             curr_beats < seq_entry.nbeats;
             curr_beats += self._beats_per_row, row += 1)
         {
-            int ytop = self._pixels_per_row * row;
+            int ytop = pos.top + self._pixels_per_row * row;
 
             // Draw ruler labels (numbers).
             if (curr_beats.denominator() == 1) {
@@ -892,9 +894,7 @@ static void draw_pattern_background(
     ) {
         auto it = SequenceIterator<direction>{seq};
         while (auto pos = it.next()) {
-            PainterScope scope{painter};
-            painter.translate(0, pos->top);
-            draw_seq_entry(document.sequence[pos->seq_entry_index]);
+            draw_seq_entry(*pos);
         }
     };
 
