@@ -37,6 +37,7 @@ using gui::lib::format::format_hex_1;
 using gui::lib::format::format_hex_2;
 namespace gui_fmt = gui::lib::format;
 using namespace gui::lib::painter_ext;
+using util::math::inplace_modulo;
 using util::math::frac_floor;
 using util::math::frac_ceil;
 
@@ -1203,6 +1204,10 @@ static inline doc::BeatFraction to_beats(
 }
 
 
+static bool wrap_cursor = true;
+static bool wrap_across_frames = true;
+
+
 void PatternEditorPanel::up_pressed(bool shift_held) {
     qDebug() << "up pressed, shift_held =" << shift_held;
 
@@ -1215,11 +1220,16 @@ void PatternEditorPanel::up_pressed(bool shift_held) {
     if (up_row >= 0) {
         out_row = up_row;
 
-    } else if (_cursor_y.seq_entry_index > 0) {
-        _cursor_y.seq_entry_index -= 1;
+    } else if (wrap_cursor) {
+        if (wrap_across_frames) {
+            _cursor_y.seq_entry_index -= 1;
+            inplace_modulo(
+                _cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
+            );
+        }
 
         auto const & seq_entry = document.sequence[_cursor_y.seq_entry_index];
-        out_row = frac_prev(seq_entry.nbeats / _beats_per_row);
+        out_row = frac_prev(to_rows(*this, seq_entry.nbeats));
 
     } else {
         out_row = 0;
@@ -1246,8 +1256,12 @@ void PatternEditorPanel::down_pressed(bool shift_held) {
     if (down_row < num_rows) {
         out_row = down_row;
 
-    } else if (_cursor_y.seq_entry_index + 1 < document.sequence.size()) {
-        _cursor_y.seq_entry_index += 1;
+    } else if (wrap_cursor) {
+        if (wrap_across_frames) {
+            _cursor_y.seq_entry_index += 1;
+            _cursor_y.seq_entry_index %= (SeqEntryIndex) document.sequence.size();
+        }
+
         out_row = 0;
 
     } else {

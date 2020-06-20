@@ -10,6 +10,11 @@ inline IntT modulo(IntT num, IntT den) {
 }
 
 template<typename IntT>
+inline void inplace_modulo(IntT & num, IntT den) {
+    num = (num % den + den) % den;
+}
+
+template<typename IntT>
 inline IntT floordiv(IntT a, IntT b) {
     // Adapted from https://stackoverflow.com/a/39304947
     auto [quot, rem] = div(a, b);
