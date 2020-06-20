@@ -6,6 +6,7 @@
 #include "gui/lib/painter_ext.h"
 #include "chip_kinds.h"
 #include "util/compare.h"
+#include "util/math.h"
 
 #include <verdigris/wobjectimpl.h>
 
@@ -36,6 +37,8 @@ using gui::lib::format::format_hex_1;
 using gui::lib::format::format_hex_2;
 namespace gui_fmt = gui::lib::format;
 using namespace gui::lib::painter_ext;
+using util::math::frac_floor;
+using util::math::frac_ceil;
 
 W_OBJECT_IMPL(PatternEditorPanel)
 
@@ -185,13 +188,13 @@ static void setup_shortcuts(PatternEditorPanel & self) {
             &self._shortcuts.KEY.key, \
             &QShortcut::activated, \
             &self, \
-            [=, &self] () { self.KEY##_pressed(false); } \
+            [=, &self] () { self.KEY##_pressed(false); self.repaint(); } \
         ); \
         QObject::connect( \
             &self._shortcuts.KEY.shift_key, \
             &QShortcut::activated, \
             &self, \
-            [=, &self] () { self.KEY##_pressed(true); } \
+            [=, &self] () { self.KEY##_pressed(true); self.repaint(); } \
         );
     SHORTCUT_PAIRS(X, )
     #undef X
@@ -634,7 +637,7 @@ public:
         PxInt const screen_height
     ) {
         PxInt const cursor_from_pattern_top =
-            pixels_from_beat(widget, widget._cursor_y.curr_beat);
+            pixels_from_beat(widget, widget._cursor_y.beat);
 
         PatternAndBeat scroll_position;
         PxInt pattern_top_from_screen_top;
@@ -645,7 +648,7 @@ public:
             scroll_position = *widget._free_scroll_position;
 
             PxInt const screen_top_from_pattern_top =
-                pixels_from_beat(widget, scroll_position.curr_beat);
+                pixels_from_beat(widget, scroll_position.beat);
             pattern_top_from_screen_top = -screen_top_from_pattern_top;
             cursor_from_screen_top =
                 cursor_from_pattern_top + pattern_top_from_screen_top;
@@ -1090,6 +1093,7 @@ static void draw_pattern_foreground(
     draw_patterns.template operator()<Direction::Forward>(seq);
     draw_patterns.template operator()<Direction::Reverse>(seq);
 
+    // TODO draw selection
     // Draw cursor.
     // The cursor is drawn on top of channel dividers and note lines/text.
     if (columns.cols.size()) {
@@ -1105,7 +1109,7 @@ static void draw_pattern_foreground(
 
 
 static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
-    doc::Document const & document = *self._history.get().gui_get_document();
+    doc::Document const & document = self.get_document();
 
     // TODO maybe only draw repaint_rect? And use Qt::IntersectClip?
 
@@ -1177,11 +1181,87 @@ void PatternEditorPanel::paintEvent(QPaintEvent *event) {
 
 // # Cursor movement
 
-void PatternEditorPanel::up_pressed(bool shift_held) {
-    qDebug() << "up pressed, shift_held =" << shift_held;
+static doc::FractionInt frac_prev(doc::BeatFraction frac) {
+    return frac_ceil(frac) - 1;
 }
 
-void PatternEditorPanel::down_pressed(bool shift_held) {}
+static doc::FractionInt frac_next(doc::BeatFraction frac) {
+    return frac_floor(frac) + 1;
+}
+
+static inline doc::BeatFraction to_rows(
+    PatternEditorPanel const & self, doc::BeatFraction beats
+) {
+    return beats / self._beats_per_row;
+}
+
+template<typename T>
+static inline doc::BeatFraction to_beats(
+    PatternEditorPanel const & self, T rows
+) {
+    return rows * self._beats_per_row;
+}
+
+
+void PatternEditorPanel::up_pressed(bool shift_held) {
+    qDebug() << "up pressed, shift_held =" << shift_held;
+
+    doc::Document const & document = get_document();
+
+    auto const orig_row = to_rows(*this, _cursor_y.beat);
+    doc::FractionInt const up_row = frac_prev(orig_row);
+    doc::FractionInt out_row;
+
+    if (up_row >= 0) {
+        out_row = up_row;
+
+    } else if (_cursor_y.seq_entry_index > 0) {
+        _cursor_y.seq_entry_index -= 1;
+
+        auto const & seq_entry = document.sequence[_cursor_y.seq_entry_index];
+        out_row = frac_prev(seq_entry.nbeats / _beats_per_row);
+
+    } else {
+        out_row = 0;
+    }
+
+    _cursor_y.beat = to_beats(*this, out_row);
+    if (!shift_held) {
+        _select_begin_y = _cursor_y;
+    }
+}
+
+void PatternEditorPanel::down_pressed(bool shift_held) {
+    qDebug() << "down pressed, shift_held =" << shift_held;
+
+    doc::Document const & document = get_document();
+
+    auto const & seq_entry = document.sequence[_cursor_y.seq_entry_index];
+    auto const num_rows = to_rows(*this, seq_entry.nbeats);
+
+    auto const orig_row = to_rows(*this, _cursor_y.beat);
+    doc::FractionInt const down_row = frac_next(orig_row);
+    doc::FractionInt out_row;
+
+    if (down_row < num_rows) {
+        out_row = down_row;
+
+    } else if (_cursor_y.seq_entry_index + 1 < document.sequence.size()) {
+        _cursor_y.seq_entry_index += 1;
+        out_row = 0;
+
+    } else {
+        // don't move the cursor.
+        goto skip_update;
+    }
+
+    _cursor_y.beat = to_beats(*this, out_row);
+
+    skip_update:
+    if (!shift_held) {
+        _select_begin_y = _cursor_y;
+    }
+}
 
 void PatternEditorPanel::prev_beat_pressed(bool shift_held) {}
 void PatternEditorPanel::next_beat_pressed(bool shift_held) {}

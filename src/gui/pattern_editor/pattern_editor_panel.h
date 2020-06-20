@@ -38,7 +38,7 @@ using RowIndex = uint32_t;
 struct PatternAndBeat {
     SeqEntryIndex seq_entry_index = 0;
 //    RowIndex row_index = 0;
-    doc::BeatFraction curr_beat = 0;
+    doc::BeatFraction beat = 0;
 };
 
 struct ShortcutPair {
@@ -143,6 +143,8 @@ PatternEditorPanel_INTERNAL:
     // TODO cursor_x
     PatternAndBeat _cursor_y;
 
+    PatternAndBeat _select_begin_y;
+
     // Non-empty if free scrolling is enabled.
     std::optional<PatternAndBeat> _free_scroll_position;
 
@@ -164,6 +166,12 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
 
 PatternEditorPanel_INTERNAL:
+
+    doc::Document const & get_document() {
+        // Change this method if we change how history works.
+        return *_history.get().gui_get_document();
+    }
+
     // QShortcut signals are bound to a lambda slot, which calls these methods.
 
     #define X(KEY) \
