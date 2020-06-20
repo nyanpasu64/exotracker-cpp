@@ -892,16 +892,13 @@ static void draw_pattern_background(
     draw_patterns.template operator()<Direction::Reverse>(seq);
 
     // Draw cursor gradient.
-    if (columns.cols.size()) {
-        int row_left_px = columns.cols[0].left_px;
-        int row_right_px = columns.cols[columns.cols.size() - 1].right_px;
-
+    {
         int cursor_bottom = cursor_top + self._pixels_per_row;
 
         painter.setPen(visual.cursor_row);
 
         GridRect cursor_rect{
-            QPoint{row_left_px, cursor_top}, QPoint{row_right_px, cursor_bottom}
+            QPoint{0, cursor_top}, QPoint{row_right_px, cursor_bottom}
         };
         // QLinearGradient's constructor takes the begin and endpoints.
         QLinearGradient grad{cursor_rect.left_top(), cursor_rect.left_bottom()};
@@ -1132,13 +1129,15 @@ static void draw_pattern_foreground(
     // TODO draw selection
     // Draw cursor.
     // The cursor is drawn on top of channel dividers and note lines/text.
-    if (columns.cols.size()) {
-        int row_left_px = columns.cols[0].left_px;
-        int row_right_px = columns.cols[columns.cols.size() - 1].right_px;
+    {
+        int row_right_px = columns.ruler.right_px;
+        if (columns.cols.size()) {
+            row_right_px = columns.cols[columns.cols.size() - 1].right_px;
+        }
 
         painter.setPen(visual.cursor_row);
         draw_top_border(
-            painter, QPoint{row_left_px, cursor_y}, QPoint{row_right_px, cursor_y}
+            painter, QPoint{0, cursor_y}, QPoint{row_right_px, cursor_y}
         );
     }
 }
