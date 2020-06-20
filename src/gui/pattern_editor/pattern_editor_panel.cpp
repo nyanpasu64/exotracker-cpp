@@ -37,7 +37,8 @@ using gui::lib::format::format_hex_1;
 using gui::lib::format::format_hex_2;
 namespace gui_fmt = gui::lib::format;
 using namespace gui::lib::painter_ext;
-using util::math::inplace_modulo;
+using util::math::increment_mod;
+using util::math::decrement_mod;
 using util::math::frac_floor;
 using util::math::frac_ceil;
 
@@ -1247,9 +1248,14 @@ using BeatsToUnits =
 using UnitsToBeats =
     doc::BeatFraction (*)(PatternEditorPanel const &, doc::FractionInt);
 
-static bool wrap_cursor = true;
-static bool wrap_across_frames = true;
+struct MovementConfig {
+    bool wrap_cursor = true;
+    bool wrap_across_frames = true;
 
+    doc::BeatFraction page_down_distance{1};
+};
+
+MovementConfig move_cfg;
 // Move the cursor, snapping to the nearest unit.
 
 template<BeatsToUnits to_units, UnitsToBeats to_beats>
@@ -1263,11 +1269,10 @@ void move_up(PatternEditorPanel & self, bool shift_held) {
     if (up_unit >= 0) {
         out_unit = up_unit;
 
-    } else if (wrap_cursor) {
-        if (wrap_across_frames) {
-            self._cursor_y.seq_entry_index -= 1;
-            inplace_modulo(
-                self._cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
+    } else if (move_cfg.wrap_cursor) {
+        if (move_cfg.wrap_across_frames) {
+            decrement_mod(
+                self._cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
             );
         }
 
@@ -1298,10 +1303,11 @@ void move_down(PatternEditorPanel & self, bool shift_held) {
     if (down_unit < num_units) {
         out_unit = down_unit;
 
-    } else if (wrap_cursor) {
-        if (wrap_across_frames) {
-            self._cursor_y.seq_entry_index += 1;
-            self._cursor_y.seq_entry_index %= (SeqEntryIndex) document.sequence.size();
+    } else if (move_cfg.wrap_cursor) {
+        if (move_cfg.wrap_across_frames) {
+            increment_mod(
+                self._cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
+            );
         }
 
         out_unit = 0;
@@ -1363,11 +1369,48 @@ void PatternEditorPanel::next_beat_pressed(bool shift_held) {
     move_down<beats_to_beats, beats_to_beats>(*this, shift_held);
 }
 
+// TODO depends on horizontal cursor position.
 void PatternEditorPanel::prev_event_pressed(bool shift_held) {}
 void PatternEditorPanel::next_event_pressed(bool shift_held) {}
 
-void PatternEditorPanel::scroll_prev_pressed(bool shift_held) {}
-void PatternEditorPanel::scroll_next_pressed(bool shift_held) {}
+/// To avoid an infinite loop,
+/// avoid scrolling more than _ patterns in a single Page Down keystroke.
+constexpr int MAX_PAGEDOWN_SCROLL = 16;
+
+void PatternEditorPanel::scroll_prev_pressed(bool shift_held) {
+    doc::Document const & document = get_document();
+
+    _cursor_y.beat -= move_cfg.page_down_distance;
+
+    for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
+        if (_cursor_y.beat < 0) {
+            decrement_mod(
+                _cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
+            );
+            _cursor_y.beat += document.sequence[_cursor_y.seq_entry_index].nbeats;
+        } else {
+            break;
+        }
+    }
+}
+
+void PatternEditorPanel::scroll_next_pressed(bool shift_held) {
+    doc::Document const & document = get_document();
+
+    _cursor_y.beat += move_cfg.page_down_distance;
+
+    for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
+        auto const & seq_entry = document.sequence[_cursor_y.seq_entry_index];
+        if (_cursor_y.beat >= seq_entry.nbeats) {
+            _cursor_y.beat -= seq_entry.nbeats;
+            increment_mod(
+                _cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
+            );
+        } else {
+            break;
+        }
+    }
+}
 
 void PatternEditorPanel::prev_pattern_pressed(bool shift_held) {}
 void PatternEditorPanel::next_pattern_pressed(bool shift_held) {}

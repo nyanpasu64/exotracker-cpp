@@ -15,6 +15,19 @@ inline void inplace_modulo(IntT & num, IntT den) {
 }
 
 template<typename IntT>
+inline void increment_mod(IntT & x, IntT den) {
+    x++;
+    x %= den;
+}
+
+template<typename IntT>
+inline void decrement_mod(IntT & x, IntT den) {
+    x--;
+    x += den;
+    x %= den;
+}
+
+template<typename IntT>
 inline IntT floordiv(IntT a, IntT b) {
     // Adapted from https://stackoverflow.com/a/39304947
     auto [quot, rem] = div(a, b);
