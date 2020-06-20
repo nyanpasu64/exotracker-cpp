@@ -906,6 +906,23 @@ static void draw_pattern_background(
     draw_patterns.template operator()<Direction::Forward>(draw_pattern_bg, seq);
     draw_patterns.template operator()<Direction::Reverse>(draw_pattern_bg, seq);
 
+    // Draw divider down right side of each column.
+    painter.setPen(visual.channel_divider);
+
+    auto draw_divider = [&painter, &inner_rect] (auto column) {
+        auto xright = column.right_px;
+
+        QPoint right_top{xright, inner_rect.top()};
+        QPoint right_bottom{xright, inner_rect.bottom()};
+
+        draw_right_border(painter, right_top, right_bottom);
+    };
+
+    draw_divider(columns.ruler);
+    for (Column const & column : columns.cols) {
+        draw_divider(column);
+    }
+
     // Draw cursor gradient.
     {
         int cursor_bottom = cursor_top + self._pixels_per_row;
@@ -934,23 +951,6 @@ static void draw_pattern_background(
 
     draw_patterns.template operator()<Direction::Forward>(draw_row_numbers, seq);
     draw_patterns.template operator()<Direction::Reverse>(draw_row_numbers, seq);
-
-    // Draw divider down right side of each column.
-    painter.setPen(visual.channel_divider);
-
-    auto draw_divider = [&painter, &inner_rect] (auto column) {
-        auto xright = column.right_px;
-
-        QPoint right_top{xright, inner_rect.top()};
-        QPoint right_bottom{xright, inner_rect.bottom()};
-
-        draw_right_border(painter, right_top, right_bottom);
-    };
-
-    draw_divider(columns.ruler);
-    for (Column const & column : columns.cols) {
-        draw_divider(column);
-    }
 }
 
 constexpr gui_fmt::NoteNameConfig note_cfg {
