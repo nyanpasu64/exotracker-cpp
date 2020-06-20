@@ -1326,21 +1326,21 @@ void move_down(PatternEditorPanel & self) {
 
 // Beat conversion functions
 
-static inline doc::BeatFraction beats_to_rows(
+static inline doc::BeatFraction rows_from_beats(
     PatternEditorPanel const & self, doc::BeatFraction beats
 ) {
     return beats / self._beats_per_row;
 }
 
 template<typename T>
-static inline doc::BeatFraction rows_to_beats(
+static inline doc::BeatFraction beats_from_rows(
     PatternEditorPanel const & self, T rows
 ) {
     return rows * self._beats_per_row;
 }
 
 template<typename T>
-static inline doc::BeatFraction beats_to_beats(
+static inline doc::BeatFraction beats_from_beats(
     [[maybe_unused]] PatternEditorPanel const & self, T beats
 ) {
     return beats;
@@ -1349,19 +1349,19 @@ static inline doc::BeatFraction beats_to_beats(
 // Cursor movement
 
 void PatternEditorPanel::up_pressed() {
-    move_up<beats_to_rows, rows_to_beats>(*this);
+    move_up<rows_from_beats, beats_from_rows>(*this);
 }
 
 void PatternEditorPanel::down_pressed() {
-    move_down<beats_to_rows, rows_to_beats>(*this);
+    move_down<rows_from_beats, beats_from_rows>(*this);
 }
 
 void PatternEditorPanel::prev_beat_pressed() {
-    move_up<beats_to_beats, beats_to_beats>(*this);
+    move_up<beats_from_beats, beats_from_beats>(*this);
 }
 
 void PatternEditorPanel::next_beat_pressed() {
-    move_down<beats_to_beats, beats_to_beats>(*this);
+    move_down<beats_from_beats, beats_from_beats>(*this);
 }
 
 // TODO depends on horizontal cursor position.
@@ -1417,9 +1417,9 @@ inline void switch_seq_entry_index(PatternEditorPanel & self) {
 
     // If cursor is out of bounds, move to last row in pattern.
     if (self._cursor_y.beat >= nbeats) {
-        doc::BeatFraction rows = beats_to_rows(self, nbeats);
+        doc::BeatFraction rows = rows_from_beats(self, nbeats);
         int prev_row = frac_prev(rows);
-        self._cursor_y.beat = rows_to_beats(self, prev_row);
+        self._cursor_y.beat = beats_from_rows(self, prev_row);
     }
 }
 
