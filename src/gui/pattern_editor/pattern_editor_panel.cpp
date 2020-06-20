@@ -162,7 +162,7 @@ struct ShortcutConfig {
     Qt::Key scroll_next{Qt::Key_PageDown};
 
     Qt::Key prev_pattern{chord(Qt::CTRL, Qt::Key_PageUp)};
-    Qt::Key next_pattern{chord(Qt::CTRL, Qt::Key_PageUp)};
+    Qt::Key next_pattern{chord(Qt::CTRL, Qt::Key_PageDown)};
 
     // TODO nudge_prev/next via alt+up/down
 
@@ -1407,8 +1407,28 @@ void PatternEditorPanel::scroll_next_pressed() {
     }
 }
 
-void PatternEditorPanel::prev_pattern_pressed() {}
-void PatternEditorPanel::next_pattern_pressed() {}
+template<void alter_mod(SeqEntryIndex & x, SeqEntryIndex den)>
+inline void switch_seq_entry_index(PatternEditorPanel & self) {
+    doc::Document const & document = self.get_document();
+
+    alter_mod(self._cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size());
+
+    doc::BeatFraction nbeats = document.sequence[self._cursor_y.seq_entry_index].nbeats;
+
+    // If cursor is out of bounds, move to last row in pattern.
+    if (self._cursor_y.beat >= nbeats) {
+        doc::BeatFraction rows = beats_to_rows(self, nbeats);
+        int prev_row = frac_prev(rows);
+        self._cursor_y.beat = rows_to_beats(self, prev_row);
+    }
+}
+
+void PatternEditorPanel::prev_pattern_pressed() {
+    switch_seq_entry_index<decrement_mod>(*this);
+}
+void PatternEditorPanel::next_pattern_pressed() {
+    switch_seq_entry_index<increment_mod>(*this);
+}
 
 
 // namespace
