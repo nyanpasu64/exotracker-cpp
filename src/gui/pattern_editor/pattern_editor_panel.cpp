@@ -784,7 +784,7 @@ static void draw_pattern_background(
         row_right_px = columns.cols[columns.cols.size() - 1].right_px;
     }
 
-    auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
+    auto draw_pattern_bg = [&](doc::SequenceEntry const & seq_entry) {
         // Draw rows.
         // Begin loop(row)
         int row = 0;
@@ -798,25 +798,6 @@ static void draw_pattern_background(
             int dy_height = self._pixels_per_row;
             int ybottom = ytop + dy_height;
             // End loop(row)
-
-            // Draw ruler labels (numbers).
-            if (curr_beats.denominator() == 1) {
-                // Draw current beat.
-                QString s = format_hex_2((uint8_t) curr_beats.numerator());
-
-                painter.setFont(visual.pattern_font);
-                painter.setPen(visual.note_line_beat);
-
-                DrawText draw_text{visual.pattern_font};
-                draw_text.draw_text(
-                    painter,
-                    columns.ruler.center_px,
-                    ytop + visual.font_tweaks.pixels_above_text,
-                    Qt::AlignTop | Qt::AlignHCenter,
-                    s
-                );
-            }
-            // Don't label non-beat rows for the time being.
 
             // Draw background of cell.
             for (Column const & column : columns.cols) {
@@ -874,7 +855,41 @@ static void draw_pattern_background(
         }
     };
 
-    auto draw_patterns = [&] <Direction direction> (SequenceIteratorState const & seq) {
+    auto draw_row_numbers = [&] (doc::SequenceEntry const & seq_entry) {
+        // Draw rows.
+        // Begin loop(row)
+        int row = 0;
+        doc::BeatFraction curr_beats = 0;
+        for (;
+            curr_beats < seq_entry.nbeats;
+            curr_beats += self._beats_per_row, row += 1)
+        {
+            int ytop = self._pixels_per_row * row;
+
+            // Draw ruler labels (numbers).
+            if (curr_beats.denominator() == 1) {
+                // Draw current beat.
+                QString s = format_hex_2((uint8_t) curr_beats.numerator());
+
+                painter.setFont(visual.pattern_font);
+                painter.setPen(visual.note_line_beat);
+
+                DrawText draw_text{visual.pattern_font};
+                draw_text.draw_text(
+                    painter,
+                    columns.ruler.center_px,
+                    ytop + visual.font_tweaks.pixels_above_text,
+                    Qt::AlignTop | Qt::AlignHCenter,
+                    s
+                );
+            }
+            // Don't label non-beat rows for the time being.
+        }
+    };
+
+    auto draw_patterns = [&] <Direction direction> (
+        auto draw_seq_entry, SequenceIteratorState const & seq
+    ) {
         auto it = SequenceIterator<direction>{seq};
         while (auto pos = it.next()) {
             PainterScope scope{painter};
@@ -888,8 +903,8 @@ static void draw_pattern_background(
 
     // this syntax has got to be a joke, right?
     // C++ needs the turbofish so badly
-    draw_patterns.template operator()<Direction::Forward>(seq);
-    draw_patterns.template operator()<Direction::Reverse>(seq);
+    draw_patterns.template operator()<Direction::Forward>(draw_pattern_bg, seq);
+    draw_patterns.template operator()<Direction::Reverse>(draw_pattern_bg, seq);
 
     // Draw cursor gradient.
     {
@@ -916,6 +931,9 @@ static void draw_pattern_background(
         // Then cast it into a QBrush, and draw the background.
         painter.fillRect(cursor_rect, QBrush{grad});
     }
+
+    draw_patterns.template operator()<Direction::Forward>(draw_row_numbers, seq);
+    draw_patterns.template operator()<Direction::Reverse>(draw_row_numbers, seq);
 
     // Draw divider down right side of each column.
     painter.setPen(visual.channel_divider);
