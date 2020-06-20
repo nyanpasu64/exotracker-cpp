@@ -1190,95 +1190,126 @@ static doc::FractionInt frac_next(doc::BeatFraction frac) {
     return frac_floor(frac) + 1;
 }
 
-static inline doc::BeatFraction to_rows(
-    PatternEditorPanel const & self, doc::BeatFraction beats
-) {
-    return beats / self._beats_per_row;
-}
-
-template<typename T>
-static inline doc::BeatFraction to_beats(
-    PatternEditorPanel const & self, T rows
-) {
-    return rows * self._beats_per_row;
-}
-
+using BeatsToUnits =
+    doc::BeatFraction (*)(PatternEditorPanel const &, doc::BeatFraction);
+using UnitsToBeats =
+    doc::BeatFraction (*)(PatternEditorPanel const &, doc::FractionInt);
 
 static bool wrap_cursor = true;
 static bool wrap_across_frames = true;
 
+// Move the cursor, snapping to the nearest unit.
 
-void PatternEditorPanel::up_pressed(bool shift_held) {
-    qDebug() << "up pressed, shift_held =" << shift_held;
+template<BeatsToUnits to_units, UnitsToBeats to_beats>
+void move_up(PatternEditorPanel & self, bool shift_held) {
+    doc::Document const & document = self.get_document();
 
-    doc::Document const & document = get_document();
+    auto const orig_unit = to_units(self, self._cursor_y.beat);
+    doc::FractionInt const up_unit = frac_prev(orig_unit);
+    doc::FractionInt out_unit;
 
-    auto const orig_row = to_rows(*this, _cursor_y.beat);
-    doc::FractionInt const up_row = frac_prev(orig_row);
-    doc::FractionInt out_row;
-
-    if (up_row >= 0) {
-        out_row = up_row;
+    if (up_unit >= 0) {
+        out_unit = up_unit;
 
     } else if (wrap_cursor) {
         if (wrap_across_frames) {
-            _cursor_y.seq_entry_index -= 1;
+            self._cursor_y.seq_entry_index -= 1;
             inplace_modulo(
-                _cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
+                self._cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
             );
         }
 
-        auto const & seq_entry = document.sequence[_cursor_y.seq_entry_index];
-        out_row = frac_prev(to_rows(*this, seq_entry.nbeats));
+        auto const & seq_entry = document.sequence[self._cursor_y.seq_entry_index];
+        out_unit = frac_prev(to_units(self, seq_entry.nbeats));
 
     } else {
-        out_row = 0;
+        out_unit = 0;
     }
 
-    _cursor_y.beat = to_beats(*this, out_row);
+    self._cursor_y.beat = to_beats(self, out_unit);
     if (!shift_held) {
-        _select_begin_y = _cursor_y;
+        self._select_begin_y = self._cursor_y;
     }
 }
 
-void PatternEditorPanel::down_pressed(bool shift_held) {
-    qDebug() << "down pressed, shift_held =" << shift_held;
+template<BeatsToUnits to_units, UnitsToBeats to_beats>
+void move_down(PatternEditorPanel & self, bool shift_held) {
+    doc::Document const & document = self.get_document();
 
-    doc::Document const & document = get_document();
+    auto const & seq_entry = document.sequence[self._cursor_y.seq_entry_index];
+    auto const num_units = to_units(self, seq_entry.nbeats);
 
-    auto const & seq_entry = document.sequence[_cursor_y.seq_entry_index];
-    auto const num_rows = to_rows(*this, seq_entry.nbeats);
+    auto const orig_unit = to_units(self, self._cursor_y.beat);
+    doc::FractionInt const down_unit = frac_next(orig_unit);
+    doc::FractionInt out_unit;
 
-    auto const orig_row = to_rows(*this, _cursor_y.beat);
-    doc::FractionInt const down_row = frac_next(orig_row);
-    doc::FractionInt out_row;
-
-    if (down_row < num_rows) {
-        out_row = down_row;
+    if (down_unit < num_units) {
+        out_unit = down_unit;
 
     } else if (wrap_cursor) {
         if (wrap_across_frames) {
-            _cursor_y.seq_entry_index += 1;
-            _cursor_y.seq_entry_index %= (SeqEntryIndex) document.sequence.size();
+            self._cursor_y.seq_entry_index += 1;
+            self._cursor_y.seq_entry_index %= (SeqEntryIndex) document.sequence.size();
         }
 
-        out_row = 0;
+        out_unit = 0;
 
     } else {
         // don't move the cursor.
         goto skip_update;
     }
 
-    _cursor_y.beat = to_beats(*this, out_row);
+    self._cursor_y.beat = to_beats(self, out_unit);
 
     skip_update:
     if (!shift_held) {
-        _select_begin_y = _cursor_y;
+        self._select_begin_y = self._cursor_y;
     }
 }
 
-void PatternEditorPanel::prev_beat_pressed(bool shift_held) {}
-void PatternEditorPanel::next_beat_pressed(bool shift_held) {}
+// Beat conversion functions
+
+static inline doc::BeatFraction beats_to_rows(
+    PatternEditorPanel const & self, doc::BeatFraction beats
+) {
+    return beats / self._beats_per_row;
+}
+
+template<typename T>
+static inline doc::BeatFraction rows_to_beats(
+    PatternEditorPanel const & self, T rows
+) {
+    return rows * self._beats_per_row;
+}
+
+template<typename T>
+static inline doc::BeatFraction beats_to_beats(
+    [[maybe_unused]] PatternEditorPanel const & self, T beats
+) {
+    return beats;
+}
+
+// Cursor movement
+
+void PatternEditorPanel::up_pressed(bool shift_held) {
+    qDebug() << "up pressed, shift_held =" << shift_held;
+    move_up<beats_to_rows, rows_to_beats>(*this, shift_held);
+}
+
+void PatternEditorPanel::down_pressed(bool shift_held) {
+    qDebug() << "down pressed, shift_held =" << shift_held;
+    move_down<beats_to_rows, rows_to_beats>(*this, shift_held);
+}
+
+void PatternEditorPanel::prev_beat_pressed(bool shift_held) {
+    qDebug() << "ctrl+up pressed, shift_held =" << shift_held;
+    move_up<beats_to_beats, beats_to_beats>(*this, shift_held);
+}
+
+void PatternEditorPanel::next_beat_pressed(bool shift_held) {
+    qDebug() << "ctrl+down pressed, shift_held =" << shift_held;
+    move_down<beats_to_beats, beats_to_beats>(*this, shift_held);
+}
 
 void PatternEditorPanel::prev_event_pressed(bool shift_held) {}
 void PatternEditorPanel::next_event_pressed(bool shift_held) {}
