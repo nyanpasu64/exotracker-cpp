@@ -196,13 +196,20 @@ static void setup_shortcuts(PatternEditorPanel & self) {
             &self._shortcuts.KEY.key, \
             &QShortcut::activated, \
             &self, \
-            [=, &self] () { self.KEY##_pressed(false); self.repaint(); } \
+            [=, &self] () { \
+                self.KEY##_pressed(); \
+                self._select_begin_y = self._cursor_y; \
+                self.repaint(); \
+            } \
         ); \
         QObject::connect( \
             &self._shortcuts.KEY.shift_key, \
             &QShortcut::activated, \
             &self, \
-            [=, &self] () { self.KEY##_pressed(true); self.repaint(); } \
+            [=, &self] () { \
+                self.KEY##_pressed(); \
+                self.repaint(); \
+            } \
         );
     SHORTCUT_PAIRS(X, )
     #undef X
@@ -1259,7 +1266,7 @@ MovementConfig move_cfg;
 // Move the cursor, snapping to the nearest unit.
 
 template<BeatsToUnits to_units, UnitsToBeats to_beats>
-void move_up(PatternEditorPanel & self, bool shift_held) {
+void move_up(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
 
     auto const orig_unit = to_units(self, self._cursor_y.beat);
@@ -1284,13 +1291,10 @@ void move_up(PatternEditorPanel & self, bool shift_held) {
     }
 
     self._cursor_y.beat = to_beats(self, out_unit);
-    if (!shift_held) {
-        self._select_begin_y = self._cursor_y;
-    }
 }
 
 template<BeatsToUnits to_units, UnitsToBeats to_beats>
-void move_down(PatternEditorPanel & self, bool shift_held) {
+void move_down(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
 
     auto const & seq_entry = document.sequence[self._cursor_y.seq_entry_index];
@@ -1314,15 +1318,10 @@ void move_down(PatternEditorPanel & self, bool shift_held) {
 
     } else {
         // don't move the cursor.
-        goto skip_update;
+        return;
     }
 
     self._cursor_y.beat = to_beats(self, out_unit);
-
-    skip_update:
-    if (!shift_held) {
-        self._select_begin_y = self._cursor_y;
-    }
 }
 
 // Beat conversion functions
@@ -1349,35 +1348,31 @@ static inline doc::BeatFraction beats_to_beats(
 
 // Cursor movement
 
-void PatternEditorPanel::up_pressed(bool shift_held) {
-    qDebug() << "up pressed, shift_held =" << shift_held;
-    move_up<beats_to_rows, rows_to_beats>(*this, shift_held);
+void PatternEditorPanel::up_pressed() {
+    move_up<beats_to_rows, rows_to_beats>(*this);
 }
 
-void PatternEditorPanel::down_pressed(bool shift_held) {
-    qDebug() << "down pressed, shift_held =" << shift_held;
-    move_down<beats_to_rows, rows_to_beats>(*this, shift_held);
+void PatternEditorPanel::down_pressed() {
+    move_down<beats_to_rows, rows_to_beats>(*this);
 }
 
-void PatternEditorPanel::prev_beat_pressed(bool shift_held) {
-    qDebug() << "ctrl+up pressed, shift_held =" << shift_held;
-    move_up<beats_to_beats, beats_to_beats>(*this, shift_held);
+void PatternEditorPanel::prev_beat_pressed() {
+    move_up<beats_to_beats, beats_to_beats>(*this);
 }
 
-void PatternEditorPanel::next_beat_pressed(bool shift_held) {
-    qDebug() << "ctrl+down pressed, shift_held =" << shift_held;
-    move_down<beats_to_beats, beats_to_beats>(*this, shift_held);
+void PatternEditorPanel::next_beat_pressed() {
+    move_down<beats_to_beats, beats_to_beats>(*this);
 }
 
 // TODO depends on horizontal cursor position.
-void PatternEditorPanel::prev_event_pressed(bool shift_held) {}
-void PatternEditorPanel::next_event_pressed(bool shift_held) {}
+void PatternEditorPanel::prev_event_pressed() {}
+void PatternEditorPanel::next_event_pressed() {}
 
 /// To avoid an infinite loop,
 /// avoid scrolling more than _ patterns in a single Page Down keystroke.
 constexpr int MAX_PAGEDOWN_SCROLL = 16;
 
-void PatternEditorPanel::scroll_prev_pressed(bool shift_held) {
+void PatternEditorPanel::scroll_prev_pressed() {
     doc::Document const & document = get_document();
 
     _cursor_y.beat -= move_cfg.page_down_distance;
@@ -1394,7 +1389,7 @@ void PatternEditorPanel::scroll_prev_pressed(bool shift_held) {
     }
 }
 
-void PatternEditorPanel::scroll_next_pressed(bool shift_held) {
+void PatternEditorPanel::scroll_next_pressed() {
     doc::Document const & document = get_document();
 
     _cursor_y.beat += move_cfg.page_down_distance;
@@ -1412,8 +1407,8 @@ void PatternEditorPanel::scroll_next_pressed(bool shift_held) {
     }
 }
 
-void PatternEditorPanel::prev_pattern_pressed(bool shift_held) {}
-void PatternEditorPanel::next_pattern_pressed(bool shift_held) {}
+void PatternEditorPanel::prev_pattern_pressed() {}
+void PatternEditorPanel::next_pattern_pressed() {}
 
 
 // namespace

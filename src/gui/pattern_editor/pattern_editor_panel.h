@@ -175,7 +175,7 @@ PatternEditorPanel_INTERNAL:
     // QShortcut signals are bound to a lambda slot, which calls these methods.
 
     #define X(KEY) \
-        void KEY##_pressed(bool shift_held);
+        void KEY##_pressed();
     SHORTCUT_PAIRS(X, )
     #undef X
 };
