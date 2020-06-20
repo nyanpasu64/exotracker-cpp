@@ -80,6 +80,10 @@ static constexpr QColor gray(int value) {
     return QColor{value, value, value};
 }
 
+static constexpr QColor gray_alpha(int value, int alpha) {
+    return QColor{value, value, value, alpha};
+}
+
 struct FontTweaks {
     int width_adjust = 0;
 
@@ -99,7 +103,9 @@ struct PatternAppearance {
     QColor gridline_non_beat = gray(80);
 
     /// Cursor color.
-    QColor cursor_row{0, 224, 255};
+    QColor cursor_row = gray(240);
+    int cursor_top_alpha = 48;
+    int cursor_bottom_alpha = 0;
 
     /// Foreground line color, also used as note text color.
     QColor note_line_beat{255, 255, 96};
@@ -877,13 +883,42 @@ static void draw_pattern_background(
         }
     };
 
-    auto [seq, cursor_y] =
+    auto [seq, cursor_top] =
         SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
 
     // this syntax has got to be a joke, right?
     // C++ needs the turbofish so badly
     draw_patterns.template operator()<Direction::Forward>(seq);
     draw_patterns.template operator()<Direction::Reverse>(seq);
+
+    // Draw cursor gradient.
+    if (columns.cols.size()) {
+        int row_left_px = columns.cols[0].left_px;
+        int row_right_px = columns.cols[columns.cols.size() - 1].right_px;
+
+        int cursor_bottom = cursor_top + self._pixels_per_row;
+
+        painter.setPen(visual.cursor_row);
+
+        GridRect cursor_rect{
+            QPoint{row_left_px, cursor_top}, QPoint{row_right_px, cursor_bottom}
+        };
+        // QLinearGradient's constructor takes the begin and endpoints.
+        QLinearGradient grad{cursor_rect.left_top(), cursor_rect.left_bottom()};
+
+        // You need to assign the color map afterwards.
+        QColor cursor_bg_top{visual.cursor_row}, cursor_bg_bottom{visual.cursor_row};
+        cursor_bg_top.setAlpha(visual.cursor_top_alpha);
+        cursor_bg_bottom.setAlpha(visual.cursor_bottom_alpha);
+
+        grad.setStops(QGradientStops{
+            QPair{0., cursor_bg_top},
+            QPair{1., cursor_bg_bottom},
+        });
+
+        // Then cast it into a QBrush, and draw the background.
+        painter.fillRect(cursor_rect, QBrush{grad});
+    }
 
     // Draw divider down right side of each column.
     painter.setPen(visual.channel_divider);
