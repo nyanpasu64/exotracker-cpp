@@ -17,6 +17,7 @@ namespace audio::synth::nes_2a03_driver {
 using namespace doc::tuning;
 using namespace music_driver;
 using chip_kinds::Apu1ChannelID;
+using audio_gui::MaybeSequencerTime;
 
 // Pulse 1/2 driver
 
@@ -136,13 +137,22 @@ public:
         _tuning_table = make_tuning_table(frequencies, _clocks_per_sec);
     }
 
-    void driver_tick(
+    MaybeSequencerTime driver_tick(
         doc::Document const & document,
         ChipIndex chip_index,
         RegisterWriteQueue &/*out*/ register_writes
     ) {
-        EnumMap<ChannelID, sequencer::EventsRef> channel_events =
-            _chip_sequencer.sequencer_tick(document, chip_index);
+        auto chip_time = MaybeSequencerTime::none();
+        // Values are empty slices.
+        auto channel_events = EnumMap<ChannelID, sequencer::EventsRef>{};
+
+        // TODO if not playing, don't tick sequencer.
+        {
+            auto [seq_chip_time, seq_channel_events] =
+                _chip_sequencer.sequencer_tick(document, chip_index);
+            chip_time = MaybeSequencerTime{seq_chip_time};
+            channel_events = seq_channel_events;
+        }
 
         _pulse1_driver.tick(
             document, channel_events[ChannelID::Pulse1], /*mut*/ register_writes
@@ -152,6 +162,7 @@ public:
         );
 
         // TODO write $4015 to register_writes, if I ever add envelope functionality.
+        return chip_time;
     }
 };
 

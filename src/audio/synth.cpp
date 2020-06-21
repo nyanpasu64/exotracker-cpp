@@ -76,6 +76,8 @@ void OverallSynth::synthesize_overall(
     */
     blip_nsamp_t samples_so_far = 0;  // [0, nsamp]
 
+    auto play_time = _play_time.load(std::memory_order_relaxed);
+
     while (true) {
         release_assert(samples_so_far <= nsamp);
 
@@ -126,7 +128,6 @@ void OverallSynth::synthesize_overall(
 
             // This is the important one.
             case SynthEvent::Tick: {
-                // Reset register write queue.
                 ChipIndex const nchip = (ChipIndex) _chip_instances.size();
 
                 for (ChipIndex chip_index = 0; chip_index < nchip; chip_index++) {
@@ -134,12 +135,22 @@ void OverallSynth::synthesize_overall(
 
                     RegisterWriteQueue & register_writes = chip._register_writes;
                     release_assert(register_writes.num_unread() == 0);
+
+                    // Reset register write queue.
                     register_writes.clear();
 
                     // chip's time passes.
-                    chip.driver_tick(document, chip_index);
+                    auto chip_time = chip.driver_tick(document, chip_index);
+
+                    // Ensure all chip sequencers are running in sync.
+                    if (chip_index > 0) {
+                        // TODO release_assert?
+                        assert(play_time == chip_time);
+                    }
+                    play_time = chip_time;
                 }
 
+                // Schedule next tick.
                 _events.set_timeout(SynthEvent::Tick, _clocks_per_tick);
                 break;
             }
@@ -147,6 +158,10 @@ void OverallSynth::synthesize_overall(
             case SynthEvent::COUNT: break;
         }
     }
+
+    // If sequencer not running, overwrite timestamp with none.
+    // Otherwise overwrite with latest time.
+    _play_time.store(play_time, std::memory_order_relaxed);
 }
 
 // end namespaces

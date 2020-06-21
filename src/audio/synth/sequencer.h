@@ -2,17 +2,20 @@
 
 #include "doc.h"
 #include "chip_common.h"
+#include "audio_gui_common.h"
 #include "util/enum_map.h"
 #include "util/release_assert.h"
 #include "util/compare.h"
 
 #include <gsl/span>
 
+#include <tuple>
 #include <vector>
 
 namespace audio::synth::sequencer {
 
 using namespace chip_common;
+using audio_gui::SequencerTime;
 
 using EventsRef = gsl::span<doc::RowEvent const>;
 using EventIndex = uint32_t;
@@ -127,7 +130,7 @@ public:
     void seek() {}
 
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
-    EventsRef next_tick(
+    std::tuple<SequencerTime, EventsRef> next_tick(
         doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
     );
 };
@@ -142,17 +145,29 @@ public:
     // impl
 
     /// Eventually, (document, ChipIndex) will be passed in as well.
-    EnumMap<ChannelID, EventsRef> sequencer_tick(
+    std::tuple<SequencerTime, EnumMap<ChannelID, EventsRef>> sequencer_tick(
         doc::Document const & document, ChipIndex chip_index
     ) {
         EnumMap<ChannelID, EventsRef> channel_events;
 
+        auto seq_chip_time = SequencerTime::_none();
+
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
-            channel_events[chan] = _channel_sequencers[chan]
-                .next_tick(document, chip_index, chan);
+            auto [seq_chan_time, events] =
+                _channel_sequencers[chan].next_tick(document, chip_index, chan);
+
+            // Get audio position.
+            if (seq_chip_time != SequencerTime::_none()) {
+                // TODO should this be release_assert?
+                assert(seq_chip_time == seq_chan_time);
+            }
+            seq_chip_time = seq_chan_time;
+
+            // Get events.
+            channel_events[chan] = events;
         }
 
-        return channel_events;
+        return {seq_chip_time, channel_events};
     }
 };
 

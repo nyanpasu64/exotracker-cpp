@@ -4,8 +4,10 @@
 #include "synth_common.h"
 #include "audio_common.h"
 #include "doc.h"
+#include "audio_gui_common.h"
 #include "util/enum_map.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 
@@ -22,8 +24,8 @@ enum class SynthEvent {
     COUNT
 };
 
-/// <'a>
-///
+using audio_gui::MaybeSequencerTime;
+
 /// Preconditions:
 /// - Sampling rate must be 1000 or more.
 ///   Otherwise blip_buffer constructor/set_sample_rate() breaks.
@@ -75,6 +77,11 @@ private:
     /// _chip_instances.size() in [1..MAX_NCHIP] inclusive. Derived from Document::chips.
     std::vector<std::unique_ptr<ChipInstance>> _chip_instances = {};
 
+    // Playback tracking
+    bool _sequencer_running = false;
+    std::atomic<MaybeSequencerTime> _play_time {MaybeSequencerTime::none()};
+    static_assert(decltype(_play_time)::is_always_lock_free);
+
     /// Per-chip "special audio" written into this and read into _nes_blip.
     /// This MUST remain the last field in the struct,
     /// which may/not improve memory locality of other fields.
@@ -109,6 +116,10 @@ public:
         gsl::span<Amplitude> output_buffer,
         size_t const mono_smp_per_block
     );
+
+    MaybeSequencerTime play_time() const {
+        return _play_time.load(std::memory_order_relaxed);
+    }
 };
 
 

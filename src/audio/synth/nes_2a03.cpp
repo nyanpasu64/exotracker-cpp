@@ -1,6 +1,7 @@
 #include "nes_2a03.h"
 #include "nes_2a03_driver.h"
 #include "audio/event_queue.h"
+#include "audio_gui_common.h"
 #include "util.h"
 #include "util/release_assert.h"
 
@@ -13,6 +14,8 @@
 namespace audio {
 namespace synth {
 namespace nes_2a03 {
+
+using audio_gui::MaybeSequencerTime;
 
 // Disable external linkage.
 namespace {
@@ -84,11 +87,11 @@ public:
     }
 
     // impl ChipInstance
-    void driver_tick(
+    MaybeSequencerTime driver_tick(
         doc::Document const & document, chip_common::ChipIndex chip_index
     ) override {
         // Sequencer's time passes.
-        _driver.driver_tick(document, chip_index, /*out*/ _register_writes);
+        return _driver.driver_tick(document, chip_index, /*out*/ _register_writes);
     }
 
     void synth_write_memory(RegisterWrite write) override {

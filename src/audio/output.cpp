@@ -51,6 +51,12 @@ public:
         _get_document(get_document)
     {}
 
+    // impl CallbackInterface
+
+    MaybeSequencerTime play_time() const override {
+        return synth.play_time();
+    }
+
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
     // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
     // interleaved=false was added to support ASIO's native representation.

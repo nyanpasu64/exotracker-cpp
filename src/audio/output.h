@@ -20,6 +20,7 @@
 #include "audio_common.h"
 #include "doc.h"
 #include "locked_doc.h"
+#include "audio_gui_common.h"
 #include "util/copy_move.h"
 
 #include <rtaudio/RtAudio.h>
@@ -29,8 +30,11 @@
 namespace audio {
 namespace output {
 
+using audio_gui::MaybeSequencerTime;
+
 struct CallbackInterface {
     virtual ~CallbackInterface() = default;
+    virtual MaybeSequencerTime play_time() const = 0;
 };
 
 struct AudioThreadHandle {
@@ -59,6 +63,11 @@ public:
     static AudioThreadHandle make(
         RtAudio & rt, unsigned int device, locked_doc::GetDocument & get_document
     );
+
+    /// Called by GUI pattern editor.
+    inline MaybeSequencerTime play_time() const {
+        return callback->play_time();
+    }
 
     ~AudioThreadHandle();
 

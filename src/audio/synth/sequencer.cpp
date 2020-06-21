@@ -62,7 +62,7 @@ doc::MaybeSeqEntryIndex calc_next_entry(
     // change function to return both a pattern and a beat.
 }
 
-EventsRef ChannelSequencer::next_tick(
+std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
 ) {
     _events_this_tick.clear();
@@ -75,6 +75,14 @@ EventsRef ChannelSequencer::next_tick(
 
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
+
+    // Return time note starts, not next tick. This is a subjective choice?
+    SequencerTime const seq_chan_time {
+        (uint16_t) _now.seq_entry,
+        (uint16_t) ticks_per_beat,
+        (int16_t) _now.next_tick.beat,
+        (int16_t) _now.next_tick.dtick,
+    };
 
     auto frac_to_tick = [ticks_per_beat](doc::BeatFraction beat) -> BeatPlusTick {
         doc::FractionInt ibeat = beat.numerator() / beat.denominator();
@@ -265,7 +273,7 @@ EventsRef ChannelSequencer::next_tick(
         check_invariants();
     }
 
-    return _events_this_tick;
+    return {seq_chan_time, _events_this_tick};
 }
 
 #ifdef UNITTEST

@@ -5,6 +5,7 @@
 #include "audio_common.h"
 #include "doc.h"
 #include "chip_common.h"
+#include "audio_gui_common.h"
 #include "util/enum_map.h"
 #include "util/copy_move.h"
 
@@ -17,6 +18,7 @@ namespace audio {
 namespace synth {
 
 using namespace chip_common;
+using audio_gui::MaybeSequencerTime;
 
 // https://wiki.nesdev.com/w/index.php/CPU
 // >Emulator authors may wish to emulate the NTSC NES/Famicom CPU at 21441960 Hz...
@@ -161,7 +163,7 @@ public:
     /// Mutates _register_writes.
     ///
     /// We take a Document& to avoid repeatedly mutating atomic refcounts (slow?)
-    virtual void driver_tick(
+    virtual MaybeSequencerTime driver_tick(
         doc::Document const & document, chip_common::ChipIndex chip_index
     ) = 0;
 
