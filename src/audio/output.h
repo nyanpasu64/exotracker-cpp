@@ -38,9 +38,9 @@ struct CallbackInterface {
     virtual MaybeSequencerTime play_time() const = 0;
 };
 
-struct AudioThreadHandle {
+class AudioThreadHandle {
     // Used to shut down the stream when AudioThreadHandle is destroyed.
-    std::reference_wrapper<RtAudio> rt;
+    std::reference_wrapper<RtAudio> _rt;
 
     // output.h does not contain #include "synth.h",
     // and only exposes output::OutputCallback via unique_ptr<CallbackInterface>.
@@ -50,14 +50,14 @@ struct AudioThreadHandle {
     //
     // No disadvantage: No speed loss from indirection (unsure about reduced locality),
     //  since RtAudio accesses via pointer anyway.
-    std::unique_ptr<CallbackInterface> callback;
+    std::unique_ptr<CallbackInterface> _callback;
 
-public:
     AudioThreadHandle(RtAudio & rt, std::unique_ptr<CallbackInterface> && callback)
-        : rt{rt}
-        , callback{std::move(callback)}
+        : _rt{rt}
+        , _callback{std::move(callback)}
     {}
 
+public:
     // Moving `this` is okay because `callback` is stored behind a unique_ptr.
     // But for some reason, move assignment defaults to deleted copy assignment,
     // not move assignment.
@@ -78,7 +78,7 @@ public:
 
     /// Called by GUI pattern editor.
     inline MaybeSequencerTime play_time() const {
-        return callback->play_time();
+        return _callback->play_time();
     }
 
     ~AudioThreadHandle();

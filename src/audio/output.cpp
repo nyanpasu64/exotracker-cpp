@@ -146,17 +146,17 @@ AudioThreadHandle AudioThreadHandle::make(
 
 AudioThreadHandle::~AudioThreadHandle() {
     // Don't stop audio if this has been moved from.
-    if (!callback) {
+    if (!_callback) {
         return;
     }
 
     try {
-        rt.get().stopStream();
+        _rt.get().stopStream();
     } catch (RtAudioError & e) {
         e.printMessage();
     }
 
-    rt.get().closeStream();
+    _rt.get().closeStream();
 }
 
 // end namespaces
