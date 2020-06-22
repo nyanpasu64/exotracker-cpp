@@ -8,8 +8,10 @@
 #include <rtaudio/RtAudio.h>
 
 #include <QApplication>
+#include <QTimer>
 
 #include <iostream>
+#include <optional>
 #include <variant>
 
 #include "win32_fonts.h"
@@ -113,10 +115,23 @@ int main(int argc, char *argv[])
     unsigned int device = rt.getDefaultOutputDevice();
 
     // Begin playing audio. Destroying this variable makes audio stop.
-    auto audio_handle = audio::output::AudioThreadHandle::make(rt, device, history);
+    std::optional audio_handle{
+        audio::output::AudioThreadHandle::make(rt, device, history)
+    };
 
     unique_ptr<MainWindow> w = MainWindow::make(history);
     w->show();
+
+    QTimer timer;
+    timer.setInterval(1000);
+    timer.callOnTimeout([&] () {
+        // Only one stream can be running at a time.
+        // The lifetimes of the old and new audio thread must not overlap.
+        // So destroy the old before constructing the new.
+        audio_handle = {};
+        audio_handle = audio::output::AudioThreadHandle::make(rt, device, history);
+    });
+    timer.start();
 
     return a.exec();
 }
