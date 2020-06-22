@@ -25,6 +25,7 @@
 
 #include <rtaudio/RtAudio.h>
 
+#include <functional>  // reference_wrapper
 #include <memory>
 
 namespace audio {
@@ -39,7 +40,7 @@ struct CallbackInterface {
 
 struct AudioThreadHandle {
     // Used to shut down the stream when AudioThreadHandle is destroyed.
-    RtAudio & rt;
+    std::reference_wrapper<RtAudio> rt;
 
     // output.h does not contain #include "synth.h",
     // and only exposes output::OutputCallback via unique_ptr<CallbackInterface>.
@@ -52,6 +53,17 @@ struct AudioThreadHandle {
     std::unique_ptr<CallbackInterface> callback;
 
 public:
+    AudioThreadHandle(RtAudio & rt, std::unique_ptr<CallbackInterface> && callback)
+        : rt{rt}
+        , callback{std::move(callback)}
+    {}
+
+    // Moving `this` is okay because `callback` is stored behind a unique_ptr.
+    // But for some reason, move assignment defaults to deleted copy assignment,
+    // not move assignment.
+    // So explicitly opt into moves.
+    DISABLE_COPY(AudioThreadHandle)
+    DEFAULT_MOVE(AudioThreadHandle)
 
     /// Preconditions:
     /// - get_document argument must outlive returned OverallSynth.
@@ -70,10 +82,6 @@ public:
     }
 
     ~AudioThreadHandle();
-
-    // unique_ptr prevents copying.
-    // Moving `this` is okay because `callback` is stored behind a unique_ptr.
-    // Don't disable copy or move, keep aggregate initialization.
 };
 
 }   // namespace output

@@ -141,17 +141,22 @@ AudioThreadHandle AudioThreadHandle::make(
 
     rt.startStream();
 
-    return AudioThreadHandle{.rt=rt, .callback=std::move(callback)};
+    return AudioThreadHandle{rt, std::move(callback)};
 }
 
 AudioThreadHandle::~AudioThreadHandle() {
+    // Don't stop audio if this has been moved from.
+    if (!callback) {
+        return;
+    }
+
     try {
-        rt.stopStream();
+        rt.get().stopStream();
     } catch (RtAudioError & e) {
         e.printMessage();
     }
 
-    rt.closeStream();
+    rt.get().closeStream();
 }
 
 // end namespaces
