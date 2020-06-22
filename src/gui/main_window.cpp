@@ -24,6 +24,9 @@
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
 
+#include <optional>
+#include <stdexcept>  // logic_error
+
 namespace gui {
 
 using std::unique_ptr;
@@ -34,13 +37,13 @@ using gui::pattern_editor::PatternEditorPanel;
 W_OBJECT_IMPL(MainWindow)
 
 // module-private
-class MainWindowPrivate : public MainWindow {
+class MainWindowImpl : public MainWindow {
 public: // module-private
     // widget pointers go here, if needed
 
     PatternEditorPanel * pattern_editor_panel;
 
-    MainWindowPrivate(history::History & history, QWidget * parent) :
+    MainWindowImpl(history::History & history, QWidget * parent) :
         MainWindow(parent)
     {
         setupUi();
@@ -57,14 +60,16 @@ public: // module-private
     }
 };
 
+static MainWindow * instance;
 
 // public
 std::unique_ptr<MainWindow> MainWindow::make(
     history::History & history, QWidget * parent
 ) {
-    return make_unique<MainWindowPrivate>(history, parent);
+    auto out = make_unique<MainWindowImpl>(history, parent);
+    instance = &*out;
+    return out;
 }
-
 
 MainWindow::MainWindow(QWidget *parent) :
     // I kinda regret using the same name for namespace "history" and member variable "history".
@@ -73,8 +78,18 @@ MainWindow::MainWindow(QWidget *parent) :
 {}
 
 
-MainWindow::~MainWindow()
-{}
+MainWindow & MainWindow::get_instance() {
+    if (instance) {
+        return *instance;
+    } else {
+        throw std::logic_error("Tried to get instance when none was present");
+    }
+}
+
+
+MainWindow::~MainWindow() {
+    instance = nullptr;
+}
 
 // namespace
 }

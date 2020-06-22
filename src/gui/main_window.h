@@ -26,6 +26,8 @@ public:
         history::History & history, QWidget * parent = nullptr
     );
 
+    static MainWindow & get_instance();
+
     MainWindow(QWidget *parent = nullptr);
     virtual void _() = 0;
     virtual ~MainWindow();
