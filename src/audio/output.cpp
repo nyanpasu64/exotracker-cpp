@@ -101,7 +101,7 @@ static unsigned int const MONO_SMP_PER_BLOCK = 64;
 
 /// Why factory method and not constructor?
 /// So we can calculate values (like sampling rate) used in multiple places.
-AudioThreadHandle AudioThreadHandle::make(
+std::optional<AudioThreadHandle> AudioThreadHandle::make(
     RtAudio & rt, unsigned int device, locked_doc::GetDocument & get_document
 ) {
     RtAudio::StreamParameters outParams;
@@ -121,27 +121,36 @@ AudioThreadHandle AudioThreadHandle::make(
         outParams.nChannels, sample_rate, get_document, audio_options
     );
 
-    rt.openStream(
-        &/*mut*/ outParams,
-        nullptr,
-        AmplitudeFmt,
-        sample_rate,
-        &/*mut*/ mono_smp_per_block,
-        OutputCallback::rtaudio_callback,
-        callback.get(),
-        &/*mut*/ stream_opt
-    );
-    /*
-    What does RtAudio::openStream() mutate?
+    // On OpenSUSE Tumbleweed, if you hold F12,
+    // sometimes PulseAudio tells RtAudio there are 0 output devices,
+    // and RtAudio throws an exception trying to open device 0.
+    // TODO return RtAudio error message? They're not very useful TBH.
+    try {
+        rt.openStream(
+            &/*mut*/ outParams,
+            nullptr,
+            AmplitudeFmt,
+            sample_rate,
+            &/*mut*/ mono_smp_per_block,
+            OutputCallback::rtaudio_callback,
+            callback.get(),
+            &/*mut*/ stream_opt
+        );
+        /*
+        What does RtAudio::openStream() mutate?
 
-    outParams: Not mutated. If nChannels decreased, would result in out-of-bounds writes.
-    mono_smp_per_block: Mutated by DirectSound, but callback doesn't store the old value.
-    stream_opt: Only numberOfBuffers is mutated. If flags mutated, would result in garbled audio.
-    */
+        outParams: Not mutated. If nChannels decreased, would result in out-of-bounds writes.
+        mono_smp_per_block: Mutated by DirectSound, but callback doesn't store the old value.
+        stream_opt: Only numberOfBuffers is mutated. If flags mutated, would result in garbled audio.
+        */
 
-    rt.startStream();
+        rt.startStream();
+    } catch (RtAudioError & e) {
+        e.printMessage();
+        return {};
+    }
 
-    return AudioThreadHandle{rt, std::move(callback)};
+    return {AudioThreadHandle{rt, std::move(callback)}};
 }
 
 AudioThreadHandle::~AudioThreadHandle() {

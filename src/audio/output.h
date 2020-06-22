@@ -72,8 +72,8 @@ public:
     /// - In get_document's list of chips, any APU2 must be preceded directly with APU1.
     ///
     /// throws PaException or PaCppException or whatever else
-    static AudioThreadHandle make(
-        RtAudio & rt, unsigned int device, locked_doc::GetDocument & get_document
+    static std::optional<AudioThreadHandle> make(
+        RtAudio & _rt, unsigned int device, locked_doc::GetDocument & get_document
     );
 
     /// Called by GUI pattern editor.
