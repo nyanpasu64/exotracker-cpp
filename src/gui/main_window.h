@@ -12,8 +12,6 @@
 
 namespace gui {
 
-class MainWindowPrivate;
-
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
 class MainWindow : public QMainWindow
 {
@@ -31,8 +29,6 @@ public:
     MainWindow(QWidget *parent = nullptr);
     virtual void _() = 0;
     virtual ~MainWindow();
-
-    friend class MainWindowPrivate;
 };
 
 
