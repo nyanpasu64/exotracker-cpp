@@ -612,7 +612,7 @@ using PxInt = int;
 /// Convert a pattern (technically sequence entry) duration to a display height.
 PxInt pixels_from_beat(PatternEditorPanel const & widget, doc::BeatFraction beat) {
     PxInt out = doc::round_to_int(
-        beat / widget._beats_per_row * widget._pixels_per_row
+        beat * widget._rows_per_beat * widget._pixels_per_row
     );
     return out;
 }
@@ -844,10 +844,11 @@ static void draw_pattern_background(
         // Draw rows.
         // Begin loop(row)
         int row = 0;
+        doc::BeatFraction const beats_per_row{1, self._rows_per_beat};
         doc::BeatFraction curr_beats = 0;
         for (;
             curr_beats < seq_entry.nbeats;
-            curr_beats += self._beats_per_row, row += 1)
+            curr_beats += beats_per_row, row += 1)
         {
             // Compute row height.
             int ytop = pos.top + self._pixels_per_row * row;
@@ -869,10 +870,11 @@ static void draw_pattern_background(
         // Draw rows.
         // Begin loop(row)
         int row = 0;
+        doc::BeatFraction const beats_per_row{1, self._rows_per_beat};
         doc::BeatFraction curr_beats = 0;
         for (;
             curr_beats < seq_entry.nbeats;
-            curr_beats += self._beats_per_row, row += 1)
+            curr_beats += beats_per_row, row += 1)
         {
             int ytop = pos.top + self._pixels_per_row * row;
 
@@ -1045,7 +1047,7 @@ static void draw_pattern_foreground(
 
                 // Compute where to draw row.
                 Frac beat = time.anchor_beat;
-                Frac row = beat / self._beats_per_row;
+                Frac row = beat * self._rows_per_beat;
                 int yPx = doc::round_to_int(self._pixels_per_row * row);
 
                 // Move painter relative to current row (not cell).
@@ -1329,14 +1331,14 @@ void move_down(PatternEditorPanel & self) {
 static inline doc::BeatFraction rows_from_beats(
     PatternEditorPanel const & self, doc::BeatFraction beats
 ) {
-    return beats / self._beats_per_row;
+    return beats * self._rows_per_beat;
 }
 
 template<typename T>
 static inline doc::BeatFraction beats_from_rows(
     PatternEditorPanel const & self, T rows
 ) {
-    return rows * self._beats_per_row;
+    return rows / doc::BeatFraction{self._rows_per_beat};
 }
 
 template<typename T>
