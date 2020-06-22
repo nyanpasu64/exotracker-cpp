@@ -118,7 +118,7 @@ public:
     );
 
     MaybeSequencerTime play_time() const {
-        return _play_time.load(std::memory_order_relaxed);
+        return _play_time.load(std::memory_order_seq_cst);
     }
 };
 

@@ -162,7 +162,7 @@ void OverallSynth::synthesize_overall(
     end:
     // If sequencer not running, overwrite timestamp with none.
     // Otherwise overwrite with latest time.
-    _play_time.store(play_time, std::memory_order_relaxed);
+    _play_time.store(play_time, std::memory_order_seq_cst);
 }
 
 // end namespaces
