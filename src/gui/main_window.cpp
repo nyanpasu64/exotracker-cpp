@@ -69,7 +69,16 @@ public:
         // Hook up refresh timer.
         connect(
             &_gui_refresh_timer, &QTimer::timeout,
-            this, [this] () { emit gui_refresh(); }
+            this, [this] () {
+                auto maybe_seq_time = MaybeSequencerTime::none();
+
+                auto & audio_thread = audio_handle();
+                if (audio_thread.has_value()) {
+                    maybe_seq_time = audio_thread->play_time();
+                }
+
+                emit gui_refresh(maybe_seq_time);
+            }
         );
         setup_screen();
         // TODO setup_screen() when primaryScreen changed
@@ -156,7 +165,7 @@ public:
         _audio_handle = AudioThreadHandle::make(_rt, _audio_device, _history);
     }
 
-    std::optional<AudioThreadHandle> & audio_handle() override {
+    std::optional<AudioThreadHandle> const & audio_handle() override {
         return _audio_handle;
     }
 

@@ -5,6 +5,7 @@
 // Other widgets include main_window.h, since they rely on MainWindow for data/signals.
 #include "history.h"
 #include "doc.h"
+#include "audio_gui_common.h"
 #include "audio.h"
 
 #include <verdigris/wobjectdefs.h>
@@ -17,6 +18,7 @@
 namespace gui {
 
 using audio::output::AudioThreadHandle;
+using audio_gui::MaybeSequencerTime;
 
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
 class MainWindow : public QMainWindow
@@ -36,10 +38,11 @@ public:
     virtual void _() = 0;
     virtual ~MainWindow();
 
-    virtual std::optional<AudioThreadHandle> & audio_handle() = 0;
+    virtual std::optional<AudioThreadHandle> const & audio_handle() = 0;
 
 signals:
-    void gui_refresh() W_SIGNAL(gui_refresh)
+    void gui_refresh(MaybeSequencerTime maybe_seq_time)
+        W_SIGNAL(gui_refresh, (MaybeSequencerTime), maybe_seq_time)
 
 public slots:
     virtual void restart_audio_thread() = 0;

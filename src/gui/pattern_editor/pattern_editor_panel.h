@@ -16,8 +16,6 @@
 #include <cstdint>
 #include <functional>  // std::reference_wrapper
 
-W_REGISTER_ARGTYPE(audio_gui::MaybeSequencerTime)
-
 namespace gui::pattern_editor {
 
 struct PatternFontMetrics {
@@ -165,7 +163,7 @@ public slots:
     // update() is called by timers and user input.
     // It mutates state (cached audio playback position) and calls repaint().
     void update(audio_gui::MaybeSequencerTime maybe_seq_time);
-    W_SLOT(update)
+    W_SLOT(update, (audio_gui::MaybeSequencerTime))
 
 protected:
 

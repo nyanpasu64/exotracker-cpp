@@ -318,14 +318,10 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * parent) :
     // setContextMenuPolicy(Qt::CustomContextMenu);
 
     connect(
-        parent, &MainWindow::gui_refresh, this, [this] () {
-            auto maybe_seq_time = MaybeSequencerTime::none();
-
-            auto & x = win().audio_handle();
-            if (x.has_value()) {
-                maybe_seq_time = x->play_time();
-            }
-
+        parent,
+        &MainWindow::gui_refresh,
+        this,
+        [this] (MaybeSequencerTime maybe_seq_time) {
             update(maybe_seq_time);
         }
     );
