@@ -7,6 +7,8 @@
 #include <verdigris/wobjectdefs.h>
 
 #include <QMainWindow>
+#include <QWidget>
+
 #include <memory>
 
 
@@ -23,7 +25,7 @@ public:
 
     // impl
     static std::unique_ptr<MainWindow> make(
-        history::History & history, QWidget * parent = nullptr
+        doc::Document document, QWidget * parent = nullptr
     );
 
     static MainWindow & get_instance();
@@ -31,6 +33,10 @@ public:
     MainWindow(QWidget *parent = nullptr);
     virtual void _() = 0;
     virtual ~MainWindow();
+
+public slots:
+    virtual void restart_audio_thread() = 0;
+    W_SLOT(restart_audio_thread)
 };
 
 
