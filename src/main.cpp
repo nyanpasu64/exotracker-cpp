@@ -6,7 +6,6 @@
 #include <fmt/core.h>
 
 #include <QApplication>
-#include <QTimer>
 
 #include <variant>
 
@@ -72,11 +71,6 @@ int main(int argc, char *argv[])
     auto const & document = sample_docs::DOCUMENTS.at(arg.doc_name);
     unique_ptr<MainWindow> w = MainWindow::make(document.clone());
     w->show();
-
-    QTimer timer;
-    timer.setInterval(1000);
-    QObject::connect(&timer, &QTimer::timeout, &*w, &MainWindow::restart_audio_thread);
-    timer.start();
 
     return a.exec();
 }

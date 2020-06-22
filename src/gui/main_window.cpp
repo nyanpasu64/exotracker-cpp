@@ -7,6 +7,8 @@
 #include <rtaudio/RtAudio.h>
 #include <verdigris/wobjectimpl.h>
 
+#include <QShortcut>
+
 #include <iostream>
 #include <optional>
 #include <stdexcept>  // logic_error
@@ -32,17 +34,20 @@ using audio::output::AudioThreadHandle;
 
 // module-private
 class MainWindowImpl : public MainWindow {
-public: // module-private
-    // widget pointers go here, if needed
+public:
+    // fields
 
     gui::history::History _history;
 
+    // Use raw pointers since QObjects automatically destroy children.
     PatternEditorPanel * _pattern_editor_panel;
+    QShortcut _restart_audio_shortcut{QKeySequence{Qt::Key_F12}, this};
 
     RtAudio _rt;
     unsigned int _audio_device;
     std::optional<audio::output::AudioThreadHandle> _audio_handle;
 
+    // impl
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindow(parent)
         , _history{std::move(document)}
@@ -53,6 +58,11 @@ public: // module-private
         _pattern_editor_panel->set_history(_history);
 
         setup_audio();
+
+        connect(
+            &_restart_audio_shortcut, &QShortcut::activated,
+            this, &MainWindow::restart_audio_thread
+        );
     }
 
     void _() override {}
