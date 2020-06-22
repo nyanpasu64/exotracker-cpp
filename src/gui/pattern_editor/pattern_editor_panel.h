@@ -34,11 +34,12 @@ enum class ColumnCollapse {
 
 using doc::SeqEntryIndex;
 using RowIndex = uint32_t;
+using doc::BeatFraction;
 
 struct PatternAndBeat {
     SeqEntryIndex seq_entry_index = 0;
 //    RowIndex row_index = 0;
-    doc::BeatFraction beat = 0;
+    BeatFraction beat = 0;
 };
 
 struct ShortcutPair {

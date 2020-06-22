@@ -610,7 +610,7 @@ using PxInt = int;
 //using PxNat = uint32_t;
 
 /// Convert a pattern (technically sequence entry) duration to a display height.
-PxInt pixels_from_beat(PatternEditorPanel const & widget, doc::BeatFraction beat) {
+PxInt pixels_from_beat(PatternEditorPanel const & widget, BeatFraction beat) {
     PxInt out = doc::round_to_int(
         beat * widget._rows_per_beat * widget._pixels_per_row
     );
@@ -844,8 +844,8 @@ static void draw_pattern_background(
         // Draw rows.
         // Begin loop(row)
         int row = 0;
-        doc::BeatFraction const beats_per_row{1, self._rows_per_beat};
-        doc::BeatFraction curr_beats = 0;
+        BeatFraction const beats_per_row{1, self._rows_per_beat};
+        BeatFraction curr_beats = 0;
         for (;
             curr_beats < seq_entry.nbeats;
             curr_beats += beats_per_row, row += 1)
@@ -870,8 +870,8 @@ static void draw_pattern_background(
         // Draw rows.
         // Begin loop(row)
         int row = 0;
-        doc::BeatFraction const beats_per_row{1, self._rows_per_beat};
-        doc::BeatFraction curr_beats = 0;
+        BeatFraction const beats_per_row{1, self._rows_per_beat};
+        BeatFraction curr_beats = 0;
         for (;
             curr_beats < seq_entry.nbeats;
             curr_beats += beats_per_row, row += 1)
@@ -979,7 +979,7 @@ static void draw_pattern_foreground(
     QPainter & painter,
     GridRect const inner_rect
 ) {
-    using Frac = doc::BeatFraction;
+    using Frac = BeatFraction;
 
     // Take a backup of _image to self._temp_image.
     {
@@ -1244,24 +1244,22 @@ void PatternEditorPanel::paintEvent(QPaintEvent *event) {
 
 // # Cursor movement
 
-static doc::FractionInt frac_prev(doc::BeatFraction frac) {
+static doc::FractionInt frac_prev(BeatFraction frac) {
     return frac_ceil(frac) - 1;
 }
 
-static doc::FractionInt frac_next(doc::BeatFraction frac) {
+static doc::FractionInt frac_next(BeatFraction frac) {
     return frac_floor(frac) + 1;
 }
 
-using BeatsToUnits =
-    doc::BeatFraction (*)(PatternEditorPanel const &, doc::BeatFraction);
-using UnitsToBeats =
-    doc::BeatFraction (*)(PatternEditorPanel const &, doc::FractionInt);
+using BeatsToUnits = BeatFraction (*)(PatternEditorPanel const &, BeatFraction);
+using UnitsToBeats = BeatFraction (*)(PatternEditorPanel const &, doc::FractionInt);
 
 struct MovementConfig {
     bool wrap_cursor = true;
     bool wrap_across_frames = true;
 
-    doc::BeatFraction page_down_distance{1};
+    BeatFraction page_down_distance{1};
 };
 
 MovementConfig move_cfg;
@@ -1328,21 +1326,21 @@ void move_down(PatternEditorPanel & self) {
 
 // Beat conversion functions
 
-static inline doc::BeatFraction rows_from_beats(
-    PatternEditorPanel const & self, doc::BeatFraction beats
+static inline BeatFraction rows_from_beats(
+    PatternEditorPanel const & self, BeatFraction beats
 ) {
     return beats * self._rows_per_beat;
 }
 
 template<typename T>
-static inline doc::BeatFraction beats_from_rows(
+static inline BeatFraction beats_from_rows(
     PatternEditorPanel const & self, T rows
 ) {
-    return rows / doc::BeatFraction{self._rows_per_beat};
+    return rows / BeatFraction{self._rows_per_beat};
 }
 
 template<typename T>
-static inline doc::BeatFraction beats_from_beats(
+static inline BeatFraction beats_from_beats(
     [[maybe_unused]] PatternEditorPanel const & self, T beats
 ) {
     return beats;
@@ -1415,11 +1413,11 @@ inline void switch_seq_entry_index(PatternEditorPanel & self) {
 
     alter_mod(self._cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size());
 
-    doc::BeatFraction nbeats = document.sequence[self._cursor_y.seq_entry_index].nbeats;
+    BeatFraction nbeats = document.sequence[self._cursor_y.seq_entry_index].nbeats;
 
     // If cursor is out of bounds, move to last row in pattern.
     if (self._cursor_y.beat >= nbeats) {
-        doc::BeatFraction rows = rows_from_beats(self, nbeats);
+        BeatFraction rows = rows_from_beats(self, nbeats);
         int prev_row = frac_prev(rows);
         self._cursor_y.beat = beats_from_rows(self, prev_row);
     }
