@@ -123,7 +123,7 @@ void OverallSynth::synthesize_overall(
             case SynthEvent::EndOfCallback: {
                 release_assert_equal(samples_so_far, nsamp);
                 release_assert(_nes_blip.samples_avail() == 0);
-                return;
+                goto end;
             }
 
             // This is the important one.
@@ -159,6 +159,7 @@ void OverallSynth::synthesize_overall(
         }
     }
 
+    end:
     // If sequencer not running, overwrite timestamp with none.
     // Otherwise overwrite with latest time.
     _play_time.store(play_time, std::memory_order_relaxed);

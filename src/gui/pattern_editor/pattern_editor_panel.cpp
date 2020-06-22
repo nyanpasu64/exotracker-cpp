@@ -4,6 +4,7 @@
 #include "gui/lib/color.h"
 #include "gui/lib/format.h"
 #include "gui/lib/painter_ext.h"
+#include "gui_common.h"
 #include "chip_kinds.h"
 #include "util/compare.h"
 #include "util/math.h"
@@ -33,14 +34,19 @@ namespace gui::pattern_editor {
 using gui::lib::color::lerp;
 using gui::lib::color::lerp_colors;
 using gui::lib::color::lerp_srgb;
+
 using gui::lib::format::format_hex_1;
 using gui::lib::format::format_hex_2;
 namespace gui_fmt = gui::lib::format;
+
 using namespace gui::lib::painter_ext;
+
 using util::math::increment_mod;
 using util::math::decrement_mod;
 using util::math::frac_floor;
 using util::math::frac_ceil;
+
+using audio_gui::MaybeSequencerTime;
 
 W_OBJECT_IMPL(PatternEditorPanel)
 
@@ -284,7 +290,7 @@ void create_image(PatternEditorPanel & self) {
     self._temp_image = QImage(self.geometry().size(), format);
 }
 
-PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
+PatternEditorPanel::PatternEditorPanel(MainWindow * parent) :
     QWidget(parent),
     _dummy_history{doc::DocumentCopy{}},
     _history{_dummy_history},
@@ -310,6 +316,19 @@ PatternEditorPanel::PatternEditorPanel(QWidget *parent) :
 
     // setAttribute(Qt::WA_Hover);  (generates paint events when mouse cursor enters/exits)
     // setContextMenuPolicy(Qt::CustomContextMenu);
+
+    connect(
+        parent, &MainWindow::gui_refresh, this, [this] () {
+            auto maybe_seq_time = MaybeSequencerTime::none();
+
+            auto & x = win().audio_handle();
+            if (x.has_value()) {
+                maybe_seq_time = x->play_time();
+            }
+
+            update(maybe_seq_time);
+        }
+    );
 }
 
 void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
@@ -1240,6 +1259,33 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
 
 void PatternEditorPanel::paintEvent(QPaintEvent *event) {
     draw_pattern(*this, event->rect());
+}
+
+// # Following audio thread
+
+void PatternEditorPanel::update(audio_gui::MaybeSequencerTime maybe_seq_time) {
+    if (maybe_seq_time.has_value()) {
+        // Update cursor to sequencer position (from audio thread).
+        auto const seq_time = maybe_seq_time.get();
+
+        PatternAndBeat new_cursor_y{seq_time.seq_entry_index, seq_time.beats};
+
+        // Find row.
+        for (int curr_row = _rows_per_beat - 1; curr_row >= 0; curr_row--) {
+
+            auto curr_ticks = curr_row / BeatFraction{_rows_per_beat}
+                * seq_time.curr_ticks_per_beat;
+
+            if (doc::round_to_int(curr_ticks) <= seq_time.ticks) {
+                new_cursor_y.beat += BeatFraction{curr_row, _rows_per_beat};
+                break;
+            }
+        }
+
+        _cursor_y = new_cursor_y;
+    }
+
+    repaint();
 }
 
 // # Cursor movement

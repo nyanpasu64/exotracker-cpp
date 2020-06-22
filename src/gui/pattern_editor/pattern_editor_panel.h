@@ -2,7 +2,9 @@
 #define PATTERNEDITORPANEL_H
 
 #include "doc.h"
+#include "gui/main_window.h"
 #include "gui/history.h"
+#include "audio_gui_common.h"
 
 #include <verdigris/wobjectdefs.h>
 
@@ -13,6 +15,8 @@
 
 #include <cstdint>
 #include <functional>  // std::reference_wrapper
+
+W_REGISTER_ARGTYPE(audio_gui::MaybeSequencerTime)
 
 namespace gui::pattern_editor {
 
@@ -105,11 +109,7 @@ class PatternEditorPanel : public QWidget
 {
     W_OBJECT(PatternEditorPanel)
 public:
-    explicit PatternEditorPanel(QWidget *parent);
-
-signals:
-
-public slots:
+    explicit PatternEditorPanel(MainWindow * parent);
 
 PatternEditorPanel_INTERNAL:
     // # Non-user-facing state.
@@ -161,8 +161,15 @@ public:
         _history = _dummy_history;
     }
 
+public slots:
+    // update() is called by timers and user input.
+    // It mutates state (cached audio playback position) and calls repaint().
+    void update(audio_gui::MaybeSequencerTime maybe_seq_time);
+    W_SLOT(update)
+
 protected:
-    // overrides QWidget
+
+    // paintEvent() is a pure function (except for screen output).
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent* event) override;
 

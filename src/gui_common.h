@@ -4,7 +4,7 @@
 
 namespace gui {
 
-MainWindow & window() {
+MainWindow & win() {
     return MainWindow::get_instance();
 }
 

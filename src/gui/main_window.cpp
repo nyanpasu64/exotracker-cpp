@@ -1,14 +1,17 @@
 #include "main_window.h"
 #include "gui/pattern_editor/pattern_editor_panel.h"
 #include "lib/lightweight.h"
-#include "audio.h"
 
 #include <fmt/core.h>
 #include <rtaudio/RtAudio.h>
 #include <verdigris/wobjectimpl.h>
 
+#include <QGuiApplication>
+#include <QScreen>
 #include <QShortcut>
+#include <QTimer>
 
+#include <functional>  // reference_wrapper
 #include <iostream>
 #include <optional>
 #include <stdexcept>  // logic_error
@@ -30,33 +33,49 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
 {}
 
-using audio::output::AudioThreadHandle;
-
 // module-private
 class MainWindowImpl : public MainWindow {
+    // W_OBJECT(MainWindowImpl)
 public:
     // fields
-
     gui::history::History _history;
+
+    // GUI widgets/etc.
+    QScreen * _screen;
+    QTimer _gui_refresh_timer;
 
     // Use raw pointers since QObjects automatically destroy children.
     PatternEditorPanel * _pattern_editor_panel;
     QShortcut _restart_audio_shortcut{QKeySequence{Qt::Key_F12}, this};
 
+    // Audio.
     RtAudio _rt;
     unsigned int _audio_device;
-    std::optional<audio::output::AudioThreadHandle> _audio_handle;
+    std::optional<AudioThreadHandle> _audio_handle;
 
     // impl
+    void _() override {}
+
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindow(parent)
         , _history{std::move(document)}
         , _rt{}
         , _audio_handle{}
     {
-        setupUi();
+        // Setup GUI.
+        setup_widgets();  // Output: _pattern_editor_panel.
         _pattern_editor_panel->set_history(_history);
 
+        // Hook up refresh timer.
+        connect(
+            &_gui_refresh_timer, &QTimer::timeout,
+            this, [this] () { emit gui_refresh(); }
+        );
+        setup_screen();
+        // TODO setup_screen() when primaryScreen changed
+        // TODO setup_timer() when refreshRate changed
+
+        // Setup audio.
         setup_audio();
 
         connect(
@@ -65,7 +84,28 @@ public:
         );
     }
 
-    void _() override {}
+    /// Output: _pattern_editor_panel.
+    void setup_widgets() {
+        auto w = this;
+        {add_central_widget_no_layout(PatternEditorPanel(parent));
+            _pattern_editor_panel = w;
+        }
+    }
+
+    void setup_screen() {
+        _screen = QGuiApplication::primaryScreen();
+        setup_timer();
+    }
+    // W_SLOT(setup_screen)
+
+    void setup_timer() {
+        // floor div
+        auto refresh_ms = int(1000 / _screen->refreshRate());
+        _gui_refresh_timer.setInterval(refresh_ms);
+        // calling twice will restart timer.
+        _gui_refresh_timer.start();
+    }
+    // W_SLOT(setup_timer)
 
     /// Output: _audio_device.
     void scan_devices() {
@@ -116,12 +156,8 @@ public:
         _audio_handle = AudioThreadHandle::make(_rt, _audio_device, _history);
     }
 
-    /// Output: _pattern_editor_panel.
-    void setupUi() {
-        auto w = this;
-        {add_central_widget_no_layout(PatternEditorPanel(parent));
-            _pattern_editor_panel = w;
-        }
+    std::optional<AudioThreadHandle> & audio_handle() override {
+        return _audio_handle;
     }
 
     void restart_audio_thread() override {
@@ -132,6 +168,8 @@ public:
         _audio_handle = AudioThreadHandle::make(_rt, _audio_device, _history);
     }
 };
+
+// W_OBJECT_IMPL(MainWindowImpl)
 
 // public
 std::unique_ptr<MainWindow> MainWindow::make(doc::Document document, QWidget * parent) {
