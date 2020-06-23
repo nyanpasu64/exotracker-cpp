@@ -1,3 +1,4 @@
+#define ChannelSequencer_INTERNAL public
 #include "sequencer.h"
 
 #include "util/release_assert.h"
@@ -11,6 +12,8 @@
 #include <type_traits>  // std::is_signed_v
 
 namespace audio::synth::sequencer {
+
+using doc::BeatFraction;
 
 // TODO add support for grooves.
 // We need to remove usages of `doc::round_to_int()`
@@ -62,6 +65,39 @@ doc::MaybeSeqEntryIndex calc_next_entry(
     // change function to return both a pattern and a beat.
 }
 
+static BeatPlusTick frac_to_tick(TickT ticks_per_beat, BeatFraction beat) {
+    doc::FractionInt ibeat = beat.numerator() / beat.denominator();
+    BeatFraction fbeat = beat - ibeat;
+
+    doc::FractionInt dtick = doc::round_to_int(fbeat * ticks_per_beat);
+    return BeatPlusTick{.beat=ibeat, .dtick=dtick};
+}
+
+static void advance_event_seq_entry(
+    EventIterator & next_event, doc::Document const & document
+) {
+    next_event.event_idx = 0;
+    next_event.prev_seq_entry = next_event.seq_entry;
+
+    auto next_seq_entry = calc_next_entry(document, next_event.seq_entry);
+    if (next_seq_entry.has_value()) {
+        next_event.seq_entry = *next_seq_entry;
+    } else {
+        // TODO halt playback
+        next_event.seq_entry = 0;
+    }
+};
+
+static void check_invariants(ChannelSequencer const & self) {
+    // If two sequential patterns are different,
+    // assert that they don't take up the same region in time.
+    // But if they're the same, they could be different occurrences of a loop.
+    if (self._next_event.seq_entry != self._now.seq_entry) {
+        release_assert(self._pattern_offset.event_minus_now() != 0);
+    }
+};
+
+
 std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
 ) {
@@ -84,50 +120,20 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         (int16_t) _now.next_tick.dtick,
     };
 
-    auto frac_to_tick = [ticks_per_beat](doc::BeatFraction beat) -> BeatPlusTick {
-        doc::FractionInt ibeat = beat.numerator() / beat.denominator();
-        doc::BeatFraction fbeat = beat - ibeat;
-
-        doc::FractionInt dtick = doc::round_to_int(fbeat * ticks_per_beat);
-        return BeatPlusTick{.beat=ibeat, .dtick=dtick};
-    };
-
     auto distance = [ticks_per_beat](BeatPlusTick from, BeatPlusTick to) -> TickT {
         return ticks_per_beat * (to.beat - from.beat) + to.dtick - from.dtick;
     };
 
     BeatPlusTick const now_pattern_len = [&] {
         doc::SequenceEntry const & now_entry = document.sequence[_now.seq_entry];
-        return frac_to_tick(now_entry.nbeats);
+        return frac_to_tick(ticks_per_beat, now_entry.nbeats);
     }();
-
-    auto advance_event_seq_entry = [this, &document]() {
-        _next_event.event_idx = 0;
-        _next_event.prev_seq_entry = _next_event.seq_entry;
-
-        auto next_seq_entry = calc_next_entry(document, _next_event.seq_entry);
-        if (next_seq_entry.has_value()) {
-            _next_event.seq_entry = *next_seq_entry;
-        } else {
-            // TODO halt playback
-            _next_event.seq_entry = 0;
-        }
-    };
-
-    auto check_invariants = [this]() {
-        // If two sequential patterns are different,
-        // assert that they don't take up the same region in time.
-        // But if they're the same, they could be different occurrences of a loop.
-        if (_next_event.seq_entry != _now.seq_entry) {
-            release_assert(_pattern_offset.event_minus_now() != 0);
-        }
-    };
 
     TimedEventsRef events;
     BeatPlusTick ev_pattern_len;
 
     auto get_events = [
-        this, &document, chip_index, chan_index, nchip, nchan, &frac_to_tick,
+        this, &document, chip_index, chan_index, nchip, nchan, ticks_per_beat,
         // mutate these
         &events, &ev_pattern_len
     ]() {
@@ -143,10 +149,10 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         release_assert(channel_events.size() == nchan);
         events = channel_events[chan_index];
 
-        ev_pattern_len = frac_to_tick(current_entry.nbeats);
+        ev_pattern_len = frac_to_tick(ticks_per_beat, current_entry.nbeats);
     };
 
-    check_invariants();
+    check_invariants(*this);
     get_events();
 
     while (true) {
@@ -159,15 +165,16 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
                 goto end_loop;
             }
 
-            advance_event_seq_entry();
-            check_invariants();
+            advance_event_seq_entry(_next_event, document);
+            check_invariants(*this);
             get_events();
         }
 
         doc::TimedRowEvent next_ev = events[_next_event.event_idx];
 
         BeatPlusTick now = _now.next_tick;
-        BeatPlusTick next_ev_time = frac_to_tick(next_ev.time.anchor_beat);
+        BeatPlusTick next_ev_time =
+            frac_to_tick(ticks_per_beat, next_ev.time.anchor_beat);
         next_ev_time.dtick += next_ev.time.tick_offset;
 
         // Only scanning for events in the next pattern
@@ -257,7 +264,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 
             // These commented-out operations are not strictly necessary.
             // release_assert(_pattern_offset.advance_event());
-            advance_event_seq_entry();
+            advance_event_seq_entry(_next_event, document);
             // release_assert(_pattern_offset.advance_time());
         }
         now_tick = {0, 0};
@@ -270,7 +277,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             _now.seq_entry = 0;
         }
 
-        check_invariants();
+        check_invariants(*this);
     }
 
     return {seq_chan_time, _events_this_tick};

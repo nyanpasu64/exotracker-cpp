@@ -70,7 +70,7 @@ public:
     using Success = bool;
 
     /// you really shouldn't need this, but whatever.
-    auto event_minus_now() {
+    auto event_minus_now() const {
         return _event_minus_now;
     }
 
@@ -99,6 +99,11 @@ public:
     }
 };
 
+// This is UB. (shrug)
+#ifndef ChannelSequencer_INTERNAL
+#define ChannelSequencer_INTERNAL private
+#endif
+
 /*
 TODO only expose through unique_ptr?
 (Unnecessary since class is not polymorphic. But speed hit remains.)
@@ -107,6 +112,7 @@ Moving only methods to .cpp is not helpful,
 since ChannelSequencer's list of fields is in flux, and co-evolves with its methods.
 */
 class ChannelSequencer {
+ChannelSequencer_INTERNAL:
     using EventsThisTickOwned = std::vector<doc::RowEvent>;
     EventsThisTickOwned _events_this_tick;
 
