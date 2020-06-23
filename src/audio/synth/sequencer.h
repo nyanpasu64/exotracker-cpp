@@ -136,6 +136,7 @@ public:
     void seek() {}
 
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
+    /// Return: SequencerTime is current tick (just occurred), not next tick.
     std::tuple<SequencerTime, EventsRef> next_tick(
         doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
     );

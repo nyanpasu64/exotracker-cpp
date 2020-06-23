@@ -112,7 +112,8 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
 
-    // Return time note starts, not next tick. This is a subjective choice?
+    // SequencerTime is current tick (just occurred), not next tick.
+    // This is a subjective choice?
     SequencerTime const seq_chan_time {
         (uint16_t) _now.seq_entry,
         (uint16_t) ticks_per_beat,
@@ -155,9 +156,10 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     check_invariants(*this);
     get_events();
 
+    // We want to look for the next event in the song, to check whether to play it.
     while (true) {
         while (_next_event.event_idx >= events.size()) {
-            // Current pattern is empty.
+            // Current pattern has no more events to play. Check the next pattern.
 
             if (!_pattern_offset.advance_event()) {
                 // _next_event is already 1 pattern past real time.
@@ -172,6 +174,8 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 
         doc::TimedRowEvent next_ev = events[_next_event.event_idx];
 
+        // Quantize event to (beat integer, tick offset), to match now.
+        // Note that *.beat is int, not BeatFraction!
         BeatPlusTick now = _now.next_tick;
         BeatPlusTick next_ev_time =
             frac_to_tick(ticks_per_beat, next_ev.time.anchor_beat);
@@ -183,26 +187,30 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         // reduces the risk of integer overflow.
 
         if (_pattern_offset.event_is_ahead()) {
-            // Don't look too far ahead.
-            // Ensure _now is within 1 beat of finishing the pattern.
-            // Otherwise don't bother playing any notes.
-            if (!(now.beat + 1 >= now_pattern_len.beat)) {
+            // If event is on next pattern,
+            // and _now is over 1 beat from reaching the next pattern,
+            // don't play the next pattern.
+            if (now.beat + 1 < now_pattern_len.beat) {
                 break;
             }
 
+            // Treat next pattern as starting at time 0.
             now -= now_pattern_len;
 
         } else if (_pattern_offset.event_is_behind()) {
+            // If event is on previous pattern, wait indefinitely.
+            // Treat previous pattern as ending at time 0.
             next_ev_time -= ev_pattern_len;
 
         } else {
-            // Ensure _now is within 1 beat of the next event.
-            // Otherwise don't bother playing any notes.
-            if (!(now.beat + 1 >= next_ev_time.beat)) {
+            // Event is on current pattern.
+            // If event is anchored over 1 beat ahead of now, don't play it.
+            if (now.beat + 1 < next_ev_time.beat) {
                 break;
             }
         }
 
+        // Compare quantized times, check if event has occurred or not.
         TickT now_to_event = distance(now, next_ev_time);
         if (now_to_event < 0) {
             auto time = next_ev.time;

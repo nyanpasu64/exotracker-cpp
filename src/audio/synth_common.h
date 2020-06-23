@@ -163,6 +163,8 @@ public:
     /// Mutates _register_writes.
     ///
     /// We take a Document& to avoid repeatedly mutating atomic refcounts (slow?)
+    ///
+    /// Return: MaybeSequencerTime is current tick (just occurred), not next tick.
     virtual MaybeSequencerTime driver_tick(
         doc::Document const & document, chip_common::ChipIndex chip_index
     ) = 0;
