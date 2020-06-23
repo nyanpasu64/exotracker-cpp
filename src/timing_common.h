@@ -7,6 +7,11 @@
 
 namespace timing {
 
+struct PatternAndBeat {
+    doc::SeqEntryIndex seq_entry_index = 0;
+    doc::BeatFraction beat = 0;
+};
+
 // Atomically written by audio thread, atomically read by GUI.
 // Make sure this fits within 8 bytes.
 struct [[nodiscard]] alignas(uint64_t) SequencerTime {
