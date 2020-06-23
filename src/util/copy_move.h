@@ -19,6 +19,10 @@
     Class(const Class &) = default;\
     Class &operator=(const Class &) = default;
 
+#define CONSTEXPR_COPY(Class) \
+    constexpr Class(const Class &) = default;\
+    constexpr Class &operator=(const Class &) = default;
+
 #define DEFAULT_MOVE(Class) \
     Class(Class &&) = default; \
     Class &operator=(Class &&) = default;
