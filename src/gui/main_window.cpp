@@ -88,9 +88,9 @@ public:
 
                 auto maybe_seq_time = MaybeSequencerTime::none();
 
-                auto & audio_thread = audio_handle();
-                if (audio_thread.has_value()) {
-                    maybe_seq_time = audio_thread->play_time();
+                auto & audio = audio_handle();
+                if (audio.has_value()) {
+                    maybe_seq_time = audio->play_time();
                 }
 
                 emit gui_refresh(maybe_seq_time);
