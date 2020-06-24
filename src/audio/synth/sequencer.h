@@ -151,20 +151,20 @@ class ChipSequencer {
 public:
     // impl
 
-    /// Eventually, (document, ChipIndex) will be passed in as well.
     std::tuple<SequencerTime, EnumMap<ChannelID, EventsRef>> sequencer_tick(
         doc::Document const & document, ChipIndex chip_index
     ) {
         EnumMap<ChannelID, EventsRef> channel_events;
 
-        auto seq_chip_time = SequencerTime::_none();
+        SequencerTime seq_chip_time;
+        static_assert(enum_count<ChannelID> > 0, "invalid chip with 0 channels");
 
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             auto [seq_chan_time, events] =
                 _channel_sequencers[chan].next_tick(document, chip_index, chan);
 
             // Get audio position.
-            if (seq_chip_time != SequencerTime::_none()) {
+            if (chan > 0) {
                 // TODO should this be release_assert?
                 assert(seq_chip_time == seq_chan_time);
             }
