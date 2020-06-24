@@ -184,6 +184,8 @@ Rules:
         - The ABA problem cannot occur if the original read has matching `was_playing` and `has_time`, since the GUI thread always writes mismatched atomics.
     - Read flag (not time).
 
+TODO: If `(Stopped, time)`, interpret remaining bits as a i16/i16 beat fraction, rather than audio timestamp. MuseScore can do that, why can't we?
+
 States:
 
 - `(Stopped, None)`
