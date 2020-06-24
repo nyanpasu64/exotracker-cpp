@@ -158,6 +158,55 @@ My current API provides no way for drivers to *read* from sound chips' address s
 
 j0CC handles this differently. CAPU (hardware chip synth) has a Read() method, but it's completely unused. The 5B uses static globals, rather than a ChipDriver class, to write chip-wide registers.
 
+## GUI/audio communication
+
+The GUI and audio thread share an atomic for tearing-free "audio thread position" communication. This scheme is a bit overengineered, but designed so if you if you stop playback and immediately try moving in the document, your keystrokes won't get discarded since the audio thread hasn't stopped yet.
+
+The atomic has a single-bit `was_playing` flag (approximately, does GUI think audio was already playing?) and a `time` field (approximately, where does the GUI want playback to go to?). If the atomic is playing, the audio thread writes to the atomic to tell the GUI thread where it's playing. If not, the audio thread cannot overwrite it unless the GUI sends a seek command.
+
+The audio thread will check for state transitions on the *beginning* of each callback, and if so, immediately CAS the atomic. If playback is active, it will CAS at the end too.
+
+Atomic: `(was_playing, time)`
+
+Starting point: `(Stopped, None)`
+
+(Eventually add a special constructor/method to send a start-playback event immediately, before generating audio. Useful if embedding exotracker as a library.)
+
+Rules:
+
+- GUI thread:
+    - Write to flag and time
+    - Read time (not flag).
+    - GUI thread transitions cannot call any methods on the audio synth.
+- Audio thread:
+    - CAS-write to time and flag.
+        - Only CAS allowed. If audio and GUI race to update timestamp, GUI wins and audio will see GUI's intent on next callback.
+        - The ABA problem cannot occur if the original read has matching `was_playing` and `has_time`, since the GUI thread always writes mismatched atomics.
+    - Read flag (not time).
+
+States:
+
+- `(Stopped, None)`
+    - Precondition: `run_sequencer = false`
+    - Audio thread: leave as is
+    - Transition: GUI begin playback, →write `(Stopped, time)`
+- `(Stopped, time)`
+    - Precondition: `run_sequencer = ?` (depends on whether we start or restart playback)
+    - Audio thread: →CAS `(Playing, time)`
+        - `all_notes_off()` (in case we're restarting playback)
+        - `run_sequencer := true`
+- `(Play, time)`
+    - Precondition: `run_sequencer = true`
+    - Audio thread: advance time, →CAS to update atomic
+    - Transition: Audio song ends, goto `(Play, None)`'s code.
+    - Transition: GUI restart playback, →write `(Stopped, time=new)`
+    - Transition: GUI end playback, →write `(Play, None)`
+- `(Play, None)`
+    - Precondition: `run_sequencer = true?`
+    - Audio thread: →CAS `(Stopped, None)`
+        - `all_notes_off()`
+        - `run_sequencer := false`
+
 ## Rules for avoiding circular header inclusion
 
 C++ headers malfunction when there is a `#include` cycle. I have designed some rules to prevent inclusion cycles (ensure topological sortability).
