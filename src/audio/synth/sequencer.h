@@ -113,6 +113,10 @@ since ChannelSequencer's list of fields is in flux, and co-evolves with its meth
 */
 class ChannelSequencer {
 ChannelSequencer_INTERNAL:
+    // Must be assigned after construction.
+    ChipIndex _chip_index = (ChipIndex) -1;
+    ChannelIndex _chan_index = (ChannelIndex) -1;
+
     using EventsThisTickOwned = std::vector<doc::RowEvent>;
     EventsThisTickOwned _events_this_tick;
 
@@ -132,14 +136,17 @@ public:
     // impl
     ChannelSequencer();
 
+    void set_chip_chan(ChipIndex chip_index, ChannelIndex chan_index) {
+        _chip_index = chip_index;
+        _chan_index = chan_index;
+    }
+
     /// TODO
     void seek() {}
 
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
     /// Return: SequencerTime is current tick (just occurred), not next tick.
-    std::tuple<SequencerTime, EventsRef> next_tick(
-        doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
-    );
+    std::tuple<SequencerTime, EventsRef> next_tick(doc::Document const & document);
 };
 
 /// The sequencer owned by a (Chip)Instance.
@@ -150,9 +157,14 @@ class ChipSequencer {
 
 public:
     // impl
+    ChipSequencer(ChipIndex chip_index) {
+        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
+            _channel_sequencers[chan].set_chip_chan(chip_index, chan);
+        }
+    }
 
     std::tuple<SequencerTime, EnumMap<ChannelID, EventsRef>> sequencer_tick(
-        doc::Document const & document, ChipIndex chip_index
+        doc::Document const & document
     ) {
         EnumMap<ChannelID, EventsRef> channel_events;
 
@@ -161,7 +173,7 @@ public:
 
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             auto [seq_chan_time, events] =
-                _channel_sequencers[chan].next_tick(document, chip_index, chan);
+                _channel_sequencers[chan].next_tick(document);
 
             // Get audio position.
             if (chan > 0) {

@@ -27,10 +27,13 @@ OverallSynth::OverallSynth(
     // this is a malformed document, so throw an exception.
     nes_2a03::BaseApu1Instance * apu1_maybe = nullptr;
 
-    for (ChipKind chip_kind : document.chips) {
+    for (ChipIndex chip_index = 0; chip_index < document.chips.size(); chip_index++) {
+        ChipKind chip_kind = document.chips[chip_index];
+
         switch (chip_kind) {
             case ChipKind::Apu1: {
                 auto apu1_unique = nes_2a03::make_Apu1Instance(
+                    chip_index,
                     _nes_blip,
                     CLOCKS_PER_S,
                     doc::FrequenciesRef{document.frequency_table},
@@ -140,7 +143,7 @@ void OverallSynth::synthesize_overall(
                     register_writes.clear();
 
                     // chip's time passes.
-                    auto chip_time = chip.driver_tick(document, chip_index);
+                    auto chip_time = chip.driver_tick(document);
 
                     // Ensure all chip sequencers are running in sync.
                     if (chip_index > 0) {

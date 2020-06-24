@@ -165,9 +165,7 @@ public:
     /// We take a Document& to avoid repeatedly mutating atomic refcounts (slow?)
     ///
     /// Return: MaybeSequencerTime is current tick (just occurred), not next tick.
-    virtual MaybeSequencerTime driver_tick(
-        doc::Document const & document, chip_common::ChipIndex chip_index
-    ) = 0;
+    virtual MaybeSequencerTime driver_tick(doc::Document const & document) = 0;
 
     /// Cannot cross tick boundaries. Can cross register-write boundaries.
     void run_chip_for(

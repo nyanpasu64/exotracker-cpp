@@ -12,6 +12,7 @@ namespace nes_2a03 {
 
 class BaseApu1Instance : public ChipInstance {};
 std::unique_ptr<BaseApu1Instance> make_Apu1Instance(
+    chip_common::ChipIndex chip_index,
     Blip_Buffer & blip,
     ClockT clocks_per_sec,
     doc::FrequenciesRef frequencies,

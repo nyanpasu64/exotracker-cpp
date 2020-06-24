@@ -99,15 +99,15 @@ static void check_invariants(ChannelSequencer const & self) {
 
 
 std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
-    doc::Document const & document, ChipIndex chip_index, ChannelIndex chan_index
+    doc::Document const & document
 ) {
     _events_this_tick.clear();
 
     // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
-    release_assert(chip_index < nchip);
-    auto const nchan = document.chip_index_to_nchan(chip_index);
-    release_assert(chan_index < nchan);
+    release_assert(_chip_index < nchip);
+    auto const nchan = document.chip_index_to_nchan(_chip_index);
+    release_assert(_chan_index < nchan);
 
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
@@ -134,7 +134,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     BeatPlusTick ev_pattern_len;
 
     auto get_events = [
-        this, &document, chip_index, chan_index, nchip, nchan, ticks_per_beat,
+        this, &document, nchip, nchan, ticks_per_beat,
         // mutate these
         &events, &ev_pattern_len
     ]() {
@@ -144,11 +144,11 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 
         // [chip_index]
         release_assert(chip_channel_events.size() == nchip);
-        auto & channel_events = chip_channel_events[chip_index];
+        auto & channel_events = chip_channel_events[_chip_index];
 
         // [chip_index][chan_index]
         release_assert(channel_events.size() == nchan);
-        events = channel_events[chan_index];
+        events = channel_events[_chan_index];
 
         ev_pattern_len = frac_to_tick(ticks_per_beat, current_entry.nbeats);
     };

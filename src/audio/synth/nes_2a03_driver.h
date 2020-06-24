@@ -17,7 +17,6 @@ namespace audio::synth::nes_2a03_driver {
 using namespace doc::tuning;
 using namespace music_driver;
 using chip_kinds::Apu1ChannelID;
-using timing::MaybeSequencerTime;
 
 // Pulse 1/2 driver
 
@@ -120,8 +119,6 @@ TEST_PUBLIC:
     ClockT const _clocks_per_sec;
     TuningOwned _tuning_table;
 
-    sequencer::ChipSequencer<ChannelID> _chip_sequencer;
-
     Apu1PulseDriver _pulse1_driver{0, TuningRef{_tuning_table}};
     Apu1PulseDriver _pulse2_driver{1, TuningRef{_tuning_table}};
 
@@ -137,23 +134,11 @@ public:
         _tuning_table = make_tuning_table(frequencies, _clocks_per_sec);
     }
 
-    MaybeSequencerTime driver_tick(
+    void driver_tick(
         doc::Document const & document,
-        ChipIndex chip_index,
+        EnumMap<ChannelID, sequencer::EventsRef> const & channel_events,
         RegisterWriteQueue &/*out*/ register_writes
     ) {
-        auto chip_time = MaybeSequencerTime::none();
-        // Values are empty slices.
-        auto channel_events = EnumMap<ChannelID, sequencer::EventsRef>{};
-
-        // TODO if not playing, don't tick sequencer.
-        {
-            auto [seq_chip_time, seq_channel_events] =
-                _chip_sequencer.sequencer_tick(document, chip_index);
-            chip_time = MaybeSequencerTime{seq_chip_time};
-            channel_events = seq_channel_events;
-        }
-
         _pulse1_driver.tick(
             document, channel_events[ChannelID::Pulse1], /*mut*/ register_writes
         );
@@ -162,7 +147,6 @@ public:
         );
 
         // TODO write $4015 to register_writes, if I ever add envelope functionality.
-        return chip_time;
     }
 };
 

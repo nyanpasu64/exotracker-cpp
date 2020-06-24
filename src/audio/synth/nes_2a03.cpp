@@ -1,6 +1,7 @@
 #include "nes_2a03.h"
 #include "nes_2a03_driver.h"
 #include "audio/event_queue.h"
+#include "chip_kinds.h"
 #include "timing_common.h"
 #include "util.h"
 #include "util/release_assert.h"
@@ -15,6 +16,7 @@ namespace audio {
 namespace synth {
 namespace nes_2a03 {
 
+using chip_kinds::Apu1ChannelID;
 using timing::MaybeSequencerTime;
 
 // Disable external linkage.
@@ -43,7 +45,10 @@ enum class SampleEvent {
 template<typename Synth = MyBlipSynth>
 class Apu1Instance : public BaseApu1Instance {
 private:
+    using ChannelID = Apu1ChannelID;
+
     // fields
+    sequencer::ChipSequencer<ChannelID> _chip_sequencer;
     nes_2a03_driver::Apu1Driver _driver;
 
     // NesApu2Synth::apu2 (xgm::NES_DMC) holds a reference to apu1 (xgm::NES_APU).
@@ -68,14 +73,16 @@ private:
 
 public:
     explicit Apu1Instance(
+        chip_common::ChipIndex chip_index,
         Blip_Buffer & blip,
         ClockT clocks_per_sec,
         doc::FrequenciesRef frequencies,
         ClockT clocks_per_sound_update
-    ) :
-        _driver{clocks_per_sec, frequencies},
-        _apu1_synth{blip, APU1_RANGE, APU1_VOLUME},
-        _clocks_per_smp{clocks_per_sound_update}
+    )
+        : _chip_sequencer{chip_index}
+        , _driver{clocks_per_sec, frequencies}
+        , _apu1_synth{blip, APU1_RANGE, APU1_VOLUME}
+        , _clocks_per_smp{clocks_per_sound_update}
     {
         // Make sure these parameters aren't swapped.
         release_assert(clocks_per_sound_update < clocks_per_sec);
@@ -87,11 +94,14 @@ public:
     }
 
     // impl ChipInstance
-    MaybeSequencerTime driver_tick(
-        doc::Document const & document, chip_common::ChipIndex chip_index
-    ) override {
-        // Sequencer's time passes.
-        return _driver.driver_tick(document, chip_index, /*out*/ _register_writes);
+
+    MaybeSequencerTime driver_tick(doc::Document const & document) override {
+        auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);
+
+        // Appends to _register_writes.
+        _driver.driver_tick(document, channel_events, _register_writes);
+
+        return MaybeSequencerTime{chip_time};
     }
 
     void synth_write_memory(RegisterWrite write) override {
@@ -175,13 +185,14 @@ public:
 };
 
 std::unique_ptr<BaseApu1Instance> make_Apu1Instance(
+    chip_common::ChipIndex chip_index,
     Blip_Buffer & blip,
     ClockT clocks_per_sec,
     doc::FrequenciesRef frequencies,
     ClockT clocks_per_sound_update
 ) {
     return std::make_unique<Apu1Instance<>>(
-        blip, clocks_per_sec, frequencies, clocks_per_sound_update
+        chip_index, blip, clocks_per_sec, frequencies, clocks_per_sound_update
     );
 }
 
