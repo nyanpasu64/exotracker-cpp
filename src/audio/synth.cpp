@@ -143,14 +143,24 @@ void OverallSynth::synthesize_overall(
                     register_writes.clear();
 
                     // chip's time passes.
-                    auto chip_time = chip.driver_tick(document);
+                    /// Current tick (just occurred), not next tick.
+                    if (_sequencer_running) {
+                        auto chip_time = chip.sequencer_tick(document);
 
-                    // Ensure all chip sequencers are running in sync.
-                    if (chip_index > 0) {
-                        // TODO release_assert?
-                        assert(play_time == chip_time);
+                        chip.driver_tick(document);
+
+                        // Ensure all chip sequencers are running in sync.
+                        if (chip_index > 0) {
+                            // TODO release_assert?
+                            assert(
+                                play_time == MaybeSequencerTime{chip_time}
+                            );
+                        }
+
+                        play_time = MaybeSequencerTime{chip_time};
+                    } else {
+                        chip.driver_tick(document);
                     }
-                    play_time = chip_time;
                 }
 
                 // Schedule next tick.

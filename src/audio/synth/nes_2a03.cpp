@@ -17,7 +17,7 @@ namespace synth {
 namespace nes_2a03 {
 
 using chip_kinds::Apu1ChannelID;
-using timing::MaybeSequencerTime;
+using timing::SequencerTime;
 
 // Disable external linkage.
 namespace {
@@ -49,6 +49,7 @@ private:
 
     // fields
     sequencer::ChipSequencer<ChannelID> _chip_sequencer;
+    EnumMap<ChannelID, sequencer::EventsRef> _channel_events;
     nes_2a03_driver::Apu1Driver _driver;
 
     // NesApu2Synth::apu2 (xgm::NES_DMC) holds a reference to apu1 (xgm::NES_APU).
@@ -94,14 +95,21 @@ public:
     }
 
     // impl ChipInstance
-
-    MaybeSequencerTime driver_tick(doc::Document const & document) override {
+    /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
+    SequencerTime sequencer_tick(doc::Document const & document) override {
         auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);
+        _channel_events = channel_events;
+        return chip_time;
+    }
 
+    /// Can be called without calling sequencer_tick() first.
+    /// This will not play any notes.
+    void driver_tick(doc::Document const & document) override {
         // Appends to _register_writes.
-        _driver.driver_tick(document, channel_events, _register_writes);
+        _driver.driver_tick(document, _channel_events, _register_writes);
 
-        return MaybeSequencerTime{chip_time};
+        // Replace all map values with empty slices.
+        _channel_events = {};
     }
 
     void synth_write_memory(RegisterWrite write) override {

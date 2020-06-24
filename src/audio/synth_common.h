@@ -18,7 +18,7 @@ namespace audio {
 namespace synth {
 
 using namespace chip_common;
-using timing::MaybeSequencerTime;
+using timing::SequencerTime;
 
 // https://wiki.nesdev.com/w/index.php/CPU
 // >Emulator authors may wish to emulate the NTSC NES/Famicom CPU at 21441960 Hz...
@@ -158,14 +158,14 @@ public:
     // impl
     virtual ~ChipInstance() = default;
 
-    /// Eventually, (document, ChipIndex) will be passed in as well.
+    /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
     /// Sequencer's time passes.
+    ///
+    /// Return: SequencerTime is current tick (just occurred), not next tick.
+    virtual SequencerTime sequencer_tick(doc::Document const & document) = 0;
+
     /// Mutates _register_writes.
-    ///
-    /// We take a Document& to avoid repeatedly mutating atomic refcounts (slow?)
-    ///
-    /// Return: MaybeSequencerTime is current tick (just occurred), not next tick.
-    virtual MaybeSequencerTime driver_tick(doc::Document const & document) = 0;
+    virtual void driver_tick(doc::Document const & document) = 0;
 
     /// Cannot cross tick boundaries. Can cross register-write boundaries.
     void run_chip_for(
