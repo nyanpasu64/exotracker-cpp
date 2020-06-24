@@ -31,21 +31,14 @@ QPainter's coordinates work as follows:
 
 - (0, 0) lies at the center of a pixel, not at fenceposts. I think this was a mistake, for the following reasons:
     - If you create a `QRect` from (0, 0) to (16, 16), drawing it takes up 17 pixels on-screen. QRect's size-based constructor sets the bottom-right endpoint by subtracting 1 from horizontal and vertical size.
-
     - `QPainter::fillRect(QPoint{0, 0}, QPoint{16, 16})` takes up 17 pixels on-screen.
-
     - `QPainter::fillRect(QPoint{0, 0}, QSize{16, 16})` takes up 16 pixels on-screen.
-
     - https://bugreports.qt.io/browse/QTBUG-38642
-
         > When you draw an outline at 10,10 20x20 the [outline] will span a rectangle which is [positioned] at 9.5, 9.5 spanning 21x21 pixels (assuming 1px wide pens). The interior of that rectangle is [positioned] at 10.5,10.5 19x19.
 
         This is so confusing.
-        
     - https://bugreports.qt.io/browse/QTBUG-38653
-    
 - The Qt website pretends that QRect is defined in terms of grid intersections rather than pixels, leading to a confusing explanation. https://doc.qt.io/qt-5/qrect.html#coordinates
-
     - > We recommend that you use x() + width() and y() + height() to find the true bottom-right corner, and avoid right() and bottom(). Another solution is to use QRectF: The QRectF class defines a rectangle in the plane using floating point accuracy for coordinates, and the QRectF::right() and QRectF::bottom() functions do return the right and bottom coordinates.
 
 I instead chose a mental model where coordinates lie at fenceposts/gridlines between pixels. When drawing an axis-aligned line 1 or more pixels thick, you can pick which side it lies on. I haven't figured out how to handle lines "centered" on pixels, or non-axis-aligned lines yet.
