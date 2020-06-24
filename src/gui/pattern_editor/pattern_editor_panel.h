@@ -139,6 +139,11 @@ PatternEditorPanel_INTERNAL:
     int _rows_per_beat = 4;
     bool _is_zoomed = false;
 
+    // TODO encapsulate selection begin (x, y) and cursor (x, y)
+    // into a Selection class.
+    // set_cursor() and select_to()?
+    // set_cursor(bool select)?
+
     // TODO cursor_x
     PatternAndBeat _cursor_y;
 
