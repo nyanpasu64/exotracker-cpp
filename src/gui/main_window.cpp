@@ -74,18 +74,6 @@ public:
         connect(
             &_gui_refresh_timer, &QTimer::timeout,
             this, [this] () {
-                auto now = Clock::now();
-                if (_prev_time.time_since_epoch() > Clock::duration{0}) {
-                    std::cerr
-                        << std::chrono::duration_cast<
-                            std::chrono::duration<double, std::milli>
-                        >(
-                            now - _prev_time
-                        ).count()
-                        << "\n";
-                }
-                _prev_time = now;
-
                 auto maybe_seq_time = MaybeSequencerTime::none();
 
                 auto & audio = audio_handle();
