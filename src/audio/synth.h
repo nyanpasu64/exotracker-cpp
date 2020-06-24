@@ -3,6 +3,7 @@
 #include "synth/nes_2a03.h"
 #include "synth_common.h"
 #include "audio_common.h"
+#include "callback.h"
 #include "doc.h"
 #include "timing_common.h"
 #include "util/enum_map.h"
@@ -33,7 +34,7 @@ using timing::FlagAndTime;
 /// - Tick rate must be over 4 tick/second.
 ///   Otherwise blip_buffer count_clocks(nsamp) breaks.
 /// - samp/s / ticks/sec < 65536. Otherwise _temp_buffer overflows.
-class OverallSynth : boost::noncopyable {
+class OverallSynth : boost::noncopyable, public callback::CallbackInterface {
     // runtime constants
 public:
     uint32_t const _stereo_nchan;
@@ -79,7 +80,7 @@ private:
     std::vector<std::unique_ptr<ChipInstance>> _chip_instances = {};
 
     // Playback tracking
-    bool _sequencer_running = true;
+    bool _sequencer_running = false;
 
     using AtomicFlagTime = std::atomic<FlagAndTime>;
     static_assert(
@@ -126,8 +127,20 @@ public:
     );
 
     /// Called by GUI thread.
-    MaybeSequencerTime play_time() const {
+    MaybeSequencerTime play_time() const override {
         return _flag_time.load(std::memory_order_seq_cst).maybe_time();
+    }
+
+    /// Called by GUI thread.
+    void stop_playback() override {
+        FlagAndTime flag_time{true, MaybeSequencerTime::none()};
+        _flag_time.store(flag_time);
+    }
+
+    /// Called by GUI thread.
+    void start_playback(SequencerTime time) override {
+        FlagAndTime flag_time{false, time};
+        _flag_time.store(flag_time);
     }
 };
 

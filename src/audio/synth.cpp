@@ -87,13 +87,6 @@ void OverallSynth::synthesize_overall(
     // Increases as we run ticks.
     FlagAndTime flag_time = flag_begin_;
 
-    static int x = 0;
-    if (++x == 1000) {
-        // Ask the thread to stop.
-        flag_time.set_time_none();
-        x = 0;
-    }
-
     // If we were playing, but GUI wants us to stop...
     if (flag_time.was_playing() && !flag_time.has_time()) {
         _sequencer_running = false;

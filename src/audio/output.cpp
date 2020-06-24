@@ -21,9 +21,9 @@ static unsigned int const STEREO_NCHAN = 2;
 /// GUI-only audio synthesis callback.
 /// Uses GetDocument to obtain a document reference every callback.
 /// The document (possibly address too) will change when the user edits the document.
-class OutputCallback : public CallbackInterface {
+class OutputCallback : public synth::OverallSynth {
+    // OverallSynth impl CallbackInterface
 private:
-    synth::OverallSynth synth;
     locked_doc::GetDocument &/*'a*/ _get_document;
 
 public:
@@ -47,15 +47,10 @@ public:
         AudioOptions audio_options,
         locked_doc::GetDocument &/*'a*/ get_document
     ) :
-        synth(synth::OverallSynth(stereo_nchan, smp_per_s, document, audio_options)),
+        synth::OverallSynth(stereo_nchan, smp_per_s, document, audio_options),
         _get_document(get_document)
     {}
 
-    // impl CallbackInterface
-
-    MaybeSequencerTime play_time() const override {
-        return synth.play_time();
-    }
 
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
     // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
@@ -71,7 +66,7 @@ public:
         void *userData
     ) {
         auto self = static_cast<OutputCallback *>(userData);
-        synth::OverallSynth & synth = self->synth;
+        synth::OverallSynth & synth = *self;
 
         // Convert output buffer from raw pointer into GSL span.
         size_t stereo_smp_per_block = size_t(synth._stereo_nchan) * mono_smp_per_block;

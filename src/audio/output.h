@@ -18,6 +18,7 @@
 /// By contrast, FamiTracker's synth thread pushes to a queue with backpressure.
 
 #include "audio_common.h"
+#include "callback.h"
 #include "doc.h"
 #include "locked_doc.h"
 #include "timing_common.h"
@@ -32,11 +33,8 @@ namespace audio {
 namespace output {
 
 using timing::MaybeSequencerTime;
-
-struct CallbackInterface {
-    virtual ~CallbackInterface() = default;
-    virtual MaybeSequencerTime play_time() const = 0;
-};
+using timing::SequencerTime;
+using callback::CallbackInterface;
 
 class AudioThreadHandle {
     // Used to shut down the stream when AudioThreadHandle is destroyed.
@@ -76,9 +74,19 @@ public:
         RtAudio & _rt, unsigned int device, locked_doc::GetDocument & get_document
     );
 
-    /// Called by GUI pattern editor.
+    /// Called by GUI thread.
     inline MaybeSequencerTime play_time() const {
         return _callback->play_time();
+    }
+
+    /// Called by GUI thread.
+    void stop_playback() {
+        _callback->stop_playback();
+    }
+
+    /// Called by GUI thread.
+    void start_playback(SequencerTime time) {
+        _callback->start_playback(time);
     }
 
     ~AudioThreadHandle();
