@@ -12,7 +12,7 @@
 #include "win32_fonts.h"
 
 using std::unique_ptr;
-using gui::MainWindow;
+using gui::main_window::MainWindow;
 
 
 struct ReturnCode {

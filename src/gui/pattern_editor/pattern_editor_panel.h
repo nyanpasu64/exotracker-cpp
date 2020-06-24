@@ -103,6 +103,8 @@ struct PatternEditorShortcuts {
 // I should've, idk, defined my own class,
 // and subclassed QWidget to contain an instance of my class?
 
+using main_window::MainWindow;
+
 class PatternEditorPanel : public QWidget
 {
     W_OBJECT(PatternEditorPanel)

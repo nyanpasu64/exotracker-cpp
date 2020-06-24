@@ -17,7 +17,7 @@
 #include <optional>
 #include <stdexcept>  // logic_error
 
-namespace gui {
+namespace gui::main_window {
 
 using std::unique_ptr;
 using std::make_unique;

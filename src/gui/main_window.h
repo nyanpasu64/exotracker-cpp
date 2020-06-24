@@ -15,7 +15,7 @@
 
 #include <memory>
 
-namespace gui {
+namespace gui::main_window {
 
 using audio::output::AudioThreadHandle;
 using timing::MaybeSequencerTime;
