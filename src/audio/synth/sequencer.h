@@ -141,8 +141,7 @@ public:
         _chan_index = chan_index;
     }
 
-    /// TODO
-    void seek() {}
+    void seek(doc::Document const & document, SequencerTime time);
 
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
     /// Return: SequencerTime is current tick (just occurred), not next tick.
@@ -160,6 +159,12 @@ public:
     ChipSequencer(ChipIndex chip_index) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             _channel_sequencers[chan].set_chip_chan(chip_index, chan);
+        }
+    }
+
+    void seek(doc::Document const & document, SequencerTime time) {
+        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
+            _channel_sequencers[chan].seek(document, time);
         }
     }
 
