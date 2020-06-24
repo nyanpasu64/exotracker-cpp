@@ -20,6 +20,11 @@ namespace gui::main_window {
 using audio::output::AudioThreadHandle;
 using timing::MaybeSequencerTime;
 
+struct PatternAndBeat {
+    doc::SeqEntryIndex seq_entry_index = 0;
+    doc::BeatFraction beat = 0;
+};
+
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
 class MainWindow : public QMainWindow
 {

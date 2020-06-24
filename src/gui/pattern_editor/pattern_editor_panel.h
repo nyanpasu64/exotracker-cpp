@@ -37,12 +37,7 @@ enum class ColumnCollapse {
 using doc::SeqEntryIndex;
 using RowIndex = uint32_t;
 using doc::BeatFraction;
-
-struct PatternAndBeat {
-    SeqEntryIndex seq_entry_index = 0;
-//    RowIndex row_index = 0;
-    BeatFraction beat = 0;
-};
+using main_window::PatternAndBeat;
 
 struct ShortcutPair {
     // You can't use an array of 2 elements. Why?
