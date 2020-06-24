@@ -25,6 +25,7 @@ enum class SynthEvent {
 };
 
 using timing::MaybeSequencerTime;
+using timing::FlagAndTime;
 
 /// Preconditions:
 /// - Sampling rate must be 1000 or more.
@@ -78,9 +79,16 @@ private:
     std::vector<std::unique_ptr<ChipInstance>> _chip_instances = {};
 
     // Playback tracking
-    bool _sequencer_running = false;
-    std::atomic<MaybeSequencerTime> _play_time {MaybeSequencerTime::none()};
-    static_assert(decltype(_play_time)::is_always_lock_free);
+    bool _sequencer_running = true;
+
+    using AtomicFlagTime = std::atomic<FlagAndTime>;
+    static_assert(
+        AtomicFlagTime::is_always_lock_free, "std::atomic<FlagAndTime> not lock-free"
+    );
+
+    AtomicFlagTime _flag_time{
+        FlagAndTime{false, timing::MaybeSequencerTime::none()}
+    };
 
     /// Per-chip "special audio" written into this and read into _nes_blip.
     /// This MUST remain the last field in the struct,
@@ -117,8 +125,9 @@ public:
         size_t const mono_smp_per_block
     );
 
+    /// Called by GUI thread.
     MaybeSequencerTime play_time() const {
-        return _play_time.load(std::memory_order_seq_cst);
+        return _flag_time.load(std::memory_order_seq_cst).maybe_time();
     }
 };
 

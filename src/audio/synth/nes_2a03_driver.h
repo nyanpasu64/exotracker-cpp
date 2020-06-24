@@ -94,6 +94,8 @@ public:
         _prev_note(0)
     {}
 
+    void stop_note(RegisterWriteQueue &/*mut*/ register_writes);
+
     // TODO add a $4015 reference parameter,
     // so after Apu1PulseDriver writes to channels,
     // Apu1Driver can toggle hardware envelopes.
@@ -132,6 +134,11 @@ public:
 
     void recompute_tuning(FrequenciesRef frequencies) {
         _tuning_table = make_tuning_table(frequencies, _clocks_per_sec);
+    }
+
+    void stop_all_notes(RegisterWriteQueue &/*mut*/ register_writes) {
+        _pulse1_driver.stop_note(/*mut*/ register_writes);
+        _pulse2_driver.stop_note(/*mut*/ register_writes);
     }
 
     void driver_tick(

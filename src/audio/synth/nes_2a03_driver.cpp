@@ -47,6 +47,11 @@ TuningOwned make_tuning_table(
     return out;
 }
 
+void Apu1PulseDriver::stop_note([[maybe_unused]] RegisterWriteQueue & register_writes) {
+    #define NOTE_CUT(iter)  iter.note_cut()
+    Apu1PulseDriver_FOREACH(NOTE_CUT)
+}
+
 void Apu1PulseDriver::tick(
     doc::Document const & document,
     sequencer::EventsRef events,
@@ -66,7 +71,6 @@ void Apu1PulseDriver::tick(
                 Apu1PulseDriver_FOREACH(RELEASE)
 
             } else if (note.is_cut()) {
-                #define NOTE_CUT(iter)  iter.note_cut()
                 Apu1PulseDriver_FOREACH(NOTE_CUT)
             }
         } else if (event.instr.has_value()) {

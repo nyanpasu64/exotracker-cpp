@@ -158,6 +158,14 @@ public:
     // impl
     virtual ~ChipInstance() = default;
 
+    /// TODO write a description
+    virtual void seek(doc::Document const & document, timing::SequencerTime time) = 0;
+
+    /// May/not mutate _register_writes.
+    /// You are required to call driver_tick() afterwards on the same tick,
+    /// or notes may not necessarily stop.
+    virtual void stop_all_notes() = 0;
+
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
     /// Sequencer's time passes.
     ///

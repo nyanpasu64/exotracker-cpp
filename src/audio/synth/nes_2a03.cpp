@@ -95,6 +95,15 @@ public:
     }
 
     // impl ChipInstance
+    void seek(doc::Document const & document, timing::SequencerTime time) override {
+        _chip_sequencer.seek(document, time);
+    }
+
+    void stop_all_notes() override {
+        // May append to _register_writes.
+        _driver.stop_all_notes(_register_writes);
+    }
+
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
     SequencerTime sequencer_tick(doc::Document const & document) override {
         auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);
