@@ -5,7 +5,7 @@
 // Other widgets include main_window.h, since they rely on MainWindow for data/signals.
 #include "history.h"
 #include "doc.h"
-#include "audio_gui_common.h"
+#include "timing_common.h"
 #include "audio.h"
 
 #include <verdigris/wobjectdefs.h>
@@ -18,7 +18,7 @@
 namespace gui {
 
 using audio::output::AudioThreadHandle;
-using audio_gui::MaybeSequencerTime;
+using timing::MaybeSequencerTime;
 
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
 class MainWindow : public QMainWindow

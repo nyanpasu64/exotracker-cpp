@@ -4,7 +4,7 @@
 #include "synth_common.h"
 #include "audio_common.h"
 #include "doc.h"
-#include "audio_gui_common.h"
+#include "timing_common.h"
 #include "util/enum_map.h"
 
 #include <atomic>
@@ -24,7 +24,7 @@ enum class SynthEvent {
     COUNT
 };
 
-using audio_gui::MaybeSequencerTime;
+using timing::MaybeSequencerTime;
 
 /// Preconditions:
 /// - Sampling rate must be 1000 or more.

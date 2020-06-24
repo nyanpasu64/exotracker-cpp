@@ -2,7 +2,7 @@
 
 #include "doc.h"
 #include "chip_common.h"
-#include "audio_gui_common.h"
+#include "timing_common.h"
 #include "util/enum_map.h"
 #include "util/release_assert.h"
 #include "util/compare.h"
@@ -15,7 +15,7 @@
 namespace audio::synth::sequencer {
 
 using namespace chip_common;
-using audio_gui::SequencerTime;
+using timing::SequencerTime;
 
 using EventsRef = gsl::span<doc::RowEvent const>;
 using EventIndex = uint32_t;

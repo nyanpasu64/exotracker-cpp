@@ -4,7 +4,7 @@
 #include "doc.h"
 #include "gui/main_window.h"
 #include "gui/history.h"
-#include "audio_gui_common.h"
+#include "timing_common.h"
 
 #include <verdigris/wobjectdefs.h>
 
@@ -162,8 +162,8 @@ public:
 public slots:
     // update() is called by timers and user input.
     // It mutates state (cached audio playback position) and calls repaint().
-    void update(audio_gui::MaybeSequencerTime maybe_seq_time);
-    W_SLOT(update, (audio_gui::MaybeSequencerTime))
+    void update(timing::MaybeSequencerTime maybe_seq_time);
+    W_SLOT(update, (timing::MaybeSequencerTime))
 
 protected:
 

@@ -17,7 +17,7 @@ namespace audio::synth::nes_2a03_driver {
 using namespace doc::tuning;
 using namespace music_driver;
 using chip_kinds::Apu1ChannelID;
-using audio_gui::MaybeSequencerTime;
+using timing::MaybeSequencerTime;
 
 // Pulse 1/2 driver
 

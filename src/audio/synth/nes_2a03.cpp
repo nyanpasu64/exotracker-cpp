@@ -1,7 +1,7 @@
 #include "nes_2a03.h"
 #include "nes_2a03_driver.h"
 #include "audio/event_queue.h"
-#include "audio_gui_common.h"
+#include "timing_common.h"
 #include "util.h"
 #include "util/release_assert.h"
 
@@ -15,7 +15,7 @@ namespace audio {
 namespace synth {
 namespace nes_2a03 {
 
-using audio_gui::MaybeSequencerTime;
+using timing::MaybeSequencerTime;
 
 // Disable external linkage.
 namespace {

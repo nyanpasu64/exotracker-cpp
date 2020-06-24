@@ -5,7 +5,7 @@
 #include "audio_common.h"
 #include "doc.h"
 #include "chip_common.h"
-#include "audio_gui_common.h"
+#include "timing_common.h"
 #include "util/enum_map.h"
 #include "util/copy_move.h"
 
@@ -18,7 +18,7 @@ namespace audio {
 namespace synth {
 
 using namespace chip_common;
-using audio_gui::MaybeSequencerTime;
+using timing::MaybeSequencerTime;
 
 // https://wiki.nesdev.com/w/index.php/CPU
 // >Emulator authors may wish to emulate the NTSC NES/Famicom CPU at 21441960 Hz...

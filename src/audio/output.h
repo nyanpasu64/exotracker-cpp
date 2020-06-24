@@ -20,7 +20,7 @@
 #include "audio_common.h"
 #include "doc.h"
 #include "locked_doc.h"
-#include "audio_gui_common.h"
+#include "timing_common.h"
 #include "util/copy_move.h"
 
 #include <rtaudio/RtAudio.h>
@@ -31,7 +31,7 @@
 namespace audio {
 namespace output {
 
-using audio_gui::MaybeSequencerTime;
+using timing::MaybeSequencerTime;
 
 struct CallbackInterface {
     virtual ~CallbackInterface() = default;

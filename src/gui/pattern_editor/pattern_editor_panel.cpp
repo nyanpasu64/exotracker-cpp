@@ -46,7 +46,7 @@ using util::math::decrement_mod;
 using util::math::frac_floor;
 using util::math::frac_ceil;
 
-using audio_gui::MaybeSequencerTime;
+using timing::MaybeSequencerTime;
 
 W_OBJECT_IMPL(PatternEditorPanel)
 
@@ -1259,7 +1259,7 @@ void PatternEditorPanel::paintEvent(QPaintEvent *event) {
 
 // # Following audio thread
 
-void PatternEditorPanel::update(audio_gui::MaybeSequencerTime maybe_seq_time) {
+void PatternEditorPanel::update(timing::MaybeSequencerTime maybe_seq_time) {
     if (maybe_seq_time.has_value()) {
         // Update cursor to sequencer position (from audio thread).
         auto const seq_time = maybe_seq_time.get();

@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace audio_gui {
+namespace timing {
 
 // Atomically written by audio thread, atomically read by GUI.
 // Make sure this fits within 8 bytes.
