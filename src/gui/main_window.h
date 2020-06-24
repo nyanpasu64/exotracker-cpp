@@ -31,7 +31,20 @@ class MainWindow : public QMainWindow
     W_OBJECT(MainWindow)
 
 public:
-    // MainWindow is a pure virtual class. All fields are declared in subclass.
+    // Just make it a grab bag of fields for now.
+    // TODO add "cursor_moved" signal.
+
+    // TODO encapsulate selection begin (x, y) and cursor (x, y)
+    // into a Selection class.
+    // set_cursor() and select_to()?
+    // set_cursor(bool select)?
+
+    // TODO cursor_x
+    PatternAndBeat _cursor_y;
+
+    PatternAndBeat _select_begin_y;
+
+public:
     // impl
     static std::unique_ptr<MainWindow> make(
         doc::Document document, QWidget * parent = nullptr

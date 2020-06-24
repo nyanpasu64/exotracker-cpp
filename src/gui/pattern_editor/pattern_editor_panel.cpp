@@ -204,7 +204,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
             &self, \
             [=, &self] () { \
                 self.KEY##_pressed(); \
-                self._select_begin_y = self._cursor_y; \
+                self._win._select_begin_y = self._win._cursor_y; \
                 self.repaint(); \
             } \
         ); \
@@ -290,11 +290,12 @@ void create_image(PatternEditorPanel & self) {
     self._temp_image = QImage(self.geometry().size(), format);
 }
 
-PatternEditorPanel::PatternEditorPanel(MainWindow * parent) :
-    QWidget(parent),
-    _dummy_history{doc::DocumentCopy{}},
-    _history{_dummy_history},
-    _shortcuts{this}
+PatternEditorPanel::PatternEditorPanel(MainWindow * parent)
+    : QWidget(parent)
+    , _win{*parent}
+    , _dummy_history{doc::DocumentCopy{}}
+    , _history{_dummy_history}
+    , _shortcuts{this}
 {
     // Upon application startup, pattern editor panel is focused.
     setFocus();
@@ -667,7 +668,7 @@ public:
         PxInt const screen_height
     ) {
         PxInt const cursor_from_pattern_top =
-            pixels_from_beat(widget, widget._cursor_y.beat);
+            pixels_from_beat(widget, widget._win._cursor_y.beat);
 
         PatternAndBeat scroll_position;
         PxInt pattern_top_from_screen_top;
@@ -684,7 +685,7 @@ public:
                 cursor_from_pattern_top + pattern_top_from_screen_top;
         } else {
             // Cursor-locked scrolling.
-            scroll_position = widget._cursor_y;
+            scroll_position = widget._win._cursor_y;
 
             cursor_from_screen_top = centered_cursor_pos(screen_height);
             pattern_top_from_screen_top =
@@ -1278,7 +1279,7 @@ void PatternEditorPanel::update(timing::MaybeSequencerTime maybe_seq_time) {
             }
         }
 
-        _cursor_y = new_cursor_y;
+        _win._cursor_y = new_cursor_y;
     }
 
     repaint();
@@ -1310,8 +1311,9 @@ MovementConfig move_cfg;
 template<BeatsToUnits to_units, UnitsToBeats to_beats>
 void move_up(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
+    auto & cursor_y = self._win._cursor_y;
 
-    auto const orig_unit = to_units(self, self._cursor_y.beat);
+    auto const orig_unit = to_units(self, cursor_y.beat);
     doc::FractionInt const up_unit = frac_prev(orig_unit);
     doc::FractionInt out_unit;
 
@@ -1321,28 +1323,29 @@ void move_up(PatternEditorPanel & self) {
     } else if (move_cfg.wrap_cursor) {
         if (move_cfg.wrap_across_frames) {
             decrement_mod(
-                self._cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
+                cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
             );
         }
 
-        auto const & seq_entry = document.sequence[self._cursor_y.seq_entry_index];
+        auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
         out_unit = frac_prev(to_units(self, seq_entry.nbeats));
 
     } else {
         out_unit = 0;
     }
 
-    self._cursor_y.beat = to_beats(self, out_unit);
+    cursor_y.beat = to_beats(self, out_unit);
 }
 
 template<BeatsToUnits to_units, UnitsToBeats to_beats>
 void move_down(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
+    auto & cursor_y = self._win._cursor_y;
 
-    auto const & seq_entry = document.sequence[self._cursor_y.seq_entry_index];
+    auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
     auto const num_units = to_units(self, seq_entry.nbeats);
 
-    auto const orig_unit = to_units(self, self._cursor_y.beat);
+    auto const orig_unit = to_units(self, cursor_y.beat);
     doc::FractionInt const down_unit = frac_next(orig_unit);
     doc::FractionInt out_unit;
 
@@ -1352,7 +1355,7 @@ void move_down(PatternEditorPanel & self) {
     } else if (move_cfg.wrap_cursor) {
         if (move_cfg.wrap_across_frames) {
             increment_mod(
-                self._cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
+                cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
             );
         }
 
@@ -1363,7 +1366,7 @@ void move_down(PatternEditorPanel & self) {
         return;
     }
 
-    self._cursor_y.beat = to_beats(self, out_unit);
+    cursor_y.beat = to_beats(self, out_unit);
 }
 
 // Beat conversion functions
@@ -1416,15 +1419,16 @@ constexpr int MAX_PAGEDOWN_SCROLL = 16;
 
 void PatternEditorPanel::scroll_prev_pressed() {
     doc::Document const & document = get_document();
+    auto & cursor_y = _win._cursor_y;
 
-    _cursor_y.beat -= move_cfg.page_down_distance;
+    cursor_y.beat -= move_cfg.page_down_distance;
 
     for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
-        if (_cursor_y.beat < 0) {
+        if (cursor_y.beat < 0) {
             decrement_mod(
-                _cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
+                cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
             );
-            _cursor_y.beat += document.sequence[_cursor_y.seq_entry_index].nbeats;
+            cursor_y.beat += document.sequence[cursor_y.seq_entry_index].nbeats;
         } else {
             break;
         }
@@ -1433,15 +1437,16 @@ void PatternEditorPanel::scroll_prev_pressed() {
 
 void PatternEditorPanel::scroll_next_pressed() {
     doc::Document const & document = get_document();
+    auto & cursor_y = _win._cursor_y;
 
-    _cursor_y.beat += move_cfg.page_down_distance;
+    cursor_y.beat += move_cfg.page_down_distance;
 
     for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
-        auto const & seq_entry = document.sequence[_cursor_y.seq_entry_index];
-        if (_cursor_y.beat >= seq_entry.nbeats) {
-            _cursor_y.beat -= seq_entry.nbeats;
+        auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
+        if (cursor_y.beat >= seq_entry.nbeats) {
+            cursor_y.beat -= seq_entry.nbeats;
             increment_mod(
-                _cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
+                cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size()
             );
         } else {
             break;
@@ -1452,16 +1457,17 @@ void PatternEditorPanel::scroll_next_pressed() {
 template<void alter_mod(SeqEntryIndex & x, SeqEntryIndex den)>
 inline void switch_seq_entry_index(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
+    auto & cursor_y = self._win._cursor_y;
 
-    alter_mod(self._cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size());
+    alter_mod(cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size());
 
-    BeatFraction nbeats = document.sequence[self._cursor_y.seq_entry_index].nbeats;
+    BeatFraction nbeats = document.sequence[cursor_y.seq_entry_index].nbeats;
 
     // If cursor is out of bounds, move to last row in pattern.
-    if (self._cursor_y.beat >= nbeats) {
+    if (cursor_y.beat >= nbeats) {
         BeatFraction rows = rows_from_beats(self, nbeats);
         int prev_row = frac_prev(rows);
-        self._cursor_y.beat = beats_from_rows(self, prev_row);
+        cursor_y.beat = beats_from_rows(self, prev_row);
     }
 }
 

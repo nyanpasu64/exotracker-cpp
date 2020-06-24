@@ -109,6 +109,9 @@ public:
 PatternEditorPanel_INTERNAL:
     // # Non-user-facing state.
 
+    /// Parent pointer of the subclass type.
+    MainWindow & _win;
+
     // Upon construction, history = dummy_history, until a document is created and assigned.
     history::History _dummy_history;
 
@@ -135,16 +138,6 @@ PatternEditorPanel_INTERNAL:
     ColumnCollapse _column_collapse = ColumnCollapse::Full;
     int _rows_per_beat = 4;
     bool _is_zoomed = false;
-
-    // TODO encapsulate selection begin (x, y) and cursor (x, y)
-    // into a Selection class.
-    // set_cursor() and select_to()?
-    // set_cursor(bool select)?
-
-    // TODO cursor_x
-    PatternAndBeat _cursor_y;
-
-    PatternAndBeat _select_begin_y;
 
     // Non-empty if free scrolling is enabled.
     std::optional<PatternAndBeat> _free_scroll_position;
