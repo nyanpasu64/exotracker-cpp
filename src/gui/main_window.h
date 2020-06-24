@@ -18,6 +18,7 @@
 namespace gui::main_window {
 
 using audio::output::AudioThreadHandle;
+using timing::SequencerTime;
 using timing::MaybeSequencerTime;
 
 struct PatternAndBeat {

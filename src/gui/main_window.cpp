@@ -6,6 +6,7 @@
 #include <rtaudio/RtAudio.h>
 #include <verdigris/wobjectimpl.h>
 
+#include <QDebug>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QShortcut>
@@ -34,6 +35,26 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
 {}
 
+// frac_to_tick() copied from sequencer.h.
+// TODO refactor code so we send a beat fraction
+// (encoded as int16/int16) to audio thread.
+
+using doc::BeatFraction;
+using TickT = int32_t;
+
+struct BeatPlusTick {
+    int32_t beat;
+    int32_t dtick;
+};
+
+static BeatPlusTick frac_to_tick(TickT ticks_per_beat, BeatFraction beat) {
+    doc::FractionInt ibeat = beat.numerator() / beat.denominator();
+    BeatFraction fbeat = beat - ibeat;
+
+    doc::FractionInt dtick = doc::round_to_int(fbeat * ticks_per_beat);
+    return BeatPlusTick{.beat=ibeat, .dtick=dtick};
+}
+
 // module-private
 class MainWindowImpl : public MainWindow {
     // W_OBJECT(MainWindowImpl)
@@ -47,6 +68,10 @@ public:
 
     // Use raw pointers since QObjects automatically destroy children.
     PatternEditorPanel * _pattern_editor_panel;
+
+    // Global playback shortcuts.
+    // TODO implement global configuration system with "reloaded" signal
+    QShortcut _play_pause{QKeySequence{Qt::Key_Space}, this};
     QShortcut _restart_audio_shortcut{QKeySequence{Qt::Key_F12}, this};
 
     // Audio.
@@ -95,6 +120,41 @@ public:
             &_restart_audio_shortcut, &QShortcut::activated,
             this, &MainWindow::restart_audio_thread
         );
+
+        connect(
+            &_play_pause, &QShortcut::activated,
+            this, [&] {
+                if (_audio_handle.has_value()) {
+                    if (_audio_handle->play_time().has_value()) {
+                        _audio_handle->stop_playback();
+                    } else {
+                        auto ticks_per_beat = _history
+                            .gui_get_document()
+                            ->sequencer_options
+                            .ticks_per_beat;
+
+                        auto x = frac_to_tick(ticks_per_beat, _cursor_y.beat);
+
+                        SequencerTime time{
+                            (uint16_t) _cursor_y.seq_entry_index,
+                            // If set to 0, GUI renders pattern wrong briefly.
+                            (uint16_t) ticks_per_beat,
+                            (int16_t) x.beat,
+                            (int16_t) x.dtick
+                        };
+                        _audio_handle->start_playback(time);
+                    }
+                }
+            }
+        );
+
+        connect(
+            &_play_pause, &QShortcut::activatedAmbiguously,
+            this, [&] {
+                qDebug() << "ambiguous yay";
+            }
+        );
+
     }
 
     /// Output: _pattern_editor_panel.
