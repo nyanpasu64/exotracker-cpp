@@ -159,7 +159,7 @@ public:
     virtual ~ChipInstance() = default;
 
     /// TODO write a description
-    virtual void seek(doc::Document const & document, timing::SequencerTime time) = 0;
+    virtual void seek(doc::Document const & document, timing::PatternAndBeat time) = 0;
 
     /// May/not mutate _register_writes.
     /// You are required to call driver_tick() afterwards on the same tick,

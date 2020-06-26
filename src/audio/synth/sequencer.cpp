@@ -291,7 +291,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     return {seq_chan_time, _events_this_tick};
 }
 
-void ChannelSequencer::seek(doc::Document const & document, SequencerTime time) {
+void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time) {
     // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
     release_assert(_chip_index < nchip);
@@ -303,7 +303,7 @@ void ChannelSequencer::seek(doc::Document const & document, SequencerTime time) 
 
     // Set real time.
     {
-        BeatPlusTick now_ticks{.beat=time.beats, .dtick=time.ticks};
+        BeatPlusTick now_ticks = frac_to_tick(ticks_per_beat, time.beat);
 
         _now = RealTime{.seq_entry=time.seq_entry_index, .next_tick=now_ticks};
     }
@@ -327,10 +327,7 @@ void ChannelSequencer::seek(doc::Document const & document, SequencerTime time) 
         return ticks_per_beat * (to.beat - from.beat) + to.dtick - from.dtick;
     };
 
-    BeatPlusTick const now_pattern_len = [&] {
-        doc::SequenceEntry const & now_entry = document.sequence[_now.seq_entry];
-        return frac_to_tick(ticks_per_beat, now_entry.nbeats);
-    }();
+    BeatFraction const now_pattern_len = document.sequence[_now.seq_entry].nbeats;
 
     TimedEventsRef events;
 
@@ -373,14 +370,8 @@ void ChannelSequencer::seek(doc::Document const & document, SequencerTime time) 
 
         doc::TimedRowEvent next_ev = events[_next_event.event_idx];
 
-        // Quantize event to (beat integer, tick offset), to match now.
-        // Note that *.beat is int, not BeatFraction!
-        BeatPlusTick now = _now.next_tick;
-        BeatPlusTick next_ev_time =
-            frac_to_tick(ticks_per_beat, next_ev.time.anchor_beat);
-
-        // Ignore next_ev.time.tick_offset when seeking.
-        // We only care about the note's anchor beat.
+        auto now = time.beat;
+        auto next_ev_time = next_ev.time.anchor_beat;
 
         if (_pattern_offset.event_is_ahead()) {
             // If event is on next pattern, queue it for playback.

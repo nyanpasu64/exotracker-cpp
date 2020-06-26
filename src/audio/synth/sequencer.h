@@ -16,6 +16,7 @@ namespace audio::synth::sequencer {
 
 using namespace chip_common;
 using timing::SequencerTime;
+using timing::PatternAndBeat;
 
 using EventsRef = gsl::span<doc::RowEvent const>;
 using EventIndex = uint32_t;
@@ -141,7 +142,7 @@ public:
         _chan_index = chan_index;
     }
 
-    void seek(doc::Document const & document, SequencerTime time);
+    void seek(doc::Document const & document, PatternAndBeat time);
 
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
     /// Return: SequencerTime is current tick (just occurred), not next tick.
@@ -162,7 +163,7 @@ public:
         }
     }
 
-    void seek(doc::Document const & document, SequencerTime time) {
+    void seek(doc::Document const & document, PatternAndBeat time) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             _channel_sequencers[chan].seek(document, time);
         }
