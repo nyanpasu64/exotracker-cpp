@@ -82,30 +82,26 @@ void OverallSynth::synthesize_overall(
     // The "end of callback" time will get exposed to the GUI
     // once the audio starts (not finishes) playing...
     // but I don't care anymore.
-    FlagAndTime const flag_begin_ = _flag_time.load(std::memory_order_seq_cst);
+    SequencerTime const seq_begin_ = _seq_time.load(std::memory_order_seq_cst);
 
     // Increases as we run ticks.
-    FlagAndTime flag_time = flag_begin_;
+    SequencerTime seq_time = seq_begin_;
 
     // If we were playing, but GUI wants us to stop...
-    if (flag_time.was_playing() && !flag_time.has_time()) {
+    if (false) {
         _sequencer_running = false;
         for (auto & chip : _chip_instances) {
             chip->stop_all_notes();
         }
-
-        flag_time.set_is_playing(false);
     }
 
     // If we weren't playing, but GUI wants us to start...
-    if (!flag_time.was_playing() && flag_time.has_time()) {
+    if (false) {
         _sequencer_running = true;
         for (auto & chip : _chip_instances) {
             chip->stop_all_notes();
-            chip->seek(document, flag_time.maybe_time().get());
+            // chip->seek(document, flag_time.maybe_time().get());
         }
-
-        flag_time.set_is_playing(true);
     }
 
     while (true) {
@@ -179,12 +175,10 @@ void OverallSynth::synthesize_overall(
                         // Ensure all chip sequencers are running in sync.
                         if (chip_index > 0) {
                             // TODO release_assert?
-                            assert(
-                                flag_time.maybe_time() == MaybeSequencerTime{chip_time}
-                            );
+                            assert(seq_time == chip_time);
                         }
 
-                        flag_time.set_maybe_time(MaybeSequencerTime{chip_time});
+                        seq_time = chip_time;
                     } else {
                         chip.driver_tick(document);
                     }
@@ -203,13 +197,8 @@ void OverallSynth::synthesize_overall(
 
     // If sequencer not running, overwrite timestamp with none.
     // Otherwise overwrite with latest time.
-    if (flag_time != flag_begin_) {
-        // Atomic _play_time is either equal to begin_play_time,
-        // or has been replaced by a flagged value (GUI stop/seek operation).
-        // If atomic == begin, set to end.
-        // Otherwise, the next callback will seek to the right spot.
-        auto flag_begin_mut = flag_begin_;
-        _flag_time.compare_exchange_strong(flag_begin_mut, flag_time);
+    if (seq_time != seq_begin_) {
+        _seq_time.store(seq_time, std::memory_order_seq_cst);
     }
 }
 

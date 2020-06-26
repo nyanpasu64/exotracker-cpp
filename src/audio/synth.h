@@ -25,8 +25,7 @@ enum class SynthEvent {
     COUNT
 };
 
-using timing::MaybeSequencerTime;
-using timing::FlagAndTime;
+using timing::SequencerTime;
 
 /// Preconditions:
 /// - Sampling rate must be 1000 or more.
@@ -82,14 +81,13 @@ private:
     // Playback tracking
     bool _sequencer_running = false;
 
-    using AtomicFlagTime = std::atomic<FlagAndTime>;
+    using AtomicSequencerTime = std::atomic<SequencerTime>;
     static_assert(
-        AtomicFlagTime::is_always_lock_free, "std::atomic<FlagAndTime> not lock-free"
+        AtomicSequencerTime::is_always_lock_free,
+        "std::atomic<SequencerTime> not lock-free"
     );
 
-    AtomicFlagTime _flag_time{
-        FlagAndTime{false, timing::MaybeSequencerTime::none()}
-    };
+    AtomicSequencerTime _seq_time{SequencerTime{}};
 
     /// Per-chip "special audio" written into this and read into _nes_blip.
     /// This MUST remain the last field in the struct,
@@ -127,20 +125,19 @@ public:
     );
 
     /// Called by GUI thread.
-    MaybeSequencerTime play_time() const override {
-        return _flag_time.load(std::memory_order_seq_cst).maybe_time();
+    SequencerTime play_time() const override {
+        return _seq_time.load(std::memory_order_seq_cst);
     }
 
     /// Called by GUI thread.
     void stop_playback() override {
-        FlagAndTime flag_time{true, MaybeSequencerTime::none()};
-        _flag_time.store(flag_time);
+        // TODO push to queue
     }
 
     /// Called by GUI thread.
     void start_playback(SequencerTime time) override {
-        FlagAndTime flag_time{false, time};
-        _flag_time.store(flag_time);
+        // TODO push to queue
+        // TODO switch to beat fractions
     }
 };
 

@@ -32,7 +32,6 @@
 namespace audio {
 namespace output {
 
-using timing::MaybeSequencerTime;
 using timing::SequencerTime;
 using callback::CallbackInterface;
 
@@ -75,7 +74,7 @@ public:
     );
 
     /// Called by GUI thread.
-    inline MaybeSequencerTime play_time() const {
+    inline SequencerTime play_time() const {
         return _callback->play_time();
     }
 

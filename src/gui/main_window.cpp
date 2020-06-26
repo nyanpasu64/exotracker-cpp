@@ -99,7 +99,7 @@ public:
         connect(
             &_gui_refresh_timer, &QTimer::timeout,
             this, [this] () {
-                auto maybe_seq_time = MaybeSequencerTime::none();
+                MaybeSequencerTime maybe_seq_time{};
 
                 auto & audio = audio_handle();
                 if (audio.has_value()) {
@@ -125,7 +125,8 @@ public:
             &_play_pause, &QShortcut::activated,
             this, [&] {
                 if (_audio_handle.has_value()) {
-                    if (_audio_handle->play_time().has_value()) {
+                    // TODO store playback state in GUI thread
+                    if (false) {
                         _audio_handle->stop_playback();
                     } else {
                         auto ticks_per_beat = _history

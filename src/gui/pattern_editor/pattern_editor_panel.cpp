@@ -1263,7 +1263,7 @@ void PatternEditorPanel::paintEvent(QPaintEvent *event) {
 void PatternEditorPanel::update(timing::MaybeSequencerTime maybe_seq_time) {
     if (maybe_seq_time.has_value()) {
         // Update cursor to sequencer position (from audio thread).
-        auto const seq_time = maybe_seq_time.get();
+        auto const seq_time = maybe_seq_time.value();
 
         PatternAndBeat new_cursor_y{seq_time.seq_entry_index, seq_time.beats};
 
