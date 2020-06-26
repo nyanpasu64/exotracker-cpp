@@ -39,7 +39,7 @@ struct [[nodiscard]] alignas(uint64_t) SequencerTime {
         , ticks{ticks}
     {}
 
-    constexpr SequencerTime() : SequencerTime{0, 0, 0, 0} {}
+    constexpr SequencerTime() : SequencerTime{0, 1, 0, 0} {}
 
     CONSTEXPR_COPY(SequencerTime)
     EQUALABLE(SequencerTime, (seq_entry_index, curr_ticks_per_beat, beats, ticks))
