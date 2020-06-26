@@ -22,6 +22,12 @@ using timing::PatternAndBeat;
 using timing::SequencerTime;
 using timing::MaybeSequencerTime;
 
+enum class AudioState {
+    Stopped,
+    Starting,
+    PlayHasStarted,
+};
+
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
 class MainWindow : public QMainWindow
 {
@@ -54,6 +60,8 @@ public:
     virtual ~MainWindow();
 
     virtual std::optional<AudioThreadHandle> const & audio_handle() = 0;
+
+    virtual AudioState audio_state() const = 0;
 
 signals:
     void gui_refresh(MaybeSequencerTime maybe_seq_time)

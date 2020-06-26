@@ -41,12 +41,6 @@ using doc::BeatFraction;
 using audio_cmd::CommandQueue;
 using audio_cmd::AudioCommand;
 
-enum class AudioState {
-    Stopped,
-    Starting,
-    PlayHasStarted,
-};
-
 // module-private
 class MainWindowImpl : public MainWindow {
      W_OBJECT(MainWindowImpl)
@@ -290,6 +284,10 @@ public:
 
     std::optional<AudioThreadHandle> const & audio_handle() override {
         return _audio_handle;
+    }
+
+    AudioState audio_state() const override {
+        return _audio_component.audio_state();
     }
 
     void restart_audio_thread() override {
