@@ -109,7 +109,6 @@ public:
         void play_from(MainWindowImpl & win, PatternAndBeat time) {
             _command_queue.push(audio_cmd::SeekTo{time});
             _audio_state = AudioState::Starting;
-            fmt::print(stderr, "{}, {}/{}\n", time.seq_entry_index, time.beat.numerator(), time.beat.denominator());
 
             // Move cursor to right spot, while waiting for audio thread to respond.
             win._cursor_y = time;
@@ -137,14 +136,6 @@ public:
                     // once GUI sees audio caught up on commands, it must see audio's new time.
                     if (_audio_state == AudioState::Starting) {
                         _audio_state = AudioState::PlayHasStarted;
-                        auto mx = audio_handle.play_time();
-                        if (mx) {
-                            auto x = *mx;
-                            fmt::print(stderr, "{} {} {} {}\n", x.seq_entry_index, x.curr_ticks_per_beat, x.beats, x.ticks);
-                        }
-                        else {
-                            fmt::print(stderr, "audio position unknown\n");
-                        }
                     }
                 }
             }
