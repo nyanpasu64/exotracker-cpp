@@ -198,24 +198,33 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     #undef X
 
     using Method = void (PatternEditorPanel::*)();
+
+    auto on_key_pressed = [] (
+        PatternEditorPanel & self, Method method, bool shift_held
+    ) {
+        // TODO encapsulate cursor, allow moving with mouse, show selection, etc.
+        std::invoke(method, self);
+        if (shift_held) {
+            self._win._select_begin_y = self._win._cursor_y;
+        }
+        self.repaint();
+    };
+
     auto connect_shortcut = [&] (ShortcutPair & pair, Method method) {
         QObject::connect(
             &pair.key,
             &QShortcut::activated,
             &self,
-            [&self, method] () {
-                std::invoke(method, self);
-                self._win._select_begin_y = self._win._cursor_y;
-                self.repaint();
+            [&self, method, on_key_pressed] () {
+                on_key_pressed(self, method, false);
             }
         );
         QObject::connect(
             &pair.shift_key,
             &QShortcut::activated,
             &self,
-            [&self, method] () {
-                std::invoke(method, self);
-                self.repaint();
+            [&self, method, on_key_pressed] () {
+                on_key_pressed(self, method, true);
             }
         );
     };
