@@ -23,6 +23,7 @@
 #include <QRect>
 
 #include <algorithm>  // std::max
+#include <functional>  // std::invoke
 #include <optional>
 #include <tuple>
 #include <type_traits>  // is_same_v
@@ -196,27 +197,32 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     SHORTCUT_PAIRS(X, )
     #undef X
 
+    using Method = void (PatternEditorPanel::*)();
+    auto connect_shortcut = [&] (ShortcutPair & pair, Method method) {
+        QObject::connect(
+            &pair.key,
+            &QShortcut::activated,
+            &self,
+            [&self, method] () {
+                std::invoke(method, self);
+                self._win._select_begin_y = self._win._cursor_y;
+                self.repaint();
+            }
+        );
+        QObject::connect(
+            &pair.shift_key,
+            &QShortcut::activated,
+            &self,
+            [&self, method] () {
+                std::invoke(method, self);
+                self.repaint();
+            }
+        );
+    };
+
     // Copy, don't borrow, local lambdas.
     #define X(KEY) \
-        QObject::connect( \
-            &self._shortcuts.KEY.key, \
-            &QShortcut::activated, \
-            &self, \
-            [=, &self] () { \
-                self.KEY##_pressed(); \
-                self._win._select_begin_y = self._win._cursor_y; \
-                self.repaint(); \
-            } \
-        ); \
-        QObject::connect( \
-            &self._shortcuts.KEY.shift_key, \
-            &QShortcut::activated, \
-            &self, \
-            [=, &self] () { \
-                self.KEY##_pressed(); \
-                self.repaint(); \
-            } \
-        );
+        connect_shortcut(self._shortcuts.KEY, &PatternEditorPanel::KEY##_pressed);
     SHORTCUT_PAIRS(X, )
     #undef X
 }
