@@ -42,10 +42,10 @@ class Apu1PulseDriver {
 #define ITER_NAME(name)  _ ## name ## _iter
 #define ID(name)  name
 
-#define DEFINE_ITERATORS(name) \
+#define DEFINE_ITERATOR(name) \
     envelope::EnvelopeIterator<decltype(doc::Instrument::name)> ITER_NAME(name)
 
-    Apu1PulseDriver_FOREACH_RAW(DEFINE_ITERATORS, ID)
+    Apu1PulseDriver_FOREACH_RAW(DEFINE_ITERATOR, ID)
 
 #define Apu1PulseDriver_FOREACH(X) \
     Apu1PulseDriver_FOREACH_RAW(X, ITER_NAME)
