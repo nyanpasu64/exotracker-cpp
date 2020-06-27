@@ -48,14 +48,40 @@ TuningOwned make_tuning_table(
 }
 
 void Apu1PulseDriver::stop_note([[maybe_unused]] RegisterWriteQueue & register_writes) {
+    /*
+    When we stop all notes, we want to reset all mutable state
+    (except for cached register contents).
+    To avoid forgetting to overwrite some fields,
+    I decided to overwrite *this with a new Apu1PulseDriver.
+    However, Apu1PulseDriver and EnvelopeIterator have const fields,
+    which disable the assignment operator.
+
+    Logically, the issue is that we mix mutable state (to be assigned)
+    and immutable constants (makes no sense to reassign).
+
+    Options:
+
+    - Transform const fields into template non-type arguments.
+      So each combination of const fields will generate a new copy of each method.
+      Bloats codegen by 2-3 times, and a poor fit for N163
+      (which has a dynamic channel count).
+    - Custom assignment operator that ignores const fields or asserts they match.
+    - Mark all fields as non-const.
+    - delete this and placement new. Ignores constness entirely.
+
+    I decided to "mark all fields as non-const".
+
+    Rust lacks const fields.
+    I wish it had them, but it might break std::mem::replace and assignment via &mut.
+    */
+
     // Backup parameters.
     auto pulse_num = _pulse_num;
     auto tuning_table = _tuning_table;
     // Backup state.
     auto prev_state = _prev_state;
 
-    this->~Apu1PulseDriver();
-    new(this) Apu1PulseDriver{pulse_num, tuning_table};
+    *this = Apu1PulseDriver{pulse_num, tuning_table};
     // Initialize state so we know how to turn off sound.
     _prev_state = prev_state;
     // _next_state = silence.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "doc.h"
+#include "util/copy_move.h"
 #include "util/macros.h"
 
 #include <cstdint>
@@ -15,12 +16,12 @@ class EnvelopeIterator {
 
     /// which envelope to track (volume, pitch, arpeggio...)
     using EnvelopePtr = EnvelopeT doc::Instrument::*;
-    EnvelopePtr const _field;
+    EnvelopePtr /*const*/ _field;
 
     // Treat "no instrument loaded" as "instrument loaded, all envelopes empty".
 
     /// Value if we trigger a new note, but instrument envelope is empty.
-    IntT const _default_value;
+    IntT /*const*/ _default_value;
 
     /// Which instrument to track.
     std::optional<doc::InstrumentIndex> _curr_instr;
@@ -43,6 +44,9 @@ public:
         _next_position()
         // On MSVC and Clang, optional_field({}) initializes to 0.
     {}
+
+    explicit DEFAULT_COPY(EnvelopeIterator)
+    DEFAULT_MOVE(EnvelopeIterator)
 
     /*
     state machine

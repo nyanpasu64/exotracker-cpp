@@ -28,8 +28,8 @@ constexpr static int BITS_PER_BYTE = 8;
 class Apu1PulseDriver {
     using PulseNum = Range<0, 2, uint16_t>;
 
-    PulseNum const _pulse_num;
-    Address const _base_address;
+    PulseNum /*const*/ _pulse_num;
+    Address /*const*/ _base_address;
     TuningRef _tuning_table;
 
     bool _first_tick_occurred = false;
@@ -83,6 +83,10 @@ private:
     Apu1Reg _next_state = 0;
 
     // impl
+private:
+    explicit DEFAULT_COPY(Apu1PulseDriver)
+    DEFAULT_MOVE(Apu1PulseDriver)
+
 public:
     Apu1PulseDriver(PulseNum pulse_num, TuningRef tuning_table) noexcept :
         _pulse_num(pulse_num),
