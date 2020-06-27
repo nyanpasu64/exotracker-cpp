@@ -48,8 +48,17 @@ TuningOwned make_tuning_table(
 }
 
 void Apu1PulseDriver::stop_note([[maybe_unused]] RegisterWriteQueue & register_writes) {
-    #define NOTE_CUT(iter)  iter.note_cut()
-    Apu1PulseDriver_FOREACH(NOTE_CUT)
+    // Backup parameters.
+    auto pulse_num = _pulse_num;
+    auto tuning_table = _tuning_table;
+    // Backup state.
+    auto prev_state = _prev_state;
+
+    this->~Apu1PulseDriver();
+    new(this) Apu1PulseDriver{pulse_num, tuning_table};
+    // Initialize state so we know how to turn off sound.
+    _prev_state = prev_state;
+    // _next_state = silence.
 }
 
 void Apu1PulseDriver::tick(
@@ -71,6 +80,7 @@ void Apu1PulseDriver::tick(
                 Apu1PulseDriver_FOREACH(RELEASE)
 
             } else if (note.is_cut()) {
+                #define NOTE_CUT(iter)  iter.note_cut()
                 Apu1PulseDriver_FOREACH(NOTE_CUT)
             }
         } else if (event.instr.has_value()) {

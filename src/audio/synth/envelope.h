@@ -36,7 +36,7 @@ class EnvelopeIterator {
     std::optional<uint32_t> _next_position;
 
 public:
-    EnvelopeIterator(EnvelopePtr field, IntT default_value) :
+    EnvelopeIterator(EnvelopePtr field, IntT default_value) noexcept :
         _field(field),
         _default_value(default_value),
         _curr_instr(),

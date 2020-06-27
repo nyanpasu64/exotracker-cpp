@@ -82,9 +82,9 @@ private:
     Apu1Reg _prev_state = 0;
     Apu1Reg _next_state = 0;
 
-public:
     // impl
-    Apu1PulseDriver(PulseNum pulse_num, TuningRef tuning_table) :
+public:
+    Apu1PulseDriver(PulseNum pulse_num, TuningRef tuning_table) noexcept :
         _pulse_num(pulse_num),
         _base_address(Address(0x4000 + 0x4 * pulse_num)),
         _tuning_table(tuning_table),
