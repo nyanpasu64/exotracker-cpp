@@ -760,7 +760,7 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value, bool>::type
    operator < (const Arg& b, const rational<IntType>& a)
 {
-      return a > b;
+      return a.operator>(b);
 }
 template <class Arg, class IntType>
 BOOST_CXX14_CONSTEXPR
@@ -768,7 +768,7 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value, bool>::type
    operator > (const Arg& b, const rational<IntType>& a)
 {
-      return a < b;
+      return a.operator<(b);
 }
 template <class Arg, class IntType>
 BOOST_CONSTEXPR
@@ -776,7 +776,8 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value, bool>::type
    operator == (const Arg& b, const rational<IntType>& a)
 {
-      return a == b;
+      // In C++20 mode, GCC miscompiles (a == b) to operator==(b, a).
+      return a.operator==(b);;
 }
 
 // Comparison operators
