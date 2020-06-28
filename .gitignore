@@ -88,4 +88,6 @@ compile_commands.json
 
 /cmake_user_override.txt
 /cmake_user_override.cmake
+/cmake_user_begin.cmake
+/cmake_user_end.cmake
 .cmake

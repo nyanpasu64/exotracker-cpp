@@ -15,8 +15,7 @@ set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Build (rtaudio, fmt, ...?) as shared lib
 # I patched RtAudio so you can specify whether to make msvcrt static or dynamic.
 set(RTAUDIO_STATIC_MSVCRT FALSE)
 
-# This can be used to enable asan (-fsanitize=memory/undefined).
-include(cmake_user_override.cmake OPTIONAL)
+include(cmake_user_begin.cmake OPTIONAL)
 #End initialize environment
 
 
@@ -154,3 +153,7 @@ target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests PRIVATE exotracker-lib)
 target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
+
+
+# This can be used to enable asan (-fsanitize=memory/undefined/leak).
+include(cmake_user_end.cmake OPTIONAL)
