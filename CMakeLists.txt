@@ -104,7 +104,7 @@ add_library(exotracker-lib
         src/audio/synth/nes_2a03.cpp
         src/audio/synth/nes_2a03_driver.cpp
 
-        # Etc.
+        # Glue files
         src/doc/events.cpp
         )
 target_compile_options(exotracker-lib PRIVATE "${options}")
@@ -114,9 +114,10 @@ target_compile_definitions(exotracker-lib PRIVATE EXO_LIB)
 
 # GUI editor, uses Qt
 add_executable(exotracker-bin
-        # GUI/audio thread-safe locking
+        # GUI/audio communication
         src/util/sync.cpp
         src/audio/output.cpp
+        src/audio_cmd.cpp
 
         # GUI
         src/sample_docs.cpp
@@ -144,12 +145,10 @@ add_executable(exotracker-tests
         tests/test_utils/test_parameterize.cpp
 
         src/doc/events.cpp
+        src/audio_cmd.cpp
         src/audio/synth/envelope.cpp
         src/audio/synth/sequencer.cpp
         src/audio/synth/nes_2a03_driver.cpp
-
-        # No tests yet, why is it included?
-        src/gui/history.cpp
         )
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)

@@ -160,54 +160,139 @@ j0CC handles this differently. CAPU (hardware chip synth) has a Read() method, b
 
 ## GUI/audio communication
 
-The GUI and audio thread share an atomic for tearing-free "audio thread position" communication. This scheme is a bit overengineered, but designed so if you if you stop playback and immediately try moving in the document, your keystrokes won't get discarded since the audio thread hasn't stopped yet.
+- struct SeekTo
+    - messages: `vector<(chip id, channel id, volume/instr/effect state)>`
+    - time: beat fraction
+- struct AudioCommand
+    - seek_or_stop: `optional<SeekTo>`
+    - next: `atomic<AudioCommand*>` = nullptr
+- impl AudioCommand
+    - explicit AudioCommand(seek_or_stop: `optional<SeekTo>`)
+        - ...
+    - explicit AudioCommand(AudioCommand const &) = default
+    - AudioCommand(AudioCommand &&) = default
+    - REMOVED METHOD (clashes with field next):
+        - AudioCommand * next() const
 
-The atomic has a single-bit `was_playing` flag (approximately, does GUI think audio was already playing?) and a `time` field (approximately, where does the GUI want playback to go to?). If the atomic is playing, the audio thread writes to the atomic to tell the GUI thread where it's playing. If not, the audio thread cannot overwrite it unless the GUI sends a seek command.
+            - return next.load(acquire)
+- class CommandQueue
+    - Not exposed to audio thread. Audio thread is initialized with `AudioCommand *` and iterates via `next()`.
+    - AudioCommand * _begin (non-null?)
+    - AudioCommand * _end (non-null, may be equal)
+- impl CommandQueue
+    - priv fn init()
+        - _begin = _end = new AudioCommand{{}}
+    - priv fn destroy_all()
+        - *Only run this when there are no live readers left.*
+        - if (_begin == nullptr)  // moved-from state?
+            - return
+        - while (auto next = _begin->next.load(relaxed))
+            - auto destroy = _begin
+            - _begin = next
+            - delete destroy
+        - release_assert(_begin == _end)
+        - delete _begin
+        - // set _begin = _end = nullptr?
+    - pub fn ~CommandQueue()
+        - destroy_all()
+    - pub fn clear()
+        - destroy_all()
+        - init()
+    - pub AudioCommand const * begin()
+        - Not thread-safe. The return value is sent to audio thread.
+        - return _begin
+    - pub AudioCommand const * end()
+        - Not thread-safe.
+        - return _end
+    - pub fn push(AudioCommand elem)
+        - auto new_end = new AudioCommand(std::move(elem))
+        - _end->next.store(new_end, release)
+            - Paired with synthesize_overall() load(acquire).
+        - _end = new_end
+    - pub fn pop()  // no return value because exception safety or something? what is exception safety help
+        - release_assert(_begin != _end)
+        - auto next = _begin->next.load(relaxed)
+        - release_assert(next)
+        - auto destroy = _begin
+        - _begin = next
+        - delete destroy
+- gui
+    - _playback_state: enum AudioState
+        - Stopped
+        - Starting
+        - PlayHasStarted
+    - _audio_queue: CommandQueue
+- impl gui
+    - fn clean_done() -> void
+        - auto x = audio.seen_command()
+        - while list.begin() != x
+            - list.pop()
+        - if (list.begin() == list.end())
+            - // once GUI sees audio caught up on commands, it must see audio's new time.
+            - if (_playback_state == Starting)
+                - _playback_state = PlayHasStarted
+    - fn start_stop
+        - if _playback_state == Stopped
+            - (eventually recall channel state and current speed)
+            - _audio_queue.push(AudioCommand{cursor time})
+            - _playback_state = Starting
+        - else
+            - _audio_queue.push(AudioCommand{{}})
+            - _playback_state = Stopped
+    - fn update
+        - if _playback_state == PlayHasStarted
+            - write cursor pos = audio.seq_time() if has_value()
+    - fn on_arrow_key
+        - if _playback_state != Stopped
+            - early return
+        - scroll i guess
+- audio
+    - _seen_command: `atomic<AudioCommand *>`
+    - _seq_time: `atomic<maybe timestamp>` (value always present, ignored by GUI when GUI thinks not playing)
+- impl audio
+    - seen_command()  // Called on GUI thread
+        - The audio thread ignores this command since it has already handled it.
+        - We only look at the next pointer.
+        - This wastes one command worth of memory, but not a big deal
+        - return _seen_command.load(acquire)  // once GUI sees we've caught up on commands, it must see our new time.
+    - seq_time()  // Called on GUI thread
+        - return _seq_time.load(seq_cst)  // ehh... minimize latency 👌
+    - new(AudioCommand *) -> audio  // Called on GUI thread
+        - _seen_command.store(^, release)
+        - _seq_time.store(suitable initial value, relaxed)
+    - synthesize_overall()
+        - auto seq_time = _seq_time.load(relaxed)
+        - auto const orig_seq_time = seq_time
+        - // Handle all commands we haven't seen yet.
+        - auto cmd = _seen_command.load(relaxed)
+        - auto const orig_cmd = cmd
+        - while (auto next = cmd->next.load(acquire))
+            - Paired with CommandQueue::push() store(release).
+            - Handle command (*next). If we seek, set seq_time = nullopt.
+            - cmd = next
+        - (... synthesize audio. If a tick occurs, overwrite seq_time.)
+        - if (seq_time != orig_seq_time)
+            - _seq_time.store(seq_time, seq_cst)  // ehh... minimize latency 👌
+        - if (cmd != orig_cmd)
+            - _seen_command.store(cmd, release)  // once GUI sees we've caught up on commands, it must see our new time.
 
-The audio thread will check for state transitions on the *beginning* of each callback, and if so, immediately CAS the atomic. If playback is active, it will CAS at the end too.
+### Do we need memory barriers between constructing the synth and accessing it?
 
-Atomic: `(was_playing, time)`
+No.
 
-Starting point: `(Stopped, None)`
+On Linux, RtAudio uses pthread to create the audio thread.
 
-(Eventually add a special constructor/method to send a start-playback event immediately, before generating audio. Useful if embedding exotracker as a library.)
+- https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_12
+- https://stackoverflow.com/questions/24137964
+- pthread_create acts as a memory barrier, so the synth object (as initialized by the main thread) will be fully seen by the audio thread.
 
-Rules:
+On Windows, RtAudio uses CreateThread to create the audio thread.
 
-- GUI thread:
-    - Write to flag and time
-    - Read time (not flag).
-    - GUI thread transitions cannot call any methods on the audio synth.
-- Audio thread:
-    - CAS-write to time and flag.
-        - Only CAS allowed. If audio and GUI race to update timestamp, GUI wins and audio will see GUI's intent on next callback.
-        - The ABA problem cannot occur if the original read has matching `was_playing` and `has_time`, since the GUI thread always writes mismatched atomics.
-    - Read flag (not time).
+- https://stackoverflow.com/questions/12363211
+- > All writes prior to CreateThread are visible to the new thread.
+- Apparently this is a de-facto standard.
 
-TODO: If `(Stopped, time)`, interpret remaining bits as a i16/i16 beat fraction, rather than audio timestamp. MuseScore can do that, why can't we?
-
-States:
-
-- `(Stopped, None)`
-    - Precondition: `run_sequencer = false`
-    - Audio thread: leave as is
-    - Transition: GUI begin playback, →write `(Stopped, time)`
-- `(Stopped, time)`
-    - Precondition: `run_sequencer = ?` (depends on whether we start or restart playback)
-    - Audio thread: →CAS `(Playing, time)`
-        - `all_notes_off()` (in case we're restarting playback)
-        - `run_sequencer := true`
-- `(Play, time)`
-    - Precondition: `run_sequencer = true`
-    - Audio thread: advance time, →CAS to update atomic
-    - Transition: Audio song ends, goto `(Play, None)`'s code.
-    - Transition: GUI restart playback, →write `(Stopped, time=new)`
-    - Transition: GUI end playback, →write `(Play, None)`
-- `(Play, None)`
-    - Precondition: `run_sequencer = true?`
-    - Audio thread: →CAS `(Stopped, None)`
-        - `all_notes_off()`
-        - `run_sequencer := false`
+On Mac... I have no clue.
 
 ## Rules for avoiding circular header inclusion
 

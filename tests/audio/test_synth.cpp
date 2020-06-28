@@ -2,6 +2,8 @@
 #include "audio/synth/nes_2a03_driver.h"
 #include "doc.h"
 #include "chip_kinds.h"
+#include "audio_cmd.h"
+#include "timing_common.h"
 #include "test_utils/parameterize.h"
 
 #include <fmt/core.h>
@@ -79,6 +81,14 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
 using audio::Amplitude;
 using audio::AudioOptions;
 using audio::ClockT;
+using audio_cmd::AudioCommand;
+using audio_cmd::CommandQueue;
+
+CommandQueue play_from_begin() {
+    CommandQueue out;
+    out.push(audio_cmd::SeekTo{timing::PatternAndBeat{0, 0}});
+    return out;
+}
 
 /// Constructs a new OverallSynth at the specified sampling rate,
 /// and runs it for the specified amount of time.
@@ -87,13 +97,16 @@ std::vector<Amplitude> run_new_synth(
     doc::Document const & document,
     uint32_t smp_per_s,
     blip_nsamp_t nsamp,
+    AudioCommand * stub_command,
     AudioOptions audio_options
 ) {
     CAPTURE(smp_per_s);
     CAPTURE(nsamp);
 
     // (int stereo_nchan, int smp_per_s, locked_doc::GetDocument &/*'a*/ document)
-    audio::synth::OverallSynth synth{1, smp_per_s, document, audio_options};
+    audio::synth::OverallSynth synth{
+        1, smp_per_s, document, stub_command, audio_options
+    };
 
     std::vector<Amplitude> buffer;
     buffer.resize(nsamp);
@@ -148,9 +161,10 @@ TEST_CASE("Test that empty documents produce silence") {
     TestChannelID which_channel = TestChannelID::NONE;
     doc::Note random_note{60};
     doc::Document document{one_note_document(which_channel, random_note)};
+    CommandQueue play_commands = play_from_begin();
 
     std::vector<Amplitude> buffer = run_new_synth(
-        document, 48000, 4 * 1024, audio_options
+        document, 48000, 4 * 1024, play_commands.begin(), audio_options
     );
     for (size_t idx = 0; idx < buffer.size(); idx++) {
         Amplitude y = buffer[idx];
@@ -169,6 +183,7 @@ TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
 
     TestChannelID which_channel;
     AudioOptions audio_options;
+    CommandQueue play_commands = play_from_begin();
 
     PICK(all_channels(which_channel, all_audio_options(audio_options)));
 
@@ -184,7 +199,7 @@ TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
     CHECK(driver._tuning_table[(size_t) high_note.value] <= 0xff);
 
     std::vector<Amplitude> buffer = run_new_synth(
-        document, 48000, 4 * 1024, audio_options
+        document, 48000, 4 * 1024, play_commands.begin(), audio_options
     );
     Amplitude const THRESHOLD = 1000;
     check_signed_amplitude(buffer, THRESHOLD);
@@ -202,6 +217,7 @@ TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
 
     doc::Note low_note{36};
     doc::Document document{one_note_document(which_channel, low_note)};
+    CommandQueue play_commands = play_from_begin();
 
     Apu1Driver driver{
         audio::synth::CLOCKS_PER_S, document.frequency_table
@@ -214,7 +230,7 @@ TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
     );
 
     std::vector<Amplitude> buffer = run_new_synth(
-        document, 48000, 4 * 1024, audio_options
+        document, 48000, 4 * 1024, play_commands.begin(), audio_options
     );
     Amplitude const THRESHOLD = 1000;
     check_signed_amplitude(buffer, THRESHOLD);
@@ -224,6 +240,7 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
 
     doc::Note note{60};
     doc::Document document{one_note_document(TestChannelID::Pulse1, note)};
+    CommandQueue play_commands = play_from_begin();
 
     Apu1Driver driver{
         audio::synth::CLOCKS_PER_S, document.frequency_table
@@ -239,26 +256,32 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
     // The largest failing value is 873.
     // Not all values fail. As smp_per_s decreases, it becomes more likely to fail.
     for (uint32_t smp_per_s = 1000; smp_per_s <= 250'000; INCREASE(smp_per_s)) {
-        run_new_synth(document, smp_per_s, smp_per_s / 4, audio_options);  // smp_per_s * 0.25 second
+        // smp_per_s * 0.25 second
+        run_new_synth(document, smp_per_s, smp_per_s / 4, play_commands.begin(), audio_options);
     }
 
     // 44100Hz, zero samples
-    run_new_synth(document, 44100, 0, audio_options);
+    run_new_synth(document, 44100, 0, play_commands.begin(), audio_options);
 
     // 48000Hz, various durations
     for (uint32_t nsamp = 1; nsamp <= 100'000; INCREASE(nsamp)) {
-        run_new_synth(document, 48000, nsamp, audio_options);
+        run_new_synth(document, 48000, nsamp, play_commands.begin(), audio_options);
     }
 }
 
 TEST_CASE("Send all note pitches into AudioInstance and look for assertion errors") {
     // 32000Hz, 4000 samples, various note pitches.
+    CommandQueue play_commands = play_from_begin();
     for (doc::ChromaticInt pitch = 0; pitch < doc::CHROMATIC_COUNT; pitch++) {
         doc::Document document{
             one_note_document(TestChannelID::Pulse1, {pitch})
         };
         run_new_synth(
-            document, 32000, 1000, AudioOptions{.clocks_per_sound_update = 1}
+            document,
+            32000,
+            1000,
+            play_commands.begin(),
+            AudioOptions{.clocks_per_sound_update = 1}
         );
     }
 }

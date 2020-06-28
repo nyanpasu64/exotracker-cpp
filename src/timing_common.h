@@ -1,9 +1,9 @@
 #pragma once
 
 #include "doc.h"
+#include "util/copy_move.h"
 
 #include <cstdint>
-#include <optional>
 
 namespace timing {
 
@@ -46,6 +46,71 @@ struct [[nodiscard]] alignas(uint64_t) SequencerTime {
 };
 static_assert(sizeof(SequencerTime) <= 8, "SequencerTime over 8 bytes, not atomic");
 
-using MaybeSequencerTime = std::optional<SequencerTime>;
+
+struct [[nodiscard]] MaybeSequencerTime {
+private:
+    SequencerTime _timestamp;
+
+public:
+    // Clone API at https://en.cppreference.com/w/cpp/utility/optional#Member_functions
+
+    constexpr MaybeSequencerTime(SequencerTime timestamp)
+        : _timestamp{timestamp}
+    {}
+
+    static constexpr MaybeSequencerTime none() {
+        return SequencerTime{(uint16_t) -1, (uint16_t) -1, -1, -1};
+    }
+
+    constexpr MaybeSequencerTime()
+        : MaybeSequencerTime{none()}
+    {}
+
+    constexpr MaybeSequencerTime(std::nullopt_t)
+        : MaybeSequencerTime{}
+    {}
+
+    CONSTEXPR_COPY(MaybeSequencerTime)
+    // std::optional also has constexpr move, but what does that mean?
+    DEFAULT_MOVE(MaybeSequencerTime)
+
+    constexpr bool has_value() const {
+        return *this != none();
+    }
+
+    explicit operator bool() const {
+        return has_value();
+    }
+
+    SequencerTime const & value() const {
+        return _timestamp;
+    }
+
+    SequencerTime & value() {
+        return _timestamp;
+    }
+
+    SequencerTime const & operator*() const {
+        return _timestamp;
+    }
+
+    SequencerTime & operator*() {
+        return _timestamp;
+    }
+
+    SequencerTime const * operator->() const {
+        return &_timestamp;
+    }
+
+    SequencerTime * operator->() {
+        return &_timestamp;
+    }
+
+    EQUALABLE(MaybeSequencerTime, (_timestamp))
+};
+static_assert(
+    sizeof(MaybeSequencerTime) <= 8, "MaybeSequencerTime over 8 bytes, not atomic"
+);
+
 
 }

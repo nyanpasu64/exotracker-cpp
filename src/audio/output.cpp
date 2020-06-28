@@ -31,12 +31,18 @@ public:
         uint32_t stereo_nchan,
         uint32_t smp_per_s,
         locked_doc::GetDocument &/*'a*/ get_document,
+        AudioCommand * stub_command,
         AudioOptions audio_options
     ) {
         // Outlives the return constructor call. Outlives all use of *doc_guard.
         auto doc_guard = get_document.get_document();
         return std::make_unique<OutputCallback>(
-            stereo_nchan, smp_per_s, *doc_guard, audio_options, get_document
+            stereo_nchan,
+            smp_per_s,
+            *doc_guard,
+            stub_command,
+            audio_options,
+            get_document
         );
     }
 
@@ -44,10 +50,13 @@ public:
         uint32_t stereo_nchan,
         uint32_t smp_per_s,
         doc::Document const & document,
+        AudioCommand * stub_command,
         AudioOptions audio_options,
         locked_doc::GetDocument &/*'a*/ get_document
     ) :
-        synth::OverallSynth(stereo_nchan, smp_per_s, document, audio_options),
+        synth::OverallSynth(
+            stereo_nchan, smp_per_s, document, stub_command, audio_options
+        ),
         _get_document(get_document)
     {}
 
@@ -97,7 +106,10 @@ static unsigned int const MONO_SMP_PER_BLOCK = 64;
 /// Why factory method and not constructor?
 /// So we can calculate values (like sampling rate) used in multiple places.
 std::optional<AudioThreadHandle> AudioThreadHandle::make(
-    RtAudio & rt, unsigned int device, locked_doc::GetDocument & get_document
+    RtAudio & rt,
+    unsigned int device,
+    locked_doc::GetDocument & get_document,
+    AudioCommand * stub_command
 ) {
     RtAudio::StreamParameters outParams;
     outParams.deviceId = device;
@@ -113,7 +125,7 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
     };
 
     std::unique_ptr<OutputCallback> callback = OutputCallback::make(
-        outParams.nChannels, sample_rate, get_document, audio_options
+        outParams.nChannels, sample_rate, get_document, stub_command, audio_options
     );
 
     // On OpenSUSE Tumbleweed, if you hold F12,

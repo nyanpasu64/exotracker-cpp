@@ -21,6 +21,7 @@
 #include "callback.h"
 #include "doc.h"
 #include "locked_doc.h"
+#include "audio_cmd.h"
 #include "timing_common.h"
 #include "util/copy_move.h"
 
@@ -32,7 +33,8 @@
 namespace audio {
 namespace output {
 
-using timing::SequencerTime;
+using audio_cmd::AudioCommand;
+using timing::MaybeSequencerTime;
 using callback::CallbackInterface;
 
 class AudioThreadHandle {
@@ -70,22 +72,20 @@ public:
     ///
     /// throws PaException or PaCppException or whatever else
     static std::optional<AudioThreadHandle> make(
-        RtAudio & _rt, unsigned int device, locked_doc::GetDocument & get_document
+        RtAudio & rt,
+        unsigned int device,
+        locked_doc::GetDocument & get_document,
+        AudioCommand * stub_command
     );
 
     /// Called by GUI thread.
-    inline SequencerTime play_time() const {
+    inline AudioCommand * seen_command() const {
+        return _callback->seen_command();
+    }
+
+    /// Called by GUI thread.
+    inline MaybeSequencerTime play_time() const {
         return _callback->play_time();
-    }
-
-    /// Called by GUI thread.
-    void stop_playback() {
-        _callback->stop_playback();
-    }
-
-    /// Called by GUI thread.
-    void start_playback(SequencerTime time) {
-        _callback->start_playback(time);
     }
 
     ~AudioThreadHandle();

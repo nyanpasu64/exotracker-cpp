@@ -15,12 +15,19 @@ OverallSynth::OverallSynth(
     uint32_t stereo_nchan,
     uint32_t smp_per_s,
     doc::Document const & document,
+    AudioCommand * stub_command,
     AudioOptions audio_options
 ) :
     _stereo_nchan(stereo_nchan),
     _clocks_per_sound_update(audio_options.clocks_per_sound_update),
     _nes_blip(smp_per_s, CLOCKS_PER_S)
 {
+    // Constructor runs on GUI thread. Fields later be read on audio thread.
+    _maybe_seq_time.store(MaybeSequencerTime{}, std::memory_order_relaxed);
+    _seen_command.store(stub_command, std::memory_order_relaxed);
+
+    // Thread creation will act as a memory barrier, so we don't need a fence.
+
     // Optional non-owning reference to the previous chip, which may/not be APU1.
     // Passed to APU2.
     // If an APU2 is not immediately preceded by an APU1 (if apu1_maybe == nullptr),
@@ -79,28 +86,43 @@ void OverallSynth::synthesize_overall(
     */
     blip_nsamp_t samples_so_far = 0;  // [0, nsamp]
 
+    // Thread creation will act as a memory barrier, so we don't need a fence.
+    // Only the audio thread writes to _maybe_seq_time and _seen_command.
+
     // The "end of callback" time will get exposed to the GUI
     // once the audio starts (not finishes) playing...
     // but I don't care anymore.
-    SequencerTime const seq_begin_ = _seq_time.load(std::memory_order_seq_cst);
+    auto const orig_seq_time = _maybe_seq_time.load(std::memory_order_relaxed);
 
     // Increases as we run ticks.
-    SequencerTime seq_time = seq_begin_;
+    auto seq_time = orig_seq_time;
 
-    // If we were playing, but GUI wants us to stop...
-    if (false) {
-        _sequencer_running = false;
-        for (auto & chip : _chip_instances) {
-            chip->stop_all_notes();
-        }
-    }
+    auto cmd = _seen_command.load(std::memory_order_relaxed);
+    auto const orig_cmd = cmd;
 
-    // If we weren't playing, but GUI wants us to start...
-    if (false) {
-        _sequencer_running = true;
-        for (auto & chip : _chip_instances) {
-            chip->stop_all_notes();
-            // chip->seek(document, flag_time.maybe_time().get());
+    // Handle all commands we haven't seen yet.
+
+    // Paired with CommandQueue::push() store(release).
+    for (; auto next = cmd->next.load(std::memory_order_acquire); cmd = next) {
+        // Process each command from the GUI.
+        if (next->seek_or_stop.has_value()) {
+            // Seek and play.
+            auto & seek_to = next->seek_or_stop.value();
+
+            _sequencer_running = true;
+            for (auto & chip : _chip_instances) {
+                chip->stop_all_notes();
+                chip->seek(document, seek_to.time);
+            }
+            seq_time = std::nullopt;
+
+        } else {
+            // Stop playback.
+            _sequencer_running = false;
+            for (auto & chip : _chip_instances) {
+                chip->stop_all_notes();
+            }
+            seq_time = std::nullopt;
         }
     }
 
@@ -195,10 +217,16 @@ void OverallSynth::synthesize_overall(
 
     end:
 
-    // If sequencer not running, overwrite timestamp with none.
-    // Otherwise overwrite with latest time.
-    if (seq_time != seq_begin_) {
-        _seq_time.store(seq_time, std::memory_order_seq_cst);
+    // Store final time after synthesis completes.
+    if (seq_time != orig_seq_time) {
+        _maybe_seq_time.store(seq_time, std::memory_order_seq_cst);
+    }
+
+    // Store "seen command" after timestamp.
+    // This way, if GUI sees we're done with commands, it sees the right time.
+    // Paired with seen_command().
+    if (cmd != orig_cmd) {
+        _seen_command.store(cmd, std::memory_order_release);
     }
 }
 

@@ -6,6 +6,7 @@
 #include "callback.h"
 #include "doc.h"
 #include "timing_common.h"
+#include "audio_cmd.h"
 #include "util/enum_map.h"
 
 #include <atomic>
@@ -25,7 +26,8 @@ enum class SynthEvent {
     COUNT
 };
 
-using timing::SequencerTime;
+using audio_cmd::AudioCommand;
+using timing::MaybeSequencerTime;
 
 /// Preconditions:
 /// - Sampling rate must be 1000 or more.
@@ -79,15 +81,17 @@ private:
     std::vector<std::unique_ptr<ChipInstance>> _chip_instances = {};
 
     // Playback tracking
+    /// Last seen/processed command.
+    std::atomic<AudioCommand *> _seen_command;
     bool _sequencer_running = false;
 
-    using AtomicSequencerTime = std::atomic<SequencerTime>;
+    using AtomicSequencerTime = std::atomic<MaybeSequencerTime>;
     static_assert(
         AtomicSequencerTime::is_always_lock_free,
-        "std::atomic<SequencerTime> not lock-free"
+        "std::atomic<MaybeSequencerTime> not lock-free"
     );
 
-    AtomicSequencerTime _seq_time{SequencerTime{}};
+    AtomicSequencerTime _maybe_seq_time{MaybeSequencerTime{}};
 
     /// Per-chip "special audio" written into this and read into _nes_blip.
     /// This MUST remain the last field in the struct,
@@ -105,6 +109,7 @@ public:
         uint32_t stereo_nchan,
         uint32_t smp_per_s,
         doc::Document const & document,
+        AudioCommand * stub_command,
         AudioOptions audio_options
     );
 
@@ -125,19 +130,14 @@ public:
     );
 
     /// Called by GUI thread.
-    SequencerTime play_time() const override {
-        return _seq_time.load(std::memory_order_seq_cst);
+    AudioCommand * seen_command() const override {
+        // Paired with synthesize_overall() store(release).
+        return _seen_command.load(std::memory_order_acquire);
     }
 
     /// Called by GUI thread.
-    void stop_playback() override {
-        // TODO push to queue
-    }
-
-    /// Called by GUI thread.
-    void start_playback(SequencerTime time) override {
-        // TODO push to queue
-        // TODO switch to beat fractions
+    MaybeSequencerTime play_time() const override {
+        return _maybe_seq_time.load(std::memory_order_seq_cst);
     }
 };
 

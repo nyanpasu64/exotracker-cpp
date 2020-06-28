@@ -158,7 +158,8 @@ public:
     // impl
     virtual ~ChipInstance() = default;
 
-    /// TODO write a description
+    /// Seek the sequencer to this time in the document
+    /// (sequence entry and beat fraction).
     virtual void seek(doc::Document const & document, timing::PatternAndBeat time) = 0;
 
     /// May/not mutate _register_writes.
