@@ -8,10 +8,10 @@
 #include <rtaudio/RtAudio.h>
 #include <verdigris/wobjectimpl.h>
 
+#include <QAction>
 #include <QDebug>
 #include <QGuiApplication>
 #include <QScreen>
-#include <QShortcut>
 #include <QTimer>
 
 #include <chrono>
@@ -56,10 +56,13 @@ public:
     PatternEditorPanel * _pattern_editor_panel;
 
     // Global playback shortcuts.
-    // TODO implement global configuration system with "reloaded" signal
-    QShortcut _play_pause{QKeySequence{Qt::Key_Return}, this};
-    QShortcut _play_from_row{QKeySequence{Qt::Key_Apostrophe}, this};
-    QShortcut _restart_audio_shortcut{QKeySequence{Qt::Key_F12}, this};
+    // TODO implement global configuration system with "reloaded" signal.
+    // When user changes shortcuts, reassign shortcut keybinds.
+
+    // QShortcut is only a shortcut. QAction can be bound to menus and buttons too.
+    QAction _play_pause{nullptr};
+    QAction _play_from_row{nullptr};
+    QAction _restart_audio{nullptr};
 
     /// This API is a bit too broad for my liking, but whatever.
     class AudioComponent {
@@ -202,17 +205,29 @@ public:
         // Setup audio.
         setup_audio();
 
+        auto init_qaction = [&] (QAction & action, QKeySequence seq) {
+            action.setShortcut(seq);
+            action.setShortcutContext(Qt::WidgetWithChildrenShortcut);
+            _pattern_editor_panel->addAction(&action);
+        };
+
+        init_qaction(_play_pause, QKeySequence{Qt::Key_Return});
         connect(
-            &_play_pause, &QShortcut::activated,
+            &_play_pause, &QAction::triggered,
             this, [this] () { _audio_component.play_pause(*this); }
         );
+
+        init_qaction(_play_from_row, QKeySequence{Qt::Key_Apostrophe});
         connect(
-            &_play_from_row, &QShortcut::activated,
+            &_play_from_row, &QAction::triggered,
             this, [this] () { _audio_component.play_from_row(*this); }
         );
 
+        _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
+        _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
+        this->addAction(&_restart_audio);
         connect(
-            &_restart_audio_shortcut, &QShortcut::activated,
+            &_restart_audio, &QAction::triggered,
             this, &MainWindow::restart_audio_thread
         );
     }
