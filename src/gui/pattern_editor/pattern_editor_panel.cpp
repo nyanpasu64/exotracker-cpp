@@ -9,6 +9,7 @@
 #include "chip_kinds.h"
 #include "util/compare.h"
 #include "util/math.h"
+#include "util/reverse.h"
 
 #include <verdigris/wobjectimpl.h>
 
@@ -47,6 +48,7 @@ using util::math::increment_mod;
 using util::math::decrement_mod;
 using util::math::frac_floor;
 using util::math::frac_ceil;
+using util::reverse::reverse;
 
 using timing::MaybeSequencerTime;
 
@@ -415,9 +417,13 @@ struct ColumnPx {
     SubColumnLayout subcolumns;  // all endpoints lie within [left_px, left_px + width]
 };
 
+using MaybeColumnPx = std::optional<ColumnPx>;
+
+/// Has the same number of items as ColumnList. Does *not* exclude off-screen columns.
+/// To skip drawing off-screen columns, fill their slot with nullopt.
 struct ColumnLayout {
     SubColumnPx ruler;
-    std::vector<ColumnPx> cols;
+    std::vector<MaybeColumnPx> cols;
 };
 
 /// Compute where on-screen to draw each pattern column.
@@ -520,6 +526,7 @@ static ColumnLayout gen_column_layout(
             x_px += channel_divider_width;
             end_sub(subcolumns[subcolumns.size() - 1], false);
 
+            // TODO replace off-screen columns with nullopt.
             column_layout.cols.push_back(ColumnPx{
                 .chip = chip_index,
                 .channel = channel_index,
@@ -666,7 +673,12 @@ static void draw_header(
     }
 
     // Draw each channel's header outline and text.
-    for (ColumnPx const & column : columns.cols) {
+    for (MaybeColumnPx const & maybe_column : columns.cols) {
+        if (!maybe_column) {
+            continue;
+        }
+        ColumnPx const & column = *maybe_column;
+
         auto chip = column.chip;
         auto channel = column.channel;
 
@@ -882,16 +894,22 @@ static void draw_pattern_background(
     COMPUTE_DIVIDER_COLOR(effect, visual.effect_bg, visual.effect)
 
     int row_right_px = columns.ruler.right_px;
-    if (columns.cols.size()) {
-        row_right_px = columns.cols[columns.cols.size() - 1].right_px;
+    for (auto & c : reverse(columns.cols)) {
+        if (c.has_value()) {
+            row_right_px = c->right_px;
+            break;
+        }
     }
 
     auto draw_pattern_bg = [&] (SeqEntryPosition const & pos) {
         doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
 
         // Draw background of cell.
-        for (ColumnPx const & column : columns.cols) {
-            for (SubColumnPx const & sub : column.subcolumns) {
+        for (MaybeColumnPx const & maybe_column : columns.cols) {
+            if (!maybe_column) {
+                continue;
+            }
+            for (SubColumnPx const & sub : maybe_column->subcolumns) {
                 GridRect sub_rect{
                     QPoint{sub.left_px, pos.top}, QPoint{sub.right_px, pos.bottom}
                 };
@@ -1013,7 +1031,8 @@ static void draw_pattern_background(
     // Draw divider down right side of each column.
     painter.setPen(visual.channel_divider);
 
-    auto draw_divider = [&painter, &inner_rect] (auto column) {
+    // Templated function with multiple T.
+    auto draw_divider = [&painter, &inner_rect] (auto const & column) {
         auto xright = column.right_px;
 
         QPoint right_top{xright, inner_rect.top()};
@@ -1023,8 +1042,10 @@ static void draw_pattern_background(
     };
 
     draw_divider(columns.ruler);
-    for (ColumnPx const & column : columns.cols) {
-        draw_divider(column);
+    for (auto & column : columns.cols) {
+        if (column) {
+            draw_divider(*column);
+        }
     }
 
     // Draw cursor gradient.
@@ -1125,7 +1146,11 @@ static void draw_pattern_foreground(
     };
 
     auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
-        for (ColumnPx const & column : columns.cols) {
+        for (MaybeColumnPx const & maybe_column : columns.cols) {
+            if (!maybe_column) {
+                continue;
+            }
+            ColumnPx const & column = *maybe_column;
             auto xleft = column.left_px;
             auto xright = column.right_px;
 
@@ -1253,8 +1278,11 @@ static void draw_pattern_foreground(
     // The cursor is drawn on top of channel dividers and note lines/text.
     {
         int row_right_px = columns.ruler.right_px;
-        if (columns.cols.size()) {
-            row_right_px = columns.cols[columns.cols.size() - 1].right_px;
+        for (auto & c : reverse(columns.cols)) {
+            if (c.has_value()) {
+                row_right_px = c->right_px;
+                break;
+            }
         }
 
         painter.setPen(visual.cursor_row);
