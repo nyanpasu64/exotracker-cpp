@@ -4,6 +4,7 @@
 #include "gui/lib/color.h"
 #include "gui/lib/format.h"
 #include "gui/lib/painter_ext.h"
+#include "gui/main_window.h"
 #include "gui_common.h"
 #include "chip_kinds.h"
 #include "util/compare.h"
@@ -207,6 +208,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
         // TODO encapsulate cursor, allow moving with mouse, show selection, etc.
         std::invoke(method, self);
         if (shift_held) {
+            self._win._select_begin_x = self._win._cursor_x;
             self._win._select_begin_y = self._win._cursor_y;
         }
         self.repaint();
@@ -361,7 +363,7 @@ struct ChannelDraw {
     int xright;
 };
 
-namespace subcolumn_types {
+namespace subcolumns {
     struct Note {
         COMPARABLE(Note, ())
     };
@@ -380,17 +382,18 @@ namespace subcolumn_types {
         COMPARABLE(EffectValue, (effect_col))
     };
 
-    using SubColumnType = std::variant<
+    using SubColumn = std::variant<
         Note, Instrument, Volume, EffectName, EffectValue
     >;
 }
 
-using subcolumn_types::SubColumnType;
-using SubColumnIndex = uint32_t;
+using subcolumns::SubColumn;
 
-/// One colum that the cursor can move into.
-struct SubColumn {
-    SubColumnType type;
+// # Visual layout.
+
+/// One column that the cursor can move into.
+struct SubColumnPx {
+    SubColumn type;
 
     // Determines the boundaries for click/selection handling.
     int left_px = 0;
@@ -399,22 +402,22 @@ struct SubColumn {
     // Center for text rendering.
     qreal center_px = 0.0;
 
-    SubColumn(SubColumnType type) : type{type} {}
+    SubColumnPx(SubColumn type) : type{type} {}
 };
 
-using SubColumns = std::vector<SubColumn>;
+using SubColumnLayout = std::vector<SubColumnPx>;
 
-struct Column {
+struct ColumnPx {
     chip_common::ChipIndex chip;
     chip_common::ChannelIndex channel;
     int left_px;
     int right_px;
-    SubColumns subcolumns;  // all endpoints lie within [left_px, left_px + width]
+    SubColumnLayout subcolumns;  // all endpoints lie within [left_px, left_px + width]
 };
 
 struct ColumnLayout {
-    SubColumn ruler;
-    std::vector<Column> cols;
+    SubColumnPx ruler;
+    std::vector<ColumnPx> cols;
 };
 
 /// Compute where on-screen to draw each pattern column.
@@ -432,28 +435,28 @@ static ColumnLayout gen_column_layout(
         x_px += extra_width;
     };
 
-    auto begin_sub = [&x_px, add_padding] (SubColumn & sub, bool pad = true) {
+    auto begin_sub = [&x_px, add_padding] (SubColumnPx & sub, bool pad = true) {
         sub.left_px = x_px;
         if (pad) {
             add_padding();
         }
     };
 
-    auto center_sub = [&x_px, width_per_char] (SubColumn & sub, int nchar) {
+    auto center_sub = [&x_px, width_per_char] (SubColumnPx & sub, int nchar) {
         int dwidth = width_per_char * nchar;
         sub.center_px = x_px + dwidth / qreal(2.0);
         x_px += dwidth;
     };
 
-    auto end_sub = [&x_px, add_padding] (SubColumn & sub, bool pad = true) {
+    auto end_sub = [&x_px, add_padding] (SubColumnPx & sub, bool pad = true) {
         if (pad) {
             add_padding();
         }
         sub.right_px = x_px;
     };
 
-    // SubColumnType doesn't matter.
-    SubColumn ruler{subcolumn_types::Note{}};
+    // SubColumn doesn't matter.
+    SubColumnPx ruler{subcolumns::Note{}};
 
     begin_sub(ruler);
     center_sub(ruler, columns::RULER_WIDTH_CHARS);
@@ -473,16 +476,16 @@ static ColumnLayout gen_column_layout(
         ) {
             int const orig_left_px = x_px;
 
-            SubColumns subcolumns;
+            SubColumnLayout subcolumns;
             // TODO change doc to list how many effect colums there are
 
             auto append_subcolumn = [&subcolumns, begin_sub, center_sub, end_sub] (
-                SubColumnType type,
+                SubColumn type,
                 int nchar,
                 bool pad_left = true,
                 bool pad_right = true
             ) {
-                SubColumn sub{type};
+                SubColumnPx sub{type};
 
                 begin_sub(sub, pad_left);
                 center_sub(sub, nchar);
@@ -492,24 +495,24 @@ static ColumnLayout gen_column_layout(
             };
 
             // Notes are 3 characters wide.
-            append_subcolumn(subcolumn_types::Note{}, 3);
+            append_subcolumn(subcolumns::Note{}, 3);
 
             // TODO configurable column hiding (one checkbox per column type?)
             // Instruments are 2 characters wide.
-            append_subcolumn(subcolumn_types::Instrument{}, 2);
+            append_subcolumn(subcolumns::Instrument{}, 2);
 
             // TODO Document::get_volume_width(chip_index, chan_index)
             // Volumes are 2 characters wide.
-            append_subcolumn(subcolumn_types::Volume{}, 2);
+            append_subcolumn(subcolumns::Volume{}, 2);
 
             for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
                 // Effect names are 2 characters wide and only have left padding.
                 append_subcolumn(
-                    subcolumn_types::EffectName{effect_col}, 2, true, false
+                    subcolumns::EffectName{effect_col}, 2, true, false
                 );
                 // Effect values are 2 characters wide and only have right padding.
                 append_subcolumn(
-                    subcolumn_types::EffectValue{effect_col}, 2, false, true
+                    subcolumns::EffectValue{effect_col}, 2, false, true
                 );
             }
 
@@ -517,7 +520,7 @@ static ColumnLayout gen_column_layout(
             x_px += channel_divider_width;
             end_sub(subcolumns[subcolumns.size() - 1], false);
 
-            column_layout.cols.push_back(Column{
+            column_layout.cols.push_back(ColumnPx{
                 .chip = chip_index,
                 .channel = channel_index,
                 .left_px = orig_left_px,
@@ -529,9 +532,67 @@ static ColumnLayout gen_column_layout(
     return column_layout;
 }
 
-// TODO fn gen_column_list(doc, ColumnView) generates order of all sub/columns
-// (not just visible columns) for keyboard-based movement rather than rendering.
-// Either flat or nested, not sure yet.
+// # Cursor positioning
+
+using SubColumnList = std::vector<SubColumn>;
+
+struct Column {
+    chip_common::ChipIndex chip;
+    chip_common::ChannelIndex channel;
+    SubColumnList subcolumns;
+};
+
+using ColumnList = std::vector<Column>;
+
+/// Generates order of all sub/columns // (not just visible columns)
+/// for keyboard-based movement rather than rendering.
+///
+/// TODO add function in self for determining subcolumn visibility.
+ColumnList gen_column_list(
+    PatternEditorPanel const & self,
+    doc::Document const & document
+) {
+    ColumnList column_list;
+
+    for (
+        chip_common::ChipIndex chip_index = 0;
+        chip_index < document.chips.size();
+        chip_index++
+    ) {
+        for (
+            chip_common::ChannelIndex channel_index = 0;
+            channel_index < document.chip_index_to_nchan(chip_index);
+            channel_index++
+        ) {
+            SubColumnList subcolumns;
+            // TODO change doc to list how many effect colums there are
+
+            // Notes are 3 characters wide.
+            subcolumns.push_back(subcolumns::Note{});
+
+            // TODO configurable column hiding (one checkbox per column type?)
+            // Instruments are 2 characters wide.
+            subcolumns.push_back(subcolumns::Instrument{});
+
+            // TODO Document::get_volume_width(chip_index, chan_index)
+            // Volumes are 2 characters wide.
+            subcolumns.push_back(subcolumns::Volume{});
+
+            for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
+                subcolumns.push_back(subcolumns::EffectName{effect_col});
+                subcolumns.push_back(subcolumns::EffectValue{effect_col});
+            }
+
+            column_list.push_back(Column{
+                .chip = chip_index,
+                .channel = channel_index,
+                .subcolumns = subcolumns,
+            });
+        }
+    }
+
+    return column_list;
+}
 
 // # Pattern drawing
 
@@ -605,7 +666,7 @@ static void draw_header(
     }
 
     // Draw each channel's header outline and text.
-    for (Column const & column : columns.cols) {
+    for (ColumnPx const & column : columns.cols) {
         auto chip = column.chip;
         auto channel = column.channel;
 
@@ -829,8 +890,8 @@ static void draw_pattern_background(
         doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
 
         // Draw background of cell.
-        for (Column const & column : columns.cols) {
-            for (SubColumn const & sub : column.subcolumns) {
+        for (ColumnPx const & column : columns.cols) {
+            for (SubColumnPx const & sub : column.subcolumns) {
                 GridRect sub_rect{
                     QPoint{sub.left_px, pos.top}, QPoint{sub.right_px, pos.bottom}
                 };
@@ -850,15 +911,15 @@ static void draw_pattern_background(
                         bg = BG; \
                     }
 
-                namespace st = subcolumn_types;
+                namespace sc = subcolumns;
 
                 // Don't draw the note column's divider line,
                 // since it lies right next to the previous channel's channel divider.
-                CASE_NO_FG(st::Note, visual.note_bg)
-                CASE(st::Instrument, visual.instrument_bg, instrument_divider)
-                CASE(st::Volume, visual.volume_bg, volume_divider)
-                CASE(st::EffectName, visual.effect_bg, effect_divider)
-                CASE_NO_FG(st::EffectValue, visual.effect_bg)
+                CASE_NO_FG(sc::Note, visual.note_bg)
+                CASE(sc::Instrument, visual.instrument_bg, instrument_divider)
+                CASE(sc::Volume, visual.volume_bg, volume_divider)
+                CASE(sc::EffectName, visual.effect_bg, effect_divider)
+                CASE_NO_FG(sc::EffectValue, visual.effect_bg)
 
                 #undef CASE
                 #undef CASE_NO_FG
@@ -962,7 +1023,7 @@ static void draw_pattern_background(
     };
 
     draw_divider(columns.ruler);
-    for (Column const & column : columns.cols) {
+    for (ColumnPx const & column : columns.cols) {
         draw_divider(column);
     }
 
@@ -1031,7 +1092,7 @@ static void draw_pattern_foreground(
     constexpr qreal Y_OFFSET = 0.0;
 
     auto draw_note_cut = [&self, &painter, rect_height, rect_width] (
-        SubColumn const & subcolumn, QColor color
+        SubColumnPx const & subcolumn, QColor color
     ) {
         qreal x1f = subcolumn.center_px - rect_width / 2;
         qreal x2f = x1f + rect_width;
@@ -1046,7 +1107,7 @@ static void draw_pattern_foreground(
     };
 
     auto draw_release = [&self, &painter, rect_height, rect_width] (
-        SubColumn const & subcolumn, QColor color
+        SubColumnPx const & subcolumn, QColor color
     ) {
         qreal x1f = subcolumn.center_px - rect_width / 2;
         qreal x2f = x1f + rect_width;
@@ -1064,7 +1125,7 @@ static void draw_pattern_foreground(
     };
 
     auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
-        for (Column const & column : columns.cols) {
+        for (ColumnPx const & column : columns.cols) {
             auto xleft = column.left_px;
             auto xright = column.right_px;
 
@@ -1107,7 +1168,7 @@ static void draw_pattern_foreground(
 
                 // Draw text.
                 for (auto const & subcolumn : column.subcolumns) {
-                    namespace st = subcolumn_types;
+                    namespace sc = subcolumns;
 
                     auto draw = [&](QString & text) {
                         // Clear background using unmodified copy free of rendered text.
@@ -1137,7 +1198,7 @@ static void draw_pattern_foreground(
                     #define CASE(VARIANT) \
                         if (std::holds_alternative<VARIANT>(subcolumn.type))
 
-                    CASE(st::Note) {
+                    CASE(sc::Note) {
                         if (row_event.note) {
                             auto note = *row_event.note;
 
@@ -1152,7 +1213,7 @@ static void draw_pattern_foreground(
                             }
                         }
                     }
-                    CASE(st::Instrument) {
+                    CASE(sc::Instrument) {
                         if (row_event.instr) {
                             painter.setPen(visual.instrument);
                             auto s = format_hex_2(uint8_t(*row_event.instr));

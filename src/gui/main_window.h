@@ -28,6 +28,14 @@ enum class AudioState {
     PlayHasStarted,
 };
 
+using ColumnIndex = uint32_t;
+using SubColumnIndex = uint32_t;
+
+struct CursorX {
+    ColumnIndex column = 0;
+    SubColumnIndex subcolumn = 0;
+};
+
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
 class MainWindow : public QMainWindow
 {
@@ -43,9 +51,10 @@ public:
     // set_cursor() and select_to()?
     // set_cursor(bool select)?
 
-    // TODO cursor_x
+    CursorX _cursor_x;
     PatternAndBeat _cursor_y;
 
+    CursorX _select_begin_x;
     PatternAndBeat _select_begin_y;
 
 public:
