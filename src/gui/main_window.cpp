@@ -332,6 +332,9 @@ W_OBJECT_IMPL(MainWindowImpl)
 
 // public
 std::unique_ptr<MainWindow> MainWindow::make(doc::Document document, QWidget * parent) {
+    if (instance) {
+        throw std::logic_error("Tried to create two MainWindow instances");
+    }
     auto out = make_unique<MainWindowImpl>(std::move(document), parent);
     instance = &*out;
     return out;
