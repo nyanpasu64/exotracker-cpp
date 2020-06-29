@@ -118,7 +118,12 @@ struct PatternAppearance {
     int cursor_top_alpha = 48;
     int cursor_bottom_alpha = 0;
 
-    QColor cursor_cell{255, 192, 96};
+    QColor cell{255, 255, 96};
+    int cell_top_alpha = 96;
+    int cell_bottom_alpha = 96;
+
+    int cell_left_top_alpha = 255;
+    int cell_left_bottom_alpha = 255;
 
     /// Foreground line color, also used as note text color.
     QColor note_line_beat{255, 255, 96};
@@ -866,6 +871,27 @@ public:
 
 }
 
+QLinearGradient make_gradient(
+    int cursor_top, int cursor_bottom,  QColor color, int top_alpha, int bottom_alpha
+) {
+    // QLinearGradient's constructor takes the begin and endpoints.
+    QLinearGradient grad{QPoint{0, cursor_top}, QPoint{0, cursor_bottom}};
+
+    // You need to assign the color map afterwards.
+    QColor top_color{color};
+    top_color.setAlpha(top_alpha);
+
+    QColor bottom_color{color};
+    bottom_color.setAlpha(bottom_alpha);
+
+    grad.setStops(QGradientStops{
+        QPair{0., top_color},
+        QPair{1., bottom_color},
+    });
+
+    return grad;
+}
+
 /// Draw the background lying behind notes/etc.
 static void draw_pattern_background(
     PatternEditorPanel & self,
@@ -1038,30 +1064,64 @@ static void draw_pattern_background(
         }
     }
 
-    // Draw cursor gradient.
+    // Draw cursor gradient after drawing the divider.
+    // The cursor row is drawn on top of the divider,
+    // so the gradient should be too.
     {
         int cursor_bottom = cursor_top + self._pixels_per_row;
 
-        painter.setPen(visual.cursor_row);
-
-        GridRect cursor_rect{
+        GridRect cursor_row_rect{
             QPoint{0, cursor_top}, QPoint{row_right_px, cursor_bottom}
         };
-        // QLinearGradient's constructor takes the begin and endpoints.
-        QLinearGradient grad{cursor_rect.left_top(), cursor_rect.left_bottom()};
 
-        // You need to assign the color map afterwards.
-        QColor cursor_bg_top{visual.cursor_row}, cursor_bg_bottom{visual.cursor_row};
-        cursor_bg_top.setAlpha(visual.cursor_top_alpha);
-        cursor_bg_bottom.setAlpha(visual.cursor_bottom_alpha);
+        auto bg_grad = make_gradient(
+            cursor_top,
+            cursor_bottom,
+            visual.cursor_row,
+            visual.cursor_top_alpha,
+            visual.cursor_bottom_alpha
+        );
 
-        grad.setStops(QGradientStops{
-            QPair{0., cursor_bg_top},
-            QPair{1., cursor_bg_bottom},
-        });
+        auto cursor_x = self._win._cursor_x;
+        if (cursor_x.column >= columns.cols.size()) {
+            cursor_x.column = 0;
+            cursor_x.subcolumn = 0;
+        }
 
-        // Then cast it into a QBrush, and draw the background.
-        painter.fillRect(cursor_rect, QBrush{grad});
+        // Draw cursor row and cell background.
+        if (auto & col = columns.cols[cursor_x.column]) {
+            // If cursor is on-screen, draw left/cursor/right.
+            auto subcol = col->subcolumns[cursor_x.subcolumn];
+
+            // Draw left background.
+            auto left_rect = cursor_row_rect;
+            left_rect.set_right(subcol.left_px);
+            painter.fillRect(left_rect, bg_grad);
+
+            // Draw right background.
+            auto right_rect = cursor_row_rect;
+            right_rect.set_left(subcol.right_px);
+            painter.fillRect(right_rect, bg_grad);
+
+            // Draw cursor cell background.
+            GridRect cursor_rect{
+                QPoint{subcol.left_px, cursor_top},
+                QPoint{subcol.right_px, cursor_bottom}
+            };
+            painter.fillRect(
+                cursor_rect,
+                make_gradient(
+                    cursor_top,
+                    cursor_bottom,
+                    visual.cell,
+                    visual.cell_top_alpha,
+                    visual.cell_bottom_alpha
+                )
+            );
+        } else {
+            // Otherwise just draw background.
+            painter.fillRect(cursor_row_rect, bg_grad);
+        }
     }
 
     draw_patterns.template operator()<Direction::Forward>(draw_row_numbers, seq);
@@ -1257,7 +1317,7 @@ static void draw_pattern_foreground(
         }
     };
 
-    auto [seq, cursor_y] =
+    auto [seq, cursor_top] =
         SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
 
     draw_patterns.template operator()<Direction::Forward>(seq);
@@ -1267,6 +1327,8 @@ static void draw_pattern_foreground(
     // Draw cursor.
     // The cursor is drawn on top of channel dividers and note lines/text.
     {
+        int cursor_bottom = cursor_top + self._pixels_per_row;
+
         int row_right_px = columns.ruler.right_px;
         for (auto & c : reverse(columns.cols)) {
             if (c.has_value()) {
@@ -1275,10 +1337,64 @@ static void draw_pattern_foreground(
             }
         }
 
+        // Draw white line across entire screen.
         painter.setPen(visual.cursor_row);
         draw_top_border(
-            painter, QPoint{0, cursor_y}, QPoint{row_right_px, cursor_y}
+            painter, QPoint{0, cursor_top}, QPoint{row_right_px, cursor_top}
         );
+
+        // Draw cursor cell outline:
+        auto vertical_rect = [cursor_top=cursor_top, cursor_bottom] (int x) {
+            return GridRect{QPoint{x, cursor_top}, QPoint{x, cursor_bottom}};
+        };
+
+        auto cursor_border_grad = make_gradient(
+            cursor_top,
+            cursor_bottom,
+            visual.cell,
+            visual.cell_left_top_alpha,
+            visual.cell_left_bottom_alpha
+        );
+
+        auto cursor_x = self._win._cursor_x;
+        auto ncol = columns.cols.size();
+
+        bool draw_left = true;
+
+        // Handle special-case of past-the-end cursors separately.
+        if (cursor_x.column >= ncol) {
+            // If cursor is past-the-end... paint the end.
+            // Assume the cursor is always visible, so row_right_px = rightmost column.
+            // If the rightmost column is nullopt, there's no better approach
+            // (except not drawing cursor).
+            if (auto & col = columns.cols[ncol - 1]) {
+                painter.fillRect(
+                    right_border(painter, vertical_rect(col->right_px)),
+                    cursor_border_grad
+                );
+            }
+            cursor_x.column = 0;
+            cursor_x.subcolumn = 0;
+            draw_left = false;
+        }
+
+        // If cursor is on-screen, draw cell outline.
+        if (auto & col = columns.cols[cursor_x.column]) {
+            auto subcol = col->subcolumns[cursor_x.subcolumn];
+            GridRect cursor_rect{
+                QPoint{subcol.left_px, cursor_top},
+                QPoint{subcol.right_px, cursor_bottom}
+            };
+
+            // Draw left border.
+            if (draw_left) {
+                painter.fillRect(left_border(painter, cursor_rect), cursor_border_grad);
+            }
+
+            // Draw top line.
+            painter.setPen(visual.cell);
+            draw_top_border(painter, cursor_rect);
+        }
     }
 }
 

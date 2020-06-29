@@ -20,7 +20,7 @@ using u32 = uint32_t;
 /// Unlike QRect, this class treats the corners as lying on gridlines *between* pixels.
 /// So if _x2 - _x1 == 16, then width() == 16 as well,
 /// and calling QPainter::fillRect() will paint a 16-pixel-wide rectangle on-screen.
-class GridRect {
+class [[nodiscard]] GridRect {
     /// left
     i32 _x1;
     /// top
@@ -154,42 +154,53 @@ public:
     }
 };
 
-
-#define FILL_RECT painter.fillRect(rect, painter.pen().color())
-/// Draws the left border of a GridRect.
-static inline void draw_left_border(QPainter & painter, GridRect rect) {
+/// Finds the left border of a GridRect to stroke.
+static inline GridRect left_border(QPainter & painter, GridRect rect) {
     rect.set_right(rect.left() + painter.pen().width());
-    FILL_RECT;
+    return rect;
 }
 
-/// Draws the right border of a GridRect.
-static inline void draw_right_border(QPainter & painter, GridRect rect) {
+/// Finds the right border of a GridRect to stroke.
+static inline GridRect right_border(QPainter & painter, GridRect rect) {
     rect.set_left(rect.right() - painter.pen().width());
-    FILL_RECT;
+    return rect;
 }
 
-/// Draws the top border of a GridRect.
-static inline void draw_top_border(QPainter & painter, GridRect rect) {
+/// Finds the top border of a GridRect to stroke.
+static inline GridRect top_border(QPainter & painter, GridRect rect) {
     rect.set_bottom(rect.top() + painter.pen().width());
-    FILL_RECT;
+    return rect;
 }
 
-/// Draws the bottom border of a GridRect.
-static inline void draw_bottom_border(QPainter & painter, GridRect rect) {
+/// Finds the bottom border of a GridRect to stroke.
+static inline GridRect bottom_border(QPainter & painter, GridRect rect) {
     rect.set_top(rect.bottom() - painter.pen().width());
-    FILL_RECT;
+    return rect;
 }
-#undef FILL_RECT
 
-#define DRAW_BORDER_OVERLOAD(METHOD_NAME) \
-    static inline void METHOD_NAME(QPainter & painter, QPoint a, QPoint b) { \
-        METHOD_NAME(painter, GridRect{a, b}); \
+#define DEF_DRAW_BORDER(DIRECTION) \
+    static inline void draw_##DIRECTION##_border(QPainter & painter, GridRect rect) { \
+        painter.fillRect(DIRECTION##_border(painter, rect), painter.pen().color()); \
     }
-DRAW_BORDER_OVERLOAD(draw_left_border)
-DRAW_BORDER_OVERLOAD(draw_right_border)
-DRAW_BORDER_OVERLOAD(draw_top_border)
-DRAW_BORDER_OVERLOAD(draw_bottom_border)
-#undef DRAW_BORDER_OVERLOAD
+DEF_DRAW_BORDER(left)
+DEF_DRAW_BORDER(right)
+DEF_DRAW_BORDER(top)
+DEF_DRAW_BORDER(bottom)
+#undef DEF_DRAW_BORDER
+
+#define BORDER_OVERLOAD(METHOD_NAME) \
+    static inline auto METHOD_NAME(QPainter & painter, QPoint a, QPoint b) { \
+        return METHOD_NAME(painter, GridRect{a, b}); \
+    }
+BORDER_OVERLOAD(left_border)
+BORDER_OVERLOAD(right_border)
+BORDER_OVERLOAD(top_border)
+BORDER_OVERLOAD(bottom_border)
+BORDER_OVERLOAD(draw_left_border)
+BORDER_OVERLOAD(draw_right_border)
+BORDER_OVERLOAD(draw_top_border)
+BORDER_OVERLOAD(draw_bottom_border)
+#undef BORDER_OVERLOAD
 
 
 /// Draw text anchored to a point, with any alignment relative to that point,
