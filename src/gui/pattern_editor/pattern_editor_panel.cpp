@@ -115,6 +115,8 @@ struct PatternAppearance {
     int cursor_top_alpha = 48;
     int cursor_bottom_alpha = 0;
 
+    QColor cursor_cell{255, 192, 96};
+
     /// Foreground line color, also used as note text color.
     QColor note_line_beat{255, 255, 96};
     QColor note_line_non_beat{0, 255, 0};

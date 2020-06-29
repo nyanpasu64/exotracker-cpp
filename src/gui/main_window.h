@@ -35,7 +35,8 @@ class MainWindow : public QMainWindow
 
 public:
     // Just make it a grab bag of fields for now.
-    // TODO add "cursor_moved" signal.
+    // We really don't need a "cursor_moved" signal.
+    // Each method updates the cursor location, then the screen is redrawn at 60fps.
 
     // TODO encapsulate selection begin (x, y) and cursor (x, y)
     // into a Selection class.
