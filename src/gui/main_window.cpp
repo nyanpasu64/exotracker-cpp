@@ -57,7 +57,8 @@ public:
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal
-    QShortcut _play_pause{QKeySequence{Qt::Key_Space}, this};
+    QShortcut _play_pause{QKeySequence{Qt::Key_Return}, this};
+    QShortcut _play_from_row{QKeySequence{Qt::Key_Apostrophe}, this};
     QShortcut _restart_audio_shortcut{QKeySequence{Qt::Key_F12}, this};
 
     /// This API is a bit too broad for my liking, but whatever.
@@ -92,7 +93,20 @@ public:
                 gc_command_queue(win._audio_handle.value());
 
                 if (_audio_state == AudioState::Stopped) {
-                    // TODO play from pattern start?
+                    auto cursor = win._cursor_y;
+                    cursor.beat = 0;
+                    play_from(win, cursor);
+                } else {
+                    stop_play(win);
+                }
+            }
+        }
+
+        void play_from_row(MainWindowImpl & win) {
+            if (win._audio_handle.has_value()) {
+                gc_command_queue(win._audio_handle.value());
+
+                if (_audio_state == AudioState::Stopped) {
                     play_from(win, win._cursor_y);
                 } else {
                     stop_play(win);
@@ -192,12 +206,9 @@ public:
             &_play_pause, &QShortcut::activated,
             this, [this] () { _audio_component.play_pause(*this); }
         );
-
         connect(
-            &_play_pause, &QShortcut::activatedAmbiguously,
-            this, [&] {
-                qDebug() << "ambiguous yay";
-            }
+            &_play_from_row, &QShortcut::activated,
+            this, [this] () { _audio_component.play_from_row(*this); }
         );
 
         connect(
