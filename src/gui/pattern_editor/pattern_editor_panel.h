@@ -28,6 +28,9 @@ struct PatternFontMetrics {
     int descent;
 };
 
+/// Currently unused.
+/// Eventually I want to make each column (like pan) independently toggleable
+/// (except note is always shown).
 enum class ColumnCollapse {
     Full,
     HideEffects,
@@ -134,8 +137,6 @@ PatternEditorPanel_INTERNAL:
     PatternEditorShortcuts _shortcuts;
 
     // # Editing state, set by user interactions.
-
-    ColumnCollapse _column_collapse = ColumnCollapse::Full;
     int _rows_per_beat = 4;
     bool _is_zoomed = false;
 
