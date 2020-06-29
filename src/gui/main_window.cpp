@@ -222,34 +222,10 @@ public:
         // TODO setup_screen() when primaryScreen changed
         // TODO setup_timer() when refreshRate changed
 
-        // Setup audio.
         setup_audio();
 
-        auto init_qaction = [&] (QAction & action, QKeySequence seq) {
-            action.setShortcut(seq);
-            action.setShortcutContext(Qt::WidgetWithChildrenShortcut);
-            _pattern_editor_panel->addAction(&action);
-        };
-
-        init_qaction(_play_pause, QKeySequence{Qt::Key_Return});
-        connect(
-            &_play_pause, &QAction::triggered,
-            this, [this] () { _audio_component.play_pause(*this); }
-        );
-
-        init_qaction(_play_from_row, QKeySequence{Qt::Key_Apostrophe});
-        connect(
-            &_play_from_row, &QAction::triggered,
-            this, [this] () { _audio_component.play_from_row(*this); }
-        );
-
-        _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
-        _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
-        this->addAction(&_restart_audio);
-        connect(
-            &_restart_audio, &QAction::triggered,
-            this, &MainWindow::restart_audio_thread
-        );
+        reload_shortcuts();
+        // TODO reload_shortcuts() when shortcut keybinds changed
     }
 
     /// Output: _pattern_editor_panel.
@@ -325,6 +301,43 @@ public:
         // Begin playing audio. Destroying this variable makes audio stop.
         _audio_handle = AudioThreadHandle::make(
             _rt, _curr_audio_device, _history, _audio_component.stub_command()
+        );
+    }
+
+    /// Clears existing bindings and rebinds shortcuts.
+    /// Can be called multiple times.
+    void reload_shortcuts() {
+        auto init_qaction = [&] (QAction & action, QKeySequence seq) {
+            // Probably overwrites existing shortcut.
+            action.setShortcut(seq);
+            action.setShortcutContext(Qt::WidgetWithChildrenShortcut);
+
+            // "A QWidget should only have one of each action and adding an action
+            // it already has will not cause the same action to be in the widget twice."
+            _pattern_editor_panel->addAction(&action);
+        };
+
+        init_qaction(_play_pause, QKeySequence{Qt::Key_Return});
+        connect(
+            &_play_pause, &QAction::triggered,
+            this, [this] () { _audio_component.play_pause(*this); },
+            Qt::UniqueConnection
+        );
+
+        init_qaction(_play_from_row, QKeySequence{Qt::Key_Apostrophe});
+        connect(
+            &_play_from_row, &QAction::triggered,
+            this, [this] () { _audio_component.play_from_row(*this); },
+            Qt::UniqueConnection
+        );
+
+        _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
+        _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
+        this->addAction(&_restart_audio);
+        connect(
+            &_restart_audio, &QAction::triggered,
+            this, &MainWindow::restart_audio_thread,
+            Qt::UniqueConnection
         );
     }
 };
