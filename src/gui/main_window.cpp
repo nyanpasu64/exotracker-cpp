@@ -166,9 +166,29 @@ public:
     using Clock = std::chrono::steady_clock;
     Clock::time_point _prev_time;
 
-    // impl
+    // impl MainWindow
     void _() override {}
 
+    std::optional<AudioThreadHandle> const & audio_handle() override {
+        return _audio_handle;
+    }
+
+    AudioState audio_state() const override {
+        return _audio_component.audio_state();
+    }
+
+    void restart_audio_thread() override {
+        // Only one stream can be running at a time.
+        // The lifetimes of the old and new audio thread must not overlap.
+        // So destroy the old before constructing the new.
+        _audio_handle = {};
+        _audio_component.reset();
+        _audio_handle = AudioThreadHandle::make(
+            _rt, _curr_audio_device, _history, _audio_component.stub_command()
+        );
+    }
+
+    // private methods
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindow(parent)
         , _history{std::move(document)}
@@ -303,25 +323,6 @@ public:
         release_assert(_audio_component.is_empty());
 
         // Begin playing audio. Destroying this variable makes audio stop.
-        _audio_handle = AudioThreadHandle::make(
-            _rt, _curr_audio_device, _history, _audio_component.stub_command()
-        );
-    }
-
-    std::optional<AudioThreadHandle> const & audio_handle() override {
-        return _audio_handle;
-    }
-
-    AudioState audio_state() const override {
-        return _audio_component.audio_state();
-    }
-
-    void restart_audio_thread() override {
-        // Only one stream can be running at a time.
-        // The lifetimes of the old and new audio thread must not overlap.
-        // So destroy the old before constructing the new.
-        _audio_handle = {};
-        _audio_component.reset();
         _audio_handle = AudioThreadHandle::make(
             _rt, _curr_audio_device, _history, _audio_component.stub_command()
         );
