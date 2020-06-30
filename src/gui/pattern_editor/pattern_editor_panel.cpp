@@ -429,8 +429,7 @@ struct ColumnLayout {
 /// Compute where on-screen to draw each pattern column.
 static ColumnLayout gen_column_layout(
     PatternEditorPanel const & self,
-    doc::Document const & document,
-    int channel_divider_width
+    doc::Document const & document
 ) {
     int const width_per_char = self._pattern_font_metrics.width;
     int const extra_width = width_per_char / columns::EXTRA_WIDTH_DIVISOR;
@@ -521,10 +520,6 @@ static ColumnLayout gen_column_layout(
                     subcolumns::EffectValue{effect_col}, 2, false, true
                 );
             }
-
-            // The rightmost subcolumn has one extra pixel for the channel divider.
-            x_px += channel_divider_width;
-            end_sub(subcolumns[subcolumns.size() - 1], false);
 
             // TODO replace off-screen columns with nullopt.
             column_layout.cols.push_back(ColumnPx{
@@ -637,7 +632,8 @@ static void draw_header(
         // Draw border.
         painter.setPen(self.palette().shadow().color());
         // In 0CC, each "gray gridline" belongs to the previous (left) channel.
-        // So each channel only draws its right border.
+        // In our tracker, each "gray gridline" belongs to the next channel.
+        // But draw the header the same as 0CC, it looks prettier.
         draw_top_border(painter, channel_rect);
         draw_right_border(painter, channel_rect);
         draw_bottom_border(painter, channel_rect);
@@ -870,14 +866,6 @@ public:
 
 }
 
-
-/// Vertical channel dividers are drawn at fixed locations. Horizontal gridlines and events are not.
-/// So draw horizontal lines after of channel dividers.
-/// This macro prevents horizontal gridlines from covering up channel dividers.
-#define HORIZ_GRIDLINE(right_top, channel_divider_width) \
-    ((right_top) - QPoint{(channel_divider_width), 0})
-
-
 /// Draw the background lying behind notes/etc.
 static void draw_pattern_background(
     PatternEditorPanel & self,
@@ -1028,7 +1016,9 @@ static void draw_pattern_background(
     draw_patterns.template operator()<Direction::Forward>(draw_pattern_bg, seq);
     draw_patterns.template operator()<Direction::Reverse>(draw_pattern_bg, seq);
 
-    // Draw divider down right side of each column.
+    // Draw divider "just past right" of each column.
+    // This replaces the "note divider" of the next column.
+    // The last column draws a divider in the void.
     painter.setPen(visual.channel_divider);
 
     // Templated function with multiple T.
@@ -1038,7 +1028,7 @@ static void draw_pattern_background(
         QPoint right_top{xright, inner_rect.top()};
         QPoint right_bottom{xright, inner_rect.bottom()};
 
-        draw_right_border(painter, right_top, right_bottom);
+        draw_left_border(painter, right_top, right_bottom);
     };
 
     draw_divider(columns.ruler);
@@ -1250,10 +1240,10 @@ static void draw_pattern_foreground(
                 }
 
                 // Draw top border. Do it after each note clears the background.
+                // Exclude the leftmost column, so we don't overwrite channel dividers.
                 painter.setPen(note_color);
-                draw_top_border(
-                    painter, left_top, HORIZ_GRIDLINE(right_top, painter.pen().width())
-                );
+                int pen_width = painter.pen().width();
+                draw_top_border(painter, left_top + QPoint{pen_width, 0}, right_top);
             }
         }
     };
@@ -1305,7 +1295,7 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
 
         GridRect canvas_rect = self._image.rect();
 
-        ColumnLayout columns = gen_column_layout(self, document, painter.pen().width());
+        ColumnLayout columns = gen_column_layout(self, document);
 
         // TODO build an abstraction for this
         {
