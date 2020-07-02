@@ -72,7 +72,14 @@ struct ShortcutPair {
     X(scroll_prev) SEP \
     X(scroll_next) SEP \
     X(prev_pattern) SEP \
-    X(next_pattern)
+    X(next_pattern) SEP \
+    X(left) SEP \
+    X(right) SEP \
+    X(scroll_left) SEP \
+    X(scroll_right)
+
+//    X(prev_channel) SEP
+//    X(next_channel)
 
 
 struct PatternEditorShortcuts {

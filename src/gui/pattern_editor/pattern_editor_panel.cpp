@@ -166,8 +166,6 @@ constexpr Qt::Key chord(int modifier, Qt::Key key) {
 struct ShortcutConfig {
     constexpr static Qt::Key up{Qt::Key_Up};
     constexpr static Qt::Key down{Qt::Key_Down};
-//    constexpr static Qt::Key left{Qt::Key_Left};
-//    constexpr static Qt::Key right{Qt::Key_Right};
 
     Qt::Key prev_beat{chord(Qt::CTRL, Qt::Key_Up)};
     Qt::Key next_beat{chord(Qt::CTRL, Qt::Key_Down)};
@@ -183,7 +181,11 @@ struct ShortcutConfig {
 
     // TODO nudge_prev/next via alt+up/down
 
-    // TODO horizontal shortcuts
+    constexpr static Qt::Key left{Qt::Key_Left};
+    constexpr static Qt::Key right{Qt::Key_Right};
+
+    Qt::Key scroll_left{chord(Qt::ALT, Qt::Key_Left)};
+    Qt::Key scroll_right{chord(Qt::ALT, Qt::Key_Right)};
 };
 
 static ShortcutConfig shortcut_keys;
@@ -432,7 +434,7 @@ struct ColumnLayout {
 };
 
 /// Compute where on-screen to draw each pattern column.
-static ColumnLayout gen_column_layout(
+[[nodiscard]] static ColumnLayout gen_column_layout(
     PatternEditorPanel const & self,
     doc::Document const & document
 ) {
@@ -555,7 +557,7 @@ using ColumnList = std::vector<Column>;
 /// for keyboard-based movement rather than rendering.
 ///
 /// TODO add function in self for determining subcolumn visibility.
-ColumnList gen_column_list(
+[[nodiscard]] static ColumnList gen_column_list(
     PatternEditorPanel const & self,
     doc::Document const & document
 ) {
@@ -1690,6 +1692,120 @@ void PatternEditorPanel::next_pattern_pressed() {
     switch_seq_entry_index<increment_mod>(*this);
 }
 
+using main_window::CursorX;
+using main_window::ColumnIndex;
+using main_window::SubColumnIndex;
+
+ColumnIndex ncol(ColumnList const& cols) {
+    return ColumnIndex(cols.size());
+}
+
+SubColumnIndex nsubcol(ColumnList const& cols, size_t column_idx) {
+    return SubColumnIndex(cols[column_idx].subcolumns.size());
+}
+
+/// Transforms a "past the end" cursor to point to the beginning instead.
+/// Call this before moving the cursor towards the right.
+void wrap_cursor(ColumnList const& cols, CursorX & cursor_x) {
+    if (cursor_x.column >= ncol(cols)) {
+        cursor_x.column = 0;
+    }
+}
+
+/*
+There are two cursor models I could use: Inclusive cursors (item indexing),
+or exclusive cursors (gridline indexing).
+
+With inclusive cursors, selecting an integer number of columns is janky.
+With exclusive cursors, you can get zero-width selections.
+And there must be a way to move the cursor "past the end"
+to create a selection including the rightmost subcolumn.
+If you type in that state, they'll get inserted in the leftmost channel's
+note column instead.
+
+Cursor affinity is fun.
+
+I'll either switch to inclusive horizontal cursor movement,
+or allow the user to pick in the settings.
+
+Vertical cursor movement is a less severe issue,
+since "end of pattern" and "beginning of next" are indistinguishable
+except for pressing End a second time, or when inserting notes.
+
+The biggest vertical cursor issue arises if you have a single looping pattern.
+If you hold shift+down until the cursor reaches the end of the document,
+the cursor should extend to the end of the document, not the beginning.
+Similarly, if you hold down until the cursor reaches the end of the document,
+then press shift+up, the cursor should extend from the end of the document.
+*/
+
+void PatternEditorPanel::left_pressed() {
+    doc::Document const & document = get_document();
+    ColumnList cols = gen_column_list(*this, document);
+
+    // there's got to be a better way to write this code...
+    // an elegant abstraction i'm missing
+    auto & cursor_x = _win._cursor_x;
+
+    if (cursor_x.subcolumn > 0) {
+        cursor_x.subcolumn--;
+    } else {
+        if (cursor_x.column > 0) {
+            cursor_x.column--;
+        } else {
+            cursor_x.column = ncol(cols) - 1;
+        }
+        cursor_x.subcolumn = nsubcol(cols, cursor_x.column) - 1;
+    }
+}
+
+void PatternEditorPanel::right_pressed() {
+    doc::Document const & document = get_document();
+    ColumnList cols = gen_column_list(*this, document);
+
+    // Is it worth extracting cursor movement logic to a class?
+    auto & cursor_x = _win._cursor_x;
+    wrap_cursor(cols, cursor_x);
+    cursor_x.subcolumn++;
+
+    if (cursor_x.subcolumn >= nsubcol(cols, cursor_x.column)) {
+        cursor_x.subcolumn = 0;
+        cursor_x.column++;
+
+        if (cursor_x.column >= ncol(cols)) {
+            cursor_x.column = 0;
+        }
+    }
+}
+
+// TODO implement comparison between subcolumn variants,
+// so you can hide pan on some but not all channels
+
+void PatternEditorPanel::scroll_left_pressed() {
+    doc::Document const & document = get_document();
+    ColumnList cols = gen_column_list(*this, document);
+
+    auto & cursor_x = _win._cursor_x;
+    if (cursor_x.column > 0) {
+        cursor_x.column--;
+    } else {
+        cursor_x.column = ncol(cols) - 1;
+    }
+
+    cursor_x.subcolumn =
+        std::min(cursor_x.subcolumn, nsubcol(cols, cursor_x.column) - 1);
+}
+
+void PatternEditorPanel::scroll_right_pressed() {
+    doc::Document const & document = get_document();
+    ColumnList cols = gen_column_list(*this, document);
+
+    auto & cursor_x = _win._cursor_x;
+    cursor_x.column++;
+    wrap_cursor(cols, cursor_x);
+    cursor_x.subcolumn =
+        std::min(cursor_x.subcolumn, nsubcol(cols, cursor_x.column) - 1);
+}
 
 // namespace
 }
