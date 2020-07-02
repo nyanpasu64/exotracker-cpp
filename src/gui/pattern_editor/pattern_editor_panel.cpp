@@ -122,9 +122,6 @@ struct PatternAppearance {
     int cell_top_alpha = 96;
     int cell_bottom_alpha = 96;
 
-    int cell_left_top_alpha = 255;
-    int cell_left_bottom_alpha = 255;
-
     /// Foreground line color, also used as note text color.
     QColor note_line_beat{255, 255, 96};
     QColor note_line_non_beat{0, 255, 0};
@@ -1346,38 +1343,13 @@ static void draw_pattern_foreground(
         );
 
         // Draw cursor cell outline:
-        auto vertical_rect = [cursor_top=cursor_top, cursor_bottom] (int x) {
-            return GridRect{QPoint{x, cursor_top}, QPoint{x, cursor_bottom}};
-        };
-
-        auto cursor_border_grad = make_gradient(
-            cursor_top,
-            cursor_bottom,
-            visual.cell,
-            visual.cell_left_top_alpha,
-            visual.cell_left_bottom_alpha
-        );
-
         auto cursor_x = self._win._cursor_x;
         auto ncol = columns.cols.size();
 
-        bool draw_left = true;
-
         // Handle special-case of past-the-end cursors separately.
         if (cursor_x.column >= ncol) {
-            // If cursor is past-the-end... paint the end.
-            // Assume the cursor is always visible, so row_right_px = rightmost column.
-            // If the rightmost column is nullopt, there's no better approach
-            // (except not drawing cursor).
-            if (auto & col = columns.cols[ncol - 1]) {
-                painter.fillRect(
-                    right_border(painter, vertical_rect(col->right_px)),
-                    cursor_border_grad
-                );
-            }
             cursor_x.column = 0;
             cursor_x.subcolumn = 0;
-            draw_left = false;
         }
 
         // If cursor is on-screen, draw cell outline.
@@ -1387,11 +1359,6 @@ static void draw_pattern_foreground(
                 QPoint{subcol.left_px, cursor_top},
                 QPoint{subcol.right_px, cursor_bottom}
             };
-
-            // Draw left border.
-            if (draw_left) {
-                painter.fillRect(left_border(painter, cursor_rect), cursor_border_grad);
-            }
 
             // Draw top line.
             painter.setPen(visual.cell);
