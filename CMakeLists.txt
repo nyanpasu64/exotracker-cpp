@@ -111,6 +111,12 @@ target_link_libraries(exotracker-lib PRIVATE lib-3rdparty rtaudio)
 target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
 target_compile_definitions(exotracker-lib PRIVATE EXO_LIB)
 
+if(COMMAND target_precompile_headers)
+    target_precompile_headers(exotracker-lib PRIVATE
+        precompiled_headers/exotracker_lib.h
+    )
+endif()
+
 # GUI editor, uses Qt
 add_executable(exotracker-bin
         # GUI/audio communication
@@ -131,6 +137,13 @@ add_executable(exotracker-bin
 target_compile_options(exotracker-bin PRIVATE "${options}")
 target_link_libraries(exotracker-bin PRIVATE exotracker-lib rtaudio Qt5::Widgets)
 target_compile_definitions(exotracker-bin PRIVATE EXO_BIN)
+
+if(COMMAND target_precompile_headers)
+    target_precompile_headers(exotracker-bin PRIVATE
+        precompiled_headers/exotracker_lib.h
+        precompiled_headers/exotracker_bin.h
+    )
+endif()
 
 # Unit tests
 add_executable(exotracker-tests
@@ -154,6 +167,11 @@ target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests PRIVATE exotracker-lib)
 target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
 
+if(COMMAND target_precompile_headers)
+    target_precompile_headers(exotracker-tests PRIVATE
+        precompiled_headers/exotracker_lib.h
+    )
+endif()
 
 # This can be used to enable asan (-fsanitize=memory/undefined/leak).
 include(cmake_user_end.cmake OPTIONAL)
