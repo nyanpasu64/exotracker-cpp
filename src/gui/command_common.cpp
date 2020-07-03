@@ -1,5 +1,1 @@
-#include "command_common.h"
-
-namespace gui::command {
-
-}
+//#include "command_common.h"
