@@ -1,6 +1,7 @@
 #pragma once
 
 #include "make_blip_buffer.h"
+#include "synth/music_driver_common.h"
 #include "event_queue.h"
 #include "audio_common.h"
 #include "doc.h"
@@ -19,6 +20,8 @@ namespace synth {
 
 using namespace chip_common;
 using timing::SequencerTime;
+using music_driver::RegisterWrite;
+using music_driver::RegisterWriteQueue;
 
 // https://wiki.nesdev.com/w/index.php/CPU
 // >Emulator authors may wish to emulate the NTSC NES/Famicom CPU at 21441960 Hz...
@@ -38,101 +41,6 @@ int constexpr TICKS_PER_S = 60;
 using event_queue::ClockT;
 
 using SampleT = uint32_t;
-
-using Address = uint16_t;
-using Byte = uint8_t;
-
-struct RegisterWrite {
-    Address address;
-    Byte value;
-};
-
-/// Maybe just inline the methods, don't move to .cpp?
-class RegisterWriteQueue {
-
-public:
-    struct RelativeRegisterWrite {
-        RegisterWrite write;
-        ClockT time_before;
-    };
-
-private:
-    std::vector<RelativeRegisterWrite> vec;
-
-    struct WriteState {
-        ClockT accum_dtime = 0;
-        bool pending() const {
-            return accum_dtime != 0;
-        }
-    } input;
-
-    struct ReadState {
-        ClockT prev_time = 0;
-        size_t index = 0;
-        bool pending() const {
-            return prev_time != 0 || index != 0;
-        }
-    } output;
-
-public:
-    // impl
-    DISABLE_COPY_MOVE(RegisterWriteQueue)
-
-    RegisterWriteQueue() : input{}, output{} {
-        vec.reserve(4 * 1024);
-    }
-
-    void clear() {
-        vec.clear();
-        input = {};
-        output = {};
-    }
-
-    // Called by OverallDriver’s member drivers.
-
-    // Is this a usable API? I don't know.
-    // I think music_driver::TimeRef will make it easier to use.
-    void add_time(ClockT dtime) {
-        input.accum_dtime += dtime;
-    }
-
-    void push_write(RegisterWrite val) {
-        assert(!output.pending());
-        RelativeRegisterWrite relative{.write=val, .time_before=input.accum_dtime};
-        input.accum_dtime = 0;
-
-        vec.push_back(relative);
-    }
-
-    // Called by Synth.
-
-    /// Returns a nullable pointer to a RelativeRegisterWrite.
-    RelativeRegisterWrite * peek_mut() {  // -> &'Self mut RelativeRegisterWrite
-        assert(!input.pending());
-
-        if (output.index < vec.size()) {
-            return &vec[output.index];
-        }
-
-        return nullptr;
-    }
-
-    RegisterWrite pop() {
-        assert(!input.pending());
-
-        assert(output.index < vec.size());
-        RelativeRegisterWrite out = vec[output.index++];
-        assert(out.time_before == 0);
-        return out.write;
-    }
-
-    size_t num_unread() {
-        return vec.size() - output.index;
-    }
-};
-
-// /// Each ChanToPatternData is logically tied to a ChipInstance,
-// /// and has length == enum_count<ChipInstance::type-erased ChipKind>.
 
 /// Static polymorphic properties of classes,
 /// which can be accessed via pointers to subclasses.
