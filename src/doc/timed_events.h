@@ -71,8 +71,8 @@ struct TimedRowEvent {
     TimeInPattern time;
     events::RowEvent v;
 
-    EQUALABLE(TimedRowEvent, (time, v))
-    COMPARE_ONLY(TimedRowEvent, (time))
+//    EQUALABLE(TimedRowEvent, (time, v))
+//    COMPARE_ONLY(TimedRowEvent, (time))
 };
 
 // end namespace

@@ -106,7 +106,7 @@ public:
         return &_timestamp;
     }
 
-    EQUALABLE(MaybeSequencerTime, (_timestamp))
+    EQUALABLE_SIMPLE(MaybeSequencerTime, _timestamp)
 };
 static_assert(
     sizeof(MaybeSequencerTime) <= 8, "MaybeSequencerTime over 8 bytes, not atomic"

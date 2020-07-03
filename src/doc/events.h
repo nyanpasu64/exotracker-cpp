@@ -27,7 +27,7 @@ inline namespace note_ {
         constexpr Note(ChromaticInt value) : value(value) {}
 
         // impl
-        EQUALABLE(Note, (value))
+        EQUALABLE_SIMPLE(Note, value)
 
         [[nodiscard]] constexpr bool is_cut() const;
         [[nodiscard]] constexpr bool is_release() const;
@@ -58,7 +58,9 @@ struct RowEvent {
     std::optional<InstrumentIndex> instr = {};
     // TODO volumes and []effects
 
-    EQUALABLE(RowEvent, (note))
+    // We really should compare instr too, but that will increase compile times.
+    // And the equality check is unused outside of unit tests.
+    EQUALABLE_SIMPLE(RowEvent, note)
 };
 
 // end namespace

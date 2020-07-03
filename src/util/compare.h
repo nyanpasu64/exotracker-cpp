@@ -44,3 +44,13 @@
     ZZ_KEY(comparable_, paren_of_fields)\
     ZZ_EQUAL_INTERNAL(comparable_, T) \
     ZZ_COMPARE_INTERNAL(comparable_, T)
+
+/// Compiles faster than EQUALABLE.
+#define EQUALABLE_SIMPLE(T, FIELD) \
+    [[nodiscard]] constexpr bool operator==(const T& other) const { \
+        return this->FIELD == other.FIELD; \
+    } \
+    [[nodiscard]] constexpr bool operator!=(const T& other) const { \
+        return this->FIELD != other.FIELD; \
+    } \
+
