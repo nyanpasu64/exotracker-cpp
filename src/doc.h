@@ -27,6 +27,29 @@ struct SequencerOptions {
     TickT ticks_per_beat;
 };
 
+// Tuning table types
+inline namespace tuning {
+    using ChromaticInt = ChromaticInt;
+    using FreqDouble = double;
+    using RegisterInt = int;
+
+    template<typename T>
+    using Owned_ = std::array<T, CHROMATIC_COUNT>;
+
+    template<typename T>
+    using Ref_ = gsl::span<T const, CHROMATIC_COUNT>;
+
+    using FrequenciesOwned = Owned_<FreqDouble>;
+    using FrequenciesRef = Ref_<FreqDouble>;
+
+    using TuningOwned = Owned_<RegisterInt>;
+    using TuningRef = Ref_<RegisterInt>;
+
+    FrequenciesOwned equal_temperament(
+        ChromaticInt root_chromatic = 69, FreqDouble root_frequency = 440.
+    );
+}
+
 using chip_kinds::ChipKind;
 using ChipList = std::vector<chip_kinds::ChipKind>;
 

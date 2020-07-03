@@ -104,7 +104,7 @@ add_library(exotracker-lib
         src/audio/synth/nes_2a03_driver.cpp
 
         # Glue files
-        src/doc/events.cpp
+        src/doc.cpp
         )
 target_compile_options(exotracker-lib PRIVATE "${options}")
 target_link_libraries(exotracker-lib PRIVATE lib-3rdparty rtaudio)
@@ -156,7 +156,7 @@ add_executable(exotracker-tests
         tests/test_utils/parameterize.cpp
         tests/test_utils/test_parameterize.cpp
 
-        src/doc/events.cpp
+        src/doc.cpp
         src/audio_cmd.cpp
         src/audio/synth/envelope.cpp
         src/audio/synth/sequencer.cpp

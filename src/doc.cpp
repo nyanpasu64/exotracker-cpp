@@ -1,4 +1,4 @@
-#include "events.h"
+#include "doc.h"
 
 #include <cmath>  // pow
 
@@ -6,7 +6,7 @@
 #include <doctest.h>
 #endif
 
-namespace doc::events {
+namespace doc {
 
 inline namespace tuning {
     constexpr double NOTES_PER_OCTAVE = 12.;
