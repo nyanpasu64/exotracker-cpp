@@ -24,6 +24,14 @@ inline namespace tuning {
     }
 }
 
+Document Document::clone() const {
+    return *this;
+}
+
+Document::Document(const DocumentCopy & other) : DocumentCopy(other) {}
+
+Document::Document(DocumentCopy && other) : DocumentCopy(std::move(other)) {}
+
 #ifdef UNITTEST
 TEST_CASE("equal_temperament()") {
     FrequenciesOwned freqs = equal_temperament();

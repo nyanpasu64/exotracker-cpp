@@ -80,13 +80,11 @@ struct DocumentCopy {
 
 /// Non-copyable version of Document. You must call clone() explicitly.
 struct Document : DocumentCopy {
-    Document clone() const {
-        return *this;
-    }
+    Document clone() const;
 
     // Document(Document.clone())
-    Document(DocumentCopy const & other) : DocumentCopy(other) {}
-    Document(DocumentCopy && other) : DocumentCopy(std::move(other)) {}
+    Document(DocumentCopy const & other);
+    Document(DocumentCopy && other);
 
 private:
     DEFAULT_COPY(Document)

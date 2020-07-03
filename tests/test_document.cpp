@@ -1,4 +1,5 @@
 #include "doc.h"
+#include "doc/kv.h"
 
 #include <map>
 #include <type_traits>
@@ -52,6 +53,7 @@ TEST_CASE("Test that TimeInPattern comparisons work properly.") {
 
 TEST_CASE ("Test that EventList and KV search is implemented properly.") {
     using namespace doc;
+    using doc::kv::KV;
 
     doc::EventList events;
     events.push_back({{0, 0}, {}});
