@@ -47,7 +47,9 @@ TuningOwned make_tuning_table(
     return out;
 }
 
-void Apu1PulseDriver::stop_note([[maybe_unused]] RegisterWriteQueue & register_writes) {
+void Apu1PulseDriver::stop_playback(
+    [[maybe_unused]] RegisterWriteQueue & register_writes
+) {
     /*
     When we stop all notes, we want to reset all mutable state
     (except for cached register contents).

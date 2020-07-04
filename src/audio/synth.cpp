@@ -113,7 +113,7 @@ void OverallSynth::synthesize_overall(
             // Seek and play.
             _sequencer_running = true;
             for (auto & chip : _chip_instances) {
-                chip->stop_all_notes();
+                chip->stop_playback();
                 chip->seek(document, seek_to->time);
             }
             seq_time = std::nullopt;
@@ -123,7 +123,7 @@ void OverallSynth::synthesize_overall(
             // Stop playback.
             _sequencer_running = false;
             for (auto & chip : _chip_instances) {
-                chip->stop_all_notes();
+                chip->stop_playback();
             }
             seq_time = std::nullopt;
         }

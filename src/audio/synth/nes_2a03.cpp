@@ -99,9 +99,9 @@ public:
         _chip_sequencer.seek(document, time);
     }
 
-    void stop_all_notes() override {
+    void stop_playback() override {
         // May append to _register_writes.
-        _driver.stop_all_notes(_register_writes);
+        _driver.stop_playback(_register_writes);
     }
 
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
