@@ -7,6 +7,8 @@
 #include <cstdint>  // int16_t
 #include <type_traits>  // is_same_v
 
+#include <fmt/core.h>
+
 namespace audio {
 namespace output {
 
@@ -150,6 +152,8 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
         mono_smp_per_block: Mutated by DirectSound, but callback doesn't store the old value.
         stream_opt: Only numberOfBuffers is mutated. If flags mutated, would result in garbled audio.
         */
+
+        fmt::print(stderr, "{} smp/block, {} buffers\n", mono_smp_per_block, stream_opt.numberOfBuffers);
 
         rt.startStream();
     } catch (RtAudioError & e) {
