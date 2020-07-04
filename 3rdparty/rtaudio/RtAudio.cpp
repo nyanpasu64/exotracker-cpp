@@ -114,7 +114,7 @@ const char* rtaudio_api_names[][2] = {
   { "ds"          , "DirectSound" },
   { "dummy"       , "Dummy" },
 };
-const unsigned int rtaudio_num_api_names = 
+const unsigned int rtaudio_num_api_names =
   sizeof(rtaudio_api_names)/sizeof(rtaudio_api_names[0]);
 
 // The order here will control the order of RtAudio's API search in
@@ -473,7 +473,7 @@ double RtApi :: getStreamTime( void )
   then = stream_.lastTickTimestamp;
   return stream_.streamTime +
     ((now.tv_sec + 0.000001 * now.tv_usec) -
-     (then.tv_sec + 0.000001 * then.tv_usec));     
+     (then.tv_sec + 0.000001 * then.tv_usec));
 #else
   return stream_.streamTime;
 #endif
@@ -1914,7 +1914,7 @@ bool RtApiCore :: callbackEvent( AudioDeviceID deviceId,
           channelsLeft -= streamChannels;
         }
       }
-      
+
       if ( stream_.doConvertBuffer[1] ) { // convert from our internal "device" buffer
         convertBuffer( stream_.userBuffer[1],
                        stream_.deviceBuffer,
@@ -1929,7 +1929,7 @@ bool RtApiCore :: callbackEvent( AudioDeviceID deviceId,
   // Make sure to only tick duplex stream time once if using two devices
   if ( stream_.mode != DUPLEX || (stream_.mode == DUPLEX && handle->id[0] != handle->id[1] && deviceId == handle->id[0] ) )
     RtApi::tickStreamTime();
-  
+
   return SUCCESS;
 }
 
@@ -2814,7 +2814,7 @@ RtApiAsio :: RtApiAsio()
   // CoInitialize beforehand, but it must be for appartment threading
   // (in which case, CoInitilialize will return S_FALSE here).
   coInitialized_ = false;
-  HRESULT hr = CoInitialize( NULL ); 
+  HRESULT hr = CoInitialize( NULL );
   if ( FAILED(hr) ) {
     errorText_ = "RtApiAsio::ASIO requires a single-threaded appartment. Call CoInitializeEx(0,COINIT_APARTMENTTHREADED)";
     error( RtAudioError::WARNING );
@@ -3265,7 +3265,7 @@ bool RtApiAsio :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigne
     errorText_ = errorStream_.str();
     goto error;
   }
-  buffersAllocated = true;  
+  buffersAllocated = true;
   stream_.state = STREAM_STOPPED;
 
   // Set flags for buffer conversion.
@@ -3743,13 +3743,13 @@ static long asioMessages( long selector, long value, void* /*message*/, double* 
 
 static const char* getAsioErrorString( ASIOError result )
 {
-  struct Messages 
+  struct Messages
   {
     ASIOError value;
     const char*message;
   };
 
-  static const Messages m[] = 
+  static const Messages m[] =
     {
       {   ASE_NotPresent,    "Hardware input or output is not present or available." },
       {   ASE_HWMalfunction,  "Hardware is malfunctioning." },
@@ -5512,7 +5512,7 @@ Exit:
 #if defined(__WINDOWS_DS__) // Windows DirectSound API
 
 // Modified by Robin Davies, October 2005
-// - Improvements to DirectX pointer chasing. 
+// - Improvements to DirectX pointer chasing.
 // - Bug fix for non-power-of-two Asio granularity used by Edirol PCR-A30.
 // - Auto-call CoInitialize for DSOUND and ASIO platforms.
 // Various revisions for RtAudio 4.0 by Gary Scavone, April 2007
@@ -5556,7 +5556,7 @@ struct DsHandle {
   void *id[2];
   void *buffer[2];
   bool xrun[2];
-  UINT bufferPointer[2];  
+  UINT bufferPointer[2];
   DWORD dsBufferSize[2];
   DWORD dsPointerLeadTime[2]; // the number of bytes ahead of the safe pointer to lead by.
   HANDLE condition;
@@ -6408,7 +6408,7 @@ void RtApiDs :: startStream()
   // Increase scheduler frequency on lesser windows (a side-effect of
   // increasing timer accuracy).  On greater windows (Win2K or later),
   // this is already in effect.
-  timeBeginPeriod( 1 ); 
+  timeBeginPeriod( 1 );
 
   buffersRolling = false;
   duplexPrerollBytes = 0;
@@ -6729,7 +6729,7 @@ void RtApiDs :: callbackEvent()
   }
 
   if ( stream_.mode == OUTPUT || stream_.mode == DUPLEX ) {
-    
+
     LPDIRECTSOUNDBUFFER dsBuffer = (LPDIRECTSOUNDBUFFER) handle->buffer[0];
 
     if ( handle->drainCounter > 1 ) { // write zeros to the output stream
@@ -6796,7 +6796,7 @@ void RtApiDs :: callbackEvent()
     }
 
     if ( dsPointerBetween( nextWritePointer, safeWritePointer, currentWritePointer, dsBufferSize )
-         || dsPointerBetween( endWrite, safeWritePointer, currentWritePointer, dsBufferSize ) ) { 
+         || dsPointerBetween( endWrite, safeWritePointer, currentWritePointer, dsBufferSize ) ) {
       // We've strayed into the forbidden zone ... resync the read pointer.
       handle->xrun[0] = true;
       nextWritePointer = safeWritePointer + handle->dsPointerLeadTime[0] - bufferBytes;
@@ -6870,14 +6870,14 @@ void RtApiDs :: callbackEvent()
     if ( safeReadPointer < (DWORD)nextReadPointer ) safeReadPointer += dsBufferSize; // unwrap offset
     DWORD endRead = nextReadPointer + bufferBytes;
 
-    // Handling depends on whether we are INPUT or DUPLEX. 
+    // Handling depends on whether we are INPUT or DUPLEX.
     // If we're in INPUT mode then waiting is a good thing. If we're in DUPLEX mode,
     // then a wait here will drag the write pointers into the forbidden zone.
-    // 
-    // In DUPLEX mode, rather than wait, we will back off the read pointer until 
-    // it's in a safe position. This causes dropouts, but it seems to be the only 
-    // practical way to sync up the read and write pointers reliably, given the 
-    // the very complex relationship between phase and increment of the read and write 
+    //
+    // In DUPLEX mode, rather than wait, we will back off the read pointer until
+    // it's in a safe position. This causes dropouts, but it seems to be the only
+    // practical way to sync up the read and write pointers reliably, given the
+    // the very complex relationship between phase and increment of the read and write
     // pointers.
     //
     // In order to minimize audible dropouts in DUPLEX mode, we will
@@ -6928,7 +6928,7 @@ void RtApiDs :: callbackEvent()
           error( RtAudioError::SYSTEM_ERROR );
           return;
         }
-      
+
         if ( safeReadPointer < (DWORD)nextReadPointer ) safeReadPointer += dsBufferSize; // unwrap offset
       }
     }
@@ -7152,7 +7152,7 @@ struct AlsaHandle {
   AlsaHandle()
 #if _cplusplus >= 201103L
     :handles{nullptr, nullptr}, synchronized(false), runnable(false) { xrun[0] = false; xrun[1] = false; }
-#else 
+#else
     : synchronized(false), runnable(false) { handles[0] = NULL; handles[1] = NULL; xrun[0] = false; xrun[1] = false; }
 #endif
 };
@@ -8170,7 +8170,7 @@ void RtApiAlsa :: stopStream()
   AlsaHandle *apiInfo = (AlsaHandle *) stream_.apiHandle;
   snd_pcm_t **handle = (snd_pcm_t **) apiInfo->handles;
   if ( stream_.mode == OUTPUT || stream_.mode == DUPLEX ) {
-    if ( apiInfo->synchronized ) 
+    if ( apiInfo->synchronized )
       result = snd_pcm_drop( handle[0] );
     else
       result = snd_pcm_drain( handle[0] );
@@ -8435,8 +8435,8 @@ static void *alsaCallbackHandler( void *ptr )
 
 #ifdef SCHED_RR // Undefined with some OSes (e.g. NetBSD 1.6.x with GNU Pthread)
   if ( info->doRealtime ) {
-    std::cerr << "RtAudio alsa: " << 
-             (sched_getscheduler(0) == SCHED_RR ? "" : "_NOT_ ") << 
+    std::cerr << "RtAudio alsa: " <<
+             (sched_getscheduler(0) == SCHED_RR ? "" : "_NOT_ ") <<
              "running realtime scheduling" << std::endl;
   }
 #endif
@@ -8710,15 +8710,15 @@ static void *pulseaudio_callback( void * user )
   CallbackInfo *cbi = static_cast<CallbackInfo *>( user );
   RtApiPulse *context = static_cast<RtApiPulse *>( cbi->object );
   volatile bool *isRunning = &cbi->isRunning;
-  
+
 #ifdef SCHED_RR // Undefined with some OSes (e.g. NetBSD 1.6.x with GNU Pthread)
   if (cbi->doRealtime) {
-    std::cerr << "RtAudio pulse: " << 
-             (sched_getscheduler(0) == SCHED_RR ? "" : "_NOT_ ") << 
+    std::cerr << "RtAudio pulse: " <<
+             (sched_getscheduler(0) == SCHED_RR ? "" : "_NOT_ ") <<
              "running realtime scheduling" << std::endl;
   }
 #endif
-  
+
   while ( *isRunning ) {
     pthread_testcancel();
     context->callbackEvent();
@@ -8836,7 +8836,7 @@ void RtApiPulse::callbackEvent( void )
     else
       bytes = stream_.nUserChannels[INPUT] * stream_.bufferSize *
         formatBytes( stream_.userFormat );
-            
+
     if ( pa_simple_read( pah->s_rec, pulse_in, bytes, &pa_error ) < 0 ) {
       errorStream_ << "RtApiPulse::callbackEvent: audio read error, " <<
         pa_strerror( pa_error ) << ".";
@@ -9050,7 +9050,7 @@ bool RtApiPulse::probeDeviceOpen( unsigned int device, StreamMode mode,
   if ( options && options->flags & RTAUDIO_NONINTERLEAVED ) stream_.userInterleaved = false;
   else stream_.userInterleaved = true;
   stream_.deviceInterleaved[mode] = true;
-  stream_.nBuffers = 1;
+  stream_.nBuffers = options ? options->numberOfBuffers : 1;
   stream_.doByteSwap[mode] = false;
   stream_.nUserChannels[mode] = channels;
   stream_.nDeviceChannels[mode] = channels + firstChannel;
@@ -9120,8 +9120,8 @@ bool RtApiPulse::probeDeviceOpen( unsigned int device, StreamMode mode,
   int error;
   if ( options && !options->streamName.empty() ) streamName = options->streamName;
   switch ( mode ) {
-  case INPUT:
     pa_buffer_attr buffer_attr;
+  case INPUT:
     buffer_attr.fragsize = bufferBytes;
     buffer_attr.maxlength = -1;
 
@@ -9132,18 +9132,33 @@ bool RtApiPulse::probeDeviceOpen( unsigned int device, StreamMode mode,
       goto error;
     }
     break;
-  case OUTPUT:
+  case OUTPUT: {
+    pa_buffer_attr * attr_ptr;
+
+    if ( options && options->numberOfBuffers > 0 ) {
+      // pa_buffer_attr::fragsize is recording-only.
+      // Hopefully PortAudio won't access uninitialized fields.
+      buffer_attr.maxlength = bufferBytes * options->numberOfBuffers;
+      buffer_attr.minreq = -1;
+      buffer_attr.prebuf = -1;
+      buffer_attr.tlength = -1;
+      attr_ptr = &buffer_attr;
+    } else {
+      attr_ptr = nullptr;
+    }
+
     pah->s_play = pa_simple_new( NULL, streamName.c_str(), PA_STREAM_PLAYBACK,
-                                 dev_output, "Playback", &ss, NULL, NULL, &error );
+                                 dev_output, "Playback", &ss, NULL, attr_ptr, &error );
     if ( !pah->s_play ) {
       errorText_ = "RtApiPulse::probeDeviceOpen: error connecting output to PulseAudio server.";
       goto error;
     }
     break;
+  }
   case DUPLEX:
     /* Note: We could add DUPLEX by synchronizing multiple streams,
-       but it would mean moving from Simple API to Asynchronous API:
-       https://freedesktop.org/software/pulseaudio/doxygen/streams.html#sync_streams */
+      but it would mean moving from Simple API to Asynchronous API:
+      https://freedesktop.org/software/pulseaudio/doxygen/streams.html#sync_streams */
     errorText_ = "RtApiPulse::probeDeviceOpen: duplex not supported for PulseAudio.";
     goto error;
   default:
@@ -9159,7 +9174,7 @@ bool RtApiPulse::probeDeviceOpen( unsigned int device, StreamMode mode,
 
   if ( !stream_.callbackInfo.isRunning ) {
     stream_.callbackInfo.object = this;
-    
+
     stream_.state = STREAM_STOPPED;
     // Set the thread attributes for joinable and realtime scheduling
     // priority (optional).  The higher priority will only take affect
@@ -9180,7 +9195,7 @@ bool RtApiPulse::probeDeviceOpen( unsigned int device, StreamMode mode,
       if ( priority < min ) priority = min;
       else if ( priority > max ) priority = max;
       param.sched_priority = priority;
-      
+
       // Set the policy BEFORE the priority. Otherwise it fails.
       pthread_attr_setschedpolicy(&attr, SCHED_RR);
       pthread_attr_setscope (&attr, PTHREAD_SCOPE_SYSTEM);
@@ -9209,7 +9224,7 @@ bool RtApiPulse::probeDeviceOpen( unsigned int device, StreamMode mode,
   }
 
   return SUCCESS;
- 
+
  error:
   if ( pah && stream_.callbackInfo.isRunning ) {
     pthread_cond_destroy( &pah->runnable_cv );
@@ -9801,7 +9816,7 @@ bool RtApiOss :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigned
       if ( priority < min ) priority = min;
       else if ( priority > max ) priority = max;
       param.sched_priority = priority;
-      
+
       // Set the policy BEFORE the priority. Otherwise it fails.
       pthread_attr_setschedpolicy(&attr, SCHED_RR);
       pthread_attr_setscope (&attr, PTHREAD_SCOPE_SYSTEM);
@@ -10188,8 +10203,8 @@ static void *ossCallbackHandler( void *ptr )
 
 #ifdef SCHED_RR // Undefined with some OSes (e.g. NetBSD 1.6.x with GNU Pthread)
   if (info->doRealtime) {
-    std::cerr << "RtAudio oss: " << 
-             (sched_getscheduler(0) == SCHED_RR ? "" : "_NOT_ ") << 
+    std::cerr << "RtAudio oss: " <<
+             (sched_getscheduler(0) == SCHED_RR ? "" : "_NOT_ ") <<
              "running realtime scheduling" << std::endl;
   }
 #endif
