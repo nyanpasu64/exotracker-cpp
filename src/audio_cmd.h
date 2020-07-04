@@ -4,6 +4,7 @@
 #include "util/copy_move.h"
 
 #include <atomic>
+#include <variant>
 
 namespace audio_cmd {
 #ifndef audio_cmd_INTERNAL
@@ -26,13 +27,17 @@ struct SeekTo {
     DEFAULT_MOVE(SeekTo)
 };
 
+struct StopPlayback {};
+
+using MessageBody = std::variant<SeekTo, StopPlayback>;
+
 /// Exposed to audio thread.
 struct AudioCommand {
-    std::optional<SeekTo> seek_or_stop;
+    MessageBody msg;
     std::atomic<AudioCommand *> next;  // noncopyable, immovable
 
-    explicit AudioCommand(std::optional<SeekTo> seek_or_stop)
-        : seek_or_stop{seek_or_stop}
+    explicit AudioCommand(MessageBody body)
+        : msg{body}
     {
         next.store(nullptr, std::memory_order_relaxed);
     }

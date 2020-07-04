@@ -126,7 +126,7 @@ public:
         }
 
         void stop_play([[maybe_unused]] MainWindowImpl & win) {
-            _command_queue.push(std::nullopt);
+            _command_queue.push(audio_cmd::StopPlayback{});
             _audio_state = AudioState::Stopped;
         }
 

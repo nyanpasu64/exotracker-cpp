@@ -7,7 +7,7 @@ namespace audio_cmd {
 
 // impl
 void init(CommandQueue & self) {
-    self._begin = self._end = new AudioCommand{{}};
+    self._begin = self._end = new AudioCommand{StopPlayback{}};
 }
 
 /// Only run this when there are no live readers left.

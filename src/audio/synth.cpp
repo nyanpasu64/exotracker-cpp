@@ -97,26 +97,29 @@ void OverallSynth::synthesize_overall(
     // Increases as we run ticks.
     auto seq_time = orig_seq_time;
 
-    auto cmd = _seen_command.load(std::memory_order_relaxed);
+    AudioCommand * cmd = _seen_command.load(std::memory_order_relaxed);
     auto const orig_cmd = cmd;
 
     // Handle all commands we haven't seen yet.
 
     // Paired with CommandQueue::push() store(release).
-    for (; auto next = cmd->next.load(std::memory_order_acquire); cmd = next) {
-        // Process each command from the GUI.
-        if (next->seek_or_stop.has_value()) {
-            // Seek and play.
-            auto & seek_to = next->seek_or_stop.value();
+    for (
+        ; AudioCommand * next = cmd->next.load(std::memory_order_acquire); cmd = next
+    ) {
+        audio_cmd::MessageBody * msg = &next->msg;
 
+        // Process each command from the GUI.
+        if (auto seek_to = std::get_if<audio_cmd::SeekTo>(msg)) {
+            // Seek and play.
             _sequencer_running = true;
             for (auto & chip : _chip_instances) {
                 chip->stop_all_notes();
-                chip->seek(document, seek_to.time);
+                chip->seek(document, seek_to->time);
             }
             seq_time = std::nullopt;
 
-        } else {
+        } else
+        if (auto stop = std::get_if<audio_cmd::StopPlayback>(msg)) {
             // Stop playback.
             _sequencer_running = false;
             for (auto & chip : _chip_instances) {
