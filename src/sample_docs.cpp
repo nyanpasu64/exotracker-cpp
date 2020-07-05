@@ -325,6 +325,62 @@ static Document render_test() {
     };
 }
 
+/// Test song, plays four notes from two chips nonstop.
+/// Check for audio underruns (crackling) by recording and viewing in a spectrogram.
+static Document audio_test() {
+    SequencerOptions sequencer_options{.ticks_per_beat = 24};
+
+    Instruments instruments;
+    instruments[0] = Instrument {
+        .volume = {{15}},
+        .pitch = {{}},
+        .arpeggio = {{}},
+        .wave_index = {{2}},
+    };
+
+    ChipList chips{ChipKind::Apu1, ChipKind::Apu1};
+
+    Sequence sequence;
+
+    sequence.push_back([&] {
+        ChipChannelTo<EventList> chip_channel_events;
+
+        // first apu1
+        {
+            EventList ch1;
+            ch1.push_back({at(0), RowEvent{pitch(5, 0), 0}});
+
+            EventList ch2;
+            ch2.push_back({at(0), RowEvent{pitch(5, 4), 0}});
+
+            chip_channel_events.push_back({std::move(ch1), std::move(ch2)});
+        }
+        // second apu1
+        {
+            EventList ch1;
+            ch1.push_back({at(0), RowEvent{pitch(5, 8), 0}});
+
+            EventList ch2;
+            ch2.push_back({at(0), RowEvent{pitch(5, 12), 0}});
+
+            chip_channel_events.push_back({std::move(ch1), std::move(ch2)});
+        }
+
+        return SequenceEntry {
+            .nbeats = 4,
+            .chip_channel_events = chip_channel_events,
+        };
+    }());
+
+    return DocumentCopy{
+        .sequencer_options = sequencer_options,
+        .frequency_table = equal_temperament(),
+        .instruments = instruments,
+        .chips = chips,
+        .sequence = sequence,
+    };
+}
+
 std::string const DEFAULT_DOC = "world-revolution";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
@@ -332,6 +388,7 @@ std::map<std::string, doc::Document> const DOCUMENTS = [] {
     out.insert({"dream-fragments", dream_fragments()});
     out.insert({"world-revolution", world_revolution()});
     out.insert({"render-test", render_test()});
+    out.insert({"audio-test", audio_test()});
     return out;
 }();
 
