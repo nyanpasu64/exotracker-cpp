@@ -66,7 +66,11 @@ public:
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
     // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
     // interleaved=false was added to support ASIO's native representation.
-    static constexpr RtAudioStreamFlags rtaudio_flags = RTAUDIO_NONINTERLEAVED;
+
+    // In JACK Audio mode, jackd sets our thread to real-time.
+    // In ALSA/etc., RtAudio handles modes.
+    static constexpr RtAudioStreamFlags rtaudio_flags =
+        RTAUDIO_NONINTERLEAVED | RTAUDIO_SCHEDULE_REALTIME;
 
     // impl RtAudioCallback
     static int rtaudio_callback(
