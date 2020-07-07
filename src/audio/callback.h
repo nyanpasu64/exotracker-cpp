@@ -1,11 +1,11 @@
 #pragma once
 
 #include "timing_common.h"
-#include "audio_cmd.h"
+#include "cmd_queue.h"
 
 namespace audio::callback {
 
-using audio_cmd::AudioCommand;
+using cmd_queue::AudioCommand;
 using timing::MaybeSequencerTime;
 
 struct CallbackInterface {

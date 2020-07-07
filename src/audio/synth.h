@@ -6,7 +6,7 @@
 #include "callback.h"
 #include "doc.h"
 #include "timing_common.h"
-#include "audio_cmd.h"
+#include "cmd_queue.h"
 #include "util/enum_map.h"
 
 #include <atomic>
@@ -26,7 +26,7 @@ enum class SynthEvent {
     COUNT
 };
 
-using audio_cmd::AudioCommand;
+using cmd_queue::AudioCommand;
 using timing::MaybeSequencerTime;
 
 /// Preconditions:

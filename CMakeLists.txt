@@ -121,7 +121,7 @@ endif()
 add_executable(exotracker-bin
         # GUI/audio communication
         src/audio/output.cpp
-        src/audio_cmd.cpp
+        src/cmd_queue.cpp
 
         # GUI
         src/sample_docs.cpp
@@ -155,7 +155,7 @@ add_executable(exotracker-tests
         tests/test_utils/test_parameterize.cpp
 
         src/doc.cpp
-        src/audio_cmd.cpp
+        src/cmd_queue.cpp
         src/audio/synth/envelope.cpp
         src/audio/synth/sequencer.cpp
         src/audio/synth/nes_2a03_driver.cpp

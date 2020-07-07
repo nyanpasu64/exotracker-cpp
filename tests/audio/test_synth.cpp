@@ -3,7 +3,7 @@
 #include "doc.h"
 #include "doc/kv.h"
 #include "chip_kinds.h"
-#include "audio_cmd.h"
+#include "cmd_queue.h"
 #include "timing_common.h"
 #include "test_utils/parameterize.h"
 
@@ -83,12 +83,12 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
 using audio::Amplitude;
 using audio::AudioOptions;
 using audio::ClockT;
-using audio_cmd::AudioCommand;
-using audio_cmd::CommandQueue;
+using cmd_queue::AudioCommand;
+using cmd_queue::CommandQueue;
 
 CommandQueue play_from_begin() {
     CommandQueue out;
-    out.push(audio_cmd::SeekTo{timing::PatternAndBeat{0, 0}});
+    out.push(cmd_queue::SeekTo{timing::PatternAndBeat{0, 0}});
     return out;
 }
 

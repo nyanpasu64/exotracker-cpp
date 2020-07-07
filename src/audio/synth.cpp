@@ -106,10 +106,10 @@ void OverallSynth::synthesize_overall(
     for (
         ; AudioCommand * next = cmd->next.load(std::memory_order_acquire); cmd = next
     ) {
-        audio_cmd::MessageBody * msg = &next->msg;
+        cmd_queue::MessageBody * msg = &next->msg;
 
         // Process each command from the GUI.
-        if (auto seek_to = std::get_if<audio_cmd::SeekTo>(msg)) {
+        if (auto seek_to = std::get_if<cmd_queue::SeekTo>(msg)) {
             // Seek and play.
             _sequencer_running = true;
             for (auto & chip : _chip_instances) {
@@ -119,7 +119,7 @@ void OverallSynth::synthesize_overall(
             seq_time = std::nullopt;
 
         } else
-        if (auto stop = std::get_if<audio_cmd::StopPlayback>(msg)) {
+        if (auto stop = std::get_if<cmd_queue::StopPlayback>(msg)) {
             // Stop playback.
             _sequencer_running = false;
             for (auto & chip : _chip_instances) {
@@ -127,7 +127,7 @@ void OverallSynth::synthesize_overall(
             }
             seq_time = std::nullopt;
         } else
-        if (auto edit_ptr = std::get_if<audio_cmd::EditBox>(msg)) {
+        if (auto edit_ptr = std::get_if<cmd_queue::EditBox>(msg)) {
             // Edit synth's copy of the document.
             auto & edit = **edit_ptr;
             edit.apply_swap(_document);

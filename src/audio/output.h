@@ -20,7 +20,7 @@
 #include "audio_common.h"
 #include "callback.h"
 #include "doc.h"
-#include "audio_cmd.h"
+#include "cmd_queue.h"
 #include "timing_common.h"
 #include "util/copy_move.h"
 
@@ -32,7 +32,7 @@
 namespace audio {
 namespace output {
 
-using audio_cmd::AudioCommand;
+using cmd_queue::AudioCommand;
 using timing::MaybeSequencerTime;
 using callback::CallbackInterface;
 

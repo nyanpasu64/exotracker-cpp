@@ -8,7 +8,7 @@
 #include <memory>
 #include <variant>
 
-namespace audio_cmd {
+namespace cmd_queue {
 #ifndef audio_cmd_INTERNAL
 #define audio_cmd_INTERNAL private
 #endif

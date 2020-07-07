@@ -1,7 +1,7 @@
 #include "main_window.h"
 #include "gui/pattern_editor/pattern_editor_panel.h"
 #include "lib/lightweight.h"
-#include "audio_cmd.h"
+#include "cmd_queue.h"
 #include "util/release_assert.h"
 
 #include <fmt/core.h>
@@ -38,8 +38,8 @@ MainWindow::MainWindow(QWidget *parent) :
 {}
 
 using doc::BeatFraction;
-using audio_cmd::CommandQueue;
-using audio_cmd::AudioCommand;
+using cmd_queue::CommandQueue;
+using cmd_queue::AudioCommand;
 
 // module-private
 class MainWindowImpl : public MainWindow {
@@ -118,7 +118,7 @@ public:
         }
 
         void play_from(MainWindowImpl & win, PatternAndBeat time) {
-            _command_queue.push(audio_cmd::SeekTo{time});
+            _command_queue.push(cmd_queue::SeekTo{time});
             _audio_state = AudioState::Starting;
 
             // Move cursor to right spot, while waiting for audio thread to respond.
@@ -126,7 +126,7 @@ public:
         }
 
         void stop_play([[maybe_unused]] MainWindowImpl & win) {
-            _command_queue.push(audio_cmd::StopPlayback{});
+            _command_queue.push(cmd_queue::StopPlayback{});
             _audio_state = AudioState::Stopped;
         }
 

@@ -1,9 +1,9 @@
 #define audio_cmd_INTERNAL public
-#include "audio_cmd.h"
+#include "cmd_queue.h"
 
 #include "util/release_assert.h"
 
-namespace audio_cmd {
+namespace cmd_queue {
 
 // impl
 void init(CommandQueue & self) {
