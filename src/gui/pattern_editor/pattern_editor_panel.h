@@ -178,7 +178,7 @@ PatternEditorPanel_INTERNAL:
 
     doc::Document const & get_document() {
         // Change this method if we change how history works.
-        return *_history.get().gui_get_document();
+        return _history.get().get_document();
     }
 
     // QShortcut signals are bound to a lambda slot, which calls these methods.

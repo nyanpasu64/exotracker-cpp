@@ -14,13 +14,14 @@ using chip_kinds::ChipKind;
 OverallSynth::OverallSynth(
     uint32_t stereo_nchan,
     uint32_t smp_per_s,
-    doc::Document const & document,
+    doc::Document document_moved_from,
     AudioCommand * stub_command,
     AudioOptions audio_options
-) :
-    _stereo_nchan(stereo_nchan),
-    _clocks_per_sound_update(audio_options.clocks_per_sound_update),
-    _nes_blip(smp_per_s, CLOCKS_PER_S)
+)
+    : _stereo_nchan(stereo_nchan)
+    , _document(std::move(document_moved_from))
+    , _clocks_per_sound_update(audio_options.clocks_per_sound_update)
+    , _nes_blip(smp_per_s, CLOCKS_PER_S)
 {
     // Constructor runs on GUI thread. Fields later be read on audio thread.
     _maybe_seq_time.store(MaybeSequencerTime{}, std::memory_order_relaxed);
@@ -34,8 +35,8 @@ OverallSynth::OverallSynth(
     // this is a malformed document, so throw an exception.
     nes_2a03::BaseApu1Instance * apu1_maybe = nullptr;
 
-    for (ChipIndex chip_index = 0; chip_index < document.chips.size(); chip_index++) {
-        ChipKind chip_kind = document.chips[chip_index];
+    for (ChipIndex chip_index = 0; chip_index < _document.chips.size(); chip_index++) {
+        ChipKind chip_kind = _document.chips[chip_index];
 
         switch (chip_kind) {
             case ChipKind::Apu1: {
@@ -43,7 +44,7 @@ OverallSynth::OverallSynth(
                     chip_index,
                     _nes_blip,
                     CLOCKS_PER_S,
-                    doc::FrequenciesRef{document.frequency_table},
+                    doc::FrequenciesRef{_document.frequency_table},
                     _clocks_per_sound_update
                 );
                 apu1_maybe = apu1_unique.get();
@@ -63,7 +64,6 @@ OverallSynth::OverallSynth(
 }
 
 void OverallSynth::synthesize_overall(
-    doc::Document const & document,
     gsl::span<Amplitude> output_buffer,
     size_t const mono_smp_per_block
 ) {
@@ -114,7 +114,7 @@ void OverallSynth::synthesize_overall(
             _sequencer_running = true;
             for (auto & chip : _chip_instances) {
                 chip->stop_playback();
-                chip->seek(document, seek_to->time);
+                chip->seek(_document, seek_to->time);
             }
             seq_time = std::nullopt;
 
@@ -126,6 +126,11 @@ void OverallSynth::synthesize_overall(
                 chip->stop_playback();
             }
             seq_time = std::nullopt;
+        } else
+        if (auto edit_ptr = std::get_if<audio_cmd::EditBox>(msg)) {
+            // Edit synth's copy of the document.
+            auto & edit = **edit_ptr;
+            edit.apply_swap(_document);
         }
     }
 
@@ -193,9 +198,9 @@ void OverallSynth::synthesize_overall(
                     // chip's time passes.
                     /// Current tick (just occurred), not next tick.
                     if (_sequencer_running) {
-                        auto chip_time = chip.sequencer_tick(document);
+                        auto chip_time = chip.sequencer_tick(_document);
 
-                        chip.driver_tick(document);
+                        chip.driver_tick(_document);
 
                         // Ensure all chip sequencers are running in sync.
                         if (chip_index > 0) {
@@ -205,7 +210,7 @@ void OverallSynth::synthesize_overall(
 
                         seq_time = chip_time;
                     } else {
-                        chip.driver_tick(document);
+                        chip.driver_tick(_document);
                     }
                 }
 

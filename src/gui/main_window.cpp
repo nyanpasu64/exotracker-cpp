@@ -184,7 +184,10 @@ public:
         _audio_handle = {};
         _audio_component.reset();
         _audio_handle = AudioThreadHandle::make(
-            _rt, _curr_audio_device, _history, _audio_component.stub_command()
+            _rt,
+            _curr_audio_device,
+            _history.get_document().clone(),
+            _audio_component.stub_command()
         );
     }
 
@@ -300,7 +303,10 @@ public:
 
         // Begin playing audio. Destroying this variable makes audio stop.
         _audio_handle = AudioThreadHandle::make(
-            _rt, _curr_audio_device, _history, _audio_component.stub_command()
+            _rt,
+            _curr_audio_device,
+            _history.get_document().clone(),
+            _audio_component.stub_command()
         );
     }
 

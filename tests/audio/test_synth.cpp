@@ -107,12 +107,12 @@ std::vector<Amplitude> run_new_synth(
 
     // (int stereo_nchan, int smp_per_s, locked_doc::GetDocument &/*'a*/ document)
     audio::synth::OverallSynth synth{
-        1, smp_per_s, document, stub_command, audio_options
+        1, smp_per_s, document.clone(), stub_command, audio_options
     };
 
     std::vector<Amplitude> buffer;
     buffer.resize(nsamp);
-    synth.synthesize_overall(document, /*mut*/ buffer, buffer.size());
+    synth.synthesize_overall(/*mut*/ buffer, buffer.size());
 
     return buffer;
 };

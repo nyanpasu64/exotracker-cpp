@@ -41,6 +41,8 @@ public:
     uint32_t const _stereo_nchan;
 
 private:
+    doc::Document _document;
+
     /*
     TODO this should be configurable.
 
@@ -108,7 +110,7 @@ public:
     OverallSynth(
         uint32_t stereo_nchan,
         uint32_t smp_per_s,
-        doc::Document const & document,
+        doc::Document document,
         AudioCommand * stub_command,
         AudioOptions audio_options
     );
@@ -124,7 +126,6 @@ public:
     /// output must have length length of mono_smp_per_block * stereo_nchan.
     /// It is treated as an array of interleaved samples, [smp#, * nchan + chan#] Amplitude.
     void synthesize_overall(
-        doc::Document const & document,
         gsl::span<Amplitude> output_buffer,
         size_t const mono_smp_per_block
     );

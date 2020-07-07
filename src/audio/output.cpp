@@ -25,43 +25,26 @@ static unsigned int const STEREO_NCHAN = 2;
 /// The document (possibly address too) will change when the user edits the document.
 class OutputCallback : public synth::OverallSynth {
     // OverallSynth impl CallbackInterface
-private:
-    locked_doc::GetDocument &/*'a*/ _get_document;
-
 public:
     static std::unique_ptr<OutputCallback> make(
         uint32_t stereo_nchan,
         uint32_t smp_per_s,
-        locked_doc::GetDocument &/*'a*/ get_document,
+        doc::Document document,
         AudioCommand * stub_command,
         AudioOptions audio_options
     ) {
         // Outlives the return constructor call. Outlives all use of *doc_guard.
-        auto doc_guard = get_document.get_document();
         return std::make_unique<OutputCallback>(
             stereo_nchan,
             smp_per_s,
-            *doc_guard,
+            std::move(document),
             stub_command,
-            audio_options,
-            get_document
+            audio_options
         );
     }
 
-    OutputCallback(
-        uint32_t stereo_nchan,
-        uint32_t smp_per_s,
-        doc::Document const & document,
-        AudioCommand * stub_command,
-        AudioOptions audio_options,
-        locked_doc::GetDocument &/*'a*/ get_document
-    ) :
-        synth::OverallSynth(
-            stereo_nchan, smp_per_s, document, stub_command, audio_options
-        ),
-        _get_document(get_document)
-    {}
-
+    // OutputCallback() constructor
+    using synth::OverallSynth::OverallSynth;
 
     // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
     // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
@@ -95,8 +78,7 @@ public:
         auto right = output.subspan(mono_smp_per_block, mono_smp_per_block);
 
         {
-            auto doc_guard = self->_get_document.get_document();
-            synth.synthesize_overall(*doc_guard, left, mono_smp_per_block);
+            synth.synthesize_overall(left, mono_smp_per_block);
         }
         gsl::copy(left, right);
 
@@ -116,7 +98,7 @@ static constexpr unsigned int NUM_BLOCKS = 2;
 std::optional<AudioThreadHandle> AudioThreadHandle::make(
     RtAudio & rt,
     unsigned int device,
-    locked_doc::GetDocument & get_document,
+    doc::Document document,
     AudioCommand * stub_command
 ) {
     RtAudio::StreamParameters outParams;
@@ -134,7 +116,7 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
     };
 
     std::unique_ptr<OutputCallback> callback = OutputCallback::make(
-        outParams.nChannels, sample_rate, get_document, stub_command, audio_options
+        outParams.nChannels, sample_rate, std::move(document), stub_command, audio_options
     );
 
     // On OpenSUSE Tumbleweed, if you hold F12,

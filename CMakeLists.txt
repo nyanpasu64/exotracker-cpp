@@ -120,14 +120,12 @@ endif()
 # GUI editor, uses Qt
 add_executable(exotracker-bin
         # GUI/audio communication
-        src/util/sync.cpp
         src/audio/output.cpp
         src/audio_cmd.cpp
 
         # GUI
         src/sample_docs.cpp
         src/gui/history.cpp
-        src/gui/command_common.cpp
         src/gui/main_window.cpp
         src/gui/lib/painter_ext.cpp
         src/gui/lib/format.cpp

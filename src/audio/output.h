@@ -20,7 +20,6 @@
 #include "audio_common.h"
 #include "callback.h"
 #include "doc.h"
-#include "locked_doc.h"
 #include "audio_cmd.h"
 #include "timing_common.h"
 #include "util/copy_move.h"
@@ -74,7 +73,7 @@ public:
     static std::optional<AudioThreadHandle> make(
         RtAudio & rt,
         unsigned int device,
-        locked_doc::GetDocument & get_document,
+        doc::Document document,
         AudioCommand * stub_command
     );
 

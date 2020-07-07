@@ -1,9 +1,11 @@
 #pragma once
 
+#include "edit_common.h"
 #include "timing_common.h"
 #include "util/copy_move.h"
 
 #include <atomic>
+#include <memory>
 #include <variant>
 
 namespace audio_cmd {
@@ -29,15 +31,17 @@ struct SeekTo {
 
 struct StopPlayback {};
 
-using MessageBody = std::variant<SeekTo, StopPlayback>;
+using edit::EditBox;
+
+using MessageBody = std::variant<SeekTo, StopPlayback, EditBox>;
 
 /// Exposed to audio thread.
 struct AudioCommand {
     MessageBody msg;
     std::atomic<AudioCommand *> next;  // noncopyable, immovable
 
-    explicit AudioCommand(MessageBody body)
-        : msg{body}
+    explicit AudioCommand(MessageBody && body)
+        : msg{std::move(body)}
     {
         next.store(nullptr, std::memory_order_relaxed);
     }
