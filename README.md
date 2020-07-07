@@ -1,4 +1,4 @@
-# ExoTracker (or Exotracker or exotracker)
+# ExoTracker (or exotracker)
 
 exotracker is an in-development cross-platform tracker which targets the Famicom/NES with expansion audio chips, possibly with other consoles being added later.
 
@@ -24,7 +24,11 @@ See [src/DESIGN.md](src/DESIGN.md) for design notes.
 
 This program would not be possible without the assistance of:
 
-- [Ethan McCue](https://github.com/bowbahdoe) and [arximboldi](https://github.com/arximboldi) on immutable data structures
+- [Ethan McCue](https://github.com/bowbahdoe) and [arximboldi](https://github.com/arximboldi) on immutable data structures (no longer used)
 - Saga Musix and manx (OpenMPT developers) on low-latency audio development
 - plgDavid on audio development and NES emulation
-- ax6 for the idea of storing 2 copies of the document instead of immutable data structures
+- ax6 for the idea of double-buffering/copying multiple copies of the document instead of immutable data structures (double-buffering no longer used)
+- Discord servers: The PSG Cabal, The Fourth Modulator, and famitracker.org, for discussing tracker design
+- Discord servers: The Fourth Modulator and Rust Audio for discussing audio development
+- [bintracker (by irrlicht project)](https://bintracker.org/) for discussing tracker design
+- konakonaa for discussing tracker design and commenting on prototypes
