@@ -6,7 +6,7 @@
 #include "history.h"
 #include "doc.h"
 #include "timing_common.h"
-#include "audio.h"
+#include "audio/output.h"
 
 #include <verdigris/wobjectdefs.h>
 
