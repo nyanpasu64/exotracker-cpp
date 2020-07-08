@@ -142,7 +142,14 @@ public:
         _chan_index = chan_index;
     }
 
+    /// Recompute _now based on timestamp.
+    /// Recompute _next_event based on document and timestamp.
+    /// Doesn't matter if document was edited or not.
     void seek(doc::Document const & document, PatternAndBeat time);
+
+    /// Recompute _next_event based on _now and edited document.
+    /// Assumption: ticks_per_beat unchanged.
+    void doc_edited(doc::Document const & document);
 
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
     /// Return: SequencerTime is current tick (just occurred), not next tick.
@@ -166,6 +173,12 @@ public:
     void seek(doc::Document const & document, PatternAndBeat time) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             _channel_sequencers[chan].seek(document, time);
+        }
+    }
+
+    void doc_edited(doc::Document const & document) {
+        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
+            _channel_sequencers[chan].doc_edited(document);
         }
     }
 

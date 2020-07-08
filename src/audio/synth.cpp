@@ -102,6 +102,7 @@ void OverallSynth::synthesize_overall(
 
     // Handle all commands we haven't seen yet.
 
+    bool doc_edited = false;
     // Paired with CommandQueue::push() store(release).
     for (
         ; AudioCommand * next = cmd->next.load(std::memory_order_acquire); cmd = next
@@ -131,6 +132,13 @@ void OverallSynth::synthesize_overall(
             // Edit synth's copy of the document.
             auto & edit = **edit_ptr;
             edit.apply_swap(_document);
+            doc_edited = true;
+        }
+    }
+
+    if (doc_edited) {
+        for (auto & chip : _chip_instances) {
+            chip->doc_edited(_document);
         }
     }
 

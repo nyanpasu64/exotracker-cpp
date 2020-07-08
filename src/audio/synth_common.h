@@ -75,6 +75,8 @@ public:
     /// or notes may not necessarily stop.
     virtual void stop_playback() = 0;
 
+    virtual void doc_edited(doc::Document const & document) = 0;
+
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
     /// Sequencer's time passes.
     ///

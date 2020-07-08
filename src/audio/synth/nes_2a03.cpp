@@ -104,6 +104,10 @@ public:
         _driver.stop_playback(_register_writes);
     }
 
+    void doc_edited(const doc::Document & document) override {
+        _chip_sequencer.doc_edited(document);
+    }
+
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
     SequencerTime sequencer_tick(doc::Document const & document) override {
         auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);

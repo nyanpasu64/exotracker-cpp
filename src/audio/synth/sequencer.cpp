@@ -410,6 +410,130 @@ void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time)
     return;
 }
 
+
+void ChannelSequencer::doc_edited(doc::Document const & document) {
+    // Document-level operations, not bound to current sequence entry.
+    auto const nchip = document.chips.size();
+    release_assert(_chip_index < nchip);
+    auto const nchan = document.chip_index_to_nchan(_chip_index);
+    release_assert(_chan_index < nchan);
+
+    doc::SequencerOptions const options = document.sequencer_options;
+    TickT const ticks_per_beat = options.ticks_per_beat;
+
+    // Set next event to play.
+    if (
+        _next_event.prev_seq_entry.has_value() && !_pattern_offset.event_is_behind()
+    ) {
+        _next_event.seq_entry = *_next_event.prev_seq_entry;
+        _next_event.prev_seq_entry = {};
+        _pattern_offset.advance_now();
+    }
+
+    _next_event.event_idx = 0;
+
+    // Advance _next_event to the correct event_idx, in real time.
+    BeatPlusTick const now_pattern_len = [&] {
+        doc::SequenceEntry const & now_entry = document.sequence[_now.seq_entry];
+        return frac_to_tick(ticks_per_beat, now_entry.nbeats);
+    }();
+
+    TimedEventsRef events;
+    BeatPlusTick ev_pattern_len;
+
+    auto get_events = [
+        this, &document, nchip, nchan, ticks_per_beat,
+        // mutate these
+        &events, &ev_pattern_len
+    ]() {
+        doc::SequenceEntry const & current_entry =
+            document.sequence[_next_event.seq_entry];
+        auto & chip_channel_events = current_entry.chip_channel_events;
+
+        // [chip_index]
+        release_assert(chip_channel_events.size() == nchip);
+        auto & channel_events = chip_channel_events[_chip_index];
+
+        // [chip_index][chan_index]
+        release_assert(channel_events.size() == nchan);
+        events = channel_events[_chan_index];
+
+        ev_pattern_len = frac_to_tick(ticks_per_beat, current_entry.nbeats);
+    };
+
+    check_invariants(*this);
+    get_events();
+
+    // Skip events in past, queue first now/future event (in real time).
+    while (true) {
+        while (_next_event.event_idx >= events.size()) {
+            // Current pattern has no more events to play. Check the next pattern.
+
+            if (!_pattern_offset.advance_event()) {
+                // _next_event is already 1 pattern past real time.
+                // No unvisited events in previous, current, or next pattern. Quit.
+                goto end_loop;
+            }
+
+            advance_event_seq_entry(_next_event, document);
+            check_invariants(*this);
+            get_events();
+        }
+
+        doc::TimedRowEvent next_ev = events[_next_event.event_idx];
+
+        // Quantize event to (beat integer, tick offset), to match now.
+        // Note that *.beat is int, not BeatFraction!
+        BeatPlusTick now = _now.next_tick;
+        BeatPlusTick next_ev_time =
+            frac_to_tick(ticks_per_beat, next_ev.time.anchor_beat);
+        next_ev_time.dtick += next_ev.time.tick_offset;
+
+        // On the first loop iteration, we move _next_event backwards in time
+        // so _pattern_offset.event_is_ahead() cannot happen.
+        // On subsequent iterations, it can happen.
+        // All 3 cases are necessary.
+
+        if (_pattern_offset.event_is_ahead()) {
+            // If event is on next pattern,
+            // and _now is over 1 beat from reaching the next pattern,
+            // don't play the next pattern.
+            if (now.beat + 1 < now_pattern_len.beat) {
+                goto end_loop;
+            }
+
+            // Treat next pattern as starting at time 0.
+            now -= now_pattern_len;
+
+        } else if (_pattern_offset.event_is_behind()) {
+            // If event is on previous pattern, wait indefinitely.
+            // Treat previous pattern as ending at time 0.
+            next_ev_time -= ev_pattern_len;
+
+        } else {
+            // Event is on current pattern.
+            // If event is anchored over 1 beat ahead of now, don't play it.
+            if (now.beat + 1 < next_ev_time.beat) {
+                goto end_loop;
+            }
+        }
+
+        // Compare quantized times, check if event has occurred or not.
+        auto event_pos = event_vs_now(ticks_per_beat, now, next_ev_time);
+        if (event_pos == EventPos::Past) {
+            // Skip past events.
+            // _next_event.event_idx may be out of bounds.
+            // The next iteration of the outer loop will fix this.
+            _next_event.event_idx++;
+        } else {
+            // Queue present/future events for playback.
+            goto end_loop;
+        }
+    }
+    end_loop:
+    return;
+}
+
 #ifdef UNITTEST
 // I could use DOCTEST_CONFIG_DISABLE to disable tests outside of the testing target,
 // but I don't know how to #undef only in exotracker-tests
