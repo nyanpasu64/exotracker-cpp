@@ -156,7 +156,10 @@ struct PatternAppearance {
 static PatternAppearance visual;
 
 // # Shortcuts
-constexpr Qt::Key chord(int modifier, Qt::Key key) {
+// It's UB to cast (modifier | Qt::Key) to Qt::Key, because Qt::Key is unsized.
+using KeyInt = int;
+
+constexpr int chord(int modifier, KeyInt key) {
     return static_cast<Qt::Key>(modifier | int(key));
 }
 
@@ -164,25 +167,25 @@ struct ShortcutConfig {
     constexpr static Qt::Key up{Qt::Key_Up};
     constexpr static Qt::Key down{Qt::Key_Down};
 
-    Qt::Key prev_beat{chord(Qt::CTRL, Qt::Key_Up)};
-    Qt::Key next_beat{chord(Qt::CTRL, Qt::Key_Down)};
+    KeyInt prev_beat{chord(Qt::CTRL, Qt::Key_Up)};
+    KeyInt next_beat{chord(Qt::CTRL, Qt::Key_Down)};
 
-    Qt::Key prev_event{chord(Qt::CTRL | Qt::ALT, Qt::Key_Up)};
-    Qt::Key next_event{chord(Qt::CTRL | Qt::ALT, Qt::Key_Down)};
+    KeyInt prev_event{chord(Qt::CTRL | Qt::ALT, Qt::Key_Up)};
+    KeyInt next_event{chord(Qt::CTRL | Qt::ALT, Qt::Key_Down)};
 
-    Qt::Key scroll_prev{Qt::Key_PageUp};
-    Qt::Key scroll_next{Qt::Key_PageDown};
+    KeyInt scroll_prev{Qt::Key_PageUp};
+    KeyInt scroll_next{Qt::Key_PageDown};
 
-    Qt::Key prev_pattern{chord(Qt::CTRL, Qt::Key_PageUp)};
-    Qt::Key next_pattern{chord(Qt::CTRL, Qt::Key_PageDown)};
+    KeyInt prev_pattern{chord(Qt::CTRL, Qt::Key_PageUp)};
+    KeyInt next_pattern{chord(Qt::CTRL, Qt::Key_PageDown)};
 
     // TODO nudge_prev/next via alt+up/down
 
     constexpr static Qt::Key left{Qt::Key_Left};
     constexpr static Qt::Key right{Qt::Key_Right};
 
-    Qt::Key scroll_left{chord(Qt::ALT, Qt::Key_Left)};
-    Qt::Key scroll_right{chord(Qt::ALT, Qt::Key_Right)};
+    KeyInt scroll_left{chord(Qt::ALT, Qt::Key_Left)};
+    KeyInt scroll_right{chord(Qt::ALT, Qt::Key_Right)};
 };
 
 static ShortcutConfig shortcut_keys;
@@ -194,7 +197,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
         shortcut.setKey(key);
     };
 
-    auto init_pair = [&] (ShortcutPair & pair, Qt::Key key) {
+    auto init_pair = [&] (ShortcutPair & pair, KeyInt key) {
         auto shift_key = chord(Qt::SHIFT, key);
 
         init_shortcut(pair.key, key);
