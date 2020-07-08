@@ -1210,7 +1210,6 @@ static void draw_pattern_foreground(
                 : seq_entry.chip_channel_events[column.chip][column.channel]
             ) {
                 doc::TimeInPattern time = timed_event.time;
-                // TODO draw the event
                 doc::RowEvent row_event = timed_event.v;
 
                 // Compute where to draw row.
