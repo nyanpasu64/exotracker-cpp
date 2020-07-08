@@ -191,7 +191,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             // and _now is over 1 beat from reaching the next pattern,
             // don't play the next pattern.
             if (now.beat + 1 < now_pattern_len.beat) {
-                break;
+                goto end_loop;
             }
 
             // Treat next pattern as starting at time 0.
@@ -206,7 +206,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             // Event is on current pattern.
             // If event is anchored over 1 beat ahead of now, don't play it.
             if (now.beat + 1 < next_ev_time.beat) {
-                break;
+                goto end_loop;
             }
         }
 
@@ -232,7 +232,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             continue;
         }
 
-        break;
+        goto end_loop;
         // This reminds me of EventQueue.
         // But that doesn't support inserting overdue events in the past
         // (due to tracker user error).
@@ -323,12 +323,6 @@ void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time)
     // so replace _now.next_tick with time.beat,
     // and frac_to_tick(...next_ev.time.anchor_beat). with next_ev.time.anchor_beat.
 
-    auto distance = [ticks_per_beat](BeatPlusTick from, BeatPlusTick to) -> TickT {
-        return ticks_per_beat * (to.beat - from.beat) + to.dtick - from.dtick;
-    };
-
-    BeatFraction const now_pattern_len = document.sequence[_now.seq_entry].nbeats;
-
     TimedEventsRef events;
 
     auto get_events = [
@@ -352,7 +346,7 @@ void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time)
     check_invariants(*this);
     get_events();
 
-    // We want to look for the next event in the song, to check whether to play it.
+    // Skip events in past, queue first now/future event (only looking at anchor beat).
     while (true) {
         while (_next_event.event_idx >= events.size()) {
             // Current pattern has no more events to play. Check the next pattern.
