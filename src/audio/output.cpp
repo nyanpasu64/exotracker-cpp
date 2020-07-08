@@ -101,9 +101,11 @@ public:
 
 };
 
-
-static unsigned int const MONO_SMP_PER_BLOCK = 64;
-
+// Any lower latency, and I get audio dropouts on PulseAudio.
+// Not sure if it's because of PulseAudio, exotracker, non-real-time threads,
+// or Linux kernel.
+static constexpr unsigned int MONO_SMP_PER_BLOCK = 512;
+static constexpr unsigned int NUM_BLOCKS = 2;
 
 /// Why factory method and not constructor?
 /// So we can calculate values (like sampling rate) used in multiple places.
@@ -118,6 +120,7 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
     outParams.nChannels = STEREO_NCHAN;
 
     RtAudio::StreamOptions stream_opt;
+    stream_opt.numberOfBuffers = NUM_BLOCKS;
     stream_opt.flags = OutputCallback::rtaudio_flags;
 
     unsigned int sample_rate = 48000;
