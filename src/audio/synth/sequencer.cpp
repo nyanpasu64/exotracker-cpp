@@ -28,6 +28,12 @@ static TickT time_to_ticks(doc::TimeInPattern time, doc::SequencerOptions option
 
 using TimedEventsRef = gsl::span<doc::TimedRowEvent const>;
 
+enum class EventPos {
+    Past,
+    Now,
+    Future,
+};
+
 ChannelSequencer::ChannelSequencer() {
     /*
     On ticks without events, ChannelSequencer should return a 0-length vector.
@@ -97,6 +103,17 @@ static void check_invariants(ChannelSequencer const & self) {
     }
 };
 
+EventPos event_vs_now(TickT ticks_per_beat, BeatPlusTick now, BeatPlusTick ev) {
+    TickT ev_minus_now =
+        ticks_per_beat * (ev.beat - now.beat) + (ev.dtick - now.dtick);
+    if (ev_minus_now > 0) {
+        return EventPos::Future;
+    } else if (ev_minus_now < 0) {
+        return EventPos::Past;
+    } else {
+        return EventPos::Now;
+    }
+};
 
 std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     doc::Document const & document
@@ -119,10 +136,6 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         (uint16_t) ticks_per_beat,
         (int16_t) _now.next_tick.beat,
         (int16_t) _now.next_tick.dtick,
-    };
-
-    auto distance = [ticks_per_beat](BeatPlusTick from, BeatPlusTick to) -> TickT {
-        return ticks_per_beat * (to.beat - from.beat) + to.dtick - from.dtick;
     };
 
     BeatPlusTick const now_pattern_len = [&] {
@@ -211,8 +224,10 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         }
 
         // Compare quantized times, check if event has occurred or not.
-        TickT now_to_event = distance(now, next_ev_time);
-        if (now_to_event < 0) {
+        auto event_pos = event_vs_now(ticks_per_beat, now, next_ev_time);
+
+        // Past events are overdue and should never happen.
+        if (event_pos == EventPos::Past) {
             auto time = next_ev.time;
             fmt::print(
                 stderr,
@@ -223,7 +238,9 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
                 time.tick_offset
             );
         }
-        if (now_to_event <= 0) {
+
+        // Past and present events should be played.
+        if (event_pos != EventPos::Future) {
             _events_this_tick.push_back(next_ev.v);
 
             // _next_event.event_idx may be out of bounds.
@@ -232,6 +249,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             continue;
         }
 
+        // Future events can wait.
         goto end_loop;
         // This reminds me of EventQueue.
         // But that doesn't support inserting overdue events in the past
