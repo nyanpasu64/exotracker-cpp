@@ -8761,6 +8761,10 @@ void RtApiPulse::closeStream( void )
     free( stream_.userBuffer[1] );
     stream_.userBuffer[1] = 0;
   }
+  if ( stream_.deviceBuffer ) {
+    free( stream_.deviceBuffer );
+    stream_.deviceBuffer = nullptr;
+  }
 
   stream_.state = STREAM_CLOSED;
   stream_.mode = UNINITIALIZED;
