@@ -43,13 +43,7 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
         chip_channel_events.push_back([&]() {
             ChannelTo<EventList> channel_events;
 
-            EventList one_note = [&]() {
-                // .set_time(TimeInPattern, RowEvent)
-                doc::EventList events;
-                KV{events}.set_time({0, 0}, {pitch});
-                return events;
-            }();
-
+            EventList one_note {{{0, 0}, {pitch}}};
             EventList blank {};
 
             channel_events.push_back(
