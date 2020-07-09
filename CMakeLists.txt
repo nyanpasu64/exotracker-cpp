@@ -156,6 +156,7 @@ add_executable(exotracker-tests
 
         src/doc.cpp
         src/cmd_queue.cpp
+        src/sample_docs.cpp
         src/audio/synth/envelope.cpp
         src/audio/synth/sequencer.cpp
         src/audio/synth/nes_2a03_driver.cpp
