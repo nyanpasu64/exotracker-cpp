@@ -23,11 +23,11 @@ using timing::SequencerTime;
 namespace {
 
 // APU1 single pulse wave playing at volume F produces values 0 and 1223.
-const int APU1_RANGE = 3000;
-const int APU2_RANGE = 100;
+constexpr int APU1_RANGE = 3000;
+//constexpr int APU2_RANGE = 100;
 
-const double APU1_VOLUME = 0.5;
-const double APU2_VOLUME = 0.0;
+constexpr double APU1_VOLUME = 0.5;
+//constexpr double APU2_VOLUME = 0.0;
 
 // unnamed namespace
 }

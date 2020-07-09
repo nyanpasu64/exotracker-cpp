@@ -70,8 +70,6 @@ namespace columns {
     constexpr int EXTRA_WIDTH_DIVISOR = 3;
 
     // TODO switch to 3-digit ruler/space in decimal mode?
-    constexpr int RULER_DIGITS = 2;
-
     // If I label fractional beats, this needs to increase to 3 or more.
     constexpr int RULER_WIDTH_CHARS = 2;
 }

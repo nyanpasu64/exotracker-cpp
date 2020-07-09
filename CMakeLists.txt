@@ -50,7 +50,7 @@ set(options-3rdparty $<$<CXX_COMPILER_ID:MSVC>:/W3>)
 set(
     options
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-        -Wall -Wextra -Wconversion -Wno-unused -Wno-unused-parameter
+        -Wall -Wextra -Wconversion -Wno-unused-function -Wno-unused-parameter
         -Werror=return-type
     >
     $<$<CXX_COMPILER_ID:MSVC>:
