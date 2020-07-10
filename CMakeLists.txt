@@ -125,6 +125,7 @@ add_executable(exotracker-bin
 
         # GUI
         src/sample_docs.cpp
+        src/edit/pattern.cpp
         src/doc/kv.cpp
         src/gui/history.cpp
         src/gui/main_window.cpp

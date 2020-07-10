@@ -117,6 +117,14 @@ public:
             }
         }
 
+        void send_edit(MainWindowImpl & win, edit::EditBox command) {
+            if (win._audio_handle.has_value()) {
+                gc_command_queue(win._audio_handle.value());
+                _command_queue.push(std::move(command));
+            }
+        }
+
+    private:
         void play_from(MainWindowImpl & win, PatternAndBeat time) {
             _command_queue.push(cmd_queue::SeekTo{time});
             _audio_state = AudioState::Starting;
@@ -130,6 +138,7 @@ public:
             _audio_state = AudioState::Stopped;
         }
 
+    public:
         void gc_command_queue(AudioThreadHandle & audio_handle) {
             // Every time GUI pushes an event, it moves _command_queue.end().
             // Once the audio thread is done processing events,
@@ -169,12 +178,16 @@ public:
     // impl MainWindow
     void _() override {}
 
-    std::optional<AudioThreadHandle> const & audio_handle() override {
+    std::optional<AudioThreadHandle> const & audio_handle() const override {
         return _audio_handle;
     }
 
     AudioState audio_state() const override {
         return _audio_component.audio_state();
+    }
+
+    void push_edit(edit::EditBox command) override {
+        _audio_component.send_edit(*this, _history.push(std::move(command)));
     }
 
     void restart_audio_thread() override {

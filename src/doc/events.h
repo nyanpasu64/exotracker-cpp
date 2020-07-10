@@ -58,9 +58,8 @@ struct RowEvent {
     std::optional<InstrumentIndex> instr = {};
     // TODO volumes and []effects
 
-    // We really should compare instr too, but that will increase compile times.
-    // And the equality check is unused outside of unit tests.
-    EQUALABLE_SIMPLE(RowEvent, note)
+    // This compiles slowly, but whatever.
+    EQUALABLE(RowEvent, (note, instr))
 };
 
 // end namespace

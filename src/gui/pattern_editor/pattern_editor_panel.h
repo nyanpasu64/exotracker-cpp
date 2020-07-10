@@ -81,6 +81,8 @@ struct ShortcutPair {
 //    X(prev_channel) SEP
 //    X(next_channel)
 
+#define SHORTCUTS(X, SEP) \
+    X(delete_key)
 
 struct PatternEditorShortcuts {
     // [0] is just the keystroke, [1] is with Shift pressed.
@@ -89,11 +91,20 @@ struct PatternEditorShortcuts {
     SHORTCUT_PAIRS(X, )
     #undef X
 
+    #define X(KEY)  QShortcut KEY;
+    SHORTCUTS(X, )
+    #undef X
+
     PatternEditorShortcuts(QWidget * widget) :
         #define COMMA ,
+
         #define X(PAIR) \
             PAIR{QShortcut{widget}, QShortcut{widget}}
         SHORTCUT_PAIRS(X, COMMA)
+        #undef X
+
+        #define X(KEY)  ,KEY{widget}
+        SHORTCUTS(X, )
         #undef X
     {}
 };
@@ -186,6 +197,7 @@ PatternEditorPanel_INTERNAL:
     #define X(KEY) \
         void KEY##_pressed();
     SHORTCUT_PAIRS(X, )
+    SHORTCUTS(X, )
     #undef X
 };
 

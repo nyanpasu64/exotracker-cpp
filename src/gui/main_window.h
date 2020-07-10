@@ -5,6 +5,7 @@
 // Other widgets include main_window.h, since they rely on MainWindow for data/signals.
 #include "history.h"
 #include "doc.h"
+#include "edit_common.h"
 #include "timing_common.h"
 #include "audio/output.h"
 
@@ -69,9 +70,11 @@ public:
     virtual void _() = 0;
     virtual ~MainWindow();
 
-    virtual std::optional<AudioThreadHandle> const & audio_handle() = 0;
+    virtual std::optional<AudioThreadHandle> const & audio_handle() const = 0;
 
     virtual AudioState audio_state() const = 0;
+
+    virtual void push_edit(edit::EditBox command) = 0;
 
 signals:
     void gui_refresh(MaybeSequencerTime maybe_seq_time)

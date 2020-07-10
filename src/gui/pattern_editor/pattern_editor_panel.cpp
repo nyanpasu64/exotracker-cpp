@@ -7,6 +7,7 @@
 #include "gui/main_window.h"
 #include "gui_common.h"
 #include "chip_kinds.h"
+#include "edit/pattern.h"
 #include "util/compare.h"
 #include "util/math.h"
 #include "util/reverse.h"
@@ -184,6 +185,8 @@ struct ShortcutConfig {
 
     KeyInt scroll_left{chord(Qt::ALT, Qt::Key_Left)};
     KeyInt scroll_right{chord(Qt::ALT, Qt::Key_Right)};
+
+    constexpr static Qt::Key delete_key{Qt::Key_Delete};
 };
 
 static ShortcutConfig shortcut_keys;
@@ -205,6 +208,10 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     #define X(KEY) \
         init_pair(self._shortcuts.KEY, shortcut_keys.KEY);
     SHORTCUT_PAIRS(X, )
+    #undef X
+
+    #define X(KEY)  init_shortcut(self._shortcuts.KEY, shortcut_keys.KEY);
+    SHORTCUTS(X, )
     #undef X
 
     // Keystroke handlers have no arguments and don't know if Shift is held or not.
@@ -246,6 +253,22 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     #define X(KEY) \
         connect_shortcut_pair(self._shortcuts.KEY, &PatternEditorPanel::KEY##_pressed);
     SHORTCUT_PAIRS(X, )
+    #undef X
+
+    auto connect_shortcut = [&] (QShortcut & shortcut, Method method) {
+        QObject::connect(
+            &shortcut,
+            &QShortcut::activated,
+            &self,
+            [&self, method] () {
+                on_key_pressed(self, method, false);
+            }
+        );
+    };
+
+    #define X(KEY) \
+        connect_shortcut(self._shortcuts.KEY, &PatternEditorPanel::KEY##_pressed);
+    SHORTCUTS(X, )
     #undef X
 }
 
@@ -372,31 +395,8 @@ struct ChannelDraw {
     int xright;
 };
 
-namespace subcolumns {
-    struct Note {
-        COMPARABLE(Note, ())
-    };
-    struct Instrument {
-        COMPARABLE(Instrument, ())
-    };
-    struct Volume {
-        COMPARABLE(Volume, ())
-    };
-    struct EffectName {
-        uint8_t effect_col;
-        COMPARABLE(EffectName, (effect_col))
-    };
-    struct EffectValue {
-        uint8_t effect_col;
-        COMPARABLE(EffectValue, (effect_col))
-    };
-
-    using SubColumn = std::variant<
-        Note, Instrument, Volume, EffectName, EffectValue
-    >;
-}
-
-using subcolumns::SubColumn;
+namespace subcolumns = edit::pattern::subcolumns;
+using edit::pattern::SubColumn;
 
 // # Visual layout.
 
@@ -1774,6 +1774,20 @@ void PatternEditorPanel::scroll_right_pressed() {
     wrap_cursor(cols, cursor_x);
     cursor_x.subcolumn =
         std::min(cursor_x.subcolumn, nsubcol(cols, cursor_x.column) - 1);
+}
+
+// Begin document mutation
+namespace ed = edit::pattern;
+
+void PatternEditorPanel::delete_key_pressed() {
+    doc::Document const & document = get_document();
+    ColumnList cols = gen_column_list(*this, document);
+
+    Column x = cols[_win._cursor_x.column];
+    SubColumn subcolumn = x.subcolumns[ _win._cursor_x.subcolumn];
+    _win.push_edit(
+        ed::delete_cell(document, x.chip, x.channel, subcolumn, _win._cursor_y)
+    );
 }
 
 // namespace
