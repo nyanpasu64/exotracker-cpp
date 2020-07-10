@@ -207,42 +207,44 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     SHORTCUT_PAIRS(X, )
     #undef X
 
+    // Keystroke handlers have no arguments and don't know if Shift is held or not.
     using Method = void (PatternEditorPanel::*)();
 
-    auto on_key_pressed = [] (
-        PatternEditorPanel & self, Method method, bool shift_held
+    // This code is confusing. Hopefully I can fix it.
+    static auto const on_key_pressed = [] (
+        PatternEditorPanel & self, Method method, bool clear_selection
     ) {
         // TODO encapsulate cursor, allow moving with mouse, show selection, etc.
         std::invoke(method, self);
-        if (shift_held) {
+        if (clear_selection) {
             self._win._select_begin_x = self._win._cursor_x;
             self._win._select_begin_y = self._win._cursor_y;
         }
         self.repaint();
     };
 
-    auto connect_shortcut = [&] (ShortcutPair & pair, Method method) {
+    auto connect_shortcut_pair = [&] (ShortcutPair & pair, Method method) {
         QObject::connect(
             &pair.key,
             &QShortcut::activated,
             &self,
-            [&self, method, on_key_pressed] () {
-                on_key_pressed(self, method, false);
+            [&self, method] () {
+                on_key_pressed(self, method, true);
             }
         );
         QObject::connect(
             &pair.shift_key,
             &QShortcut::activated,
             &self,
-            [&self, method, on_key_pressed] () {
-                on_key_pressed(self, method, true);
+            [&self, method] () {
+                on_key_pressed(self, method, false);
             }
         );
     };
 
     // Copy, don't borrow, local lambdas.
     #define X(KEY) \
-        connect_shortcut(self._shortcuts.KEY, &PatternEditorPanel::KEY##_pressed);
+        connect_shortcut_pair(self._shortcuts.KEY, &PatternEditorPanel::KEY##_pressed);
     SHORTCUT_PAIRS(X, )
     #undef X
 }
