@@ -11,24 +11,24 @@
     } \
 
 #define ZZ_COMPARE_INTERNAL(method, T) \
-    [[nodiscard]] constexpr bool operator<(const T& other) const { \
+    [[nodiscard]] constexpr bool operator<(T const& other) const { \
         return this->method() < other.method(); \
     } \
-    [[nodiscard]] constexpr bool operator>(const T& other) const { \
+    [[nodiscard]] constexpr bool operator>(T const& other) const { \
         return this->method() > other.method(); \
     } \
-    [[nodiscard]] constexpr bool operator>=(const T& other) const { \
+    [[nodiscard]] constexpr bool operator>=(T const& other) const { \
         return this->method() >= other.method(); \
     } \
-    [[nodiscard]] constexpr bool operator<=(const T& other) const { \
+    [[nodiscard]] constexpr bool operator<=(T const& other) const { \
         return this->method() <= other.method(); \
     } \
 
 #define ZZ_EQUAL_INTERNAL(method, T) \
-    [[nodiscard]] constexpr bool operator==(const T& other) const { \
+    [[nodiscard]] constexpr bool operator==(T const& other) const { \
         return this->method() == other.method(); \
     } \
-    [[nodiscard]] constexpr bool operator!=(const T& other) const { \
+    [[nodiscard]] constexpr bool operator!=(T const& other) const { \
         return this->method() != other.method(); \
     } \
 
@@ -47,10 +47,10 @@
 
 /// Compiles faster than EQUALABLE.
 #define EQUALABLE_SIMPLE(T, FIELD) \
-    [[nodiscard]] constexpr bool operator==(const T& other) const { \
+    [[nodiscard]] constexpr bool operator==(T const& other) const { \
         return this->FIELD == other.FIELD; \
     } \
-    [[nodiscard]] constexpr bool operator!=(const T& other) const { \
+    [[nodiscard]] constexpr bool operator!=(T const& other) const { \
         return this->FIELD != other.FIELD; \
     } \
 
