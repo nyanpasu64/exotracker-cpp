@@ -1,13 +1,15 @@
 #include "doc.h"
 #include "edit_util/kv.h"
 
+#include <fmt/core.h>
+
 #include <map>
 #include <type_traits>
 
 #include "doctest.h"
 
-namespace doc {
-static std::ostream& operator<< (std::ostream& os, const RowEvent& value) {
+namespace doc::events {
+static std::ostream& operator<< (std::ostream& os, RowEvent const & value) {
     os << "RowEvent{";
     if (value.note.has_value()) {
         Note note = *value.note;
@@ -24,6 +26,18 @@ static std::ostream& operator<< (std::ostream& os, const RowEvent& value) {
         os << "{}";
     }
     os << "}";
+    return os;
+}
+}
+
+namespace doc::timed_events {
+static std::ostream& operator<< (std::ostream& os, TimeInPattern const & value) {
+    os << fmt::format(
+        "TimeInPattern{{{}/{} + {}}}",
+        value.anchor_beat.numerator(),
+        value.anchor_beat.denominator(),
+        value.tick_offset
+    );
     return os;
 }
 }
