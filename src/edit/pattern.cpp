@@ -1,5 +1,5 @@
 #include "pattern.h"
-#include "doc/kv.h"
+#include "edit_util/kv.h"
 
 #include <algorithm>  // std::swap
 #include <memory>  // make_unique. <memory> is already included for EditBox though.
@@ -76,7 +76,7 @@ EditBox delete_cell(
 
     // Erase certain event fields, based on where the cursor was positioned.
     {
-        doc::kv::KV kv{events};
+        edit_util::kv::KV kv{events};
 
         auto ev_begin = kv.beat_begin(time.beat);
         auto ev_end = kv.beat_end(time.beat);

@@ -126,7 +126,7 @@ add_executable(exotracker-bin
         # GUI
         src/sample_docs.cpp
         src/edit/pattern.cpp
-        src/doc/kv.cpp
+        src/edit_util/kv.cpp
         src/gui/history.cpp
         src/gui/main_window.cpp
         src/gui/lib/painter_ext.cpp
@@ -158,7 +158,7 @@ add_executable(exotracker-tests
         tests/test_utils/test_parameterize.cpp
 
         src/doc.cpp  # for #ifdef UNITTEST
-        src/doc/kv.cpp
+        src/edit_util/kv.cpp
         src/cmd_queue.cpp
         src/sample_docs.cpp
         src/audio/synth/envelope.cpp

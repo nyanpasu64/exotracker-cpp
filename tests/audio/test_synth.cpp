@@ -1,7 +1,7 @@
 #include "audio/synth.h"
 #include "audio/synth/nes_2a03_driver.h"
 #include "doc.h"
-#include "doc/kv.h"
+#include "edit_util/kv.h"
 #include "chip_kinds.h"
 #include "cmd_queue.h"
 #include "timing_common.h"
@@ -29,7 +29,7 @@ enum class TestChannelID {
 
 static doc::Document one_note_document(TestChannelID which_channel, doc::Note pitch) {
     using namespace doc;
-    using doc::kv::KV;
+    using edit_util::kv::KV;
 
     ChipList chips;
     ChipChannelTo<EventList> chip_channel_events;
