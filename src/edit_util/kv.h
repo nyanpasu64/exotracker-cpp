@@ -27,11 +27,15 @@ public:
     ConstIterator greater(TimeInPattern t) const;
     Iterator greater(TimeInPattern t);
 
-    ConstIterator beat_begin(BeatFraction t) const;
-    Iterator beat_begin(BeatFraction t);
+    ConstIterator beat_begin(BeatFraction beat) const;
+    Iterator beat_begin(BeatFraction beat);
 
-    ConstIterator beat_end(BeatFraction t) const;
-    Iterator beat_end(BeatFraction t);
+    ConstIterator beat_end(BeatFraction beat) const;
+    Iterator beat_end(BeatFraction beat);
+
+    /// Returns reference to last event anchored to this beat fraction.
+    /// Inserts new event if none exist at this time.
+    TimedRowEvent & get_or_insert(BeatFraction beat);
 };
 
 }

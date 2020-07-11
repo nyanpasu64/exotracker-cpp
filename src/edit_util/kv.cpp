@@ -47,4 +47,19 @@ IMPL(greater, std::upper_bound, TimeInPattern, time_and_offset)
 IMPL(beat_begin, std::lower_bound, BeatFraction, time)
 IMPL(beat_end, std::upper_bound, BeatFraction, time)
 
+TimedRowEvent & KV::get_or_insert(BeatFraction beat) {
+    // Last event anchored to this beat fraction.
+    EventList::reverse_iterator it{beat_end(beat)};
+
+    if (it != _event_list.rend() && it->time.anchor_beat == beat) {
+        return *it;
+    } else {
+        TimedRowEvent ev {
+            .time = TimeInPattern{beat, 0},
+            .v = RowEvent{},
+        };
+        return *_event_list.insert(it.base(), std::move(ev));
+    }
+}
+
 }
