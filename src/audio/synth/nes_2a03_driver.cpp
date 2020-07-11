@@ -41,6 +41,8 @@ TuningOwned make_tuning_table(
     ClockT const clocks_per_second  // clock/s
 ) {
     TuningOwned out;
+    out.resize(doc::CHROMATIC_COUNT);
+
     for (size_t i = 0; i < doc::CHROMATIC_COUNT; i++) {
         out[i] = register_quantize(frequencies[i], clocks_per_second);
     }
@@ -179,6 +181,7 @@ TEST_CASE("Ensure make_tuning_table() produces only valid register values.") {
     CHECK(register_quantize(440, 1789773) == 0x0FD);
 
     FrequenciesOwned freq;
+    freq.resize(doc::CHROMATIC_COUNT);
     std::fill(freq.begin(), freq.end(), 1);
     freq[1] = 1'000;
     freq[2] = 1'000'000;

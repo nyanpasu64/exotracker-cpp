@@ -135,10 +135,13 @@ static Document dream_fragments() {
         };
     }();
 
+    Instruments instruments;
+    instruments[0] = instrument;
+
     return DocumentCopy {
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
-        .instruments = {instrument},
+        .instruments = std::move(instruments),
         .chips = chips,
         .sequence = sequence,
     };

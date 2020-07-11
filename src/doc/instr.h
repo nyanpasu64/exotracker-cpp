@@ -1,13 +1,13 @@
 #pragma once
 
-#include <array>
+#include "util/copy_move.h"
+
 #include <cstdint>
 #include <optional>
 #include <vector>
 
 /// Instrument format.
 namespace doc::instr {
-
 
 template<class IntT_>
 struct Envelope {
@@ -36,6 +36,22 @@ struct Instrument {
 };
 
 constexpr size_t MAX_INSTRUMENTS = 128;
-using Instruments = std::array<std::optional<Instrument>, MAX_INSTRUMENTS>;
+struct Instruments {
+    std::vector<std::optional<Instrument>> v;
+
+    Instruments() {
+        v.resize(MAX_INSTRUMENTS);
+    }
+
+    DEFAULT_COPY(Instruments)
+    DEFAULT_MOVE(Instruments)
+
+    std::optional<Instrument> const & operator[](size_t idx) const {
+        return v[idx];
+    }
+    std::optional<Instrument> & operator[](size_t idx) {
+        return v[idx];
+    }
+};
 
 }

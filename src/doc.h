@@ -34,7 +34,7 @@ inline namespace tuning {
     using RegisterInt = int;
 
     template<typename T>
-    using Owned_ = std::array<T, CHROMATIC_COUNT>;
+    using Owned_ = std::vector<T>;
 
     template<typename T>
     using Ref_ = gsl::span<T const, CHROMATIC_COUNT>;

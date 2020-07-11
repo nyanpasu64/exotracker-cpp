@@ -125,16 +125,19 @@ TEST_PUBLIC:
     ClockT const _clocks_per_sec;
     TuningOwned _tuning_table;
 
-    Apu1PulseDriver _pulse1_driver{0, TuningRef{_tuning_table}};
-    Apu1PulseDriver _pulse2_driver{1, TuningRef{_tuning_table}};
+    Apu1PulseDriver _pulse1_driver;
+    Apu1PulseDriver _pulse2_driver;
 
 public:
 
-    Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies) :
-        _clocks_per_sec(clocks_per_sec)
-    {
-        recompute_tuning(frequencies);
-    }
+    // TODO Apu1PulseDriver doesn't hold reference to _tuning_table,
+    // but is passed one on each tick.
+    Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
+        : _clocks_per_sec(clocks_per_sec)
+        , _tuning_table(make_tuning_table(frequencies, clocks_per_sec))
+        , _pulse1_driver{0, TuningRef{_tuning_table}}
+        , _pulse2_driver{1, TuningRef{_tuning_table}}
+    {}
 
     void recompute_tuning(FrequenciesRef frequencies) {
         _tuning_table = make_tuning_table(frequencies, _clocks_per_sec);

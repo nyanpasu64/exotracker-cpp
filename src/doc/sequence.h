@@ -52,7 +52,7 @@ using MaybeSeqEntryIndex = std::optional<SeqEntryIndex>;
 
 // SequencerTime::seq_entry_index is 16 bits, but all-1 is reserved.
 // The actual driver will probably be restricted to 255-256 sequence entries.
-constexpr SeqEntryIndex MAX_SEQUENCE_LEN = 0x7fff;
+constexpr SeqEntryIndex MAX_SEQUENCE_LEN = 256;
 
 /// [SequenceIndex] SequenceEntry
 using Sequence = DenseMap<SeqEntryIndex, SequenceEntry>;
