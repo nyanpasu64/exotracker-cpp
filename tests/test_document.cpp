@@ -1,5 +1,6 @@
 #include "doc.h"
 #include "edit_util/kv.h"
+#include "edit_util/shorthand.h"
 
 #include <fmt/core.h>
 
@@ -68,17 +69,73 @@ TEST_CASE("Test that TimeInPattern comparisons work properly.") {
 TEST_CASE ("Test that EventList and KV search is implemented properly.") {
     using namespace doc;
     using edit_util::kv::KV;
+    using namespace edit_util::shorthand;
 
     doc::EventList events;
-    events.push_back({{0, 0}, {}});
-    events.push_back({{0, 1}, {1}});
-    events.push_back({{{1, 3}, 0}, {3}});
-    events.push_back({{{2, 3}, 0}, {6}});
-    events.push_back({{1, 0}, {10}});
-    events.push_back({{2, 0}, {20}});
+    events.push_back({at(0), {}});
+    events.push_back({at_delay(0, 1), {1}});
+    events.push_back({at({1, 3}), {3}});
+    events.push_back({at({2, 3}), {6}});
+    events.push_back({at(1), {10}});
+    events.push_back({at(2), {20}});
 
-    CHECK(KV{events}.greater_equal({-1, 0})->time == TimeInPattern{0, 0});
-    CHECK(KV{events}.greater_equal({0, 0})->time == TimeInPattern{0, 0});
-    CHECK(KV{events}.greater_equal({{1, 2}, 0})->time == TimeInPattern{{2, 3}, 0});
-    CHECK(KV{events}.greater_equal({10, 0}) == events.end());
+    using Rev = doc::EventList::reverse_iterator;
+
+    KV kv{events};
+
+    SUBCASE("Check (beat, tick) search.") {
+        // Ensure "no element found" works, and >= and > match.
+        CHECK(kv.greater_equal(at(-1))->time == at(0));
+        CHECK(kv.greater(at(-1))->time == at(0));
+
+        CHECK(kv.greater_equal(at({1, 2}))->time == at({2, 3}));
+        CHECK(kv.greater(at({1, 2}))->time == at({2, 3}));
+
+        // Ensure that in "element found", >= and > enclose one element.
+        CHECK(kv.greater_equal(at(0))->time == at(0));
+        CHECK(Rev{kv.greater(at(0))}->time == at(0));
+        CHECK(kv.greater(at(0))->time == at_delay(0, 1));
+
+        CHECK(kv.greater_equal(at(1))->time == at(1));
+        CHECK(Rev{kv.greater(at(1))}->time == at(1));
+        CHECK(kv.greater(at(1))->time == at(2));
+
+        // Test "past the end" search.
+        CHECK(kv.greater_equal(at(10)) == events.end());
+        CHECK(kv.greater(at(10)) == events.end());
+    }
+
+    SUBCASE("Check (beat) search.") {
+        // Ensure "no element found" works, and >= and > match.
+        CHECK(kv.beat_begin(-1)->time == at(0));
+        CHECK(kv.beat_end(-1)->time == at(0));
+
+        // Ensure that in "elements found" mode,
+        // >= and > enclose all elements anchored to the beat.
+        CHECK(kv.beat_begin(0)->time == at(0));
+        CHECK(Rev{kv.beat_end(0)}->time == at_delay(0, 1));
+        CHECK(kv.beat_end(0)->time == at({1, 3}));
+
+        // Test "past the end" search.
+        CHECK(kv.beat_begin(10) == events.end());
+        CHECK(kv.beat_end(10) == events.end());
+    }
+
+    SUBCASE("Test get_or_insert().") {
+        auto n = events.size();
+
+        // If one event is anchored here, make sure the right event is picked.
+        CHECK(kv.get_or_insert(1).time == at(1));
+        CHECK(events.size() == n);
+
+        // If multiple events are anchored here, make sure the last one is picked.
+        CHECK(kv.get_or_insert(0).time == at_delay(0, 1));
+        CHECK(events.size() == n);
+
+        // Test inserting events at times not already present.
+        auto & added = kv.get_or_insert(-1);
+        CHECK(added.time == at(-1));
+        CHECK(events.size() == n + 1);
+        CHECK(&added == &events[0]);
+    }
 }
