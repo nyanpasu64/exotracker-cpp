@@ -10,6 +10,7 @@
 #ifdef UNITTEST
     #include "chip_kinds.h"
     #include "sample_docs.h"
+    #include "edit_util/shorthand.h"
     #include "test_utils/parameterize.h"
 
     #include <fmt/core.h>
@@ -575,15 +576,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
 
 using namespace doc;
 using chip_kinds::ChipKind;
-
-
-static TimeInPattern at(BeatFraction anchor_beat) {
-    return TimeInPattern{anchor_beat, 0};
-}
-
-static TimeInPattern at_delay(BeatFraction anchor_beat, TickT tick_offset) {
-    return TimeInPattern{anchor_beat, tick_offset};
-}
+using namespace edit_util::shorthand;
 
 static Document simple_doc() {
     SequencerOptions sequencer_options{

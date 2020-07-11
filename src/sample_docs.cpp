@@ -2,6 +2,7 @@
 
 #include "doc.h"
 #include "chip_kinds.h"
+#include "edit_util/shorthand.h"
 #include "util/release_assert.h"
 
 #include <cmath>
@@ -9,26 +10,7 @@
 namespace sample_docs {
 
 using namespace doc;
-
-namespace {
-
-static TimeInPattern at(BeatFraction anchor_beat) {
-    return TimeInPattern{anchor_beat, 0};
-}
-
-static TimeInPattern at(int start, int num, int den) {
-    return TimeInPattern{start + BeatFraction(num, den), 0};
-}
-
-static TimeInPattern at_delay(int start, int num, int den, TickT tick_offset) {
-    return TimeInPattern{start + BeatFraction(num, den), tick_offset};
-}
-
-static Note pitch(int octave, int semitone) {
-    return Note{static_cast<ChromaticInt>(12 * octave + semitone)};
-}
-
-}
+using namespace edit_util::shorthand;
 
 /// Excerpt from "Chrono Cross - Dream Fragments".
 /// This tests the ability to nudge notes both early and later,
