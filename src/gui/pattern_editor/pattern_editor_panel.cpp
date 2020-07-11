@@ -187,6 +187,7 @@ struct ShortcutConfig {
     KeyInt scroll_right{chord(Qt::ALT, Qt::Key_Right)};
 
     constexpr static Qt::Key delete_key{Qt::Key_Delete};
+    constexpr static Qt::Key dummy_note{Qt::Key_Z};
 };
 
 static ShortcutConfig shortcut_keys;
@@ -1790,5 +1791,18 @@ void PatternEditorPanel::delete_key_pressed() {
     );
 }
 
+void PatternEditorPanel::dummy_note_pressed() {
+    doc::Document const & document = get_document();
+    ColumnList cols = gen_column_list(*this, document);
+
+    Column x = cols[_win._cursor_x.column];
+
+    // TODO add octave state and keyboard layout.
+    doc::Note note{60};
+
+    _win.push_edit(
+        ed::insert_note(document, x.chip, x.channel, _win._cursor_y, note)
+    );
+}
 // namespace
 }

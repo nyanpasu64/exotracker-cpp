@@ -113,6 +113,30 @@ EditBox delete_cell(
     });
 }
 
+EditBox insert_note(
+    Document const & document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    PatternAndBeat time,
+    doc::Note note
+) {
+    // We don't need to check if the user is inserting "no note",
+    // because it has type optional<Note> and value nullopt.
+
+    // Copy event list.
+    doc::EventList events =
+        document.sequence[time.seq_entry_index].chip_channel_events[chip][channel];
+
+    // Insert note.
+    edit_util::kv::KV kv{events};
+    auto & ev = kv.get_or_insert(time.beat);
+    ev.v.note = note;
+
+    return make_command(PatternEdit{
+        time.seq_entry_index, chip, channel, std::move(events)
+    });
+}
+
 // TODO write test to ensure subcolumn/selection deletion clears empty events.
 
 }

@@ -82,7 +82,8 @@ struct ShortcutPair {
 //    X(next_channel)
 
 #define SHORTCUTS(X, SEP) \
-    X(delete_key)
+    X(delete_key) SEP \
+    X(dummy_note)
 
 struct PatternEditorShortcuts {
     // [0] is just the keystroke, [1] is with Shift pressed.

@@ -52,4 +52,13 @@ EditBox delete_cell(
     PatternAndBeat time
 );
 
+/// Insert note at current beat fraction, reusing last existing event if it exists.
+EditBox insert_note(
+    Document const & document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    PatternAndBeat time,
+    doc::Note note
+);
+
 }
