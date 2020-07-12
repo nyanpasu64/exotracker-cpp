@@ -1,5 +1,6 @@
 #include "gui/main_window.h"
 #include "gui/history.h"
+#include "gui_common.h"
 #include "sample_docs.h"
 
 #include <CLI/CLI.hpp>
@@ -44,7 +45,7 @@ struct Arguments {
 
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
+    gui::app::GuiApp a(argc, argv);
     win32_set_font();
 
     // Parse command-line arguments.

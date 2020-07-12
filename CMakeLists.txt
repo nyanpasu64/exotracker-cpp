@@ -125,15 +125,17 @@ add_executable(exotracker-bin
         src/cmd_queue.cpp
 
         # GUI
+        src/main.cpp
+        src/gui/app.cpp
+        src/gui/main_window.cpp
+
         src/sample_docs.cpp
         src/edit/pattern.cpp
         src/edit_util/kv.cpp
         src/gui/history.cpp
-        src/gui/main_window.cpp
         src/gui/lib/painter_ext.cpp
         src/gui/lib/format.cpp
         src/gui/pattern_editor/pattern_editor_panel.cpp
-        src/main.cpp
         )
 target_compile_options(exotracker-bin PRIVATE "${options}")
 target_link_libraries(exotracker-bin PRIVATE exotracker-lib rtaudio Qt5::Widgets)
