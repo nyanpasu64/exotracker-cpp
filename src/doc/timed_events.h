@@ -12,18 +12,8 @@ namespace doc::timed_events {
 using FractionInt = int32_t;
 using BeatFraction = boost::rational<FractionInt>;
 
-template <typename T> int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
-
 /// Used to round beat-fraction timestamps to integer ticks.
-template <typename rational>
-inline int round_to_int(rational v)
-{
-    v = v + typename rational::int_type(sgn(v.numerator())) / 2;
-    return boost::rational_cast<int>(v);
-}
-
+FractionInt round_to_int(BeatFraction v);
 
 /// Why signed? Events can have negative offsets and play before their anchor beat,
 /// or even before the owning pattern starts. This is a feature(tm).
