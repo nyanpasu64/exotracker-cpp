@@ -21,6 +21,35 @@ In audio code, "out parameters" are common since they don't require allocations.
 
 In function signatures, out parameters (mutable references primarily written to, not read from) are placed at the end of the argument list. This follows the [Google Style Guide](https://google.github.io/styleguide/cppguide.html#Output_Parameters).
 
+## GUI settings and sync
+
+There are two types of persistent settings, saved to disk.
+
+- Options are set in the options dialog. Changes from other program instances are not picked up when you open the options dialog, but when you explicitly press the "synchronize settings" button. Changes are written to disk/registry when the dialog is applied or closed.
+- Persistent state items (cursor follows playback, overflow paste) are set in the main window, and written to disk when the program is closed.
+
+Both types of settings are stored in the application rather than the window. That means they're shared among all open tracker windows in a given process.
+
+If multiple processes are running at once (for example to open multiple app versions at the same time), they will each have their own copy of settings. I plan to handle this better than FamiTracker, where the last window to close saves settings, but still not as seamlessly as multiple windows in a single process. Instead of overwriting the entire config file each time, I will query the registry or a single config file, possibly using QSettings.
+
+## GUI app/window objects
+
+I plan to add an option to open multiple windows linked to a single process, sharing settings. This will change the behavior of keys like Ctrl+N, which will create a new module instead of erasing the open one. Trying to open multiple instances (even of different versions) will instead spawn a new window in the running process.
+
+`class GuiApp : public QApplication` stores program-wide variables.
+
+- Application settings and keybindings, edited through the settings menu.
+- Recent files list.
+- All persistent tracker-window state (like cursor-follow) is stored here. If each window had its own settings, we don't know which settings to save when closing the program.
+
+`class MainWindow : public QMainWindow` stores variables specific to each window (holding a single tracker module).
+
+- Cursor position
+- Should cursor step distance be owned by MainWindow (which shows it) or PatternEditorPanel (which uses it)?
+- Audio thread handles (RtAudio and synth) will be stored in MainWindow at first. If concurrent RtAudio instances don't work properly, I'll move it to GuiApp and only allow one module to play at a time.
+
+Multi-tab support is not planned at the moment, since the primary purpose of multiple instances is to copy-paste data between modules. If I want to later hack in tabs, each tab could have its own MainWindow instance, but acting as a sub-widget in an actual container window.
+
 ## GUI drawing
 
 QPainter has a highly imperative/stateful drawing API (`setPen()` and `setBrush()`).
@@ -30,16 +59,24 @@ QPainter's coordinates work as follows:
 - The origin lies at the top left, +x points right, and +y points down.
 
 - (0, 0) lies at the center of a pixel, not at fenceposts. I think this was a mistake, for the following reasons:
-    - If you create a `QRect` from (0, 0) to (16, 16), drawing it takes up 17 pixels on-screen. QRect's size-based constructor sets the bottom-right endpoint by subtracting 1 from horizontal and vertical size.
-    - `QPainter::fillRect(QPoint{0, 0}, QPoint{16, 16})` takes up 17 pixels on-screen.
-    - `QPainter::fillRect(QPoint{0, 0}, QSize{16, 16})` takes up 16 pixels on-screen.
-    - https://bugreports.qt.io/browse/QTBUG-38642
-        > When you draw an outline at 10,10 20x20 the [outline] will span a rectangle which is [positioned] at 9.5, 9.5 spanning 21x21 pixels (assuming 1px wide pens). The interior of that rectangle is [positioned] at 10.5,10.5 19x19.
 
-        This is so confusing.
-    - https://bugreports.qt.io/browse/QTBUG-38653
+  - If you create a `QRect` from (0, 0) to (16, 16), drawing it takes up 17 pixels on-screen. QRect's size-based constructor sets the bottom-right endpoint by subtracting 1 from horizontal and vertical size.
+
+  - `QPainter::fillRect(QPoint{0, 0}, QPoint{16, 16})` takes up 17 pixels on-screen.
+
+  - `QPainter::fillRect(QPoint{0, 0}, QSize{16, 16})` takes up 16 pixels on-screen.
+
+  - https://bugreports.qt.io/browse/QTBUG-38642
+
+    > When you draw an outline at 10,10 20x20 the [outline] will span a rectangle which is [positioned] at 9.5, 9.5 spanning 21x21 pixels (assuming 1px wide pens). The interior of that rectangle is [positioned] at 10.5,10.5 19x19.
+
+      This is so confusing.
+
+  - https://bugreports.qt.io/browse/QTBUG-38653
+
 - The Qt website pretends that QRect is defined in terms of grid intersections rather than pixels, leading to a confusing explanation. https://doc.qt.io/qt-5/qrect.html#coordinates
-    - > We recommend that you use x() + width() and y() + height() to find the true bottom-right corner, and avoid right() and bottom(). Another solution is to use QRectF: The QRectF class defines a rectangle in the plane using floating point accuracy for coordinates, and the QRectF::right() and QRectF::bottom() functions do return the right and bottom coordinates.
+
+  - > We recommend that you use x() + width() and y() + height() to find the true bottom-right corner, and avoid right() and bottom(). Another solution is to use QRectF: The QRectF class defines a rectangle in the plane using floating point accuracy for coordinates, and the QRectF::right() and QRectF::bottom() functions do return the right and bottom coordinates.
 
 I instead chose a mental model where coordinates lie at fenceposts/gridlines between pixels. When drawing an axis-aligned line 1 or more pixels thick, you can pick which side it lies on. I haven't figured out how to handle lines "centered" on pixels, or non-axis-aligned lines yet.
 
@@ -161,120 +198,142 @@ j0CC handles this differently. CAPU (hardware chip synth) has a Read() method, b
 ## GUI/audio communication
 
 - struct SeekTo
-    - messages: `vector<(chip id, channel id, volume/instr/effect state)>`
-    - time: beat fraction
-- struct AudioCommand
-    - seek_or_stop: `optional<SeekTo>`
-    - next: `atomic<AudioCommand*>` = nullptr
-- impl AudioCommand
-    - explicit AudioCommand(seek_or_stop: `optional<SeekTo>`)
-        - ...
-    - explicit AudioCommand(AudioCommand const &) = default
-    - AudioCommand(AudioCommand &&) = default
-    - REMOVED METHOD (clashes with field next):
-        - AudioCommand * next() const
 
-            - return next.load(acquire)
+  - messages: `vector<(chip id, channel id, volume/instr/effect state)>`
+  - time: beat fraction
+
+- struct AudioCommand
+
+  - seek_or_stop: `optional<SeekTo>`
+  - next: `atomic<AudioCommand*>` = nullptr
+
+- impl AudioCommand
+
+  - explicit AudioCommand(seek_or_stop: `optional<SeekTo>`)
+
+    - ...
+
+  - explicit AudioCommand(AudioCommand const &) = default
+
+  - AudioCommand(AudioCommand &&) = default
+
+  - REMOVED METHOD (clashes with field next):
+
+    - AudioCommand * next() const
+
+      - return next.load(acquire)
+
 - class CommandQueue
-    - Not exposed to audio thread. Audio thread is initialized with `AudioCommand *` and iterates via `next()`.
-    - AudioCommand * _begin (non-null?)
-    - AudioCommand * _end (non-null, may be equal)
+
+  - Not exposed to audio thread. Audio thread is initialized with `AudioCommand *` and iterates via `next()`.
+  - AudioCommand * _begin (non-null?)
+  - AudioCommand * _end (non-null, may be equal)
+
 - impl CommandQueue
-    - priv fn init()
-        - _begin = _end = new AudioCommand{{}}
-    - priv fn destroy_all()
-        - *Only run this when there are no live readers left.*
-        - if (_begin == nullptr)  // moved-from state?
-            - return
-        - while (auto next = _begin->next.load(relaxed))
-            - auto destroy = _begin
-            - _begin = next
-            - delete destroy
-        - release_assert(_begin == _end)
-        - delete _begin
-        - // set _begin = _end = nullptr?
-    - pub fn ~CommandQueue()
-        - destroy_all()
-    - pub fn clear()
-        - destroy_all()
-        - init()
-    - pub AudioCommand const * begin()
-        - Not thread-safe. The return value is sent to audio thread.
-        - return _begin
-    - pub AudioCommand const * end()
-        - Not thread-safe.
-        - return _end
-    - pub fn push(AudioCommand elem)
-        - auto new_end = new AudioCommand(std::move(elem))
-        - _end->next.store(new_end, release)
-            - Paired with synthesize_overall() load(acquire).
-        - _end = new_end
-    - pub fn pop()  // no return value because exception safety or something? what is exception safety help
-        - release_assert(_begin != _end)
-        - auto next = _begin->next.load(relaxed)
-        - release_assert(next)
-        - auto destroy = _begin
-        - _begin = next
-        - delete destroy
+
+  - priv fn init()
+    - _begin = _end = new AudioCommand{{}}
+  - priv fn destroy_all()
+    - *Only run this when there are no live readers left.*
+    - if (_begin == nullptr)  // moved-from state?
+      - return
+    - while (auto next = _begin->next.load(relaxed))
+      - auto destroy = _begin
+      - _begin = next
+      - delete destroy
+    - release_assert(_begin == _end)
+    - delete _begin
+    - // set _begin = _end = nullptr?
+  - pub fn ~CommandQueue()
+    - destroy_all()
+  - pub fn clear()
+    - destroy_all()
+    - init()
+  - pub AudioCommand const * begin()
+    - Not thread-safe. The return value is sent to audio thread.
+    - return _begin
+  - pub AudioCommand const * end()
+    - Not thread-safe.
+    - return _end
+  - pub fn push(AudioCommand elem)
+    - auto new_end = new AudioCommand(std::move(elem))
+    - _end->next.store(new_end, release)
+      - Paired with synthesize_overall() load(acquire).
+    - _end = new_end
+  - pub fn pop()  // no return value because exception safety or something? what is exception safety help
+    - release_assert(_begin != _end)
+    - auto next = _begin->next.load(relaxed)
+    - release_assert(next)
+    - auto destroy = _begin
+    - _begin = next
+    - delete destroy
+
 - gui
-    - _playback_state: enum AudioState
-        - Stopped
-        - Starting
-        - PlayHasStarted
-    - _audio_queue: CommandQueue
+
+  - _playback_state: enum AudioState
+    - Stopped
+    - Starting
+    - PlayHasStarted
+  - _audio_queue: CommandQueue
+
 - impl gui
-    - fn clean_done() -> void
-        - auto x = audio.seen_command()
-        - while list.begin() != x
-            - list.pop()
-        - if (list.begin() == list.end())
-            - // once GUI sees audio caught up on commands, it must see audio's new time.
-            - if (_playback_state == Starting)
-                - _playback_state = PlayHasStarted
-    - fn start_stop
-        - if _playback_state == Stopped
-            - (eventually recall channel state and current speed)
-            - _audio_queue.push(AudioCommand{cursor time})
-            - _playback_state = Starting
-        - else
-            - _audio_queue.push(AudioCommand{{}})
-            - _playback_state = Stopped
-    - fn update
-        - if _playback_state == PlayHasStarted
-            - write cursor pos = audio.seq_time() if has_value()
-    - fn on_arrow_key
-        - if _playback_state != Stopped
-            - early return
-        - scroll i guess
+
+  - fn clean_done() -> void
+    - auto x = audio.seen_command()
+    - while list.begin() != x
+      - list.pop()
+    - if (list.begin() == list.end())
+      - // once GUI sees audio caught up on commands, it must see audio's new time.
+      - if (_playback_state == Starting)
+        - _playback_state = PlayHasStarted
+  - fn start_stop
+    - if _playback_state == Stopped
+      - (eventually recall channel state and current speed)
+      - _audio_queue.push(AudioCommand{cursor time})
+      - _playback_state = Starting
+    - else
+      - _audio_queue.push(AudioCommand{{}})
+      - _playback_state = Stopped
+  - fn update
+    - if _playback_state == PlayHasStarted
+      - write cursor pos = audio.seq_time() if has_value()
+  - fn on_arrow_key
+    - if _playback_state != Stopped
+      - early return
+    - scroll i guess
+
 - audio
-    - _seen_command: `atomic<AudioCommand *>`
-    - _seq_time: `atomic<maybe timestamp>` (value always present, ignored by GUI when GUI thinks not playing)
+
+  - _seen_command: `atomic<AudioCommand *>`
+  - _seq_time: `atomic<maybe timestamp>` (value always present, ignored by GUI when GUI thinks not playing)
+
 - impl audio
-    - seen_command()  // Called on GUI thread
-        - The audio thread ignores this command since it has already handled it.
-        - We only look at the next pointer.
-        - This wastes one command worth of memory, but not a big deal
-        - return _seen_command.load(acquire)  // once GUI sees we've caught up on commands, it must see our new time.
-    - seq_time()  // Called on GUI thread
-        - return _seq_time.load(seq_cst)  // ehh... minimize latency 👌
-    - new(AudioCommand *) -> audio  // Called on GUI thread
-        - _seen_command.store(^, release)
-        - _seq_time.store(suitable initial value, relaxed)
-    - synthesize_overall()
-        - auto seq_time = _seq_time.load(relaxed)
-        - auto const orig_seq_time = seq_time
-        - // Handle all commands we haven't seen yet.
-        - auto cmd = _seen_command.load(relaxed)
-        - auto const orig_cmd = cmd
-        - while (auto next = cmd->next.load(acquire))
-            - Paired with CommandQueue::push() store(release).
-            - Handle command (*next). If we seek, set seq_time = nullopt.
-            - cmd = next
-        - (... synthesize audio. If a tick occurs, overwrite seq_time.)
-        - if (seq_time != orig_seq_time)
-            - _seq_time.store(seq_time, seq_cst)  // ehh... minimize latency 👌
-        - if (cmd != orig_cmd)
-            - _seen_command.store(cmd, release)  // once GUI sees we've caught up on commands, it must see our new time.
+
+  - seen_command()  // Called on GUI thread
+    - The audio thread ignores this command since it has already handled it.
+    - We only look at the next pointer.
+    - This wastes one command worth of memory, but not a big deal
+    - return _seen_command.load(acquire)  // once GUI sees we've caught up on commands, it must see our new time.
+  - seq_time()  // Called on GUI thread
+    - return _seq_time.load(seq_cst)  // ehh... minimize latency 👌
+  - new(AudioCommand *) -> audio  // Called on GUI thread
+    - _seen_command.store(^, release)
+    - _seq_time.store(suitable initial value, relaxed)
+  - synthesize_overall()
+    - auto seq_time = _seq_time.load(relaxed)
+    - auto const orig_seq_time = seq_time
+    - // Handle all commands we haven't seen yet.
+    - auto cmd = _seen_command.load(relaxed)
+    - auto const orig_cmd = cmd
+    - while (auto next = cmd->next.load(acquire))
+      - Paired with CommandQueue::push() store(release).
+      - Handle command (*next). If we seek, set seq_time = nullopt.
+      - cmd = next
+    - (... synthesize audio. If a tick occurs, overwrite seq_time.)
+    - if (seq_time != orig_seq_time)
+      - _seq_time.store(seq_time, seq_cst)  // ehh... minimize latency 👌
+    - if (cmd != orig_cmd)
+      - _seen_command.store(cmd, release)  // once GUI sees we've caught up on commands, it must see our new time.
 
 ### Do we need memory barriers between constructing the synth and accessing it?
 
@@ -302,9 +361,9 @@ Abstract files (in order from common to derived). Each file can include all file
 
 - ../*_common.h
 - ./general_common.h
-    - External libraries: none
+  - External libraries: none
 - ./specific_common.h
-    - External libraries: specific-related libraries
+  - External libraries: specific-related libraries
 - ./specific/nested_common.h, if used
 - ./specific/nested.h
 - ./specific.h (public interface of . folder)
@@ -317,16 +376,16 @@ Concrete files in the "audio" folder (in order from common to derived). Each fil
 
 - audio_common.h (general audio types and functions, like Amplitude = s16)
 - output.h
-    - Depends on output-related libraries (RtAudio).
+  - Depends on output-related libraries (RtAudio).
 - Application code depends on output.h.
 
 and
 
 - audio_common.h
 - synth_common.h
-    - Depends on synth-related libraries (blip_buf).
+  - Depends on synth-related libraries (blip_buf).
 - synth/Nes2A03Synth.h
-    - class audio::synth::Nes2A03Synth
+  - class audio::synth::Nes2A03Synth
 - synth.h
 - Application code depends on synth.h.
 
