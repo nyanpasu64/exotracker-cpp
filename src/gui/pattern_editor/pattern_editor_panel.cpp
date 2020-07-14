@@ -1375,19 +1375,13 @@ static doc::FractionInt frac_next(BeatFraction frac) {
 using BeatsToUnits = BeatFraction (*)(PatternEditorPanel const &, BeatFraction);
 using UnitsToBeats = BeatFraction (*)(PatternEditorPanel const &, doc::FractionInt);
 
-struct MovementConfig {
-    bool wrap_cursor = true;
-    bool wrap_across_frames = true;
-
-    BeatFraction page_down_distance{1};
-};
-
-MovementConfig move_cfg;
 // Move the cursor, snapping to the nearest unit.
 
 template<BeatsToUnits to_units, UnitsToBeats to_beats>
 void move_up(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
+    auto const & move_cfg = get_app().options().move_cfg;
+
     auto & cursor_y = self._win._cursor_y;
 
     auto const orig_unit = to_units(self, cursor_y.beat);
@@ -1417,6 +1411,8 @@ void move_up(PatternEditorPanel & self) {
 template<BeatsToUnits to_units, UnitsToBeats to_beats>
 void move_down(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
+    auto const & move_cfg = get_app().options().move_cfg;
+
     auto & cursor_y = self._win._cursor_y;
 
     auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
@@ -1496,6 +1492,8 @@ constexpr int MAX_PAGEDOWN_SCROLL = 16;
 
 void PatternEditorPanel::scroll_prev_pressed() {
     doc::Document const & document = get_document();
+    auto const & move_cfg = get_app().options().move_cfg;
+
     auto & cursor_y = _win._cursor_y;
 
     cursor_y.beat -= move_cfg.page_down_distance;
@@ -1514,6 +1512,8 @@ void PatternEditorPanel::scroll_prev_pressed() {
 
 void PatternEditorPanel::scroll_next_pressed() {
     doc::Document const & document = get_document();
+    auto const & move_cfg = get_app().options().move_cfg;
+
     auto & cursor_y = _win._cursor_y;
 
     cursor_y.beat += move_cfg.page_down_distance;
@@ -1643,6 +1643,9 @@ void PatternEditorPanel::right_pressed() {
 
 // TODO implement comparison between subcolumn variants,
 // so you can hide pan on some but not all channels
+
+// TODO disable wrapping if move_cfg.wrap_cursor is false.
+// X coordinate (nchan, 0) may/not be legal, idk yet.
 
 void PatternEditorPanel::scroll_left_pressed() {
     doc::Document const & document = get_document();

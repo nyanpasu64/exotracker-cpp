@@ -2,6 +2,7 @@
 
 #include "gui/lib/color.h"
 #include "doc/accidental_common.h"
+#include "doc/timed_events.h"
 
 #include <QColor>
 #include <QFont>
@@ -9,6 +10,7 @@
 namespace gui::config {
 
 using doc::accidental::AccidentalMode;
+using doc::timed_events::BeatFraction;
 
 inline namespace keys {
     // # Shortcuts
@@ -45,6 +47,13 @@ inline namespace keys {
 
         constexpr static Qt::Key delete_key{Qt::Key_Delete};
         constexpr static Qt::Key dummy_note{Qt::Key_Z};
+    };
+
+    struct MovementConfig {
+        bool wrap_cursor = true;
+        bool wrap_across_frames = true;
+
+        BeatFraction page_down_distance{1};
     };
 }
 
@@ -135,6 +144,8 @@ inline namespace visual {
 /// Stored in the GuiApp class.
 struct Options {
     PatternShortcuts pattern_shortcuts;
+    MovementConfig move_cfg;
+
     PatternAppearance visual = default_appearance();
 
     NoteNameConfig note_names {
