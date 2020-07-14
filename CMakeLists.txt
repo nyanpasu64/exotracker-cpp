@@ -152,6 +152,7 @@ add_executable(exotracker-tests
         tests/test_document.cpp
         tests/test_math.cpp
         tests/audio/test_event_queue.cpp
+        tests/audio/test_sequencer.cpp
         tests/audio/test_synth.cpp
         tests/test_utils/parameterize.cpp
         tests/test_utils/test_parameterize.cpp
@@ -161,7 +162,6 @@ add_executable(exotracker-tests
         src/cmd_queue.cpp
         src/sample_docs.cpp
         src/audio/synth/envelope.cpp
-        src/audio/synth/sequencer.cpp
         src/audio/synth/nes_2a03_driver.cpp
         )
 target_compile_options(exotracker-tests PRIVATE "${options}")
