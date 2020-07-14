@@ -98,9 +98,11 @@ EditBox delete_cell(
             } else
             if (auto eff = std::get_if<subcolumns::EffectName>(p)) {
                 // TODO v.effects[eff->effect_col]
+                (void) eff;
             } else
             if (auto eff = std::get_if<subcolumns::EffectValue>(p)) {
                 // TODO v.effects[eff->effect_col]
+                (void) eff;
             }
         }
     }

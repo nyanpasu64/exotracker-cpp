@@ -48,7 +48,9 @@ OverallSynth::OverallSynth(
                     _clocks_per_sound_update
                 );
                 apu1_maybe = apu1_unique.get();
-                _chip_instances.push_back(std::move(apu1_unique));
+                // Possibly more efficient than push_back,
+                // and silences false error in IDE.
+                _chip_instances.emplace_back(std::move(apu1_unique));
                 break;
             }
 
@@ -59,6 +61,9 @@ OverallSynth::OverallSynth(
             apu1_maybe = nullptr;
         }
     }
+
+    // TODO add APU2
+    (void) apu1_maybe;
 
     _events.set_timeout(SynthEvent::Tick, 0);
 }
@@ -120,7 +125,7 @@ void OverallSynth::synthesize_overall(
             seq_time = std::nullopt;
 
         } else
-        if (auto stop = std::get_if<cmd_queue::StopPlayback>(msg)) {
+        if (std::get_if<cmd_queue::StopPlayback>(msg)) {
             // Stop playback.
             _sequencer_running = false;
             for (auto & chip : _chip_instances) {
@@ -132,6 +137,19 @@ void OverallSynth::synthesize_overall(
             // Edit synth's copy of the document.
             auto & edit = **edit_ptr;
             edit.apply_swap(_document);
+
+            /*
+            TODO Pattern edits invalidate sequencer events.
+            Tempo edits invalidate sequencer times.
+            Instrument/tuning edits might invalidate driver or cause OOB reads.
+
+            We need to distinguish these cases. Maybe call methods right away,
+            maybe have multiple invalidation flags.
+
+            It's okay to apply edits mid-tick,
+            since _document is only examined by the sequencer and driver,
+            not the hardware synth.
+            */
             doc_edited = true;
         }
     }
