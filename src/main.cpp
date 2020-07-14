@@ -10,8 +10,6 @@
 
 #include <variant>
 
-#include "win32_fonts.h"
-
 using std::unique_ptr;
 using gui::main_window::MainWindow;
 
@@ -46,7 +44,6 @@ struct Arguments {
 int main(int argc, char *argv[])
 {
     gui::app::GuiApp a(argc, argv);
-    win32_set_font();
 
     // Parse command-line arguments.
     auto maybe_arg = Arguments::parse(argc, argv);

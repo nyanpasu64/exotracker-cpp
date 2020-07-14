@@ -1,7 +1,6 @@
 #define PatternEditorPanel_INTERNAL public
 #include "pattern_editor_panel.h"
 
-#include "gui/lib/color.h"
 #include "gui/lib/format.h"
 #include "gui/lib/painter_ext.h"
 #include "gui/main_window.h"
@@ -26,6 +25,7 @@
 #include <QRect>
 
 #include <algorithm>  // std::max
+#include <cmath>  // round
 #include <functional>  // std::invoke
 #include <optional>
 #include <tuple>
@@ -81,78 +81,6 @@ namespace header {
     constexpr int TEXT_X = 8;
     constexpr int TEXT_Y = 20;
 }
-
-// # Colors
-constexpr QColor BLACK{0, 0, 0};
-constexpr qreal BG_COLORIZE = 0.05;
-
-static constexpr QColor gray(int value) {
-    return QColor{value, value, value};
-}
-
-static constexpr QColor gray_alpha(int value, int alpha) {
-    return QColor{value, value, value, alpha};
-}
-
-struct FontTweaks {
-    int width_adjust = 0;
-
-    // To move text down, increase pixels_above_text and decrease pixels_below_text.
-    int pixels_above_text = 1;
-    int pixels_below_text = -1;
-};
-
-struct PatternAppearance {
-    QColor overall_bg = gray(48);
-
-    /// Vertical line to the right of each channel.
-    QColor channel_divider = gray(160);
-
-    /// Background gridline color.
-    QColor gridline_beat = gray(128);
-    QColor gridline_non_beat = gray(80);
-
-    /// Cursor color.
-    QColor cursor_row = gray(240);
-    int cursor_top_alpha = 48;
-    int cursor_bottom_alpha = 0;
-
-    QColor cell{255, 255, 96};
-    int cell_top_alpha = 96;
-    int cell_bottom_alpha = 96;
-
-    /// Foreground line color, also used as note text color.
-    QColor note_line_beat{255, 255, 96};
-    QColor note_line_non_beat{0, 255, 0};
-    QColor note_line_fractional{0, 224, 255};
-    QColor note_bg = lerp_colors(BLACK, note_line_beat, BG_COLORIZE);
-
-    /// Instrument text color.
-    QColor instrument{128, 255, 128};
-    QColor instrument_bg = lerp_colors(BLACK, instrument, BG_COLORIZE);
-
-    // Volume text color.
-    QColor volume{0, 255, 255};
-    QColor volume_bg = lerp_colors(BLACK, volume, BG_COLORIZE);
-
-    // Effect name color.
-    QColor effect{255, 128, 128};
-    QColor effect_bg = lerp_colors(BLACK, effect, BG_COLORIZE);
-
-    /// How bright to make subcolumn dividers.
-    /// At 0, dividers are the same color as the background.
-    /// At 1, dividers are the same color as foreground text.
-    qreal subcolumn_divider_blend = 0.15;
-
-    /// Fonts to use.
-    /// Initialized in PatternEditorPanel() constructor.
-    QFont header_font;
-    QFont pattern_font;
-
-    FontTweaks font_tweaks;
-};
-
-static PatternAppearance visual;
 
 // # Constructor
 static void setup_shortcuts(PatternEditorPanel & self) {
@@ -240,7 +168,8 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     #undef X
 }
 
-static PatternFontMetrics calc_single_font_metrics(QFont & font) {
+static PatternFontMetrics calc_single_font_metrics(QFont const & font) {
+    auto & visual = get_app().options().visual;
     QFontMetrics metrics{font};
 
     // height() == ascent() + descent().
@@ -267,6 +196,8 @@ static PatternFontMetrics calc_single_font_metrics(QFont & font) {
 }
 
 static void calc_font_metrics(PatternEditorPanel & self) {
+    auto & visual = get_app().options().visual;
+
     self._pattern_font_metrics = calc_single_font_metrics(visual.pattern_font);
 
     self._pixels_per_row = std::max(
@@ -323,12 +254,6 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * parent)
     setFocusPolicy(Qt::ClickFocus);
 
     setMinimumSize(128, 320);
-
-    /* Font */
-    visual.header_font = QApplication::font();
-
-    visual.pattern_font = QFont("dejavu sans mono", 9);
-    visual.pattern_font.setStyleHint(QFont::TypeWriter);
 
     calc_font_metrics(*this);
     setup_shortcuts(*this);
@@ -583,7 +508,8 @@ static void draw_header(
     QPainter & painter,
     GridRect const inner_rect
 ) {
-    painter.setFont(visual.header_font);
+    // Use standard app font for header text.
+    painter.setFont(QFont{});
 
     // Draw the header background.
     {
@@ -870,6 +796,8 @@ static void draw_pattern_background(
     QPainter & painter,
     GridRect const inner_rect
 ) {
+    auto & visual = get_app().options().visual;
+
     #define COMPUTE_DIVIDER_COLOR(OUT, BG, FG) \
         QColor OUT##_divider = lerp_colors(BG, FG, visual.subcolumn_divider_blend);
 
@@ -1116,6 +1044,8 @@ static void draw_pattern_foreground(
 ) {
     using Frac = BeatFraction;
 
+    auto & visual = get_app().options().visual;
+
     // Take a backup of _image to self._temp_image.
     {
         QPainter temp_painter{&self._temp_image};
@@ -1340,6 +1270,7 @@ static void draw_pattern_foreground(
 
 static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
     doc::Document const & document = self.get_document();
+    auto & visual = get_app().options().visual;
 
     // TODO maybe only draw repaint_rect? And use Qt::IntersectClip?
 

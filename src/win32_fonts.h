@@ -1,4 +1,4 @@
-// Only include in main.cpp!
+// Only include in one .cpp file!
 
 
 #ifdef _WIN32

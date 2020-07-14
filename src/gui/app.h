@@ -12,11 +12,28 @@ namespace gui::app {
 
 using config::Options;
 
-class GuiApp : public QApplication {
+struct SetFont {
+    SetFont();
+};
+
+class GuiApp : public QApplication, private SetFont {
     W_OBJECT(GuiApp)
 
 private:
-    using QApplication::QApplication;
+    /*
+    On Windows, QFont defaults to MS Shell Dlg 2, which is Tahoma instead of Segoe UI,
+    and also HiDPI-incompatible.
+
+    Running `QApplication::setFont(QApplication::font("QMessageBox"))` fixes this,
+    but the code must run after QApplication is constructed (otherwise MS Sans Serif),
+    but before we construct and save any QFonts.
+
+    This is a hard problem.
+    Set the font using a SetFont empty-base-class constructed before Options.
+
+    Ideally I'd store Options in some sort of "global context" singleton
+    not bound through inheritance to QApplication.
+    */
 
     Options _options;
 
@@ -31,6 +48,8 @@ private:
     // SavedState _state;
 
 public:
+    using QApplication::QApplication;
+
     Options const & options() const {
         return _options;
     }

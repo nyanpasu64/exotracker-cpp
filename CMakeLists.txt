@@ -128,13 +128,15 @@ add_executable(exotracker-bin
         src/main.cpp
         src/gui/app.cpp
         src/gui/main_window.cpp
+        src/gui/config.cpp
 
         src/sample_docs.cpp
         src/edit/pattern.cpp
         src/edit_util/kv.cpp
         src/gui/history.cpp
-        src/gui/lib/painter_ext.cpp
+        src/gui/lib/color.cpp
         src/gui/lib/format.cpp
+        src/gui/lib/painter_ext.cpp
         src/gui/pattern_editor/pattern_editor_panel.cpp
         )
 target_compile_options(exotracker-bin PRIVATE "${options}")
