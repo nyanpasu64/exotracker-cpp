@@ -65,6 +65,7 @@ static Document simple_doc() {
     return DocumentCopy{
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
         .sequence = sequence
@@ -278,6 +279,7 @@ static Document parametric_doc(uint32_t beat, TickT delay) {
     return DocumentCopy{
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
         .sequence = sequence

@@ -63,6 +63,7 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
             .ticks_per_beat = 24,
         },
         .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
         .instruments = {},
         .chips = chips,
         .sequence = {

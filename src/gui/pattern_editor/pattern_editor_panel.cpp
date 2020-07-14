@@ -1175,7 +1175,9 @@ static void draw_pattern_foreground(
                                 draw_release(subcolumn, note_color);
                             } else {
                                 painter.setPen(note_color);
-                                QString s = gui_fmt::midi_to_note_name(note_cfg, note);
+                                QString s = gui_fmt::midi_to_note_name(
+                                    note_cfg, document.accidental_mode, note
+                                );
                                 draw(s);
                             }
                         }

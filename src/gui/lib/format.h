@@ -2,6 +2,7 @@
 
 #include "gui/config.h"
 #include "doc/events.h"
+#include "doc/accidental_common.h"
 
 #include <QString>
 #include <QStringLiteral>
@@ -9,6 +10,8 @@
 #include <cstdlib>  // div
 
 namespace gui::lib::format {
+
+using doc::accidental::AccidentalMode;
 
 namespace detail {
     extern const QString hex_digits[16];
@@ -32,7 +35,9 @@ static QString format_hex_2(uint8_t num) {
 
 constexpr int NOTES_PER_OCTAVE = 12;
 
-static QString midi_to_note_name(config::NoteNameConfig cfg, doc::events::Note note) {
+static QString midi_to_note_name(
+    config::NoteNameConfig cfg, AccidentalMode accidental_mode, doc::events::Note note
+) {
     if (note.is_cut()) {
         return QStringLiteral("---");
     }
@@ -43,7 +48,7 @@ static QString midi_to_note_name(config::NoteNameConfig cfg, doc::events::Note n
         return QStringLiteral("%1?").arg(note.value);
     }
 
-    auto impl = [&cfg] (
+    auto impl = [&cfg, accidental_mode] (
         auto & impl, doc::events::ChromaticInt note, QChar accidental
     ) -> QString {
         auto [octave, semitone] = div(note, NOTES_PER_OCTAVE);
@@ -54,7 +59,7 @@ static QString midi_to_note_name(config::NoteNameConfig cfg, doc::events::Note n
             return detail::diatonic_names[diatonic]
                 + accidental
                 + QString::number(octave);
-        } else if (cfg.accidental_mode == config::Accidentals::Sharp) {
+        } else if (accidental_mode == AccidentalMode::Sharp) {
             return impl(impl, note - 1, cfg.sharp_char);
         } else {
             return impl(impl, note + 1, cfg.flat_char);

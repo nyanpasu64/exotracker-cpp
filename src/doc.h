@@ -9,6 +9,7 @@
 #include "doc/event_list.h"
 #include "doc/sequence.h"
 #include "doc/instr.h"
+#include "doc/accidental_common.h"
 #include "chip_common.h"
 #include "util/copy_move.h"
 
@@ -22,6 +23,7 @@ using namespace ::doc::timed_events;
 using namespace ::doc::event_list;
 using namespace ::doc::sequence;
 using namespace ::doc::instr;
+using accidental::AccidentalMode;
 
 struct SequencerOptions {
     TickT ticks_per_beat;
@@ -62,6 +64,7 @@ using ChipList = std::vector<chip_kinds::ChipKind>;
 struct DocumentCopy {
     SequencerOptions sequencer_options;
     FrequenciesOwned frequency_table;
+    AccidentalMode accidental_mode;
 
     Instruments instruments;
 

@@ -123,6 +123,7 @@ static Document dream_fragments() {
     return DocumentCopy {
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
         .instruments = std::move(instruments),
         .chips = chips,
         .sequence = sequence,
@@ -253,6 +254,7 @@ static Document world_revolution() {
     return DocumentCopy{
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
         .instruments = instruments,
         .chips = chips,
         .sequence = sequence,
@@ -304,6 +306,7 @@ static Document render_test() {
     return DocumentCopy{
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
         .instruments = instruments,
         .chips = chips,
         .sequence = sequence,
@@ -360,6 +363,7 @@ static Document audio_test() {
     return DocumentCopy{
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
         .instruments = instruments,
         .chips = chips,
         .sequence = sequence,
