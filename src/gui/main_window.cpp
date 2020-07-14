@@ -1,6 +1,7 @@
 #include "main_window.h"
 #include "gui/pattern_editor/pattern_editor_panel.h"
 #include "lib/lightweight.h"
+#include "gui_common.h"
 #include "cmd_queue.h"
 #include "util/release_assert.h"
 
@@ -326,6 +327,8 @@ public:
     /// Clears existing bindings and rebinds shortcuts.
     /// Can be called multiple times.
     void reload_shortcuts() {
+        auto & shortcuts = get_app().options().global_shortcuts;
+
         auto init_qaction = [&] (QAction & action, QKeySequence seq) {
             // Probably overwrites existing shortcut.
             action.setShortcut(seq);
@@ -336,14 +339,14 @@ public:
             _pattern_editor_panel->addAction(&action);
         };
 
-        init_qaction(_play_pause, QKeySequence{Qt::Key_Return});
+        init_qaction(_play_pause, QKeySequence{shortcuts.play_pause});
         connect(
             &_play_pause, &QAction::triggered,
             this, [this] () { _audio_component.play_pause(*this); },
             Qt::UniqueConnection
         );
 
-        init_qaction(_play_from_row, QKeySequence{Qt::Key_Apostrophe});
+        init_qaction(_play_from_row, QKeySequence{shortcuts.play_from_row});
         connect(
             &_play_from_row, &QAction::triggered,
             this, [this] () { _audio_component.play_from_row(*this); },
