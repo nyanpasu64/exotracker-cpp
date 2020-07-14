@@ -117,6 +117,22 @@ inline namespace visual {
     };
 
     PatternAppearance default_appearance();
+
+    enum class Accidentals {
+        Sharp,
+        Flat,
+    };
+
+    struct NoteNameConfig {
+        /// MIDI pitch 0 lies in this octave.
+        int bottom_octave;
+
+        Accidentals accidental_mode;
+
+        QChar sharp_char;
+        QChar flat_char;
+        QChar natural_char;
+    };
 }
 
 /// Set via dialog. Written to disk when dialog applied or closed.
@@ -124,6 +140,18 @@ inline namespace visual {
 struct Options {
     PatternShortcuts pattern_shortcuts;
     PatternAppearance visual = default_appearance();
+
+    // TODO move accidental mode to document. Goals:
+    // The options' accidental_mode is only used when creating new documents.
+    // It's overwritten by the current document's accidental mode
+    // during pattern rendering.
+    NoteNameConfig note_names {
+        .bottom_octave = -1,
+        .accidental_mode = Accidentals::Sharp,
+        .sharp_char = '#',
+        .flat_char = 'b',
+        .natural_char = 0xB7,
+    };
 };
 
 // Persistent application fields are stored directly in GuiApp.

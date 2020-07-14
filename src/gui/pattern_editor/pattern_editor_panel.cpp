@@ -1026,14 +1026,6 @@ static void draw_pattern_background(
     draw_patterns.template operator()<Direction::Reverse>(draw_row_numbers, seq);
 }
 
-constexpr gui_fmt::NoteNameConfig note_cfg {
-    .bottom_octave = -1,
-    .accidental_mode = gui_fmt::Accidentals::Sharp,
-    .sharp_char = '#',
-    .flat_char = 'b',
-    .natural_char = 0xB7,
-};
-
 /// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
 static void draw_pattern_foreground(
     PatternEditorPanel & self,
@@ -1045,6 +1037,7 @@ static void draw_pattern_foreground(
     using Frac = BeatFraction;
 
     auto & visual = get_app().options().visual;
+    auto & note_cfg = get_app().options().note_names;
 
     // Take a backup of _image to self._temp_image.
     {
