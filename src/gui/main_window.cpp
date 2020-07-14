@@ -327,7 +327,7 @@ public:
     /// Clears existing bindings and rebinds shortcuts.
     /// Can be called multiple times.
     void reload_shortcuts() {
-        auto & shortcuts = get_app().options().global_shortcuts;
+        auto & shortcuts = get_app().options().global_keys;
 
         auto init_qaction = [&] (QAction & action, QKeySequence seq) {
             // Probably overwrites existing shortcut.

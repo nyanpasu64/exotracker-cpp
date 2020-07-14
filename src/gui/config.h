@@ -21,12 +21,12 @@ inline namespace keys {
         return static_cast<Qt::Key>(modifier | int(key));
     }
 
-    struct GlobalShortcuts {
+    struct GlobalKeys {
         KeyInt play_pause{Qt::Key_Return};
         KeyInt play_from_row{Qt::Key_Apostrophe};
     };
 
-    struct PatternShortcuts {
+    struct PatternKeys {
         constexpr static Qt::Key up{Qt::Key_Up};
         constexpr static Qt::Key down{Qt::Key_Down};
 
@@ -148,8 +148,8 @@ inline namespace visual {
 /// Set via dialog. Written to disk when dialog applied or closed.
 /// Stored in the GuiApp class.
 struct Options {
-    GlobalShortcuts global_shortcuts;
-    PatternShortcuts pattern_shortcuts;
+    GlobalKeys global_keys;
+    PatternKeys pattern_keys;
     MovementConfig move_cfg;
 
     PatternAppearance visual = default_appearance();

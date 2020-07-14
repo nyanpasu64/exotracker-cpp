@@ -87,7 +87,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     using config::KeyInt;
     using config::chord;
 
-    auto & shortcut_keys = get_app().options().pattern_shortcuts;
+    auto & shortcut_keys = get_app().options().pattern_keys;
 
     auto init_shortcut = [&] (QShortcut & shortcut, QKeySequence const & key) {
         shortcut.setContext(Qt::WidgetShortcut);
