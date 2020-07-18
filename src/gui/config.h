@@ -4,8 +4,12 @@
 #include "doc/accidental_common.h"
 #include "doc/timed_events.h"
 
+#include <qkeycode/qkeycode.h>
+
 #include <QColor>
 #include <QFont>
+
+#include <array>
 
 namespace gui::config {
 
@@ -25,6 +29,14 @@ inline namespace keys {
         KeyInt play_pause{Qt::Key_Return};
         KeyInt play_from_row{Qt::Key_Apostrophe};
     };
+
+    // Allow a few notes of the following octave. Match 0CC's behavior.
+    static constexpr size_t NOTES_PER_ROW = 17;
+
+    using KeyboardRow = std::array<qkeycode::KeyCode, NOTES_PER_ROW>;
+
+    KeyboardRow get_octave_0();
+    KeyboardRow get_octave_1();
 
     struct PatternKeys {
         constexpr static Qt::Key up{Qt::Key_Up};
@@ -51,7 +63,8 @@ inline namespace keys {
         KeyInt scroll_right{chord(Qt::ALT, Qt::Key_Right)};
 
         constexpr static Qt::Key delete_key{Qt::Key_Delete};
-        constexpr static Qt::Key dummy_note{Qt::Key_Z};
+
+        std::array<KeyboardRow, 2> piano_keys{get_octave_0(), get_octave_1()};
     };
 
     struct MovementConfig {

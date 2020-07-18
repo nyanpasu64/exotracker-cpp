@@ -31,6 +31,8 @@ add_subdirectory(
 
 add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
 
+add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
+
 # Configure global settings
 include_directories(src)
 include_directories(SYSTEM 3rdparty 3rdparty/fmt_/include)
@@ -140,7 +142,7 @@ add_executable(exotracker-bin
         src/gui/pattern_editor/pattern_editor_panel.cpp
         )
 target_compile_options(exotracker-bin PRIVATE "${options}")
-target_link_libraries(exotracker-bin PRIVATE exotracker-lib rtaudio Qt5::Widgets)
+target_link_libraries(exotracker-bin PRIVATE exotracker-lib rtaudio Qt5::Widgets qkeycode)
 target_compile_definitions(exotracker-bin PRIVATE EXO_BIN)
 
 if(COMMAND target_precompile_headers)

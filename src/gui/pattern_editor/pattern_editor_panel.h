@@ -82,8 +82,7 @@ struct ShortcutPair {
 //    X(next_channel)
 
 #define SHORTCUTS(X, SEP) \
-    X(delete_key) SEP \
-    X(dummy_note)
+    X(delete_key)
 
 struct PatternEditorShortcuts {
     // [0] is just the keystroke, [1] is with Shift pressed.
@@ -103,6 +102,7 @@ struct PatternEditorShortcuts {
             PAIR{QShortcut{widget}, QShortcut{widget}}
         SHORTCUT_PAIRS(X, COMMA)
         #undef X
+        #undef COMMA
 
         #define X(KEY)  ,KEY{widget}
         SHORTCUTS(X, )
@@ -129,6 +129,8 @@ public:
     explicit PatternEditorPanel(MainWindow * parent);
 
 PatternEditorPanel_INTERNAL:
+    using Super = QWidget;
+
     // # Non-user-facing state.
 
     /// Parent pointer of the subclass type.
@@ -157,6 +159,7 @@ PatternEditorPanel_INTERNAL:
 
     // # Editing state, set by user interactions.
     int _rows_per_beat = 4;
+    int _octave = 5;
     bool _is_zoomed = false;
 
     // Non-empty if free scrolling is enabled.
@@ -188,7 +191,7 @@ protected:
 
 PatternEditorPanel_INTERNAL:
 
-    doc::Document const & get_document() {
+    doc::Document const & get_document() const {
         // Change this method if we change how history works.
         return _history.get().get_document();
     }
@@ -200,6 +203,10 @@ PatternEditorPanel_INTERNAL:
     SHORTCUT_PAIRS(X, )
     SHORTCUTS(X, )
     #undef X
+
+protected:
+    void keyPressEvent(QKeyEvent * event) override;
+    void keyReleaseEvent(QKeyEvent * event) override;
 };
 
 #endif // PATTERNEDITORPANEL_H

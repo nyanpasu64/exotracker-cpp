@@ -8,10 +8,13 @@
 #include "chip_kinds.h"
 #include "edit/pattern.h"
 #include "util/compare.h"
+#include "util/enumerate.h"
 #include "util/math.h"
 #include "util/reverse.h"
 
+#include <fmt/core.h>
 #include <verdigris/wobjectimpl.h>
+#include <qkeycode/qkeycode.h>
 
 #include <QApplication>
 #include <QColor>
@@ -19,12 +22,13 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QGradient>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QPainter>
 #include <QPoint>
 #include <QRect>
 
-#include <algorithm>  // std::max
+#include <algorithm>  // std::max, std::clamp
 #include <cmath>  // round
 #include <functional>  // std::invoke
 #include <optional>
@@ -1697,18 +1701,77 @@ void PatternEditorPanel::delete_key_pressed() {
     );
 }
 
-void PatternEditorPanel::dummy_note_pressed() {
-    doc::Document const & document = get_document();
-    ColumnList cols = gen_column_list(*this, document);
-
-    Column x = cols[_win._cursor_x.column];
-
-    // TODO add octave state and keyboard layout.
-    doc::Note note{60};
-
-    _win.push_edit(
-        ed::insert_note(document, x.chip, x.channel, _win._cursor_y, note)
+void note_pressed(
+    PatternEditorPanel & self,
+    doc::ChipIndex chip,
+    doc::ChannelIndex channel,
+    doc::Note note
+) {
+    self._win.push_edit(
+        ed::insert_note(self.get_document(), chip, channel, self._win._cursor_y, note)
     );
 }
+
+/// Handles events based on physical layout rather than shortcuts.
+/// Basically note and effect/hex input only.
+void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
+    auto keycode = qkeycode::toKeycode(event);
+    fmt::print(
+        stderr,
+        "KeyPress {}=\"{}\", modifier {}, repeat? {}\n",
+        keycode,
+        qkeycode::KeycodeConverter::DomCodeToCodeString(keycode),
+        event->modifiers(),
+        event->isAutoRepeat()
+    );
+
+    auto [chip, channel, subcolumn] = calc_cursor_x(*this);
+    auto subp = &subcolumn;
+
+    if (std::get_if<subcolumns::Note>(subp)) {
+        // Pick the octave based on whether the user pressed the lower or upper key row.
+        // If the user is holding shift, give the user an extra 2 octaves of range
+        // (transpose the lower row down 1 octave, and the upper row up 1).
+        bool shift_pressed = event->modifiers().testFlag(Qt::ShiftModifier);
+
+        auto const & piano_keys = get_app().options().pattern_keys.piano_keys;
+
+        for (auto const & [key_octave, key_row] : enumerate<int>(piano_keys)) {
+            int octave = _octave;
+            if (shift_pressed) {
+                octave += key_octave + (key_octave > 0 ? 1 : -1);
+            } else {
+                octave += key_octave;
+            }
+
+            for (auto const [semitone, curr_key] : enumerate<int>(key_row)) {
+                int chromatic = octave * lib::format::NOTES_PER_OCTAVE + semitone;
+                chromatic = std::clamp(chromatic, 0, doc::CHROMATIC_COUNT - 1);
+
+                if (curr_key == keycode) {
+                    auto note = doc::Note{doc::ChromaticInt(chromatic)};
+                    note_pressed(*this, chip, channel, note);
+                    return;
+                }
+            }
+        }
+
+    }
+}
+
+void PatternEditorPanel::keyReleaseEvent(QKeyEvent * event) {
+    auto dom_code = qkeycode::toKeycode(event);
+    fmt::print(
+        stderr,
+        "KeyRelease {}=\"{}\", modifier {}, repeat? {}\n",
+        dom_code,
+        qkeycode::KeycodeConverter::DomCodeToCodeString(dom_code),
+        event->modifiers(),
+        event->isAutoRepeat()
+    );
+
+    Super::keyReleaseEvent(event);
+}
+
 // namespace
 }

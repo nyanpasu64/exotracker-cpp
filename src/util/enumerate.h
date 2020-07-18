@@ -5,15 +5,19 @@
 #include <tuple>  // std::tie
 #include <iterator>  // std::begin
 #include <utility>  // std::declval
+#include <cstdint>  // size_t
 
-template <typename T,
-          typename TIter = decltype(std::begin(std::declval<T>())),
-          typename = decltype(std::end(std::declval<T>()))>
+template <
+    typename IndexT,
+    typename T,
+    typename TIter = decltype(std::begin(std::declval<T>())),
+    typename = decltype(std::end(std::declval<T>()))
+>
 constexpr auto enumerate(T && iterable)
 {
     struct iterator
     {
-        size_t i;
+        IndexT i;
         TIter iter;
         bool operator != (const iterator & other) const { return iter != other.iter; }
         void operator ++ () { ++i; ++iter; }
