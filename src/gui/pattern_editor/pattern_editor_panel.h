@@ -82,6 +82,7 @@ struct ShortcutPair {
 //    X(next_channel)
 
 #define SHORTCUTS(X, SEP) \
+    X(toggle_edit) SEP\
     X(delete_key)
 
 struct PatternEditorShortcuts {
@@ -156,6 +157,7 @@ PatternEditorPanel_INTERNAL:
 
     // # User interaction internals.
     PatternEditorShortcuts _shortcuts;
+    bool _edit_mode = false;
 
     // # Editing state, set by user interactions.
     int _rows_per_beat = 4;

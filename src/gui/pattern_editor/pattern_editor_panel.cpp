@@ -979,7 +979,7 @@ static void draw_pattern_background(
         auto bg_grad = make_gradient(
             cursor_top,
             cursor_bottom,
-            visual.cursor_row,
+            self._edit_mode ? visual.cursor_row_edit : visual.cursor_row,
             visual.cursor_top_alpha,
             visual.cursor_bottom_alpha
         );
@@ -1236,7 +1236,7 @@ static void draw_pattern_foreground(
         }
 
         // Draw white line across entire screen.
-        painter.setPen(visual.cursor_row);
+        painter.setPen(self._edit_mode ? visual.cursor_row_edit : visual.cursor_row);
         draw_top_border(
             painter, QPoint{0, cursor_top}, QPoint{row_right_px, cursor_top}
         );
@@ -1692,7 +1692,23 @@ auto calc_cursor_x(PatternEditorPanel const & self) ->
     return {column.chip, column.channel, subcolumn};
 }
 
+void PatternEditorPanel::toggle_edit_pressed() {
+    _edit_mode = !_edit_mode;
+}
+
+// TODO Is there a more reliable method for me to ensure that
+// all mutations are ignored in edit mode?
+// And all regular keypresses are interpreted purely as note previews
+// (regardless of column)?
+// Maybe in keyPressEvent(), if edit mode off,
+// preview notes and don't call mutator methods.
+// Problem is, delete_key_pressed() is *not* called through keyPressEvent(),
+// but through QShortcut.
+
 void PatternEditorPanel::delete_key_pressed() {
+    if (!_edit_mode) {
+        return;
+    }
     doc::Document const & document = get_document();
 
     auto [chip, channel, subcolumn] = calc_cursor_x(*this);
@@ -1707,6 +1723,9 @@ void note_pressed(
     doc::ChannelIndex channel,
     doc::Note note
 ) {
+    if (!self._edit_mode) {
+        return;
+    }
     self._win.push_edit(
         ed::insert_note(self.get_document(), chip, channel, self._win._cursor_y, note)
     );

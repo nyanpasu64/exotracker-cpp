@@ -62,6 +62,7 @@ inline namespace keys {
         KeyInt scroll_left{chord(Qt::ALT, Qt::Key_Left)};
         KeyInt scroll_right{chord(Qt::ALT, Qt::Key_Right)};
 
+        constexpr static Qt::Key toggle_edit{Qt::Key_Space};
         constexpr static Qt::Key delete_key{Qt::Key_Delete};
 
         std::array<KeyboardRow, 2> piano_keys{get_octave_0(), get_octave_1()};
@@ -109,7 +110,8 @@ inline namespace visual {
 
         /// Cursor color.
         QColor cursor_row = gray(240);
-        int cursor_top_alpha = 48;
+        QColor cursor_row_edit{255, 160, 160};
+        int cursor_top_alpha = 64;
         int cursor_bottom_alpha = 0;
 
         QColor cell{255, 255, 96};
