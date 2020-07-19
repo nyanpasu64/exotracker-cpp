@@ -22,7 +22,7 @@ struct EditCommand : BaseEditCommand {
         : BaseEditCommand{}, _inner{std::move(inner)}
     {}
 
-    EditBox box_clone() override {
+    EditBox box_clone() const override {
         return std::make_unique<EditCommand>(_inner);
     }
 

@@ -162,6 +162,7 @@ PatternEditorPanel_INTERNAL:
     // # Editing state, set by user interactions.
     int _rows_per_beat = 4;
     int _octave = 5;
+    int _step = 1;  // can't remember if it will be saved on close, or defaulted via settings dialog
     bool _is_zoomed = false;
 
     // Non-empty if free scrolling is enabled.

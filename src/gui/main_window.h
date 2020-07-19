@@ -63,7 +63,15 @@ public:
 
     virtual AudioState audio_state() const = 0;
 
-    virtual void push_edit(edit::EditBox command) = 0;
+    /// This is a bit of an unusual API. Caller should call:
+    ///
+    /// Cursor old_cusor = MainWindow::_cursor;
+    /// EditBox command = ...;
+    /// MainWindow::_cursor = new position;
+    /// MainWindow::push_edit(command, old cursor);
+    ///
+    /// push_edit() saves (command, old_cursor, _cursor) into the undo history.
+    virtual void push_edit(edit::EditBox command, cursor::Cursor old_cursor) = 0;
 
 signals:
     void gui_refresh(MaybeSequencerTime maybe_seq_time)

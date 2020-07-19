@@ -1714,7 +1714,8 @@ void PatternEditorPanel::delete_key_pressed() {
 
     auto [chip, channel, subcolumn] = calc_cursor_x(*this);
     _win.push_edit(
-        ed::delete_cell(document, chip, channel, subcolumn, _win._cursor.y)
+        ed::delete_cell(document, chip, channel, subcolumn, _win._cursor.y),
+        _win._cursor
     );
 }
 
@@ -1727,8 +1728,15 @@ void note_pressed(
     if (!self._edit_mode) {
         return;
     }
+
+    auto old_cursor = self._win._cursor;
+    for (int i = 0; i < self._step; i++) {
+        self.down_pressed();
+    }
+
     self._win.push_edit(
-        ed::insert_note(self.get_document(), chip, channel, self._win._cursor.y, note)
+        ed::insert_note(self.get_document(), chip, channel, old_cursor.y, note),
+        old_cursor
     );
 }
 

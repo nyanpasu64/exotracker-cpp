@@ -187,9 +187,9 @@ public:
         return _audio_component.audio_state();
     }
 
-    void push_edit(edit::EditBox command) override {
+    void push_edit(edit::EditBox command, cursor::Cursor old_cursor) override {
         _audio_component.send_edit(*this, command->box_clone());
-        _history.push(std::move(command));
+        _history.push(edit::CursorEdit{std::move(command), old_cursor, _cursor});
     }
 
     void restart_audio_thread() override {

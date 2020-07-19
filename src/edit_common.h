@@ -1,19 +1,24 @@
 #pragma once
 
 #include "doc.h"
+#include "gui/cursor.h"
 #include "util/copy_move.h"
 
 #include <memory>
+#include <optional>
 
 namespace edit {
 
 class BaseEditCommand;
 
-// Non-null pointer.
+/// Non-null pointer.
+///
+/// All edit commands return an EditBox with no indication of cursor movement.
+/// PatternEditorPanel is responsible for moving MainWindow's cursor,
+/// and MainWindow is responsible for saving old/new cursor positions in a CursorEdit.
+///
+/// Is this a good design? I don't know.
 using EditBox = std::unique_ptr<BaseEditCommand>;
-
-// Nullable pointer.
-using MaybeEditBox = std::unique_ptr<BaseEditCommand>;
 
 class BaseEditCommand {
 public:
@@ -25,7 +30,7 @@ public:
 
     /// Not bounded-time.
     /// Called on the GUI thread. Return value is sent to the audio thread.
-    virtual EditBox box_clone() = 0;
+    virtual EditBox box_clone() const = 0;
 
     /// Bounded-time. Safe to call on both GUI and audio thread.
     ///
@@ -42,5 +47,27 @@ public:
     /// After undoing, store it as a redoer.
     virtual void apply_swap(doc::Document & document) = 0;
 };
+
+using gui::cursor::Cursor;
+
+struct CursorEdit {
+    EditBox edit;
+
+    // TODO mark as optional, to support non-pattern edit commands
+    // that don't move the cursor.
+    Cursor before_cursor;
+    Cursor after_cursor;
+
+    // impl
+    CursorEdit clone() const {
+        return CursorEdit{edit->box_clone(), before_cursor, after_cursor};
+    }
+
+    void apply_swap(doc::Document & document) {
+        edit->apply_swap(document);
+    }
+};
+
+using MaybeCursorEdit = std::optional<CursorEdit>;
 
 }

@@ -13,8 +13,8 @@
 
 namespace gui::history {
 
-using edit::EditBox;
-using edit::MaybeEditBox;
+using edit::CursorEdit;
+using edit::MaybeCursorEdit;
 
 struct Success {
     bool succeeded;
@@ -24,8 +24,8 @@ struct Success {
 class History {
 private:
     doc::Document _document;
-    std::vector<EditBox> undo_stack;
-    std::vector<EditBox> redo_stack;
+    std::vector<CursorEdit> undo_stack;
+    std::vector<CursorEdit> redo_stack;
 
 public:
     History(doc::Document initial_state);
@@ -39,15 +39,17 @@ public:
     }
 
     /// Clears redo stack, mutates document, pushes command into undo history.
-    void push(EditBox command);
+    void push(CursorEdit command);
 
     /// If undo stack non-empty, moves command from undo to redo stack
-    /// and returns a copy of the command to be sent to the audio thread.
-    MaybeEditBox undo();
+    /// and returns a copy of the command, used to update GUI cursor location
+    /// and send to the audio thread.
+    MaybeCursorEdit undo();
 
     /// If redo stack non-empty, moves command from redo to undo stack
-    /// and returns a copy of the command to be sent to the audio thread.
-    MaybeEditBox redo();
+    /// and returns a copy of the command, used to update GUI cursor location
+    /// and send to the audio thread.
+    MaybeCursorEdit redo();
 };
 
 }
