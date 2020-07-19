@@ -1676,14 +1676,24 @@ void PatternEditorPanel::scroll_right_pressed() {
 // Begin document mutation
 namespace ed = edit::pattern;
 
+auto calc_cursor_x(PatternEditorPanel const & self) ->
+    std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumn>
+{
+    doc::Document const & document = self.get_document();
+    auto cursor_x = self._win._cursor_x;
+
+    Column column = gen_column_list(self, document)[cursor_x.column];
+    SubColumn subcolumn = column.subcolumns[cursor_x.subcolumn];
+
+    return {column.chip, column.channel, subcolumn};
+}
+
 void PatternEditorPanel::delete_key_pressed() {
     doc::Document const & document = get_document();
-    ColumnList cols = gen_column_list(*this, document);
 
-    Column x = cols[_win._cursor_x.column];
-    SubColumn subcolumn = x.subcolumns[ _win._cursor_x.subcolumn];
+    auto [chip, channel, subcolumn] = calc_cursor_x(*this);
     _win.push_edit(
-        ed::delete_cell(document, x.chip, x.channel, subcolumn, _win._cursor_y)
+        ed::delete_cell(document, chip, channel, subcolumn, _win._cursor_y)
     );
 }
 
