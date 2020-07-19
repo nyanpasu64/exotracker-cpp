@@ -97,7 +97,7 @@ public:
                 gc_command_queue(win._audio_handle.value());
 
                 if (_audio_state == AudioState::Stopped) {
-                    auto cursor = win._cursor_y;
+                    auto cursor = win._cursor.y;
                     cursor.beat = 0;
                     play_from(win, cursor);
                 } else {
@@ -111,7 +111,7 @@ public:
                 gc_command_queue(win._audio_handle.value());
 
                 if (_audio_state == AudioState::Stopped) {
-                    play_from(win, win._cursor_y);
+                    play_from(win, win._cursor.y);
                 } else {
                     stop_play(win);
                 }
@@ -131,7 +131,7 @@ public:
             _audio_state = AudioState::Starting;
 
             // Move cursor to right spot, while waiting for audio thread to respond.
-            win._cursor_y = time;
+            win._cursor.y = time;
         }
 
         void stop_play([[maybe_unused]] MainWindowImpl & win) {

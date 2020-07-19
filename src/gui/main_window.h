@@ -4,6 +4,7 @@
 // Do *not* include any other widgets in this header and create an include cycle.
 // Other widgets include main_window.h, since they rely on MainWindow for data/signals.
 #include "history.h"
+#include "cursor.h"
 #include "doc.h"
 #include "edit_common.h"
 #include "timing_common.h"
@@ -20,21 +21,12 @@ namespace gui::main_window {
 
 using audio::output::AudioThreadHandle;
 using timing::PatternAndBeat;
-using timing::SequencerTime;
 using timing::MaybeSequencerTime;
 
 enum class AudioState {
     Stopped,
     Starting,
     PlayHasStarted,
-};
-
-using ColumnIndex = uint32_t;
-using SubColumnIndex = uint32_t;
-
-struct CursorX {
-    ColumnIndex column = 0;
-    SubColumnIndex subcolumn = 0;
 };
 
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
@@ -52,11 +44,8 @@ public:
     // set_cursor() and select_to()?
     // set_cursor(bool select)?
 
-    CursorX _cursor_x;
-    PatternAndBeat _cursor_y;
-
-    CursorX _select_begin_x;
-    PatternAndBeat _select_begin_y;
+    cursor::Cursor _cursor;
+    cursor::Cursor _select_begin;
 
 public:
     // impl

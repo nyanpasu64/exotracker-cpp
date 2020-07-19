@@ -42,6 +42,10 @@ using doc::SeqEntryIndex;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 
+// You can't pass Cursor into edit functions,
+// because Cursor stores (column: int, subcolumn: int)
+// but edit functions need (chip: int, channel: int, subcolumn: SubColumn).
+
 /// Clear the focused subcolumn of all events
 /// anchored exactly to the current beat fraction.
 EditBox delete_cell(

@@ -3,6 +3,7 @@
 
 #include "gui/lib/format.h"
 #include "gui/lib/painter_ext.h"
+#include "gui/cursor.h"
 #include "gui/main_window.h"
 #include "gui_common.h"
 #include "chip_kinds.h"
@@ -124,8 +125,8 @@ static void setup_shortcuts(PatternEditorPanel & self) {
         // TODO encapsulate cursor, allow moving with mouse, show selection, etc.
         std::invoke(method, self);
         if (clear_selection) {
-            self._win._select_begin_x = self._win._cursor_x;
-            self._win._select_begin_y = self._win._cursor_y;
+            self._win._select_begin.x = self._win._cursor.x;
+            self._win._select_begin.y = self._win._cursor.y;
         }
         self.repaint();
     };
@@ -659,7 +660,7 @@ public:
         PxInt const screen_height
     ) {
         PxInt const cursor_from_pattern_top =
-            pixels_from_beat(widget, widget._win._cursor_y.beat);
+            pixels_from_beat(widget, widget._win._cursor.y.beat);
 
         PatternAndBeat scroll_position;
         PxInt pattern_top_from_screen_top;
@@ -676,7 +677,7 @@ public:
                 cursor_from_pattern_top + pattern_top_from_screen_top;
         } else {
             // Cursor-locked scrolling.
-            scroll_position = widget._win._cursor_y;
+            scroll_position = widget._win._cursor.y;
 
             cursor_from_screen_top = centered_cursor_pos(screen_height);
             pattern_top_from_screen_top =
@@ -984,7 +985,7 @@ static void draw_pattern_background(
             visual.cursor_bottom_alpha
         );
 
-        auto cursor_x = self._win._cursor_x;
+        auto cursor_x = self._win._cursor.x;
         if (cursor_x.column >= columns.cols.size()) {
             cursor_x.column = 0;
             cursor_x.subcolumn = 0;
@@ -1242,7 +1243,7 @@ static void draw_pattern_foreground(
         );
 
         // Draw cursor cell outline:
-        auto cursor_x = self._win._cursor_x;
+        auto cursor_x = self._win._cursor.x;
         auto ncol = columns.cols.size();
 
         // Handle special-case of past-the-end cursors separately.
@@ -1360,7 +1361,7 @@ void PatternEditorPanel::update(timing::MaybeSequencerTime maybe_seq_time) {
             }
         }
 
-        _win._cursor_y = new_cursor_y;
+        _win._cursor.y = new_cursor_y;
     }
 
     repaint();
@@ -1386,7 +1387,7 @@ void move_up(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto & cursor_y = self._win._cursor_y;
+    auto & cursor_y = self._win._cursor.y;
 
     auto const orig_unit = to_units(self, cursor_y.beat);
     doc::FractionInt const up_unit = frac_prev(orig_unit);
@@ -1417,7 +1418,7 @@ void move_down(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto & cursor_y = self._win._cursor_y;
+    auto & cursor_y = self._win._cursor.y;
 
     auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
     auto const num_units = to_units(self, seq_entry.nbeats);
@@ -1498,7 +1499,7 @@ void PatternEditorPanel::scroll_prev_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto & cursor_y = _win._cursor_y;
+    auto & cursor_y = _win._cursor.y;
 
     cursor_y.beat -= move_cfg.page_down_distance;
 
@@ -1518,7 +1519,7 @@ void PatternEditorPanel::scroll_next_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto & cursor_y = _win._cursor_y;
+    auto & cursor_y = _win._cursor.y;
 
     cursor_y.beat += move_cfg.page_down_distance;
 
@@ -1538,7 +1539,7 @@ void PatternEditorPanel::scroll_next_pressed() {
 template<void alter_mod(SeqEntryIndex & x, SeqEntryIndex den)>
 inline void switch_seq_entry_index(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
-    auto & cursor_y = self._win._cursor_y;
+    auto & cursor_y = self._win._cursor.y;
 
     alter_mod(cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size());
 
@@ -1559,9 +1560,9 @@ void PatternEditorPanel::next_pattern_pressed() {
     switch_seq_entry_index<increment_mod>(*this);
 }
 
-using main_window::CursorX;
-using main_window::ColumnIndex;
-using main_window::SubColumnIndex;
+using cursor::CursorX;
+using cursor::ColumnIndex;
+using cursor::SubColumnIndex;
 
 ColumnIndex ncol(ColumnList const& cols) {
     return ColumnIndex(cols.size());
@@ -1612,7 +1613,7 @@ void PatternEditorPanel::left_pressed() {
 
     // there's got to be a better way to write this code...
     // an elegant abstraction i'm missing
-    auto & cursor_x = _win._cursor_x;
+    auto & cursor_x = _win._cursor.x;
 
     if (cursor_x.subcolumn > 0) {
         cursor_x.subcolumn--;
@@ -1631,7 +1632,7 @@ void PatternEditorPanel::right_pressed() {
     ColumnList cols = gen_column_list(*this, document);
 
     // Is it worth extracting cursor movement logic to a class?
-    auto & cursor_x = _win._cursor_x;
+    auto & cursor_x = _win._cursor.x;
     wrap_cursor(cols, cursor_x);
     cursor_x.subcolumn++;
 
@@ -1655,7 +1656,7 @@ void PatternEditorPanel::scroll_left_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    auto & cursor_x = _win._cursor_x;
+    auto & cursor_x = _win._cursor.x;
     if (cursor_x.column > 0) {
         cursor_x.column--;
     } else {
@@ -1670,7 +1671,7 @@ void PatternEditorPanel::scroll_right_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    auto & cursor_x = _win._cursor_x;
+    auto & cursor_x = _win._cursor.x;
     cursor_x.column++;
     wrap_cursor(cols, cursor_x);
     cursor_x.subcolumn =
@@ -1684,7 +1685,7 @@ auto calc_cursor_x(PatternEditorPanel const & self) ->
     std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumn>
 {
     doc::Document const & document = self.get_document();
-    auto cursor_x = self._win._cursor_x;
+    auto cursor_x = self._win._cursor.x;
 
     Column column = gen_column_list(self, document)[cursor_x.column];
     SubColumn subcolumn = column.subcolumns[cursor_x.subcolumn];
@@ -1713,7 +1714,7 @@ void PatternEditorPanel::delete_key_pressed() {
 
     auto [chip, channel, subcolumn] = calc_cursor_x(*this);
     _win.push_edit(
-        ed::delete_cell(document, chip, channel, subcolumn, _win._cursor_y)
+        ed::delete_cell(document, chip, channel, subcolumn, _win._cursor.y)
     );
 }
 
@@ -1727,7 +1728,7 @@ void note_pressed(
         return;
     }
     self._win.push_edit(
-        ed::insert_note(self.get_document(), chip, channel, self._win._cursor_y, note)
+        ed::insert_note(self.get_document(), chip, channel, self._win._cursor.y, note)
     );
 }
 
