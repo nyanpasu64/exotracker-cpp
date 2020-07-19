@@ -6,9 +6,7 @@ History::History(doc::Document initial_state)
     : _document(std::move(initial_state))
 {}
 
-EditBox History::push(EditBox command) {
-    auto clone = command->box_clone();
-
+void History::push(EditBox command) {
     // Do I add support for tree-undo?
     redo_stack.clear();
 
@@ -17,8 +15,6 @@ EditBox History::push(EditBox command) {
     // Move new state into current. Move current state into undo stack.
     command->apply_swap(_document);
     undo_stack.push_back(std::move(command));
-
-    return clone;
 }
 
 // vector.pop_back() returns void because it's impossible to return the object exception-safely.

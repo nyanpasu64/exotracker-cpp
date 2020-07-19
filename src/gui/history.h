@@ -39,8 +39,7 @@ public:
     }
 
     /// Clears redo stack, mutates document, pushes command into undo history.
-    /// Returns a copy of the command to be sent to the audio thread.
-    EditBox push(EditBox command);
+    void push(EditBox command);
 
     /// If undo stack non-empty, moves command from undo to redo stack
     /// and returns a copy of the command to be sent to the audio thread.
