@@ -370,6 +370,59 @@ static Document audio_test() {
     };
 }
 
+/// Test song, plays four notes from two chips nonstop.
+/// Check for audio underruns (crackling) by recording and viewing in a spectrogram.
+static Document empty() {
+    SequencerOptions sequencer_options{.ticks_per_beat = 24};
+
+    auto instrument = [] {
+        auto volume = [] {
+            std::vector<ByteEnvelope::IntT> volume;
+            for (int i = 0; ; i++) {
+                volume.push_back(ByteEnvelope::IntT(15 * pow(0.5, i / 20.0)));
+                if (volume.back() == 0) {
+                    break;
+                }
+            }
+            return volume;
+        };
+
+        return Instrument{
+            .volume={volume()}, .pitch={{}}, .arpeggio={{7, 0}}, .wave_index={{2, 2}}
+        };
+    }();
+
+    Instruments instruments;
+    instruments[0] = instrument;
+
+    ChipList chips{ChipKind::Apu1};
+
+    Sequence sequence;
+
+    sequence.push_back(SequenceEntry {
+        .nbeats = 16,
+        .chip_channel_events = {
+            // chip 0
+            {
+                // channel 0
+                {},
+                // channel 1
+                {},
+            }
+        },
+    });
+
+    return DocumentCopy{
+        .sequencer_options = sequencer_options,
+        .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
+        .instruments = instruments,
+        .chips = chips,
+        .sequence = sequence,
+    };
+}
+
+
 std::string const DEFAULT_DOC = "world-revolution";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
@@ -378,6 +431,7 @@ std::map<std::string, doc::Document> const DOCUMENTS = [] {
     out.insert({"world-revolution", world_revolution()});
     out.insert({"render-test", render_test()});
     out.insert({"audio-test", audio_test()});
+    out.insert({"empty", empty()});
     return out;
 }();
 
