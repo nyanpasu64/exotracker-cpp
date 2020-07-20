@@ -57,12 +57,16 @@ EditBox delete_cell(
 );
 
 /// Insert note at current beat fraction, reusing last existing event if it exists.
+/// If note is cut, erases instrument (not volume) and ignores argument.
+/// If instrument is passed in, overwrites instrument. Otherwise leaves existing value.
+/// TODO If volume is passed in, overwrites volume. Otherwise leaves existing value.
 EditBox insert_note(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
     PatternAndBeat time,
-    doc::Note note
+    doc::Note note,
+    std::optional<doc::InstrumentIndex> instrument
 );
 
 }

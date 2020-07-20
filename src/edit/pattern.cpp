@@ -120,7 +120,8 @@ EditBox insert_note(
     ChipIndex chip,
     ChannelIndex channel,
     PatternAndBeat time,
-    doc::Note note
+    doc::Note note,
+    std::optional<doc::InstrumentIndex> instrument
 ) {
     // We don't need to check if the user is inserting "no note",
     // because it has type optional<Note> and value nullopt.
@@ -132,7 +133,20 @@ EditBox insert_note(
     // Insert note.
     edit_util::kv::KV kv{events};
     auto & ev = kv.get_or_insert(time.beat);
+
     ev.v.note = note;
+
+    bool is_cut = note.is_cut() || note.is_release();
+
+    if (is_cut) {
+        ev.v.instr = {};
+        // leave ev.v.volume as-is.
+    } else {
+        if (instrument) {
+            ev.v.instr = *instrument;
+        }
+        // TODO if (volume) {}
+    }
 
     return make_command(PatternEdit{
         time.seq_entry_index, chip, channel, std::move(events)

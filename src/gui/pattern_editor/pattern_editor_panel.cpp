@@ -1730,8 +1730,15 @@ void note_pressed(
         self.down_pressed();
     }
 
+    std::optional<doc::InstrumentIndex> instrument{};
+    if (self._win._insert_instrument) {
+        instrument = {self._win._instrument};
+    }
+
     self._win.push_edit(
-        ed::insert_note(self.get_document(), chip, channel, old_cursor.y, note),
+        ed::insert_note(
+            self.get_document(), chip, channel, old_cursor.y, note, instrument
+        ),
         old_cursor
     );
 }

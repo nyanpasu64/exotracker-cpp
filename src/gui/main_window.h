@@ -47,6 +47,9 @@ public:
     cursor::Cursor _cursor;
     cursor::Cursor _select_begin;
 
+    int _instrument = 0;
+    bool _insert_instrument = true;
+
 public:
     // impl
     static std::unique_ptr<MainWindow> make(
