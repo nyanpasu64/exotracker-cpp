@@ -1725,10 +1725,6 @@ void note_pressed(
     doc::ChannelIndex channel,
     doc::Note note
 ) {
-    if (!self._edit_mode) {
-        return;
-    }
-
     auto old_cursor = self._win._cursor;
     for (int i = 0; i < self._step; i++) {
         self.down_pressed();
@@ -1738,6 +1734,19 @@ void note_pressed(
         ed::insert_note(self.get_document(), chip, channel, old_cursor.y, note),
         old_cursor
     );
+}
+
+void PatternEditorPanel::note_cut_pressed() {
+    if (!_edit_mode) {
+        return;
+    }
+
+    auto [chip, channel, subcolumn] = calc_cursor_x(*this);
+    auto subp = &subcolumn;
+
+    if (std::get_if<subcolumns::Note>(subp)) {
+        note_pressed(*this, chip, channel, doc::NOTE_CUT);
+    }
 }
 
 /// Handles events based on physical layout rather than shortcuts.
@@ -1754,6 +1763,12 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
     );
 
     auto [chip, channel, subcolumn] = calc_cursor_x(*this);
+
+    if (!_edit_mode) {
+        // TODO preview note
+        return;
+    }
+
     auto subp = &subcolumn;
 
     if (std::get_if<subcolumns::Note>(subp)) {
