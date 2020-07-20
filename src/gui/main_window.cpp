@@ -61,9 +61,14 @@ public:
     // When user changes shortcuts, reassign shortcut keybinds.
 
     // QShortcut is only a shortcut. QAction can be bound to menus and buttons too.
-    QAction _play_pause{nullptr};
-    QAction _play_from_row{nullptr};
-    QAction _restart_audio{nullptr};
+    // Editor actions:
+    QAction _play_pause;
+    QAction _play_from_row;
+    QAction _undo;
+    QAction _redo;
+
+    // Global actions:
+    QAction _restart_audio;
 
     /// This API is a bit too broad for my liking, but whatever.
     class AudioComponent {
@@ -325,14 +330,28 @@ public:
         );
     }
 
+    void undo() {
+        if (auto cursor_edit = _history.get_undo()) {
+            _audio_component.send_edit(*this, std::move(cursor_edit->edit));
+            _cursor = cursor_edit->before_cursor;
+            _history.undo();
+        }
+    }
+
+    void redo() {
+        if (auto cursor_edit = _history.get_redo()) {
+            _audio_component.send_edit(*this, std::move(cursor_edit->edit));
+            _cursor = cursor_edit->after_cursor;
+            _history.redo();
+        }
+    }
+
     /// Clears existing bindings and rebinds shortcuts.
     /// Can be called multiple times.
     void reload_shortcuts() {
         auto & shortcuts = get_app().options().global_keys;
 
-        auto init_qaction = [&] (QAction & action, QKeySequence seq) {
-            // Probably overwrites existing shortcut.
-            action.setShortcut(seq);
+        auto bind_editor_action = [this] (QAction & action) {
             action.setShortcutContext(Qt::WidgetWithChildrenShortcut);
 
             // "A QWidget should only have one of each action and adding an action
@@ -340,28 +359,34 @@ public:
             _pattern_editor_panel->addAction(&action);
         };
 
-        init_qaction(_play_pause, QKeySequence{shortcuts.play_pause});
-        connect(
-            &_play_pause, &QAction::triggered,
-            this, [this] () { _audio_component.play_pause(*this); },
-            Qt::UniqueConnection
-        );
+        auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
+            connect(&action, &QAction::triggered, this, func, Qt::UniqueConnection);
+        };
 
-        init_qaction(_play_from_row, QKeySequence{shortcuts.play_from_row});
-        connect(
-            &_play_from_row, &QAction::triggered,
-            this, [this] () { _audio_component.play_from_row(*this); },
-            Qt::UniqueConnection
-        );
+        _play_pause.setShortcut(QKeySequence{shortcuts.play_pause});
+        bind_editor_action(_play_pause);
+        connect_action(_play_pause, [this] () {
+            _audio_component.play_pause(*this);
+        });
+
+        _play_from_row.setShortcut(QKeySequence{shortcuts.play_from_row});
+        bind_editor_action(_play_from_row);
+        connect_action(_play_from_row, [this] () {
+            _audio_component.play_from_row(*this);
+        });
+
+        _undo.setShortcuts(QKeySequence::Undo);
+        bind_editor_action(_undo);
+        connect_action(_undo, &MainWindowImpl::undo);
+
+        _redo.setShortcuts(QKeySequence::Redo);
+        bind_editor_action(_redo);
+        connect_action(_redo, &MainWindowImpl::redo);
 
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
         this->addAction(&_restart_audio);
-        connect(
-            &_restart_audio, &QAction::triggered,
-            this, &MainWindow::restart_audio_thread,
-            Qt::UniqueConnection
-        );
+        connect_action(_restart_audio, &MainWindow::restart_audio_thread);
     }
 };
 

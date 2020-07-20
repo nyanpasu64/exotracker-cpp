@@ -17,18 +17,24 @@ void History::push(CursorEdit command) {
     undo_stack.push_back(std::move(command));
 }
 
-// vector.pop_back() returns void because it's impossible to return the object exception-safely.
-// https://stackoverflow.com/a/12600477
-// I think "dealing with other people's exceptions" is painful.
-
-MaybeCursorEdit History::undo() {
+MaybeCursorEdit History::get_undo() const {
     if (undo_stack.empty()) {
         return {};
+    }
+    return undo_stack.back().clone();
+}
+
+void History::undo() {
+    // vector.pop_back() returns void because it's impossible to return the object exception-safely.
+    // https://stackoverflow.com/a/12600477
+    // I think "dealing with other people's exceptions" is painful.
+
+    if (undo_stack.empty()) {
+        return;
     }
 
     // Pop undo.
     CursorEdit command = std::move(undo_stack.back());
-    auto clone = command.clone();
     undo_stack.pop_back();
 
     // Apply to document.
@@ -36,13 +42,18 @@ MaybeCursorEdit History::undo() {
 
     // Push to redo.
     redo_stack.push_back(std::move(command));
-
-    return clone;
 }
 
-MaybeCursorEdit History::redo() {
+edit::MaybeCursorEdit History::get_redo() const {
     if (redo_stack.empty()) {
         return {};
+    }
+    return redo_stack.back().clone();
+}
+
+void History::redo() {
+    if (redo_stack.empty()) {
+        return;
     }
 
     // Pop redo.
@@ -55,8 +66,6 @@ MaybeCursorEdit History::redo() {
 
     // Push to undo.
     undo_stack.push_back(std::move(command));
-
-    return clone;
 }
 
 }
