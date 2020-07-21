@@ -60,7 +60,7 @@ set(
         /W4
         /wd4100  # allow unused parameters
         /wd4505  # allow unused functions
-        /wd4456  # allow shadowing
+        /wd4456 /wd4457  # allow shadowing
 
         # Loosen warnings on external libraries.
         /experimental:external /external:anglebrackets

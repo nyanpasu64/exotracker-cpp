@@ -12,8 +12,24 @@ void History::push(CursorEdit command) {
 
     // TODO if HistoryFrame.can_merge(current.load()), store to current and discard old value.
 
-    // Move new state into current. Move current state into undo stack.
+    // Move new state into current.
     command.apply_swap(_document);
+
+    if (undo_stack.size()) {
+        auto & prev = undo_stack.back();
+
+        // Only true if:
+        // - prev and command should be combined in undo history.
+        // - prev and command mutate the same state,
+        //   so History can discard command entirely after calling apply_swap().
+        if (command.edit->can_coalesce(*prev.edit)) {
+            prev.after_cursor = command.after_cursor;
+
+            // Discard current state. We only keep new state and previous state.
+            return;
+        }
+    }
+    // Move current state into undo stack.
     undo_stack.push_back(std::move(command));
 }
 

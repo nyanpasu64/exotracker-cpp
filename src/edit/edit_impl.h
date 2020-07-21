@@ -25,6 +25,10 @@ struct ImplEditCommand : BaseEditCommand {
     void apply_swap(doc::Document & document) override {
         return _body.apply_swap(document);
     }
+
+    bool can_coalesce(BaseEditCommand & prev) const override {
+        return _body.can_coalesce(prev);
+    }
 };
 
 template<typename Body>

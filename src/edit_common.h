@@ -46,6 +46,12 @@ public:
     /// After applying a BaseEditCommand, store it as an undoer.
     /// After undoing, store it as a redoer.
     virtual void apply_swap(doc::Document & document) = 0;
+
+    /// Only true if:
+    /// - prev and this should be combined in undo history.
+    /// - prev and this mutate the same state,
+    ///   so History can discard this entirely after calling apply_swap().
+    virtual bool can_coalesce(BaseEditCommand & prev) const = 0;
 };
 
 using gui::cursor::Cursor;

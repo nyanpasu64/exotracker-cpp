@@ -1,6 +1,7 @@
 #include "pattern.h"
 #include "edit_impl.h"
 #include "edit_util/kv.h"
+#include "util/typeid_cast.h"
 
 #include <algorithm>  // std::swap
 #include <cassert>
@@ -11,6 +12,13 @@ namespace edit::pattern {
 using namespace doc;
 using edit_impl::make_command;
 
+enum class PatternEditType {
+    Other,
+    InstrumentDigit1,
+    InstrumentDigit2,
+};
+using Type = PatternEditType;
+
 /// Implements EditCommand. Other classes can store a vector of multiple PatternEdit.
 struct PatternEdit {
     SeqEntryIndex _seq_entry_index;
@@ -19,11 +27,35 @@ struct PatternEdit {
 
     doc::EventList _events;
 
+    PatternEditType _type = Type::Other;
+
     void apply_swap(doc::Document & document) {
         // TODO #ifndef NDEBUG, assert all of _events are non-empty.
         auto & doc_events =
             document.sequence[_seq_entry_index].chip_channel_events[_chip][_channel];
         doc_events.swap(_events);
+    }
+
+    bool can_coalesce(BaseEditCommand & prev) const {
+        switch (_type) {
+
+        case Type::InstrumentDigit2:
+            if (auto p = typeid_cast<edit_impl::ImplEditCommand<PatternEdit> *>(&prev)) {
+                auto & prev = p->_body;
+                if (prev._type == Type::InstrumentDigit1) {
+                    assert(_seq_entry_index == prev._seq_entry_index);
+                    assert(_chip == prev._chip);
+                    assert(_channel == prev._channel);
+                    return _seq_entry_index == prev._seq_entry_index
+                        && _chip == prev._chip
+                        && _channel == prev._channel;
+                }
+            }
+            return false;
+
+        default:
+            return false;
+        }
     }
 };
 
@@ -149,7 +181,11 @@ EditBox instrument_digit_1(
     ev.v.instr = nybble;
 
     return make_command(PatternEdit{
-        time.seq_entry_index, chip, channel, std::move(events)
+        time.seq_entry_index,
+        chip,
+        channel,
+        std::move(events),
+        Type::InstrumentDigit1,
     });
 }
 
@@ -176,7 +212,11 @@ EditBox instrument_digit_2(
     ev.v.instr = (old_nybble << 4) | nybble;
 
     return make_command(PatternEdit{
-        time.seq_entry_index, chip, channel, std::move(events)
+        time.seq_entry_index,
+        chip,
+        channel,
+        std::move(events),
+        Type::InstrumentDigit2,
     });
 }
 
