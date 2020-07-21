@@ -1,4 +1,5 @@
 #include "pattern.h"
+#include "edit_impl.h"
 #include "edit_util/kv.h"
 
 #include <algorithm>  // std::swap
@@ -8,34 +9,7 @@
 namespace edit::pattern {
 
 using namespace doc;
-
-/// Since BaseEditCommand has a virtual destructor,
-/// subclasses cannot be aggregate-initialized (requiring constructor boilerplate).
-/// So instead make BaseEditCommand subclasses hold data (Body _inner),
-/// which can be aggregate-initialized.
-/// This approach also allows us to define cloning once,
-/// instead of repeating the boilerplate in each command class.
-template<typename Body>
-struct EditCommand : BaseEditCommand {
-    Body _inner;
-
-    EditCommand(Body inner)
-        : BaseEditCommand{}, _inner{std::move(inner)}
-    {}
-
-    EditBox box_clone() const override {
-        return std::make_unique<EditCommand>(_inner);
-    }
-
-    void apply_swap(doc::Document & document) override {
-        return _inner.apply_swap(document);
-    }
-};
-
-template<typename Body>
-static EditBox make_command(Body inner) {
-    return std::make_unique<EditCommand<Body>>(std::move(inner));
-}
+using edit_impl::make_command;
 
 /// Implements EditCommand. Other classes can store a vector of multiple PatternEdit.
 struct PatternEdit {
