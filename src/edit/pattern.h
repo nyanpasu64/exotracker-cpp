@@ -69,4 +69,24 @@ EditBox insert_note(
     std::optional<doc::InstrumentIndex> instrument
 );
 
+/// Erases an instrument field and replaces it with the nybble entered by the user.
+EditBox instrument_digit_1(
+    Document const & document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    PatternAndBeat time,
+    uint8_t nybble
+);
+
+/// Takes an instrument field with one nybble filled in,
+/// moves the nybble to the left, and appends the nybble entered by the user.
+/// Will be merged with previous instrument_digit_1() in undo history.
+EditBox instrument_digit_2(
+    Document const & document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    PatternAndBeat time,
+    uint8_t nybble
+);
+
 }

@@ -2,6 +2,7 @@
 #include "edit_util/kv.h"
 
 #include <algorithm>  // std::swap
+#include <cassert>
 #include <memory>  // make_unique. <memory> is already included for EditBox though.
 
 namespace edit::pattern {
@@ -147,6 +148,58 @@ EditBox insert_note(
         }
         // TODO if (volume) {}
     }
+
+    return make_command(PatternEdit{
+        time.seq_entry_index, chip, channel, std::move(events)
+    });
+}
+
+// TODO Add function_ref<uint8_t & (RowEvent&)> parameter
+// to reuse logic for volume and effect value.
+// TODO add similar function for effect name (two ASCII characters, not nybbles).
+EditBox instrument_digit_1(
+    Document const & document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    PatternAndBeat time,
+    uint8_t nybble
+) {
+    // Copy event list.
+    doc::EventList events =
+        document.sequence[time.seq_entry_index].chip_channel_events[chip][channel];
+
+    // Insert instrument.
+    edit_util::kv::KV kv{events};
+    auto & ev = kv.get_or_insert(time.beat);
+
+    ev.v.instr = nybble;
+
+    return make_command(PatternEdit{
+        time.seq_entry_index, chip, channel, std::move(events)
+    });
+}
+
+EditBox instrument_digit_2(
+    Document const & document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    PatternAndBeat time,
+    uint8_t nybble
+) {
+    // Copy event list.
+    doc::EventList events =
+        document.sequence[time.seq_entry_index].chip_channel_events[chip][channel];
+
+    // Insert instrument.
+    edit_util::kv::KV kv{events};
+    auto & ev = kv.get_or_insert(time.beat);
+
+    // TODO non-fatal popup if assertion failed.
+    assert(ev.v.instr.has_value());
+    assert(ev.v.instr.value() < 0x10);
+
+    uint8_t old_nybble = ev.v.instr.value_or(0);
+    ev.v.instr = (old_nybble << 4) | nybble;
 
     return make_command(PatternEdit{
         time.seq_entry_index, chip, channel, std::move(events)

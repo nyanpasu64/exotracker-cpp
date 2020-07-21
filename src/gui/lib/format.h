@@ -6,6 +6,8 @@
 
 #include <QString>
 #include <QStringLiteral>
+#include <QKeyEvent>
+
 #include <cstdint>
 #include <cstdlib>  // div
 
@@ -24,18 +26,20 @@ namespace detail {
 }
 
 /// Converts a nybble into a single hex character.
-static QString format_hex_1(uint8_t num) {
+[[nodiscard]] static QString format_hex_1(uint8_t num) {
     return detail::hex_digits[num & 0x0F];
 }
 
 /// Converts a byte into 2 hex characters.
-static QString format_hex_2(uint8_t num) {
+[[nodiscard]] static QString format_hex_2(uint8_t num) {
     return detail::hex_digits[num >> 4] + detail::hex_digits[num & 0x0F];
 }
 
+[[nodiscard]] std::optional<uint8_t> hex_from_key(QKeyEvent const & key);
+
 constexpr int NOTES_PER_OCTAVE = 12;
 
-static QString midi_to_note_name(
+[[nodiscard]] static QString midi_to_note_name(
     config::NoteNameConfig cfg, AccidentalMode accidental_mode, doc::events::Note note
 ) {
     if (note.is_cut()) {

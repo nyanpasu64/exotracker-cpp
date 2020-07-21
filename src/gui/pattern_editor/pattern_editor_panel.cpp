@@ -46,7 +46,7 @@ using gui::lib::color::lerp_srgb;
 
 using gui::lib::format::format_hex_1;
 using gui::lib::format::format_hex_2;
-namespace gui_fmt = gui::lib::format;
+namespace format = gui::lib::format;
 
 using namespace gui::lib::painter_ext;
 
@@ -1180,7 +1180,7 @@ static void draw_pattern_foreground(
                                 draw_release(subcolumn, note_color);
                             } else {
                                 painter.setPen(note_color);
-                                QString s = gui_fmt::midi_to_note_name(
+                                QString s = format::midi_to_note_name(
                                     note_cfg, document.accidental_mode, note
                                 );
                                 draw(s);
@@ -1761,6 +1761,39 @@ void PatternEditorPanel::note_cut_pressed() {
     }
 }
 
+void add_instrument_digit(
+    PatternEditorPanel & self,
+    doc::ChipIndex chip,
+    doc::ChannelIndex channel,
+    uint8_t nybble
+) {
+    auto const& document = self.get_document();
+    auto cursor_y = self._win._cursor->y;
+
+    if (self._win._cursor.digit_index() == 0) {
+        // Erase instrument field and enter first digit.
+        self._win.push_edit(
+            ed::instrument_digit_1(document, chip, channel, cursor_y, nybble),
+            nullptr,
+            true
+        );
+    } else {
+        // Move current instrument digit to the left, append second digit,
+        // and move cursor down.
+
+        // NOTE: instrument_digit_2() assumes the cursor's target event
+        // is still valid and has a single digit.
+        // To ensure this, both moving the cursor and mutating the document
+        // clears _cursor.digit_index() and resets input to the first digit.
+        // The only exception is "mutating the document to insert first digit".
+
+        self._win.push_edit(
+            ed::instrument_digit_2(document, chip, channel, cursor_y, nybble),
+            step_cursor_down(self)
+        );
+    }
+}
+
 /// Handles events based on physical layout rather than shortcuts.
 /// Basically note and effect/hex input only.
 void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
@@ -1811,6 +1844,11 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
             }
         }
 
+    } else
+    if (std::get_if<subcolumns::Instrument>(subp)) {
+        if (auto digit = format::hex_from_key(*event)) {
+            add_instrument_digit(*this, chip, channel, *digit);
+        }
     }
 }
 

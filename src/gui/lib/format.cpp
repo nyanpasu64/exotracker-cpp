@@ -37,4 +37,23 @@ namespace detail {
     };
 }
 
+[[nodiscard]] std::optional<uint8_t> hex_from_key(const QKeyEvent & key) {
+    // avoid accidental copies of COW strings 🤢
+    QString const text = key.text();
+    if (text.isEmpty()) {
+        return {};
+    }
+
+    ushort c = text[0].toUpper().unicode();
+
+    if ('0' <= c && c <= '9') {
+        return c - '0';
+    }
+    if ('A' <= c && c <= 'F') {
+        return c - 'A' + 0xA;
+    }
+
+    return {};
+}
+
 }
