@@ -30,9 +30,11 @@ struct PatternEdit {
     PatternEditType _type = Type::Other;
 
     void apply_swap(doc::Document & document) {
-        // TODO #ifndef NDEBUG, assert all of _events are non-empty.
         auto & doc_events =
             document.sequence[_seq_entry_index].chip_channel_events[_chip][_channel];
+        for (auto & ev : doc_events) {
+            assert(ev.v != doc::RowEvent{});
+        }
         doc_events.swap(_events);
     }
 
