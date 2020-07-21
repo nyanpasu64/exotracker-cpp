@@ -29,6 +29,28 @@ enum class AudioState {
     PlayHasStarted,
 };
 
+using cursor::Cursor;
+
+/// Some pattern cells (like instruments, volumes, and effects)
+/// have multiple characters entered in sequence.
+/// This stores the typing progress within those cells.
+class CursorAndDigit {
+    Cursor _cursor;
+    int _digit = 0;
+
+public:
+    [[nodiscard]] Cursor const& get() const;
+    Cursor const& operator*() const;
+    Cursor const* operator->() const;
+
+    [[nodiscard]] Cursor & get_mut();
+    void set(Cursor cursor);
+
+    [[nodiscard]] int digit_index() const;
+    int advance_digit();
+    void reset_digit();
+};
+
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
 class MainWindow : public QMainWindow
 {
@@ -44,8 +66,8 @@ public:
     // set_cursor() and select_to()?
     // set_cursor(bool select)?
 
-    cursor::Cursor _cursor;
-    cursor::Cursor _select_begin;
+    CursorAndDigit _cursor;
+    Cursor _select_begin;
 
     int _instrument = 0;
     bool _insert_instrument = true;

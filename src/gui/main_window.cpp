@@ -28,6 +28,41 @@ using std::make_unique;
 
 using gui::pattern_editor::PatternEditorPanel;
 
+
+const cursor::Cursor & CursorAndDigit::get() const {
+    return _cursor;
+}
+
+const cursor::Cursor & CursorAndDigit::operator*() const {
+    return _cursor;
+}
+
+const cursor::Cursor * CursorAndDigit::operator->() const {
+    return &_cursor;
+}
+
+cursor::Cursor & CursorAndDigit::get_mut() {
+    reset_digit();
+    return _cursor;
+}
+
+void CursorAndDigit::set(cursor::Cursor cursor) {
+    get_mut() = cursor;
+}
+
+int CursorAndDigit::digit_index() const {
+    return _digit;
+}
+
+int CursorAndDigit::advance_digit() {
+    return ++_digit;
+}
+
+void CursorAndDigit::reset_digit() {
+    _digit = 0;
+}
+
+
 W_OBJECT_IMPL(MainWindow)
 
 static MainWindow * instance;
@@ -102,7 +137,7 @@ public:
                 gc_command_queue(win._audio_handle.value());
 
                 if (_audio_state == AudioState::Stopped) {
-                    auto cursor = win._cursor.y;
+                    auto cursor = win._cursor->y;
                     cursor.beat = 0;
                     play_from(win, cursor);
                 } else {
@@ -116,7 +151,7 @@ public:
                 gc_command_queue(win._audio_handle.value());
 
                 if (_audio_state == AudioState::Stopped) {
-                    play_from(win, win._cursor.y);
+                    play_from(win, win._cursor->y);
                 } else {
                     stop_play(win);
                 }
@@ -136,7 +171,7 @@ public:
             _audio_state = AudioState::Starting;
 
             // Move cursor to right spot, while waiting for audio thread to respond.
-            win._cursor.y = time;
+            win._cursor.get_mut().y = time;
         }
 
         void stop_play([[maybe_unused]] MainWindowImpl & win) {
@@ -192,9 +227,9 @@ public:
         return _audio_component.audio_state();
     }
 
-    void push_edit(edit::EditBox command, cursor::Cursor old_cursor) override {
+    void push_edit(edit::EditBox command, Cursor old_cursor) override {
         _audio_component.send_edit(*this, command->box_clone());
-        _history.push(edit::CursorEdit{std::move(command), old_cursor, _cursor});
+        _history.push(edit::CursorEdit{std::move(command), old_cursor, *_cursor});
     }
 
     void restart_audio_thread() override {
@@ -333,7 +368,7 @@ public:
     void undo() {
         if (auto cursor_edit = _history.get_undo()) {
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
-            _cursor = cursor_edit->before_cursor;
+            _cursor.get_mut() = cursor_edit->before_cursor;
             _history.undo();
         }
     }
@@ -341,7 +376,7 @@ public:
     void redo() {
         if (auto cursor_edit = _history.get_redo()) {
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
-            _cursor = cursor_edit->after_cursor;
+            _cursor.get_mut() = cursor_edit->after_cursor;
             _history.redo();
         }
     }
