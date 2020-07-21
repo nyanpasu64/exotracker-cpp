@@ -7,7 +7,7 @@
 #include "gui/main_window.h"
 #include "gui_common.h"
 #include "chip_kinds.h"
-#include "edit/pattern.h"
+#include "edit/edit_pattern.h"
 #include "util/compare.h"
 #include "util/enumerate.h"
 #include "util/math.h"
@@ -294,8 +294,8 @@ struct ChannelDraw {
     int xright;
 };
 
-namespace subcolumns = edit::pattern::subcolumns;
-using edit::pattern::SubColumn;
+namespace subcolumns = edit::edit_pattern::subcolumns;
+using edit::edit_pattern::SubColumn;
 
 // # Visual layout.
 
@@ -1681,7 +1681,7 @@ void PatternEditorPanel::scroll_right_pressed() {
 }
 
 // Begin document mutation
-namespace ed = edit::pattern;
+namespace ed = edit::edit_pattern;
 
 auto calc_cursor_x(PatternEditorPanel const & self) ->
     std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumn>

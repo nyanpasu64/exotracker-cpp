@@ -1,4 +1,4 @@
-#include "pattern.h"
+#include "edit_pattern.h"
 #include "edit_impl.h"
 #include "edit_util/kv.h"
 #include "util/typeid_cast.h"
@@ -7,7 +7,7 @@
 #include <cassert>
 #include <memory>  // make_unique. <memory> is already included for EditBox though.
 
-namespace edit::pattern {
+namespace edit::edit_pattern {
 
 using namespace doc;
 using edit_impl::make_command;

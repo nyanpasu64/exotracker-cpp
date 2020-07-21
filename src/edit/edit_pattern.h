@@ -8,7 +8,7 @@
 #include <memory>
 #include <variant>
 
-namespace edit::pattern {
+namespace edit::edit_pattern {
 
 namespace subcolumns {
     struct Note {
