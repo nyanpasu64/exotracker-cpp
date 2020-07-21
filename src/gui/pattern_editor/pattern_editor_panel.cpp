@@ -1697,6 +1697,14 @@ void PatternEditorPanel::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;
 }
 
+MainWindow::MaybeMoveCursor step_cursor_down(PatternEditorPanel & self) {
+    return [&self] () {
+        for (int i = 0; i < self._step; i++) {
+            self.down_pressed();
+        }
+    };
+}
+
 // TODO Is there a more reliable method for me to ensure that
 // all mutations are ignored in edit mode?
 // And all regular keypresses are interpreted purely as note previews
@@ -1715,7 +1723,7 @@ void PatternEditorPanel::delete_key_pressed() {
     auto [chip, channel, subcolumn] = calc_cursor_x(*this);
     _win.push_edit(
         ed::delete_cell(document, chip, channel, subcolumn, _win._cursor->y),
-        *_win._cursor
+        step_cursor_down(*this)
     );
 }
 
@@ -1726,9 +1734,6 @@ void note_pressed(
     doc::Note note
 ) {
     auto old_cursor = *self._win._cursor;
-    for (int i = 0; i < self._step; i++) {
-        self.down_pressed();
-    }
 
     std::optional<doc::InstrumentIndex> instrument{};
     if (self._win._insert_instrument) {
@@ -1739,7 +1744,7 @@ void note_pressed(
         ed::insert_note(
             self.get_document(), chip, channel, old_cursor.y, note, instrument
         ),
-        old_cursor
+        step_cursor_down(self)
     );
 }
 

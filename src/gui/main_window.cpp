@@ -227,9 +227,28 @@ public:
         return _audio_component.audio_state();
     }
 
-    void push_edit(edit::EditBox command, Cursor old_cursor) override {
+    void push_edit(
+        edit::EditBox command, MaybeMoveCursor move_cursor, bool advance_digit
+    ) override {
         _audio_component.send_edit(*this, command->box_clone());
+
+        Cursor old_cursor = *_cursor;
+
+        // okay this is some incredibly janky and un-Rust-like API design.
+        // move_cursor holds a reference to PatternEditorPanel,
+        // which holds a reference to MainWindow,
+        // allowing move_cursor() to mutate MainWindow::_cursor
+        // despite not being passed a reference.
+        if (move_cursor) {
+            move_cursor();
+        }
+
         _history.push(edit::CursorEdit{std::move(command), old_cursor, *_cursor});
+        if (advance_digit) {
+            _cursor.advance_digit();
+        } else {
+            _cursor.reset_digit();
+        }
     }
 
     void restart_audio_thread() override {

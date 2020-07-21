@@ -15,6 +15,7 @@
 #include <QMainWindow>
 #include <QWidget>
 
+#include <functional>  // std::function
 #include <memory>
 
 namespace gui::main_window {
@@ -88,15 +89,17 @@ public:
 
     virtual AudioState audio_state() const = 0;
 
-    /// This is a bit of an unusual API. Caller should call:
-    ///
-    /// Cursor old_cusor = MainWindow::_cursor;
-    /// EditBox command = ...;
-    /// MainWindow::_cursor = new position;
-    /// MainWindow::push_edit(command, old cursor);
-    ///
-    /// push_edit() saves (command, old_cursor, _cursor) into the undo history.
-    virtual void push_edit(edit::EditBox command, cursor::Cursor old_cursor) = 0;
+    /// May be empty (nullptr/default).
+    using MaybeMoveCursor = std::function<void()>;
+
+    /// If move_cursor is present, calls it to move cursor.
+    /// If advance_digit is true, calls _cursor.advance_digit(),
+    /// otherwise reset_digit().
+    /// push_edit() saves (command, old_cursor, _cursor) into the undo history,
+    /// and resets _cursor.digit_index() unless preserve_digit is true.
+    virtual void push_edit(
+        edit::EditBox command, MaybeMoveCursor move_cursor, bool advance_digit = false
+    ) = 0;
 
 signals:
     void gui_refresh(MaybeSequencerTime maybe_seq_time)
