@@ -43,7 +43,7 @@ public:
     DEFAULT_MOVE(History)
 
     /// Get a const reference to the document.
-    /// To modify the document, use Command.
+    /// To modify the document, use EditBox/CursorEdit.
     doc::Document const & get_document() const {
         return _document;
     }

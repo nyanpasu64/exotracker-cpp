@@ -43,7 +43,7 @@ public:
     ///
     /// You can call apply_swap() repeatedly on the same document
     /// to repeatedly undo/redo the same action.
-    /// After performing an EditCommand, store it as an undoer.
+    /// After applying a BaseEditCommand, store it as an undoer.
     /// After undoing, store it as a redoer.
     virtual void apply_swap(doc::Document & document) = 0;
 };

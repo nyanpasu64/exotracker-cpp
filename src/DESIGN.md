@@ -84,23 +84,62 @@ This makes it easier to allocate parts of the screen to draw channels with no ov
 
 As a result, I have defined several functions to implement my drawing model in terms of QPainter.
 
-## Document architecture
+## Document/undo architecture
 
-The History class stores two copies of the current document, each located behind its own mutex. This operates analogously to double-buffered displays. Each can be designated as the front or back document. The "front document" is shown to the GUI and read by the audio thread, and never modified. The "back document" is not shown to the GUI or read by the audio thread, but mutated in response to user input.
+MainWindow and OverallSynth each keep their own copy of the document. Both threads can access their copy of the document without mutexes or locking of any kind.
 
-The interesting part is in `DocumentStore::history_apply_change()`. When the user edits the document, the program runs the edit function on the back document, swaps the roles of the documents (page flip), then runs the edit function on the new back document (which the audio thread may still be holding its mutex, so the GUI thread may block). This results in O(2*edit size) edit time instead of O(entire document) per edit. One risk of this design is that the two copies may desync; one way that may happen is if `command.redo()` is not deterministic.
+Whenever the user edits the document, both copies need to be edited in sync. To achieve this, all document mutations are reified as "command objects", or subclasses of `edit::BaseEditCommand`. This exposes a *very* simple interface, summarized below:
 
-Each document is protected by a pseudo-rwlock (backed by a mutex) for two threads. The GUI does not acquire a lock when reading, but acquires a lock (exclusive reference) when writing. The audio thread acquires a lock when reading from the document; it cannot safely write, since the GUI can read simultaneously without locking the mutex.
+    class BaseEditCommand {
+    public:
+        virtual void apply_swap(doc::Document & document) = 0;
+    };
+    using EditBox = std::unique_ptr<BaseEditCommand>;
+Every time the user performs an edit action, the program (GUI thread) calls a "constructor function" which takes a `Document const&` and parameters describing user input, and returning a `EditBox`.
 
-Since Document is mutable, it should almost never be copied (except when initializing the double-buffer), since a deep copy would be very slow. As a result, you need to explicitly call `Document.clone()` when you make a copy. By contrast, copying an immutable persistent data structure (my previous design) is merely a pointer copy and atomic refcount increase.
+The returned `EditBox` is copied. One copy is sent from the GUI to audio thread through a lock-free queue, where OverallSynth calls `apply_swap()` to apply the edit to the audio document. The other copy is kept by the GUI thread, which calls `apply_swap()` on the GUI document, then pushes the command onto the undo stack.
+
+`apply_swap()` doesn't mutate the document directly, but instead swaps the command's contents with part of the document (like a pattern vector). This was designed to satisfy two requirements: the ability to undo/redo on the GUI thread, and wait-free operation on the audio thread.
+
+### Undo/redo (GUI thread)
+
+Once you apply a change on a document, you need to be able to revert the change. You can call apply_swap() repeatedly on the same document to repeatedly undo/redo the same action. Why does this work? After applying a `BaseEditCommand`, it holds the relevant parts of the document state from before the edit. If you call `apply_swap()` again, it acts as an undo operation, restoring the old version of the document and storing the new version. You can call it again to act as a redo operation.
+
+### Wait-free operation (audio thread)
+
+When the audio thread applies an edit, the function call cannot allocate or deallocate memory. I achieve this by swapping part of the document with the edit command. For example, I can replace an entire document pattern (a `std::vector` of events belonging to one channel) with a new version from the `EditBox`. The old pattern is placed into the `EditBox` instead of being deallocated (which is unbounded-time).
+
+Once the audio thread processes a command, it cannot deallocate the command object itself, which may own vectors and other heap-allocated data. To achieve this, the audio thread's doesn't receive ownership over commands, only mutable references. The audio thread signals to the GUI thread which commands it's finished processing, so the GUI thread can destroy them.
+
+### Examples (not all implemented in tracker yet)
+
+An "insert note" function picks a single pattern in the document and creates a copy. It inserts a note in the proper spot in the copy, and returns an `EditBox` owning a `BaseEditCommand` subclass containing the edited pattern copy.
+
+When you call `edit_box->apply_swap(document)`, the edit command swaps part of `edit_box` with part of `document`.
+
+----
+
+One useful property is that an "insert instrument" or "delete note/instrument/etc." function can return the exact same `BaseEditCommand` subclass (`ImplEditCommand<PatternEdit>`), and you only have to implement the subclass once. Each subclass doesn't care about the operation performed, only the portion of the document mutated (in this case, it stores a single pattern and its location).
+
+----
+
+An "add order entry at location" function returns an `EditBox` owning a different `BaseEditCommand` subclass, holding an `optional<order entry>` (containing a vector of owned patterns) and an `OrderEntryIndex = uint8_t`.
+
+When you call `edit_box->apply_swap(document)`, since the `optional<order entry>` holds a value, the entry gets inserted into the order at the right index (which has a reserved capacity of 256 entries to avoid reallocation) and replaced with std::nullopt (which is harder in C++ than Rust).
+
+When you call `edit_box->apply_swap(document)` a second time, since the `optional<order entry>` is empty, an entry gets removed from the order and placed into `edit_box`. This undoes the original insertion.
+
+----
+
+The "remove order entry at location" function can returns the same `BaseEditCommand` subclass, only initialized to be empty instead of holding a value. Then `apply_swap()` will remove and save the corresponding entry from the document.
 
 ## Document format (unfinished, subject to change)
 
 In FamiTracker, the list of valid patterns is not exposed to the user. You can often dredge up old patterns by manually changing pattern IDs in the sequence table. You can ask FT to "Remove unused patterns".
 
-In Exotracker, PatternID will be an opaque identifier not visible to the user. Non-shared patterns are shown on the GUI as a dash. Shared pattern are shown on the GUI as the SequenceIndex of its first usage. This will make "dredging up old patterns" impossible.
+In Exotracker, currently the order/sequence owns patterns directly, making reuse impossible. If I add reuse through PatternID, it will be an opaque identifier not visible to the user. Non-shared patterns are shown on the GUI as a dash. Shared pattern are shown on the GUI as the SequenceIndex of its first usage. This will make "dredging up old patterns" impossible.
 
-I have never had a use for FT's design. However apparently other people use this feature.
+I have never had a use for dredging up old patterns. However apparently other people use this feature.
 
 ----
 
