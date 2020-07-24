@@ -56,7 +56,7 @@ using doc::events::NOTES_PER_OCTAVE;
         auto & impl, doc::events::ChromaticInt note, QChar accidental
     ) -> QString {
         auto [octave, semitone] = div(note, NOTES_PER_OCTAVE);
-        octave += cfg.bottom_octave;
+        octave += cfg.gui_bottom_octave;
 
         auto diatonic = detail::semitone_diatonics[semitone];
         if (diatonic >= 0) {

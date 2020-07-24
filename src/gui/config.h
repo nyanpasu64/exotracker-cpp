@@ -153,7 +153,7 @@ inline namespace visual {
 
     struct NoteNameConfig {
         /// MIDI pitch 0 lies in this octave.
-        int bottom_octave;
+        int gui_bottom_octave;
 
         QChar sharp_char;
         QChar flat_char;
@@ -171,7 +171,7 @@ struct Options {
     PatternAppearance visual = default_appearance();
 
     NoteNameConfig note_names {
-        .bottom_octave = -1,
+        .gui_bottom_octave = -1,
         .sharp_char = '#',
         .flat_char = 'b',
         .natural_char = 0xB7,
