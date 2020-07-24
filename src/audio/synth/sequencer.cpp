@@ -1,6 +1,7 @@
 #define ChannelSequencer_INTERNAL public
 #include "sequencer.h"
 #include "util/release_assert.h"
+#include "util/math.h"
 
 #include <fmt/core.h>
 
@@ -76,11 +77,14 @@ doc::MaybeSeqEntryIndex calc_next_entry(
     // change function to return both a pattern and a beat.
 }
 
+using RoundFrac = doc::FractionInt (*)(BeatFraction);
+
+template<RoundFrac round_frac = doc::round_to_int>
 static BeatPlusTick frac_to_tick(TickT ticks_per_beat, BeatFraction beat) {
     doc::FractionInt ibeat = beat.numerator() / beat.denominator();
     BeatFraction fbeat = beat - ibeat;
 
-    doc::FractionInt dtick = doc::round_to_int(fbeat * ticks_per_beat);
+    doc::FractionInt dtick = round_frac(fbeat * ticks_per_beat);
 
     ibeat += dtick / ticks_per_beat;
     dtick %= ticks_per_beat;
@@ -244,9 +248,10 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             auto time = next_ev.time;
             fmt::print(
                 stderr,
-                "invalid document: event at seq {} time {}/{} + {} is in the past!\n",
+                "invalid document: event at seq {} time {} {}/{} + {} is in the past!\n",
                 _next_event.seq_entry,
-                time.anchor_beat.numerator(),
+                time.anchor_beat.numerator() / time.anchor_beat.denominator(),
+                time.anchor_beat.numerator() % time.anchor_beat.denominator(),
                 time.anchor_beat.denominator(),
                 time.tick_offset
             );
@@ -580,7 +585,7 @@ void ChannelSequencer::tempo_changed(doc::Document const & document) {
     TickT const ticks_per_beat = document.sequencer_options.ticks_per_beat;
 
     // Set real time.
-    _now.next_tick = frac_to_tick(ticks_per_beat, beat);
+    _now.next_tick = frac_to_tick<util::math::frac_floor>(ticks_per_beat, beat);
 }
 
 // end namespaces
