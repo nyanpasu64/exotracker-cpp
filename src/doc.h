@@ -25,6 +25,8 @@ using namespace ::doc::sequence;
 using namespace ::doc::instr;
 using accidental::AccidentalMode;
 
+constexpr TickT MAX_TICKS_PER_BEAT = 127;
+
 struct SequencerOptions {
     TickT ticks_per_beat;
 };
