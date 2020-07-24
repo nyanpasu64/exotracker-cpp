@@ -181,6 +181,19 @@ public:
         _history = _dummy_history;
     }
 
+    #define PROPERTY(TYPE, NAME) \
+        TYPE NAME() const { \
+            return _##NAME; \
+        } \
+        void set_##NAME(TYPE v) { \
+            _##NAME = v; \
+            update(); \
+        }
+
+    PROPERTY(int, rows_per_beat)
+    PROPERTY(int, octave)
+    PROPERTY(int, step)
+
 public slots:
     // update_time() is called by timer receiving latest time from audio thread.
     // It mutates state (cached audio playback position) and calls repaint().
