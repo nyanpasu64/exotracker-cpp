@@ -67,6 +67,8 @@ void ChannelSequencer::stop_playback() {
     // Set is-playing to false.
     _curr_ticks_per_beat = 0;
 
+    _ignore_ordering_errors = false;
+
     // This is not a full state reset yet. I don't know if that's a problem.
     // seek() should clear all applicable state before any other method can see it.
 }
@@ -267,7 +269,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         auto event_pos = event_vs_now(ticks_per_beat, now, next_ev_time);
 
         // Past events are overdue and should never happen.
-        if (event_pos == EventPos::Past) {
+        if (!_ignore_ordering_errors && event_pos == EventPos::Past) {
             auto time = next_ev.time;
             fmt::print(
                 stderr,
@@ -355,6 +357,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         check_invariants(*this);
     }
 
+    _ignore_ordering_errors = false;
     return {seq_chan_time, _events_this_tick};
 }
 
@@ -464,6 +467,7 @@ void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time)
         _next_event.event_idx++;
     }
     end_loop:
+    _ignore_ordering_errors = false;
     return;
 }
 
@@ -606,6 +610,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
         }
     }
     end_loop:
+    _ignore_ordering_errors = false;
     return;
 }
 
@@ -632,6 +637,34 @@ void ChannelSequencer::tempo_changed(doc::Document const & document) {
 
     // Set real time.
     _now.next_tick = frac_to_tick<util::math::frac_floor>(ticks_per_beat, beat);
+
+    /*
+    Sometimes it's impossible to avoid putting events in the past.
+    Suppose you start with _now = 0 and ticks/beat = 1.
+
+    When next_tick() is called at ticks/beat = 1:
+    - _next_event (ceil-rounded) will advance until it's greater than _now
+      (1/4 rounds up to 1 > _now=0)
+    - _now will advance by 1 tick (_now := 1)
+
+    When tempo_changed() is called at ticks/beat = 11:
+    - _now stays at 1
+
+    When next_tick() is called at ticks/beat = 11:
+    - _next_event is at 1/4, which rounds to 3.
+    - _now rounds to 11.
+    - The event is in the past.
+
+    How would we fix this?
+    Setting frac_to_tick to frac_floor() (towards the past)
+    seems to resolve time paradoxes in the absence of delayed/early notes.
+    Switching between custom user grooves can cause semi-random time paradoxes.
+    Delayed/early notes can cause unavoidable time paradoxes
+    (not just due to rounding/quantization).
+
+    So set a flag saying "ignore past event errors".
+    */
+    _ignore_ordering_errors = true;
 }
 
 // end namespaces

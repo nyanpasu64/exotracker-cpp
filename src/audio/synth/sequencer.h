@@ -128,6 +128,8 @@ ChannelSequencer_INTERNAL:
     /// "is playing" = (_curr_ticks_per_beat != 0).
     TickT _curr_ticks_per_beat;
 
+    bool _ignore_ordering_errors;
+
     /// Next event in document to be played.
     /// May not even be in the same pattern as _now.
     /// Mutations are affected by _now.
