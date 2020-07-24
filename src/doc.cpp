@@ -10,8 +10,6 @@
 namespace doc {
 
 inline namespace tuning {
-    constexpr double NOTES_PER_OCTAVE = 12.;
-
     FrequenciesOwned equal_temperament(
         ChromaticInt root_chromatic, FreqDouble root_frequency
     ) {

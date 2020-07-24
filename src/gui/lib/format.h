@@ -37,7 +37,7 @@ namespace detail {
 
 [[nodiscard]] std::optional<uint8_t> hex_from_key(QKeyEvent const & key);
 
-constexpr int NOTES_PER_OCTAVE = 12;
+using doc::events::NOTES_PER_OCTAVE;
 
 [[nodiscard]] static QString midi_to_note_name(
     config::NoteNameConfig cfg, AccidentalMode accidental_mode, doc::events::Note note

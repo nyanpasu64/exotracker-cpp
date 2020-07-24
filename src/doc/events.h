@@ -18,6 +18,7 @@ namespace doc::events {
 inline namespace note_ {
     using ChromaticInt = int16_t;
     constexpr int CHROMATIC_COUNT = 128;
+    constexpr int NOTES_PER_OCTAVE = 12;
 
     struct Note {
         ChromaticInt value;
