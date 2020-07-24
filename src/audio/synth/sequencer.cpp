@@ -7,11 +7,21 @@
 
 #include <algorithm>  // std::min
 #include <limits>  // std::numeric_limits
+#include <string>
 #include <type_traits>  // std::is_signed_v
 
 namespace audio::synth::sequencer {
 
 using doc::BeatFraction;
+
+static std::string format_frac(BeatFraction frac) {
+    return fmt::format(
+        "{} {}/{}",
+        frac.numerator() / frac.denominator(),
+        frac.numerator() % frac.denominator(),
+        frac.denominator()
+    );
+}
 
 // TODO add support for grooves.
 // We need to remove usages of `doc::round_to_int()`
@@ -56,6 +66,9 @@ void ChannelSequencer::stop_playback() {
 
     // Set is-playing to false.
     _curr_ticks_per_beat = 0;
+
+    // This is not a full state reset yet. I don't know if that's a problem.
+    // seek() should clear all applicable state before any other method can see it.
 }
 
 doc::MaybeSeqEntryIndex calc_next_entry(
@@ -128,9 +141,19 @@ EventPos event_vs_now(TickT ticks_per_beat, BeatPlusTick now, BeatPlusTick ev) {
     }
 };
 
+void print_chip_channel(ChannelSequencer const& self) {
+    fmt::print(stderr, "seq {},{} ", self._chip_index, self._chan_index);
+}
+
 std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     doc::Document const & document
 ) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "begin tick {}, {}, {}\n", _now.seq_entry, _now.next_tick.beat, _now.next_tick.dtick);
+    fmt::print(stderr, "\tcurrent event {}, {}\n", _next_event.seq_entry, _next_event.event_idx);
+    #endif
+
     _events_this_tick.clear();
 
     // Assert that seek() was called earlier.
@@ -248,17 +271,25 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             auto time = next_ev.time;
             fmt::print(
                 stderr,
-                "invalid document: event at seq {} time {} {}/{} + {} is in the past!\n",
+                "invalid document: event at seq {} time {} + {} is in the past!\n",
                 _next_event.seq_entry,
-                time.anchor_beat.numerator() / time.anchor_beat.denominator(),
-                time.anchor_beat.numerator() % time.anchor_beat.denominator(),
-                time.anchor_beat.denominator(),
+                format_frac(time.anchor_beat),
                 time.tick_offset
             );
         }
 
         // Past and present events should be played.
         if (event_pos != EventPos::Future) {
+            #ifdef SEQUENCER_DEBUG
+            fmt::print(
+                stderr,
+                "\tadding event {} -> {}+{}\n",
+                format_frac(next_ev.time.anchor_beat),
+                next_ev_time.beat,
+                next_ev_time.dtick
+            );
+            #endif
+
             _events_this_tick.push_back(next_ev.v);
 
             // _next_event.event_idx may be out of bounds.
@@ -328,6 +359,11 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 }
 
 void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "seek {}, {}\n", time.seq_entry_index, format_frac(time.beat));
+    #endif
+
     // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
     release_assert(_chip_index < nchip);
@@ -443,6 +479,11 @@ then round down when converting back to a tick
 */
 
 void ChannelSequencer::doc_edited(doc::Document const & document) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "doc_edited\n");
+    #endif
+
     // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
     release_assert(_chip_index < nchip);
@@ -569,6 +610,11 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
 }
 
 void ChannelSequencer::tempo_changed(doc::Document const & document) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "tempo_changed {}\n", document.sequencer_options.ticks_per_beat);
+    #endif
+
     // beat must be based on the current value of _now,
     // not the previously returned "start of beat".
     // Or else, reassigning _now could erase pattern transitions
