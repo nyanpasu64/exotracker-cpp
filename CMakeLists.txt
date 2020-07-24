@@ -133,6 +133,7 @@ add_executable(exotracker-bin
         src/gui/config.cpp
 
         src/sample_docs.cpp
+        src/edit/edit_doc.cpp
         src/edit/edit_pattern.cpp
         src/edit_util/kv.cpp
         src/gui/history.cpp
