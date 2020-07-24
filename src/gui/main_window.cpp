@@ -1,14 +1,28 @@
 #include "main_window.h"
 #include "gui/pattern_editor/pattern_editor_panel.h"
-#include "lib/lightweight.h"
+#include "lib/layout_macros.h"
 #include "gui_common.h"
 #include "cmd_queue.h"
 #include "util/release_assert.h"
+#include "util/math.h"
 
 #include <fmt/core.h>
 #include <rtaudio/RtAudio.h>
 #include <verdigris/wobjectimpl.h>
 
+// Widgets
+#include <QAbstractScrollArea>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QGroupBox>
+#include <QLabel>
+#include <QLineEdit>
+#include <QSpinBox>
+#include <QToolBar>
+// Layouts
+#include <QBoxLayout>
+#include <QFormLayout>
+// Other
 #include <QAction>
 #include <QDebug>
 #include <QGuiApplication>
@@ -27,6 +41,7 @@ using std::unique_ptr;
 using std::make_unique;
 
 using gui::pattern_editor::PatternEditorPanel;
+using util::math::ceildiv;
 
 
 const cursor::Cursor & CursorAndDigit::get() const {
@@ -77,8 +92,210 @@ using doc::BeatFraction;
 using cmd_queue::CommandQueue;
 using cmd_queue::AudioCommand;
 
+constexpr int MAX_BEATS_PER_PATTERN = 256;
+
+struct MainWindowUi : MainWindow {
+    using MainWindow::MainWindow;
+
+    // Use raw pointers since QObjects automatically destroy children.
+
+    // Global state (view)
+    QCheckBox * _follow_playback;
+    QCheckBox * _compact_view;
+
+    // Per-song ephemeral state
+    QSpinBox * _rows_per_beat;
+
+    // Song options
+    QSpinBox * _ticks_per_beat;
+    QSpinBox * _beats_per_measure;
+    QComboBox * _end_action;
+    QSpinBox * _end_jump_to;
+
+    // Order entry settings
+    QSpinBox * _length_beats;
+
+    // Global state (editing)
+    QSpinBox * _octave;
+    QSpinBox * _step;
+    QCheckBox * _overflow_paste;
+    QCheckBox * _key_repeat;
+
+    PatternEditorPanel * _pattern_editor_panel;
+
+    /// Output: _pattern_editor_panel.
+    void setup_widgets() {
+
+        auto main = this;
+
+        {main__tb(QToolBar);
+            tb->setFloatable(false);
+
+            // View options.
+            tb->addWidget([this] {
+                auto w = _follow_playback = new QCheckBox;
+                w->setEnabled(false);
+                w->setText(tr("Follow playback"));
+                return w;
+            }());
+
+            tb->addWidget([this] {
+                auto w = _compact_view = new QCheckBox;
+                w->setEnabled(false);
+                w->setText(tr("Compact view"));
+                return w;
+            }());
+
+            tb->addSeparator();
+
+            tb->addWidget([] {
+                auto w = new QLabel{tr("Rows/beat")};
+                w->setMargin(6);
+                return w;
+            }());
+            tb->addWidget([this] {
+                auto w = _rows_per_beat = new QSpinBox;
+                w->setRange(1, 64);
+                return w;
+            }());
+
+            // TODO add zoom checkbox
+        }
+
+        {main__central_c_l(QWidget, QVBoxLayout);
+            l->setMargin(0);
+
+            // Top panel.
+            setup_panel(l);
+
+            // Pattern view.
+            {l__c_l(QFrame, QVBoxLayout);
+                c->setFrameStyle(int(QFrame::StyledPanel) | QFrame::Sunken);
+
+                c->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+                l->setMargin(0);
+                {l__w(PatternEditorPanel(this));
+                    w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+                    _pattern_editor_panel = w;
+                }
+            }
+        }
+    }
+
+    void setup_panel(QBoxLayout * l) { {  // needed to allow shadowing
+        l__c_l(QWidget, QHBoxLayout);
+        c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+        struct OrderEditor : QLabel {
+            using QLabel::QLabel;
+            QSize sizeHint() const override {
+                return QSize{256, 0};
+            }
+        };
+
+        // Order editor.
+        {l__w(OrderEditor(tr("pretend there's an\norder editor here")));
+            w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+        }
+
+        // Song options.
+        {l__l(QVBoxLayout);
+
+            // Song settings
+            {l__c_form(QGroupBox, QFormLayout);
+                c->setTitle(tr("Song"));
+
+                // Large values may cause issues on 8-bit processors.
+                form->addRow(
+                    tr("Ticks/beat"),
+                    [this] {
+                        auto w = _ticks_per_beat = new QSpinBox;
+                        w->setRange(1, doc::MAX_TICKS_PER_BEAT);
+                        return w;
+                    }()
+                );
+
+                // Purely cosmetic, no downside to large values.
+                form->addRow(
+                    tr("Beats/measure"),
+                    [this] {
+                        auto w = _beats_per_measure = new QSpinBox;
+                        w->setRange(1, MAX_BEATS_PER_PATTERN);
+                        w->setEnabled(false);
+                        return w;
+                    }()
+                );
+
+                // Song end selector.
+                {form__l(QHBoxLayout);
+                    l->addWidget(new QLabel(tr("End")));
+
+                    {l__w(QComboBox);
+                        _end_action = w;
+                        w->setEnabled(false);
+                        w->addItem(tr("Stop"));
+                        w->addItem(tr("Jump to"));
+                    }
+
+                    {l__w(QSpinBox);
+                        _end_jump_to = w;
+                        w->setEnabled(false);
+                        w->setRange(0, doc::MAX_SEQUENCE_LEN - 1);
+                    }
+                }
+            }
+
+            // Order entry settings
+            {l__c_form(QGroupBox, QFormLayout);
+                c->setTitle(tr("Order entry"));
+
+                form->addRow(
+                    new QLabel(tr("Pattern length")),
+                    [this] {
+                        auto w = _length_beats = new QSpinBox;
+                        w->setRange(1, MAX_BEATS_PER_PATTERN);
+                        w->setEnabled(false);
+                        return w;
+                    }()
+                );
+            }
+        }
+
+        // Pattern editing.
+        {l__c_form(QGroupBox, QFormLayout);
+            c->setTitle(tr("Pattern editing"));
+
+            {form__label_w(tr("Octave"), QSpinBox);
+                _octave = w;
+
+                int gui_bottom_octave =
+                    get_app().options().note_names.gui_bottom_octave;
+                int peak_octave = ceildiv(
+                    doc::CHROMATIC_COUNT - 1, doc::NOTES_PER_OCTAVE
+                );
+                w->setRange(gui_bottom_octave, gui_bottom_octave + peak_octave);
+            }
+
+            {form__label_w(tr("Step"), QSpinBox);
+                _step = w;
+                w->setRange(0, 256);
+            }
+
+            {form__w(QCheckBox(tr("Overflow paste")));
+                _overflow_paste = w;
+                w->setEnabled(false);
+            }
+
+            {form__w(QCheckBox(tr("Key repetition")));
+                _key_repeat = w;
+                w->setEnabled(false);
+            }
+        }
+    } }
+};
+
 // module-private
-class MainWindowImpl : public MainWindow {
+class MainWindowImpl : public MainWindowUi {
      W_OBJECT(MainWindowImpl)
 public:
     // fields
@@ -87,9 +304,6 @@ public:
     // GUI widgets/etc.
     QScreen * _screen;
     QTimer _gui_refresh_timer;
-
-    // Use raw pointers since QObjects automatically destroy children.
-    PatternEditorPanel * _pattern_editor_panel;
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
@@ -219,6 +433,55 @@ public:
     // impl MainWindow
     void _() override {}
 
+    void on_startup(
+        config::Options const& options, doc::Document const& document
+    ) {
+        // Upon application startup, pattern editor panel is focused.
+        _pattern_editor_panel->setFocus();
+
+        auto connect_spin = [&](QSpinBox * spin, auto target, auto func) {
+            connect(
+                spin,
+                qOverload<int>(&QSpinBox::valueChanged),
+                target,
+                func,
+                Qt::UniqueConnection
+            );
+        };
+
+        auto pattern_setter = [this] (auto method) {
+            return std::bind_front(method, _pattern_editor_panel);
+        };
+
+        #define BIND_SPIN(KEY) \
+            _##KEY->setValue(_pattern_editor_panel->KEY()); \
+            connect_spin( \
+                _##KEY, \
+                _pattern_editor_panel, \
+                pattern_setter(&PatternEditorPanel::set_##KEY) \
+            );
+
+        BIND_SPIN(rows_per_beat)
+
+        auto gui_bottom_octave = [] () {
+            return get_app().options().note_names.gui_bottom_octave;
+        };
+
+        // Visual octave: add offset.
+        _octave->setValue(_pattern_editor_panel->octave() + gui_bottom_octave());
+
+        // MIDI octave: subtract offset.
+        connect_spin(
+            _octave,
+            _pattern_editor_panel,
+            [this, gui_bottom_octave] (int octave) {
+                _pattern_editor_panel->set_octave(octave - gui_bottom_octave());
+            }
+        );
+
+        BIND_SPIN(step)
+    }
+
     std::optional<AudioThreadHandle> const & audio_handle() const override {
         return _audio_handle;
     }
@@ -267,7 +530,7 @@ public:
 
     // private methods
     MainWindowImpl(doc::Document document, QWidget * parent)
-        : MainWindow(parent)
+        : MainWindowUi(parent)
         , _history{std::move(document)}
         , _rt{}
         , _audio_handle{}
@@ -303,14 +566,9 @@ public:
 
         reload_shortcuts();
         // TODO reload_shortcuts() when shortcut keybinds changed
-    }
 
-    /// Output: _pattern_editor_panel.
-    void setup_widgets() {
-        auto w = this;
-        {add_central_widget_no_layout(PatternEditorPanel(parent));
-            _pattern_editor_panel = w;
-        }
+        // Last thing.
+        on_startup(get_app().options(), _history.get_document());
     }
 
     void setup_screen() {

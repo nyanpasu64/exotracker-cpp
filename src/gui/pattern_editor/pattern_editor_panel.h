@@ -128,7 +128,7 @@ class PatternEditorPanel : public QWidget
 {
     W_OBJECT(PatternEditorPanel)
 public:
-    explicit PatternEditorPanel(MainWindow * parent);
+    explicit PatternEditorPanel(MainWindow * win, QWidget * parent = nullptr);
 
 PatternEditorPanel_INTERNAL:
     using Super = QWidget;

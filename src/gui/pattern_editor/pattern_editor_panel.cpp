@@ -245,16 +245,13 @@ void create_image(PatternEditorPanel & self) {
     self._temp_image = QImage(self.geometry().size(), format);
 }
 
-PatternEditorPanel::PatternEditorPanel(MainWindow * parent)
+PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
     : QWidget(parent)
-    , _win{*parent}
+    , _win{*win}
     , _dummy_history{doc::DocumentCopy{}}
     , _history{_dummy_history}
     , _shortcuts{this}
 {
-    // Upon application startup, pattern editor panel is focused.
-    setFocus();
-
     // Focus widget on click.
     setFocusPolicy(Qt::ClickFocus);
 
@@ -268,7 +265,7 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * parent)
     // setContextMenuPolicy(Qt::CustomContextMenu);
 
     connect(
-        parent,
+        win,
         &MainWindow::gui_refresh,
         this,
         [this] (MaybeSequencerTime maybe_seq_time) {
