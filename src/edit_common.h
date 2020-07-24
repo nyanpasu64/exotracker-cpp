@@ -1,9 +1,11 @@
 #pragma once
 
+#include "edit/modified_common.h"
 #include "doc.h"
 #include "gui/cursor.h"
 #include "util/copy_move.h"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 
@@ -19,6 +21,9 @@ class BaseEditCommand;
 ///
 /// Is this a good design? I don't know.
 using EditBox = std::unique_ptr<BaseEditCommand>;
+
+using modified::ModifiedInt;
+using modified::ModifiedFlags;
 
 class BaseEditCommand {
 public:
@@ -52,6 +57,12 @@ public:
     /// - prev and this mutate the same state,
     ///   so History can discard this entirely after calling apply_swap().
     virtual bool can_coalesce(BaseEditCommand & prev) const = 0;
+
+    /// Returns a bitflag specifying which parts of the document are modified.
+    /// Called by the audio thread to invalidate/recompute sequencer state.
+    ///
+    /// (This could be a base-class field instead, I guess.)
+    [[nodiscard]] virtual ModifiedFlags modified() const = 0;
 };
 
 using gui::cursor::Cursor;

@@ -73,10 +73,11 @@ static Document simple_doc() {
 }
 
 static ChannelSequencer make_channel_sequencer(
-    ChipIndex chip_index, ChannelIndex chan_index
+    ChipIndex chip_index, ChannelIndex chan_index, Document const & document
 ) {
     ChannelSequencer seq;
     seq.set_chip_chan(chip_index, chan_index);
+    seq.seek(document, PatternAndBeat{});
     return seq;
 }
 
@@ -90,7 +91,7 @@ PARAMETERIZE(should_reload_doc, bool, should_reload_doc,
 
 TEST_CASE("Test basic sequencer") {
     auto document = simple_doc();
-    auto seq = make_channel_sequencer(0, 0);
+    auto seq = make_channel_sequencer(0, 0, document);
 
     bool reload_doc;
     PICK(should_reload_doc(reload_doc));
@@ -141,7 +142,7 @@ TEST_CASE("Test basic sequencer") {
 /// Too simple IMO.
 TEST_CASE("Test seeking") {
     auto document = simple_doc();
-    auto seq = make_channel_sequencer(0, 0);
+    auto seq = make_channel_sequencer(0, 0, document);
 
     bool reload_doc;
     PICK(should_reload_doc(reload_doc));
@@ -184,8 +185,8 @@ TEST_CASE("Ensure sequencer behaves the same with and without reloading position
         ) {
             CAPTURE(chan);
 
-            auto normal = make_channel_sequencer(0, chan);
-            auto reload = make_channel_sequencer(0, chan);
+            auto normal = make_channel_sequencer(0, chan, document);
+            auto reload = make_channel_sequencer(0, chan, document);
 
             int normal_loops = 0;
             int reload_loops = 0;
@@ -199,6 +200,53 @@ TEST_CASE("Ensure sequencer behaves the same with and without reloading position
                 }
 
                 reload.doc_edited(document);
+                auto [reload_time, reload_ev] = reload.next_tick(document);
+                if (
+                    reload_time
+                    == SequencerTime{0, reload_time.curr_ticks_per_beat, 0, 0}
+                ) {
+                    reload_loops++;
+                }
+
+                CHECK(normal_time == reload_time);
+                CHECK(normal_ev == reload_ev);
+
+                if (normal_loops == 2 || reload_loops == 2) {
+                    break;
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("Ensure sequencer behaves the same with and without reloading tempo") {
+    char const * doc_names[] {"dream-fragments", "world-revolution"};
+    for (auto doc_name : doc_names) {
+        CAPTURE(doc_name);
+        Document const & document = sample_docs::DOCUMENTS.at(doc_name);
+
+        for (
+            ChannelIndex chan = 0;
+            chan < CHIP_TO_NCHAN[(size_t) ChipKind::Apu1];
+            chan++
+        ) {
+            CAPTURE(chan);
+
+            auto normal = make_channel_sequencer(0, chan, document);
+            auto reload = make_channel_sequencer(0, chan, document);
+
+            int normal_loops = 0;
+            int reload_loops = 0;
+            while (true) {
+                auto [normal_time, normal_ev] = normal.next_tick(document);
+                if (
+                    normal_time
+                    == SequencerTime{0, normal_time.curr_ticks_per_beat, 0, 0}
+                ) {
+                    normal_loops++;
+                }
+
+                reload.tempo_changed(document);
                 auto [reload_time, reload_ev] = reload.next_tick(document);
                 if (
                     reload_time
@@ -323,8 +371,8 @@ TEST_CASE("Randomly switch between randomly generated documents") {
 
         Document document = random_doc(rng);
 
-        auto pure = make_channel_sequencer(0, 0);
-        auto dirty = make_channel_sequencer(0, 0);
+        auto pure = make_channel_sequencer(0, 0, document);
+        auto dirty = make_channel_sequencer(0, 0, document);
 
         for (int tick = 0; tick < 100; tick++) {
             CAPTURE(tick);
@@ -334,7 +382,7 @@ TEST_CASE("Randomly switch between randomly generated documents") {
 
                 // The ground truth is trained on the new document from scratch.
                 // Replaying the entire history is O(n^2) but whatever.
-                pure = make_channel_sequencer(0, 0);
+                pure = make_channel_sequencer(0, 0, document);
                 for (int j = 0; j < tick; j++) {
                     pure.next_tick(document);
                 }
@@ -348,6 +396,80 @@ TEST_CASE("Randomly switch between randomly generated documents") {
             auto [dirty_time, dirty_ev] = dirty.next_tick(document);
             CHECK(pure_time == dirty_time);
             CHECK(pure_ev == dirty_ev);
+        }
+    }
+}
+
+TEST_CASE("Deterministically switch between tempos") {
+    // Seed 1716136822 in the below random test.
+    Document document = simple_doc();
+
+    auto seq = make_channel_sequencer(0, 0, document);
+
+    for (int tick = 0; tick < 500; tick++) {
+        CAPTURE(tick);
+        // Randomly decide whether to switch documents.
+        if (tick == 1) {
+            // This frequently causes `release_assert(dbeat <= 1)` to fail.
+            document.sequencer_options.ticks_per_beat = 6;
+            seq.tempo_changed(document);
+        }
+        if (tick == 3) {
+            document.sequencer_options.ticks_per_beat = 1;
+            seq.tempo_changed(document);
+        }
+
+        seq.next_tick(document);
+    }
+}
+
+TEST_CASE("Randomly switch between random tempos") {
+    // Maybe my random test architecture from last time wasn't wasted.
+
+    using RNG = std::minstd_rand;
+    RNG rng{rd()};
+
+    for (int i = 0; i < 100; i++) {
+        // Capture state if test fails.
+        std::ostringstream ss;
+        ss << rng;
+        auto rng_state = ss.str();
+        CAPTURE(rng_state);
+
+        using rand_u32 = std::uniform_int_distribution<uint32_t>;
+        using rand_tick = std::uniform_int_distribution<TickT>;
+        using rand_bool = std::bernoulli_distribution;
+
+        auto random_doc = [] (RNG & rng) {
+            // `beat + 2` can overflow the end of the pattern.
+            // Events are misordered, but doc_edited() pretends
+            // the new document was always there (and ignores misorderings).
+            auto beat = rand_u32{0, 2}(rng);
+            auto delay = rand_tick{0, 9}(rng);
+            return parametric_doc(beat, delay);
+        };
+
+        Document document = random_doc(rng);
+
+        auto seq = make_channel_sequencer(0, 0, document);
+
+        for (int tick = 0; tick < 500; tick++) {
+            CAPTURE(tick);
+            // Randomly decide whether to switch documents.
+            if (rand_bool{0.4}(rng)) {
+                if (rand_bool{0.25}(rng)) {
+                    // This frequently causes `release_assert(dbeat <= 1)` to fail.
+                    document.sequencer_options.ticks_per_beat = 1;
+                    seq.tempo_changed(document);
+                } else {
+                    document.sequencer_options.ticks_per_beat =
+                        (TickT) rand_u32{2, 10}(rng);
+                    seq.tempo_changed(document);
+                }
+            }
+
+            // TODO add way for sequencers to report misordered events to caller.
+            seq.next_tick(document);
         }
     }
 }

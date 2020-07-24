@@ -1,8 +1,10 @@
 #include "synth.h"
 #include "chip_kinds.h"
+#include "edit/modified.h"
 #include "util/release_assert.h"
 
 #include <cstddef>  // size_t
+#include <optional>
 #include <stdexcept>  // std::logic_error will be used once I add APU2.
 #include <utility>  // std::move
 
@@ -68,6 +70,9 @@ OverallSynth::OverallSynth(
     _events.set_timeout(SynthEvent::Tick, 0);
 }
 
+using edit::ModifiedInt;
+using edit::ModifiedFlags;
+
 void OverallSynth::synthesize_overall(
     gsl::span<Amplitude> output_buffer,
     size_t const mono_smp_per_block
@@ -97,17 +102,19 @@ void OverallSynth::synthesize_overall(
     // The "end of callback" time will get exposed to the GUI
     // once the audio starts (not finishes) playing...
     // but I don't care anymore.
-    auto const orig_seq_time = _maybe_seq_time.load(std::memory_order_relaxed);
+    MaybeSequencerTime const orig_seq_time =
+        _maybe_seq_time.load(std::memory_order_relaxed);
 
     // Increases as we run ticks.
-    auto seq_time = orig_seq_time;
+    MaybeSequencerTime seq_time = orig_seq_time;
 
-    AudioCommand * cmd = _seen_command.load(std::memory_order_relaxed);
-    auto const orig_cmd = cmd;
+    AudioCommand * const orig_cmd = _seen_command.load(std::memory_order_relaxed);
+    AudioCommand * cmd = orig_cmd;
 
     // Handle all commands we haven't seen yet.
 
-    bool doc_edited = false;
+    ModifiedInt total_modified = 0;
+
     // Paired with CommandQueue::push() store(release).
     for (
         ; AudioCommand * next = cmd->next.load(std::memory_order_acquire); cmd = next
@@ -136,29 +143,34 @@ void OverallSynth::synthesize_overall(
         if (auto edit_ptr = std::get_if<cmd_queue::EditBox>(msg)) {
             // Edit synth's copy of the document.
             auto & edit = **edit_ptr;
+
+            // It's okay to apply edits mid-tick,
+            // since _document is only examined by the sequencer and driver,
+            // not the hardware synth.
             edit.apply_swap(_document);
 
-            /*
-            TODO Pattern edits invalidate sequencer events.
-            Tempo edits invalidate sequencer times.
-            Instrument/tuning edits might invalidate driver or cause OOB reads.
+            // If not _sequencer_running, edits don't matter. upon playback, we'll seek.
+            if (!_sequencer_running) {
+                continue;
+            }
 
-            We need to distinguish these cases. Maybe call methods right away,
-            maybe have multiple invalidation flags.
-
-            It's okay to apply edits mid-tick,
-            since _document is only examined by the sequencer and driver,
-            not the hardware synth.
-            */
-            doc_edited = true;
+            auto modified = edit.modified();
+            total_modified |= modified;
         }
     }
 
-    if (doc_edited) {
+    if (total_modified & ModifiedFlags::Tempo) {
+        for (auto & chip : _chip_instances) {
+            chip->tempo_changed(_document);
+        }
+    }
+    if (total_modified & ModifiedFlags::Patterns) {
         for (auto & chip : _chip_instances) {
             chip->doc_edited(_document);
         }
     }
+
+    // TODO Instrument/tuning edits might invalidate driver or cause OOB reads.
 
     while (true) {
         release_assert(samples_so_far <= nsamp);

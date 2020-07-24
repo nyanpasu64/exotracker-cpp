@@ -1,5 +1,6 @@
 #include "edit_doc.h"
 #include "edit_impl.h"
+#include "edit/modified.h"
 #include "doc.h"
 #include "util/typeid_cast.h"
 
@@ -17,6 +18,8 @@ template<typename T>
 struct Setter {
     GetMutBare<T> _field;
     int _value;
+
+    ModifiedFlags _modified;
 
     void apply_swap(doc::Document & document) {
         std::swap(_field(document), _value);
@@ -38,6 +41,7 @@ EditBox set_ticks_per_beat(int ticks_per_beat) {
     return make_command(Setter<doc::TickT> {
         mut_ticks_per_beat,
         ticks_per_beat,
+        ModifiedFlags::Tempo,
     });
 }
 

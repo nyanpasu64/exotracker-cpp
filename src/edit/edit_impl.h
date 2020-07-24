@@ -29,6 +29,10 @@ struct ImplEditCommand : BaseEditCommand {
     bool can_coalesce(BaseEditCommand & prev) const override {
         return _body.can_coalesce(prev);
     }
+
+    ModifiedFlags modified() const override {
+        return _body._modified;
+    }
 };
 
 template<typename Body>

@@ -1,7 +1,8 @@
 #define ChannelSequencer_INTERNAL public
 #include "sequencer.h"
-
 #include "util/release_assert.h"
+
+#include <fmt/core.h>
 
 #include <algorithm>  // std::min
 #include <limits>  // std::numeric_limits
@@ -46,6 +47,14 @@ ChannelSequencer::ChannelSequencer() {
     We should never reach or exceed 4 events simultaneously.
     */
     _events_this_tick.reserve(4);
+    stop_playback();  // initializes _curr_ticks_per_beat
+}
+
+void ChannelSequencer::stop_playback() {
+    _now = {};
+
+    // Set is-playing to false.
+    _curr_ticks_per_beat = 0;
 }
 
 doc::MaybeSeqEntryIndex calc_next_entry(
@@ -72,6 +81,10 @@ static BeatPlusTick frac_to_tick(TickT ticks_per_beat, BeatFraction beat) {
     BeatFraction fbeat = beat - ibeat;
 
     doc::FractionInt dtick = doc::round_to_int(fbeat * ticks_per_beat);
+
+    ibeat += dtick / ticks_per_beat;
+    dtick %= ticks_per_beat;
+
     return BeatPlusTick{.beat=ibeat, .dtick=dtick};
 }
 
@@ -116,6 +129,9 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 ) {
     _events_this_tick.clear();
 
+    // Assert that seek() was called earlier.
+    release_assert(_curr_ticks_per_beat != 0);
+
     // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
     release_assert(_chip_index < nchip);
@@ -124,6 +140,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
+    _curr_ticks_per_beat = ticks_per_beat;
 
     // SequencerTime is current tick (just occurred), not next tick.
     // This is a subjective choice?
@@ -315,6 +332,9 @@ void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time)
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
 
+    // Set is-playing to true.
+    _curr_ticks_per_beat = ticks_per_beat;
+
     // Set real time.
     {
         BeatPlusTick now_ticks = frac_to_tick(ticks_per_beat, time.beat);
@@ -427,6 +447,9 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
 
+    // *everything* needs to be overhauled when I add mid-song tempo changes.
+    release_assert_equal(_curr_ticks_per_beat, ticks_per_beat);
+
     // Set next event to play.
     if (
         _next_event.prev_seq_entry.has_value() && !_pattern_offset.event_is_behind()
@@ -538,6 +561,26 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
     }
     end_loop:
     return;
+}
+
+void ChannelSequencer::tempo_changed(doc::Document const & document) {
+    // beat must be based on the current value of _now,
+    // not the previously returned "start of beat".
+    // Or else, reassigning _now could erase pattern transitions
+    // and break invariants.
+
+    // Assert that seek() was called earlier.
+    release_assert(_curr_ticks_per_beat != 0);
+
+    doc::BeatFraction beat{
+        _now.next_tick.beat + doc::BeatFraction{
+            _now.next_tick.dtick, _curr_ticks_per_beat
+        }
+    };
+    TickT const ticks_per_beat = document.sequencer_options.ticks_per_beat;
+
+    // Set real time.
+    _now.next_tick = frac_to_tick(ticks_per_beat, beat);
 }
 
 // end namespaces

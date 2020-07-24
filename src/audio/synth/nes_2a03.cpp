@@ -100,12 +100,18 @@ public:
     }
 
     void stop_playback() override {
+        _chip_sequencer.stop_playback();
+
         // May append to _register_writes.
         _driver.stop_playback(_register_writes);
     }
 
-    void doc_edited(const doc::Document & document) override {
+    void doc_edited(doc::Document const & document) override {
         _chip_sequencer.doc_edited(document);
+    }
+
+    void tempo_changed(doc::Document const & document) override {
+        _chip_sequencer.tempo_changed(document);
     }
 
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
