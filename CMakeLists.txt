@@ -46,6 +46,10 @@ if (WIN32)
     endif ()
 endif ()
 
+if (CMAKE_BUILD_TYPE STREQUAL DEBUG)
+    add_compile_definitions(DEBUG=1)
+endif()
+
 # https://foonathan.net/2018/10/cmake-warnings/
 # more warning flags at https://stackoverflow.com/questions/5088460
 set(options-3rdparty $<$<CXX_COMPILER_ID:MSVC>:/W3>)
