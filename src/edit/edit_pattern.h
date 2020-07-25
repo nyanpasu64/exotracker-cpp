@@ -6,6 +6,7 @@
 #include "timing_common.h"
 
 #include <memory>
+#include <tuple>
 #include <variant>
 
 namespace edit::edit_pattern {
@@ -81,7 +82,7 @@ EditBox instrument_digit_1(
 /// Takes an instrument field with one nybble filled in,
 /// moves the nybble to the left, and appends the nybble entered by the user.
 /// Will be merged with previous instrument_digit_1() in undo history.
-EditBox instrument_digit_2(
+std::tuple<doc::InstrumentIndex, EditBox> instrument_digit_2(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,

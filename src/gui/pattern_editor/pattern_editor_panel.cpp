@@ -1776,6 +1776,7 @@ void add_instrument_digit(
             nullptr,
             true
         );
+        self._win._instrument = nybble;
     } else {
         // Move current instrument digit to the left, append second digit,
         // and move cursor down.
@@ -1785,11 +1786,10 @@ void add_instrument_digit(
         // To ensure this, both moving the cursor and mutating the document
         // clears _cursor.digit_index() and resets input to the first digit.
         // The only exception is "mutating the document to insert first digit".
-
-        self._win.push_edit(
-            ed::instrument_digit_2(document, chip, channel, cursor_y, nybble),
-            step_cursor_down(self)
-        );
+        auto [instr, box] =
+            ed::instrument_digit_2(document, chip, channel, cursor_y, nybble);
+        self._win.push_edit(std::move(box), step_cursor_down(self));
+        self._win._instrument = instr;
     }
 }
 

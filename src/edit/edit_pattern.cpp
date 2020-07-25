@@ -194,7 +194,7 @@ EditBox instrument_digit_1(
     });
 }
 
-EditBox instrument_digit_2(
+std::tuple<doc::InstrumentIndex, EditBox> instrument_digit_2(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
@@ -216,13 +216,16 @@ EditBox instrument_digit_2(
     uint8_t old_nybble = ev.v.instr.value_or(0);
     ev.v.instr = (old_nybble << 4) | nybble;
 
-    return make_command(PatternEdit{
-        time.seq_entry_index,
-        chip,
-        channel,
-        std::move(events),
-        Type::InstrumentDigit2,
-    });
+    return {
+        *ev.v.instr,
+        make_command(PatternEdit{
+            time.seq_entry_index,
+            chip,
+            channel,
+            std::move(events),
+            Type::InstrumentDigit2,
+        })
+    };
 }
 
 // TODO write test to ensure subcolumn/selection deletion clears empty events.
