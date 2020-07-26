@@ -19,7 +19,7 @@ using timing::SequencerTime;
 using timing::PatternAndBeat;
 
 using EventsRef = gsl::span<doc::RowEvent const>;
-using EventIndex = uint32_t;
+using doc::EventIndex;
 
 /// Why signed? Events can have negative offsets and play before their anchor beat,
 /// or even before the owning pattern starts. This is a feature(tm).
