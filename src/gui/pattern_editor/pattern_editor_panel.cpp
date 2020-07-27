@@ -1628,7 +1628,7 @@ void PatternEditorPanel::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;
 }
 
-MainWindow::MaybeMoveCursor step_cursor_down(PatternEditorPanel & self) {
+cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
     doc::Document const & document = self.get_document();
     auto cursor = self._win._cursor.get();
     move_cursor::MoveCursorYArgs args{
@@ -1637,11 +1637,9 @@ MainWindow::MaybeMoveCursor step_cursor_down(PatternEditorPanel & self) {
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    PatternAndBeat y = move_cursor::cursor_step(document, cursor, args, move_cfg);
+    cursor.y = move_cursor::cursor_step(document, cursor, args, move_cfg);
 
-    return [&self, y] () {
-        self._win._cursor.get_mut().y = y;
-    };
+    return cursor;
 }
 
 // TODO Is there a more reliable method for me to ensure that
@@ -1712,9 +1710,7 @@ void add_instrument_digit(
     if (self._win._cursor.digit_index() == 0) {
         // Erase instrument field and enter first digit.
         self._win.push_edit(
-            ed::instrument_digit_1(document, chip, channel, cursor_y, nybble),
-            nullptr,
-            true
+            ed::instrument_digit_1(document, chip, channel, cursor_y, nybble), {}, true
         );
         self._win._instrument = nybble;
     } else {
