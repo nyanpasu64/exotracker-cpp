@@ -1,8 +1,8 @@
 #pragma once
 
+#include "gui/config/cursor.h"
 #include "gui/lib/color.h"
 #include "doc/accidental_common.h"
-#include "doc/timed_events.h"
 
 #include <qkeycode/qkeycode.h>
 
@@ -14,7 +14,6 @@
 namespace gui::config {
 
 using doc::accidental::AccidentalMode;
-using doc::timed_events::BeatFraction;
 
 inline namespace keys {
     // # Shortcuts
@@ -69,12 +68,7 @@ inline namespace keys {
         std::array<KeyboardRow, 2> piano_keys{get_octave_0(), get_octave_1()};
     };
 
-    struct MovementConfig {
-        bool wrap_cursor = true;
-        bool wrap_across_frames = true;
-
-        BeatFraction page_down_distance{1};
-    };
+    using cursor::MovementConfig;
 }
 
 inline namespace visual {
