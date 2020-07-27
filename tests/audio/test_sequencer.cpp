@@ -11,18 +11,6 @@
 
 #include <random>
 
-namespace timing {
-    std::ostream& operator<< (std::ostream& os, SequencerTime const & value) {
-        os << fmt::format("SequencerTime{{{}, {}, {}, {}}}",
-            value.seq_entry_index,
-            value.curr_ticks_per_beat,
-            value.beats,
-            value.ticks
-        );
-        return os;
-    }
-}
-
 namespace audio::synth::sequencer {
 
 // I found some interesting advice for building comprehensive code tests:

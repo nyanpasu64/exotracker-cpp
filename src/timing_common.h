@@ -116,3 +116,31 @@ static_assert(
 
 
 }
+
+#ifdef UNITTEST
+
+#include <fmt/core.h>
+
+#include <ostream>
+
+namespace timing {
+    static std::ostream& operator<< (std::ostream& os, SequencerTime const & value) {
+        os << fmt::format("SequencerTime{{{}, {}, {}, {}}}",
+            value.seq_entry_index,
+            value.curr_ticks_per_beat,
+            value.beats,
+            value.ticks
+        );
+        return os;
+    }
+
+    static std::ostream& operator<< (std::ostream& os, PatternAndBeat const & value) {
+        os << fmt::format("PatternAndBeat{{{}, {}}}",
+            value.seq_entry_index,
+            format_frac(value.beat)
+        );
+        return os;
+    }
+}
+
+#endif

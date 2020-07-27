@@ -65,3 +65,31 @@ struct RowEvent {
 
 // end namespace
 }
+
+#ifdef UNITTEST
+
+#include <ostream>
+
+namespace doc::events {
+    static std::ostream& operator<< (std::ostream& os, RowEvent const & value) {
+        os << "RowEvent{";
+        if (value.note.has_value()) {
+            Note note = *value.note;
+            if (note.is_cut()) {
+                os << "note cut";
+            } else if (note.is_release()) {
+                os << "note release";
+            } else if (note.is_valid_note()) {
+                os << int(note.value);
+            } else {
+                os << "invalid note " << int(note.value);
+            }
+        }  else {
+            os << "{}";
+        }
+        os << "}";
+        return os;
+    }
+}
+
+#endif

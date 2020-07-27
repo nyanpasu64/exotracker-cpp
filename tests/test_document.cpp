@@ -9,40 +9,6 @@
 
 #include "doctest.h"
 
-namespace doc::events {
-static std::ostream& operator<< (std::ostream& os, RowEvent const & value) {
-    os << "RowEvent{";
-    if (value.note.has_value()) {
-        Note note = *value.note;
-        if (note.is_cut()) {
-            os << "note cut";
-        } else if (note.is_release()) {
-            os << "note release";
-        } else if (note.is_valid_note()) {
-            os << int(note.value);
-        } else {
-            os << "invalid note " << int(note.value);
-        }
-    }  else {
-        os << "{}";
-    }
-    os << "}";
-    return os;
-}
-}
-
-namespace doc::timed_events {
-static std::ostream& operator<< (std::ostream& os, TimeInPattern const & value) {
-    os << fmt::format(
-        "TimeInPattern{{{}/{} + {}}}",
-        value.anchor_beat.numerator(),
-        value.anchor_beat.denominator(),
-        value.tick_offset
-    );
-    return os;
-}
-}
-
 TEST_CASE("Test that TimeInPattern comparisons work properly.") {
 
     // In C++, if you aggregate-initialize and not fill in all fields,
