@@ -53,8 +53,6 @@ using namespace gui::lib::painter_ext;
 
 using util::math::increment_mod;
 using util::math::decrement_mod;
-using util::math::frac_floor;
-using util::math::frac_ceil;
 using util::reverse::reverse;
 
 using timing::MaybeSequencerTime;
@@ -1369,107 +1367,28 @@ void PatternEditorPanel::update_time(timing::MaybeSequencerTime maybe_seq_time) 
 
 // # Cursor movement
 
-static doc::FractionInt frac_prev(BeatFraction frac) {
-    return frac_ceil(frac) - 1;
-}
-
-static doc::FractionInt frac_next(BeatFraction frac) {
-    return frac_floor(frac) + 1;
-}
-
-using BeatsToUnits = BeatFraction (*)(PatternEditorPanel const &, BeatFraction);
-using UnitsToBeats = BeatFraction (*)(PatternEditorPanel const &, doc::FractionInt);
-
-// Move the cursor, snapping to the nearest unit.
-
-template<BeatsToUnits to_units, UnitsToBeats to_beats>
-void move_up(PatternEditorPanel & self) {
-    doc::Document const & document = self.get_document();
-    auto const & move_cfg = get_app().options().move_cfg;
-
-    auto & cursor_y = self._win._cursor.get_mut().y;
-
-    auto const orig_unit = to_units(self, cursor_y.beat);
-    doc::FractionInt const up_unit = frac_prev(orig_unit);
-    doc::FractionInt out_unit;
-
-    if (up_unit >= 0) {
-        out_unit = up_unit;
-
-    } else if (move_cfg.wrap_cursor) {
-        if (move_cfg.wrap_across_frames) {
-            decrement_mod(
-                cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
-            );
-        }
-
-        auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
-        out_unit = frac_prev(to_units(self, seq_entry.nbeats));
-
-    } else {
-        out_unit = 0;
-    }
-
-    cursor_y.beat = to_beats(self, out_unit);
-}
-
-template<BeatsToUnits to_units, UnitsToBeats to_beats>
-void move_down(PatternEditorPanel & self) {
-    doc::Document const & document = self.get_document();
-    auto const & move_cfg = get_app().options().move_cfg;
-
-    auto & cursor_y = self._win._cursor.get_mut().y;
-
-    auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
-    auto const num_units = to_units(self, seq_entry.nbeats);
-
-    auto const orig_unit = to_units(self, cursor_y.beat);
-    doc::FractionInt const down_unit = frac_next(orig_unit);
-    doc::FractionInt out_unit;
-
-    if (down_unit < num_units) {
-        out_unit = down_unit;
-
-    } else if (move_cfg.wrap_cursor) {
-        if (move_cfg.wrap_across_frames) {
-            increment_mod(
-                cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
-            );
-        }
-
-        out_unit = 0;
-
-    } else {
-        // don't move the cursor.
-        return;
-    }
-
-    cursor_y.beat = to_beats(self, out_unit);
-}
-
-// Beat conversion functions
-
-static inline BeatFraction rows_from_beats(
-    PatternEditorPanel const & self, BeatFraction beats
-) {
-    return beats * self._rows_per_beat;
-}
-
-template<typename T>
-static inline BeatFraction beats_from_rows(
-    PatternEditorPanel const & self, T rows
-) {
-    return rows / BeatFraction{self._rows_per_beat};
-}
-
-// Cursor movement
-
 void PatternEditorPanel::up_pressed() {
-    move_up<rows_from_beats, beats_from_rows>(*this);
+    doc::Document const & document = get_document();
+    move_cursor::MoveCursorYArgs args{
+        .rows_per_beat = _rows_per_beat,
+        .step = _step,
+    };
+    auto const& move_cfg = get_app().options().move_cfg;
+
+    auto & cursor = _win._cursor.get_mut();
+    cursor.y = move_cursor::move_up(document, cursor, args, move_cfg);
 }
 
 void PatternEditorPanel::down_pressed() {
-    move_down<rows_from_beats, beats_from_rows>(*this);
+    doc::Document const & document = get_document();
+    move_cursor::MoveCursorYArgs args{
+        .rows_per_beat = _rows_per_beat,
+        .step = _step,
+    };
+    auto const& move_cfg = get_app().options().move_cfg;
+
+    auto & cursor = _win._cursor.get_mut();
+    cursor.y = move_cursor::move_down(document, cursor, args, move_cfg);
 }
 
 
@@ -1710,10 +1629,18 @@ void PatternEditorPanel::toggle_edit_pressed() {
 }
 
 MainWindow::MaybeMoveCursor step_cursor_down(PatternEditorPanel & self) {
-    return [&self] () {
-        for (int i = 0; i < self._step; i++) {
-            self.down_pressed();
-        }
+    doc::Document const & document = self.get_document();
+    auto cursor = self._win._cursor.get();
+    move_cursor::MoveCursorYArgs args{
+        .rows_per_beat = self._rows_per_beat,
+        .step = self._step,
+    };
+    auto const& move_cfg = get_app().options().move_cfg;
+
+    PatternAndBeat y = move_cursor::cursor_step(document, cursor, args, move_cfg);
+
+    return [&self, y] () {
+        self._win._cursor.get_mut().y = y;
     };
 }
 

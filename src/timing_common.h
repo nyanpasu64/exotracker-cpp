@@ -11,7 +11,7 @@ struct PatternAndBeat {
     doc::SeqEntryIndex seq_entry_index = 0;
     doc::BeatFraction beat = 0;
 
-    EQUALABLE(PatternAndBeat, (seq_entry_index, beat))
+    COMPARABLE(PatternAndBeat, (seq_entry_index, beat))
 };
 
 // Atomically written by audio thread, atomically read by GUI.

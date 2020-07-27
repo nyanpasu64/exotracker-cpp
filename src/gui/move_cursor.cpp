@@ -259,6 +259,97 @@ PatternAndBeat next_beat(
     return next_row(document, cursor_y, 1, move_cfg);
 }
 
+
+PatternAndBeat move_up(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    MoveCursorYArgs const& args,
+    MovementConfig const& move_cfg
+) {
+    // See doc comment in header for more docs.
+
+    // If option enabled and step > 1, move cursor by multiple rows.
+    if (move_cfg.arrow_follows_step && args.step > 1) {
+        for (int i = 0; i < args.step; i++) {
+            cursor.y = prev_row(document, cursor.y, args.rows_per_beat, move_cfg);
+        }
+        return cursor.y;
+    }
+
+    PatternAndBeat grid_row =
+        prev_row(document, cursor.y, args.rows_per_beat, move_cfg);
+    SwitchEventResult event = prev_event(document, cursor);
+
+    // If option enabled and nearest event is located between cursor and nearest row,
+    // move cursor to nearest event.
+    if (move_cfg.snap_to_events && !event.wrapped && grid_row < event.time) {
+        return event.time;
+    }
+
+    // Move cursor to previous row.
+    return grid_row;
+}
+
+PatternAndBeat move_down(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    MoveCursorYArgs const& args,
+    MovementConfig const& move_cfg
+) {
+    // See doc comment in header for more docs.
+
+    // If option enabled and step > 1, move cursor by multiple rows.
+    if (move_cfg.arrow_follows_step && args.step > 1) {
+        for (int i = 0; i < args.step; i++) {
+            cursor.y = next_row(document, cursor.y, args.rows_per_beat, move_cfg);
+        }
+        return cursor.y;
+    }
+
+    PatternAndBeat grid_row =
+        next_row(document, cursor.y, args.rows_per_beat, move_cfg);
+    SwitchEventResult event = next_event(document, cursor);
+
+    // If option enabled and nearest event is located between cursor and nearest row,
+    // move cursor to nearest event.
+    if (move_cfg.snap_to_events && !event.wrapped && event.time < grid_row) {
+        return event.time;
+    }
+
+    // Move cursor to next row.
+    return grid_row;
+}
+
+PatternAndBeat cursor_step(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    MoveCursorYArgs const& args,
+    MovementConfig const& move_cfg
+) {
+    // See doc comment in header for more docs.
+
+    if (move_cfg.snap_to_events && args.step == 1) {
+        PatternAndBeat grid_row =
+            next_row(document, cursor.y, args.rows_per_beat, move_cfg);
+        SwitchEventResult event = next_event(document, cursor);
+
+        // If nearest event is located between cursor and nearest row,
+        // move cursor to nearest event.
+        if (!event.wrapped && event.time < grid_row) {
+            return event.time;
+        }
+
+        // Move cursor to next row.
+        return grid_row;
+    }
+
+    // Move cursor by multiple rows.
+    for (int i = 0; i < args.step; i++) {
+        cursor.y = next_row(document, cursor.y, args.rows_per_beat, move_cfg);
+    }
+    return cursor.y;
+}
+
 }
 
 #ifdef UNITTEST
@@ -514,6 +605,8 @@ TEST_CASE("Test prev_row()/next_row() wrapping") {
     }
 
 }
+
+// TODO add tests for move_up/move_down/cursor_step
 
 }
 
