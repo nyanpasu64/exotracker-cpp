@@ -820,6 +820,18 @@ static void draw_pattern_background(
         }
     }
 
+    auto [seq, cursor_top] =
+        SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
+
+    auto draw_patterns = [&] <Direction direction> (
+        auto draw_seq_entry, SequenceIteratorState const & seq
+    ) {
+        auto it = SequenceIterator<direction>{seq};
+        while (auto pos = it.next()) {
+            draw_seq_entry(*pos);
+        }
+    };
+
     auto draw_pattern_bg = [&] (SeqEntryPosition const & pos) {
         doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
 
@@ -895,77 +907,27 @@ static void draw_pattern_background(
         }
     };
 
-    auto draw_row_numbers = [&] (SeqEntryPosition const & pos) {
-        doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
-
-        // Draw rows.
-        // Begin loop(row)
-        int row = 0;
-        BeatFraction const beats_per_row{1, self._rows_per_beat};
-        BeatFraction curr_beats = 0;
-        for (;
-            curr_beats < seq_entry.nbeats;
-            curr_beats += beats_per_row, row += 1)
-        {
-            int ytop = pos.top + self._pixels_per_row * row;
-
-            // Draw ruler labels (numbers).
-            if (curr_beats.denominator() == 1) {
-                // Draw current beat.
-                QString s = format_hex_2((uint8_t) curr_beats.numerator());
-
-                painter.setFont(visual.pattern_font);
-                painter.setPen(visual.note_line_beat);
-
-                DrawText draw_text{visual.pattern_font};
-                draw_text.draw_text(
-                    painter,
-                    columns.ruler.center_px,
-                    ytop + visual.font_tweaks.pixels_above_text,
-                    Qt::AlignTop | Qt::AlignHCenter,
-                    s
-                );
-            }
-            // Don't label non-beat rows for the time being.
-        }
-    };
-
-    auto draw_patterns = [&] <Direction direction> (
-        auto draw_seq_entry, SequenceIteratorState const & seq
-    ) {
-        auto it = SequenceIterator<direction>{seq};
-        while (auto pos = it.next()) {
-            draw_seq_entry(*pos);
-        }
-    };
-
-    auto [seq, cursor_top] =
-        SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
-
     // this syntax has got to be a joke, right?
     // C++ needs the turbofish so badly
     draw_patterns.template operator()<Direction::Forward>(draw_pattern_bg, seq);
     draw_patterns.template operator()<Direction::Reverse>(draw_pattern_bg, seq);
 
-    // Draw divider "just past right" of each column.
-    // This replaces the "note divider" of the next column.
-    // The last column draws a divider in the void.
-    painter.setPen(visual.channel_divider);
-
-    // Templated function with multiple T.
-    auto draw_divider = [&painter, &inner_rect] (auto const & column) {
-        auto xright = column.right_px;
-
-        QPoint right_top{xright, inner_rect.top()};
-        QPoint right_bottom{xright, inner_rect.bottom()};
+    /// Draw divider "just past right" of each column.
+    /// This replaces the "note divider" of the next column.
+    /// The last column draws a divider in the void.
+    auto draw_divider = [&painter, &inner_rect] (int x) {
+        QPoint right_top{x, inner_rect.top()};
+        QPoint right_bottom{x, inner_rect.bottom()};
 
         draw_left_border(painter, right_top, right_bottom);
     };
 
-    draw_divider(columns.ruler);
+    painter.setPen(visual.channel_divider);
+
+    draw_divider(columns.ruler.right_px);
     for (auto & column : columns.cols) {
         if (column) {
-            draw_divider(*column);
+            draw_divider(column->right_px);
         }
     }
 
@@ -1028,6 +990,41 @@ static void draw_pattern_background(
             painter.fillRect(cursor_row_rect, bg_grad);
         }
     }
+
+    auto draw_row_numbers = [&] (SeqEntryPosition const & pos) {
+        doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
+
+        // Draw rows.
+        // Begin loop(row)
+        int row = 0;
+        BeatFraction const beats_per_row{1, self._rows_per_beat};
+        BeatFraction curr_beats = 0;
+        for (;
+            curr_beats < seq_entry.nbeats;
+            curr_beats += beats_per_row, row += 1)
+        {
+            int ytop = pos.top + self._pixels_per_row * row;
+
+            // Draw ruler labels (numbers).
+            if (curr_beats.denominator() == 1) {
+                // Draw current beat.
+                QString s = format_hex_2((uint8_t) curr_beats.numerator());
+
+                painter.setFont(visual.pattern_font);
+                painter.setPen(visual.note_line_beat);
+
+                DrawText draw_text{visual.pattern_font};
+                draw_text.draw_text(
+                    painter,
+                    columns.ruler.center_px,
+                    ytop + visual.font_tweaks.pixels_above_text,
+                    Qt::AlignTop | Qt::AlignHCenter,
+                    s
+                );
+            }
+            // Don't label non-beat rows for the time being.
+        }
+    };
 
     draw_patterns.template operator()<Direction::Forward>(draw_row_numbers, seq);
     draw_patterns.template operator()<Direction::Reverse>(draw_row_numbers, seq);
