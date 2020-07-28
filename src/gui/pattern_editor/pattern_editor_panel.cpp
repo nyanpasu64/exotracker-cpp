@@ -122,11 +122,16 @@ static void setup_shortcuts(PatternEditorPanel & self) {
         PatternEditorPanel & self, Method method, bool clear_selection
     ) {
         // TODO encapsulate cursor, allow moving with mouse, show selection, etc.
-        std::invoke(method, self);
         if (clear_selection) {
-            self._win._select_begin.x = self._win._cursor->x;
-            self._win._select_begin.y = self._win._cursor->y;
+            // Clear selection.
+            self._win._select_begin = {};
+        } else {
+            // Begin or extend selection at old cursor position.
+            self._win._select_begin =
+                self._win._select_begin.value_or(self._win._cursor.get());
         }
+        // Move cursor.
+        std::invoke(method, self);
         self.update();
     };
 
@@ -1610,6 +1615,10 @@ void PatternEditorPanel::scroll_right_pressed() {
 }
 
 // Begin document mutation
+
+void PatternEditorPanel::escape_pressed() {
+    _win._select_begin = {};
+}
 
 void PatternEditorPanel::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;

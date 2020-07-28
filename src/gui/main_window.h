@@ -17,6 +17,7 @@
 
 #include <functional>  // std::function
 #include <memory>
+#include <optional>
 
 namespace gui::main_window {
 
@@ -68,7 +69,7 @@ public:
     // set_cursor(bool select)?
 
     CursorAndDigit _cursor;
-    Cursor _select_begin;
+    std::optional<Cursor> _select_begin;
 
     int _instrument = 0;
     bool _insert_instrument = true;

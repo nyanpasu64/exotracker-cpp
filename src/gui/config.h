@@ -61,6 +61,7 @@ inline namespace keys {
         KeyInt scroll_left{chord(Qt::ALT, Qt::Key_Left)};
         KeyInt scroll_right{chord(Qt::ALT, Qt::Key_Right)};
 
+        constexpr static Qt::Key escape{Qt::Key_Escape};
         constexpr static Qt::Key toggle_edit{Qt::Key_Space};
         constexpr static Qt::Key delete_key{Qt::Key_Delete};
         constexpr static Qt::Key note_cut{Qt::Key_QuoteLeft};  // backtick
