@@ -91,7 +91,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     using config::KeyInt;
     using config::chord;
 
-    auto & shortcut_keys = get_app().options().pattern_keys;
+    config::PatternKeys const& shortcut_keys = get_app().options().pattern_keys;
 
     auto init_shortcut = [&] (QShortcut & shortcut, QKeySequence const & key) {
         shortcut.setContext(Qt::WidgetShortcut);
@@ -1610,19 +1610,6 @@ void PatternEditorPanel::scroll_right_pressed() {
 }
 
 // Begin document mutation
-namespace ed = edit::edit_pattern;
-
-auto calc_cursor_x(PatternEditorPanel const & self) ->
-    std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumn>
-{
-    doc::Document const & document = self.get_document();
-    auto cursor_x = self._win._cursor->x;
-
-    Column column = gen_column_list(self, document)[cursor_x.column];
-    SubColumn subcolumn = column.subcolumns[cursor_x.subcolumn];
-
-    return {column.chip, column.channel, subcolumn};
-}
 
 void PatternEditorPanel::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;
@@ -1640,6 +1627,20 @@ cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
     cursor.y = move_cursor::cursor_step(document, cursor, args, move_cfg);
 
     return cursor;
+}
+
+namespace ed = edit::edit_pattern;
+
+auto calc_cursor_x(PatternEditorPanel const & self) ->
+    std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumn>
+{
+    doc::Document const & document = self.get_document();
+    auto cursor_x = self._win._cursor->x;
+
+    Column column = gen_column_list(self, document)[cursor_x.column];
+    SubColumn subcolumn = column.subcolumns[cursor_x.subcolumn];
+
+    return {column.chip, column.channel, subcolumn};
 }
 
 // TODO Is there a more reliable method for me to ensure that
