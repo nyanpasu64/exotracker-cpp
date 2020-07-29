@@ -515,10 +515,12 @@ static void draw_header(
     doc::Document const &document,
     ColumnLayout const & columns,
     QPainter & painter,
-    GridRect const inner_rect
+    QSize const inner_size
 ) {
     // Use standard app font for header text.
     painter.setFont(QFont{});
+
+    GridRect inner_rect{QPoint{0, 0}, inner_size};
 
     // Draw the header background.
     {
@@ -830,7 +832,7 @@ static void draw_pattern_background(
     doc::Document const &document,
     ColumnLayout const & columns,
     QPainter & painter,
-    GridRect const inner_rect
+    QSize const inner_size
 ) {
     auto & visual = get_app().options().visual;
 
@@ -850,7 +852,7 @@ static void draw_pattern_background(
     }
 
     auto const [seq, cursor_top] =
-        SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
+        SequenceIteratorState::make(self, document, (PxInt) inner_size.height());
     ForeachPattern foreach_pattern{seq};
 
     auto draw_pattern_bg = [&] (SeqEntryPosition const & pos) {
@@ -935,9 +937,9 @@ static void draw_pattern_background(
     /// Draw divider "just past right" of each column.
     /// This replaces the "note divider" of the next column.
     /// The last column draws a divider in the void.
-    auto draw_divider = [&painter, &inner_rect] (int x) {
-        QPoint right_top{x, inner_rect.top()};
-        QPoint right_bottom{x, inner_rect.bottom()};
+    auto draw_divider = [&painter, &inner_size] (int x) {
+        QPoint right_top{x, 0};
+        QPoint right_bottom{x, inner_size.height()};
 
         draw_left_border(painter, right_top, right_bottom);
     };
@@ -1055,7 +1057,7 @@ static void draw_pattern_foreground(
     doc::Document const &document,
     ColumnLayout const & columns,
     QPainter & painter,
-    GridRect const inner_rect
+    QSize const inner_size
 ) {
     using Frac = BeatFraction;
 
@@ -1231,7 +1233,7 @@ static void draw_pattern_foreground(
     };
 
     auto const [seq, cursor_top] =
-        SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
+        SequenceIteratorState::make(self, document, (PxInt) inner_size.height());
     ForeachPattern foreach_pattern{seq};
     foreach_pattern(draw_notes);
 
@@ -1304,13 +1306,7 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
             outer_rect.set_bottom(header::HEIGHT);
             painter.setClipRect(outer_rect);
 
-            draw_header(
-                self,
-                document,
-                columns,
-                painter,
-                GridRect{QPoint{0, 0}, outer_rect.size()}
-            );
+            draw_header(self, document, columns, painter, outer_rect.size());
         }
 
         {
@@ -1324,8 +1320,8 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
             // translate(offset) = the given offset is added to points.
             painter.translate(absolute_rect.left_top());
 
-            // Pattern body, relative to top-left corner.
-            GridRect inner_rect{QPoint{0, 0}, absolute_rect.size()};
+            // Pattern body size.
+            QSize inner_size = absolute_rect.size();
 
             // First draw the row background. It lies in a regular grid.
 
@@ -1334,11 +1330,11 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
 
             // TODO When does Qt redraw a small rect? On non-compositing desktops?
             // On non-compositing KDE, Qt doesn't redraw when dragging a window on top.
-            draw_pattern_background(self, document, columns, painter, inner_rect);
+            draw_pattern_background(self, document, columns, painter, inner_size);
 
             // Then for each channel, draw all notes in that channel lying within view.
             // Notes may be positioned at fractional beats that do not lie in the grid.
-            draw_pattern_foreground(self, document, columns, painter, inner_rect);
+            draw_pattern_foreground(self, document, columns, painter, inner_size);
         }
     }
 
