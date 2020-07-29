@@ -28,7 +28,7 @@ inline namespace note_ {
         constexpr Note(ChromaticInt value) : value(value) {}
 
         // impl
-        EQUALABLE_SIMPLE(Note, value)
+        EQUALABLE_CONSTEXPR(Note, value)
 
         [[nodiscard]] constexpr bool is_cut() const;
         [[nodiscard]] constexpr bool is_release() const;
@@ -59,8 +59,7 @@ struct RowEvent {
     std::optional<InstrumentIndex> instr = {};
     // TODO volumes and []effects
 
-    // This compiles slowly, but whatever.
-    EQUALABLE(RowEvent, (note, instr))
+    EQUALABLE(RowEvent)
 };
 
 // end namespace

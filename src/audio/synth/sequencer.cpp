@@ -1,5 +1,6 @@
 #define ChannelSequencer_INTERNAL public
 #include "sequencer.h"
+#include "util/compare_impl.h"
 #include "util/release_assert.h"
 #include "util/math.h"
 
@@ -11,6 +12,8 @@
 #include <type_traits>  // std::is_signed_v
 
 namespace audio::synth::sequencer {
+
+COMPARABLE_IMPL(BeatPlusTick, (self.beat, self.dtick))
 
 using doc::BeatFraction;
 

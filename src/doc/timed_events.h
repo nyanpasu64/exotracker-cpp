@@ -39,7 +39,7 @@ struct TimeInPattern {
     TickT tick_offset;
     using TickLimits = std::numeric_limits<decltype(tick_offset)>;
 
-    COMPARABLE(TimeInPattern, (anchor_beat, tick_offset))
+    COMPARABLE(TimeInPattern)
 
     // TODO remove, only used for testing purposes
     static TimeInPattern from_frac(FractionInt num, FractionInt den) {

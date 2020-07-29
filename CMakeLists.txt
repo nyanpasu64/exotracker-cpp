@@ -111,7 +111,9 @@ add_library(exotracker-lib
 
         # Glue files
         src/doc.cpp
+        src/doc/events.cpp
         src/doc/timed_events.cpp
+        src/timing_common.cpp
         )
 target_compile_options(exotracker-lib PRIVATE "${options}")
 target_link_libraries(exotracker-lib PRIVATE lib-3rdparty rtaudio)
