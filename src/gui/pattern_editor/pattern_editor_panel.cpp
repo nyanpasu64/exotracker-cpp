@@ -10,6 +10,7 @@
 #include "chip_kinds.h"
 #include "edit/edit_pattern.h"
 #include "util/compare.h"
+#include "util/release_assert.h"
 #include "util/enumerate.h"
 #include "util/math.h"
 #include "util/reverse.h"
@@ -32,6 +33,7 @@
 
 #include <algorithm>  // std::max, std::clamp
 #include <cmath>  // round
+#include <climits>  // INT_MIN, INT_MAX
 #include <functional>  // std::invoke
 #include <optional>
 #include <tuple>
@@ -639,6 +641,7 @@ enum class Direction {
     Reverse,
 };
 
+/// Stores the location of a pattern on-screen.
 struct SequenceIteratorState {
     PatternEditorPanel const & _widget;
     doc::Document const & _document;
@@ -697,6 +700,7 @@ public:
     }
 };
 
+/// Iterates up or down through patterns, and yields their locations on-screen.
 template<Direction direction>
 class SequenceIterator : private SequenceIteratorState {
 public:
@@ -772,6 +776,31 @@ public:
     }
 };
 
+/// Iterates through all patterns visible on-screen, both above and below cursor.
+/// Calls the callback with the on-screen pixel coordinates of the pattern.
+class ForeachPattern {
+    SequenceIteratorState const& _state;
+
+public:
+    ForeachPattern(SequenceIteratorState const& state) : _state{state} {}
+
+    template<typename Visitor>
+    void operator()(Visitor visit_seq_entry) {
+        {
+            auto forward = SequenceIterator<Direction::Forward>{_state};
+            while (std::optional<SeqEntryPosition> pos = forward.next()) {
+                visit_seq_entry(*pos);
+            }
+        }
+        {
+            auto reverse = SequenceIterator<Direction::Reverse>{_state};
+            while (auto pos = reverse.next()) {
+                visit_seq_entry(*pos);
+            }
+        }
+    }
+};
+
 }
 
 QLinearGradient make_gradient(
@@ -820,17 +849,9 @@ static void draw_pattern_background(
         }
     }
 
-    auto [seq, cursor_top] =
+    auto const [seq, cursor_top] =
         SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
-
-    auto draw_patterns = [&] <Direction direction> (
-        auto draw_seq_entry, SequenceIteratorState const & seq
-    ) {
-        auto it = SequenceIterator<direction>{seq};
-        while (auto pos = it.next()) {
-            draw_seq_entry(*pos);
-        }
-    };
+    ForeachPattern foreach_pattern{seq};
 
     auto draw_pattern_bg = [&] (SeqEntryPosition const & pos) {
         doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
@@ -909,8 +930,7 @@ static void draw_pattern_background(
 
     // this syntax has got to be a joke, right?
     // C++ needs the turbofish so badly
-    draw_patterns.template operator()<Direction::Forward>(draw_pattern_bg, seq);
-    draw_patterns.template operator()<Direction::Reverse>(draw_pattern_bg, seq);
+    foreach_pattern(draw_pattern_bg);
 
     /// Draw divider "just past right" of each column.
     /// This replaces the "note divider" of the next column.
@@ -1026,8 +1046,7 @@ static void draw_pattern_background(
         }
     };
 
-    draw_patterns.template operator()<Direction::Forward>(draw_row_numbers, seq);
-    draw_patterns.template operator()<Direction::Reverse>(draw_row_numbers, seq);
+    foreach_pattern(draw_row_numbers);
 }
 
 /// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
@@ -1092,7 +1111,12 @@ static void draw_pattern_foreground(
         draw_top_border(painter, GridRect::from_corners(x1, ybot, x2, ybot));
     };
 
-    auto draw_notes = [&](doc::SequenceEntry const & seq_entry) {
+    auto draw_notes = [&] (SeqEntryPosition const & pos) {
+        PainterScope scope{painter};
+        painter.translate(0, pos.top);
+
+        doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
+
         for (MaybeColumnPx const & maybe_column : columns.cols) {
             if (!maybe_column) {
                 continue;
@@ -1206,20 +1230,10 @@ static void draw_pattern_foreground(
         }
     };
 
-    auto draw_patterns = [&] <Direction direction> (SequenceIteratorState const & seq) {
-        auto it = SequenceIterator<direction>{seq};
-        while (auto pos = it.next()) {
-            PainterScope scope{painter};
-            painter.translate(0, pos->top);
-            draw_notes(document.sequence[pos->seq_entry_index]);
-        }
-    };
-
-    auto [seq, cursor_top] =
+    auto const [seq, cursor_top] =
         SequenceIteratorState::make(self, document, (PxInt) inner_rect.height());
-
-    draw_patterns.template operator()<Direction::Forward>(seq);
-    draw_patterns.template operator()<Direction::Reverse>(seq);
+    ForeachPattern foreach_pattern{seq};
+    foreach_pattern(draw_notes);
 
     // TODO draw selection
     // Draw cursor.
