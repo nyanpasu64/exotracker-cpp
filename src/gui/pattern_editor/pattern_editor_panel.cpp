@@ -835,7 +835,7 @@ static void draw_pattern_background(
     auto draw_pattern_bg = [&] (SeqEntryPosition const & pos) {
         doc::SequenceEntry const & seq_entry = document.sequence[pos.seq_entry_index];
 
-        // Draw background of cell.
+        // Draw background columns.
         for (MaybeColumnPx const & maybe_column : columns.cols) {
             if (!maybe_column) {
                 continue;
@@ -1092,7 +1092,7 @@ static void draw_pattern_foreground(
         draw_top_border(painter, GridRect::from_corners(x1, ybot, x2, ybot));
     };
 
-    auto draw_seq_entry = [&](doc::SequenceEntry const & seq_entry) {
+    auto draw_notes = [&](doc::SequenceEntry const & seq_entry) {
         for (MaybeColumnPx const & maybe_column : columns.cols) {
             if (!maybe_column) {
                 continue;
@@ -1211,7 +1211,7 @@ static void draw_pattern_foreground(
         while (auto pos = it.next()) {
             PainterScope scope{painter};
             painter.translate(0, pos->top);
-            draw_seq_entry(document.sequence[pos->seq_entry_index]);
+            draw_notes(document.sequence[pos->seq_entry_index]);
         }
     };
 
