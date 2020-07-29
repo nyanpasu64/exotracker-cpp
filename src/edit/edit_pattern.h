@@ -13,21 +13,16 @@ namespace edit::edit_pattern {
 
 namespace subcolumns {
     struct Note {
-        COMPARABLE(Note, ())
     };
     struct Instrument {
-        COMPARABLE(Instrument, ())
     };
     struct Volume {
-        COMPARABLE(Volume, ())
     };
     struct EffectName {
         uint8_t effect_col;
-        COMPARABLE(EffectName, (effect_col))
     };
     struct EffectValue {
         uint8_t effect_col;
-        COMPARABLE(EffectValue, (effect_col))
     };
 
     using SubColumn = std::variant<
