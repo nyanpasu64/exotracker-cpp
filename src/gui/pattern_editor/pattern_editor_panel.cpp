@@ -1066,14 +1066,6 @@ static void draw_pattern_background(
 
         release_assert(select_top <= select_bottom);
 
-        int zero_selection_size = 2 * painter.pen().width();
-
-        // If zero-height selection, add some height.
-        if (select_top == select_bottom) {
-            select_top -= zero_selection_size;
-            select_bottom += zero_selection_size;
-        }
-
         auto get_select_x = [&] (CursorX x, bool right_border) {
             auto const& c = columns.cols[x.column];
             if (c.has_value()) {
@@ -1094,17 +1086,33 @@ static void draw_pattern_background(
         PxInt select_left = get_select_x(select.left, false);
         PxInt select_right = get_select_x(select.right, true);
 
-        auto select_rect = GridRect::from_corners(
-            select_left, select_top, select_right, select_bottom
-        );
+        if (select_top != select_bottom) {
+            auto select_rect = GridRect::from_corners(
+                select_left, select_top, select_right, select_bottom
+            );
 
-        painter.fillRect(select_rect, visual.select_bg);
+            painter.fillRect(select_rect, visual.select_bg);
 
-        painter.setPen(visual.select_border);
-        draw_left_border(painter, select_rect);
-        draw_right_border(painter, select_rect);
-        draw_top_border(painter, select_rect);
-        draw_bottom_border(painter, select_rect);
+            painter.setPen(visual.select_border);
+            draw_left_border(painter, select_rect);
+            draw_right_border(painter, select_rect);
+            draw_top_border(painter, select_rect);
+            draw_bottom_border(painter, select_rect);
+
+        } else {
+            int select_grad_bottom = select_top + self._pixels_per_row * 2 / 3;
+            auto select_rect = GridRect::from_corners(
+                select_left, select_top, select_right, select_grad_bottom
+            );
+
+            auto select_grad = make_gradient(
+                select_top, select_grad_bottom, visual.select_bg, 255, 0
+            );
+            painter.fillRect(select_rect, select_grad);
+
+            painter.setPen(visual.select_border);
+            draw_top_border(painter, select_rect);
+        }
     }
 
     /// Draw divider "just past right" of each column.
