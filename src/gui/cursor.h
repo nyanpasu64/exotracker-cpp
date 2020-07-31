@@ -1,7 +1,9 @@
 #pragma once
 
 #include "timing_common.h"
+#include "util/compare.h"
 
+#include <compare>
 #include <cstdint>
 
 namespace gui::cursor {
@@ -12,6 +14,8 @@ using SubColumnIndex = uint32_t;
 struct CursorX {
     ColumnIndex column = 0;
     SubColumnIndex subcolumn = 0;
+
+    DEFAULT_COMPARE(CursorX)
 };
 
 struct Cursor {

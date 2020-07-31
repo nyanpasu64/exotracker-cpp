@@ -32,25 +32,68 @@ enum class AudioState {
 };
 
 using cursor::Cursor;
+using cursor::CursorX;
 
+struct Selection {
+    CursorX left;
+    CursorX right;
+    PatternAndBeat top;
+    PatternAndBeat bottom;
+};
+
+struct RawSelection {
+    /// Starting point of the selection. The other endpoint is the cursor.
+    Cursor begin;
+
+    /// How many beats to select below the bottom endpoint
+    /// (whichever of _begin and cursor is lower).
+    doc::BeatFraction bottom_padding;
+
+    // impl
+    void toggle_padding(int rows_per_beat);
+};
+
+/// Stores cursor, selection,
+/// and how many beats to select below the bottom endpoint.
+///
 /// Some pattern cells (like instruments, volumes, and effects)
 /// have multiple characters entered in sequence.
-/// This stores the typing progress within those cells.
-class CursorAndDigit {
+/// digit_index() stores the typing progress within those cells.
+///
+/// Selections are a hard problem. Requirements which led to this API design at
+/// https://docs.google.com/document/d/1HBrF1W_5vKFMwHbaN6ONvtnmGAgawlJYsdZTbTUClmA/edit#heading=h.q2iq7gfnt5i8
+class CursorAndSelection {
     Cursor _cursor;
     int _digit = 0;
+    std::optional<RawSelection> _select{};
 
+    // impl
 public:
+    // # Cursor position
     [[nodiscard]] Cursor const& get() const;
     Cursor const& operator*() const;
     Cursor const* operator->() const;
 
-    [[nodiscard]] Cursor & get_mut();
     void set(Cursor cursor);
+    void set_x(CursorX x);
+    void set_y(PatternAndBeat y);
 
+    // # Digits within a cell
     [[nodiscard]] int digit_index() const;
     int advance_digit();
     void reset_digit();
+
+    // # Selection
+    [[nodiscard]] std::optional<RawSelection> raw_select();
+    [[nodiscard]] std::optional<RawSelection> & raw_select_mut();
+    [[nodiscard]] std::optional<Selection> get_select() const;
+
+    /// If selection not enabled, begin from cursor position.
+    /// Otherwise continue selection.
+    void enable_select(int rows_per_beat);
+
+    /// Clear selection.
+    void clear_select();
 };
 
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
@@ -68,8 +111,7 @@ public:
     // set_cursor() and select_to()?
     // set_cursor(bool select)?
 
-    CursorAndDigit _cursor;
-    std::optional<Cursor> _select_begin;
+    CursorAndSelection _cursor;
 
     int _instrument = 0;
     bool _insert_instrument = true;

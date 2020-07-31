@@ -27,6 +27,7 @@
 #include <QGradient>
 #include <QKeyEvent>
 #include <QKeySequence>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPoint>
 #include <QRect>
@@ -119,39 +120,48 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     // Keystroke handlers have no arguments and don't know if Shift is held or not.
     using Method = void (PatternEditorPanel::*)();
 
+    enum class AlterSelection {
+        None,
+        Clear,
+        Extend,
+    };
+
     // This code is confusing. Hopefully I can fix it.
     static auto const on_key_pressed = [] (
-        PatternEditorPanel & self, Method method, bool clear_selection
+        PatternEditorPanel & self, Method method, AlterSelection alter_selection
     ) {
-        // TODO encapsulate cursor, allow moving with mouse, show selection, etc.
-        if (clear_selection) {
-            // Clear selection.
-            self._win._select_begin = {};
-        } else {
+        if (alter_selection == AlterSelection::Clear) {
+            self._win._cursor.clear_select();
+        }
+        if (alter_selection == AlterSelection::Extend) {
             // Begin or extend selection at old cursor position.
-            self._win._select_begin =
-                self._win._select_begin.value_or(self._win._cursor.get());
+            self._win._cursor.enable_select(self._rows_per_beat);
         }
         // Move cursor.
         std::invoke(method, self);
         self.update();
     };
 
+    // Connect cursor-movement keys to cursor-movement functions
+    // (with/without shift held).
     auto connect_shortcut_pair = [&] (ShortcutPair & pair, Method method) {
+        // Connect arrow keys to "clear selection and move cursor".
         QObject::connect(
             &pair.key,
             &QShortcut::activated,
             &self,
             [&self, method] () {
-                on_key_pressed(self, method, true);
+                on_key_pressed(self, method, AlterSelection::Clear);
             }
         );
+
+        // Connect shift+arrow to "enable selection and move cursor".
         QObject::connect(
             &pair.shift_key,
             &QShortcut::activated,
             &self,
             [&self, method] () {
-                on_key_pressed(self, method, false);
+                on_key_pressed(self, method, AlterSelection::Extend);
             }
         );
     };
@@ -168,7 +178,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
             &QShortcut::activated,
             &self,
             [&self, method] () {
-                on_key_pressed(self, method, false);
+                on_key_pressed(self, method, AlterSelection::None);
             }
         );
     };
@@ -318,6 +328,9 @@ struct SubColumnPx {
 
 using SubColumnLayout = std::vector<SubColumnPx>;
 
+struct LeftOfScreen{};
+struct RightOfScreen{};
+
 struct ColumnPx {
     chip_common::ChipIndex chip;
     chip_common::ChannelIndex channel;
@@ -326,7 +339,46 @@ struct ColumnPx {
     SubColumnLayout subcolumns;  // all endpoints lie within [left_px, left_px + width]
 };
 
-using MaybeColumnPx = std::optional<ColumnPx>;
+struct MaybeColumnPx {
+    std::variant<LeftOfScreen, ColumnPx, RightOfScreen> value;
+
+    // not explicit
+    MaybeColumnPx(LeftOfScreen v) : value{v} {}
+    MaybeColumnPx(ColumnPx v) : value{v} {}
+    MaybeColumnPx(RightOfScreen v) : value{v} {}
+
+    bool left_of_screen() const {
+        return std::holds_alternative<LeftOfScreen>(value);
+    }
+
+    bool right_of_screen() const {
+        return std::holds_alternative<RightOfScreen>(value);
+    }
+
+    bool has_value() const {
+        return std::holds_alternative<ColumnPx>(value);
+    }
+
+    explicit operator bool() const {
+        return has_value();
+    }
+
+    ColumnPx & operator*() {
+        return std::get<ColumnPx>(value);
+    }
+
+    ColumnPx const& operator*() const {
+        return std::get<ColumnPx>(value);
+    }
+
+    ColumnPx * operator->() {
+        return &**this;
+    }
+
+    ColumnPx const* operator->() const {
+        return &**this;
+    }
+};
 
 /// Has the same number of items as ColumnList. Does *not* exclude off-screen columns.
 /// To skip drawing off-screen columns, fill their slot with nullopt.
@@ -826,6 +878,10 @@ QLinearGradient make_gradient(
     return grad;
 }
 
+using cursor::CursorX;
+using cursor::ColumnIndex;
+using cursor::SubColumnIndex;
+
 /// Draw the background lying behind notes/etc.
 static void draw_pattern_background(
     PatternEditorPanel & self,
@@ -933,6 +989,123 @@ static void draw_pattern_background(
     // this syntax has got to be a joke, right?
     // C++ needs the turbofish so badly
     foreach_pattern(draw_pattern_bg);
+
+    // Draw selection.
+    if (auto maybe_select = self._win._cursor.get_select()) {
+        auto select = *maybe_select;
+
+        // Limit selections to patterns, not ruler.
+        PainterScope scope{painter};
+        painter.setClipRect(GridRect::from_corners(
+            columns.ruler.right_px, 0, inner_size.width(), inner_size.height()
+        ));
+
+        int off_screen = std::max(inner_size.width(), inner_size.height()) + 100;
+
+        using MaybePxInt = std::optional<PxInt>;
+
+        /// Overwritten with the estimated top/bottom of the selection on-screen.
+        /// Set to INT_MIN/MAX if selection endpoint is above or below screen.
+        /// Only uset if 0 patterns were visited.
+        MaybePxInt maybe_select_top{};
+        MaybePxInt maybe_select_bottom{};
+
+        /// Every time we compare an endpoint against a pattern,
+        /// we can identify if it's within, above, or below.
+        ///
+        /// If within, overwrite position unconditionally.
+        /// If above/below, overwrite position if not present.
+        ///
+        /// If the endpoint is within *any* pattern, we write the exact position.
+        /// Otherwise we identify whether it's above or below the screen.
+        auto find_selection = [&] (SeqEntryPosition const & pos) {
+            using Frac = BeatFraction;
+
+            auto calc_row = [&] (PatternAndBeat y, std::optional<PxInt> & select_pos) {
+                // If row is in pattern, return exact position.
+                if (y.seq_entry_index == pos.seq_entry_index) {
+                    Frac row = y.beat * self._rows_per_beat;
+                    PxInt yPx = doc::round_to_int(self._pixels_per_row * row);
+
+                    select_pos = pos.top + yPx;
+                    return;
+                }
+
+                // If row is at end of pattern, return exact position.
+                // Because if cursor is "past end of document",
+                // it isn't owned by any pattern, but needs to be positioned correctly.
+                if (y.seq_entry_index == pos.seq_entry_index + 1 && y.beat == 0) {
+                    select_pos = pos.bottom;
+                    return;
+                }
+
+                // If row is above screen, set to top of universe (if no value present).
+                if (y.seq_entry_index < pos.seq_entry_index) {
+                    select_pos = select_pos.value_or(-off_screen);
+                    return;
+                }
+
+                // If row is below screen, set to bottom of universe (if no value present).
+                release_assert(y.seq_entry_index > pos.seq_entry_index);
+                select_pos = select_pos.value_or(+off_screen);
+            };
+
+            calc_row(select.top, maybe_select_top);
+            calc_row(select.bottom, maybe_select_bottom);
+        };
+
+        foreach_pattern(find_selection);
+
+        // It should be impossible to position the cursor such that 0 patterns are drawn.
+        if (!(maybe_select_top && maybe_select_bottom)) {
+            throw std::logic_error("Trying to draw selection with 0 patterns");
+        }
+
+        PxInt & select_top = *maybe_select_top;
+        PxInt & select_bottom = *maybe_select_bottom;
+
+        release_assert(select_top <= select_bottom);
+
+        int zero_selection_size = 2 * painter.pen().width();
+
+        // If zero-height selection, add some height.
+        if (select_top == select_bottom) {
+            select_top -= zero_selection_size;
+            select_bottom += zero_selection_size;
+        }
+
+        auto get_select_x = [&] (CursorX x, bool right_border) {
+            auto const& c = columns.cols[x.column];
+            if (c.has_value()) {
+                SubColumnPx sc = c->subcolumns[x.subcolumn];
+                return right_border ? sc.right_px : sc.left_px;
+            }
+            if (c.left_of_screen()) {
+                return -off_screen;
+            }
+            if (c.right_of_screen()) {
+                return +off_screen;
+            }
+            throw std::logic_error(
+                fmt::format("column {} is missing a position", x.column)
+            );
+        };
+
+        PxInt select_left = get_select_x(select.left, false);
+        PxInt select_right = get_select_x(select.right, true);
+
+        auto select_rect = GridRect::from_corners(
+            select_left, select_top, select_right, select_bottom
+        );
+
+        painter.fillRect(select_rect, visual.select_bg);
+
+        painter.setPen(visual.select_border);
+        draw_left_border(painter, select_rect);
+        draw_right_border(painter, select_rect);
+        draw_top_border(painter, select_rect);
+        draw_bottom_border(painter, select_rect);
+    }
 
     /// Draw divider "just past right" of each column.
     /// This replaces the "note divider" of the next column.
@@ -1371,7 +1544,7 @@ void PatternEditorPanel::update_time(timing::MaybeSequencerTime maybe_seq_time) 
         }
 
         if (_win._cursor->y != new_cursor_y) {
-            _win._cursor.get_mut().y = new_cursor_y;
+            _win._cursor.set_y(new_cursor_y);
             update();
         }
     }
@@ -1387,8 +1560,8 @@ void PatternEditorPanel::up_pressed() {
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    auto & cursor = _win._cursor.get_mut();
-    cursor.y = move_cursor::move_up(document, cursor, args, move_cfg);
+    auto cursor = _win._cursor.get();
+    _win._cursor.set_y(move_cursor::move_up(document, cursor, args, move_cfg));
 }
 
 void PatternEditorPanel::down_pressed() {
@@ -1399,8 +1572,8 @@ void PatternEditorPanel::down_pressed() {
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    auto & cursor = _win._cursor.get_mut();
-    cursor.y = move_cursor::move_down(document, cursor, args, move_cfg);
+    auto cursor = _win._cursor.get();
+    _win._cursor.set_y(move_cursor::move_down(document, cursor, args, move_cfg));
 }
 
 
@@ -1408,29 +1581,29 @@ void PatternEditorPanel::prev_beat_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto & cursor_y = _win._cursor.get_mut().y;
-    cursor_y = move_cursor::prev_beat(document, cursor_y, move_cfg);
+    auto cursor_y = _win._cursor.get().y;
+    _win._cursor.set_y(move_cursor::prev_beat(document, cursor_y, move_cfg));
 }
 
 void PatternEditorPanel::next_beat_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto & cursor_y = _win._cursor.get_mut().y;
-    cursor_y = move_cursor::next_beat(document, cursor_y, move_cfg);
+    auto cursor_y = _win._cursor.get().y;
+    _win._cursor.set_y(move_cursor::next_beat(document, cursor_y, move_cfg));
 }
 
 
 void PatternEditorPanel::prev_event_pressed() {
     doc::Document const & document = get_document();
     auto ev = move_cursor::prev_event(document, _win._cursor.get());
-    _win._cursor.get_mut().y = ev.time;
+    _win._cursor.set_y(ev.time);
 }
 
 void PatternEditorPanel::next_event_pressed() {
     doc::Document const & document = get_document();
     auto ev = move_cursor::next_event(document, _win._cursor.get());
-    _win._cursor.get_mut().y = ev.time;
+    _win._cursor.set_y(ev.time);
 }
 
 
@@ -1442,7 +1615,7 @@ void PatternEditorPanel::scroll_prev_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto & cursor_y = _win._cursor.get_mut().y;
+    auto cursor_y = _win._cursor.get().y;
 
     cursor_y.beat -= move_cfg.page_down_distance;
 
@@ -1456,13 +1629,15 @@ void PatternEditorPanel::scroll_prev_pressed() {
             break;
         }
     }
+
+    _win._cursor.set_y(cursor_y);
 }
 
 void PatternEditorPanel::scroll_next_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto & cursor_y = _win._cursor.get_mut().y;
+    auto cursor_y = _win._cursor.get().y;
 
     cursor_y.beat += move_cfg.page_down_distance;
 
@@ -1477,12 +1652,14 @@ void PatternEditorPanel::scroll_next_pressed() {
             break;
         }
     }
+
+    _win._cursor.set_y(cursor_y);
 }
 
 template<void alter_mod(SeqEntryIndex & x, SeqEntryIndex den)>
 inline void switch_seq_entry_index(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
-    auto & cursor_y = self._win._cursor.get_mut().y;
+    auto cursor_y = self._win._cursor.get().y;
 
     alter_mod(cursor_y.seq_entry_index, (SeqEntryIndex) document.sequence.size());
 
@@ -1494,6 +1671,8 @@ inline void switch_seq_entry_index(PatternEditorPanel & self) {
         int prev_row = util::math::frac_prev(rows);
         cursor_y.beat = BeatFraction{prev_row, self._rows_per_beat};
     }
+
+    self._win._cursor.set_y(cursor_y);
 }
 
 void PatternEditorPanel::prev_pattern_pressed() {
@@ -1502,10 +1681,6 @@ void PatternEditorPanel::prev_pattern_pressed() {
 void PatternEditorPanel::next_pattern_pressed() {
     switch_seq_entry_index<increment_mod>(*this);
 }
-
-using cursor::CursorX;
-using cursor::ColumnIndex;
-using cursor::SubColumnIndex;
 
 ColumnIndex ncol(ColumnList const& cols) {
     return ColumnIndex(cols.size());
@@ -1556,7 +1731,7 @@ void PatternEditorPanel::left_pressed() {
 
     // there's got to be a better way to write this code...
     // an elegant abstraction i'm missing
-    auto & cursor_x = _win._cursor.get_mut().x;
+    auto cursor_x = _win._cursor.get().x;
 
     if (cursor_x.subcolumn > 0) {
         cursor_x.subcolumn--;
@@ -1568,6 +1743,8 @@ void PatternEditorPanel::left_pressed() {
         }
         cursor_x.subcolumn = nsubcol(cols, cursor_x.column) - 1;
     }
+
+    _win._cursor.set_x(cursor_x);
 }
 
 void PatternEditorPanel::right_pressed() {
@@ -1575,7 +1752,7 @@ void PatternEditorPanel::right_pressed() {
     ColumnList cols = gen_column_list(*this, document);
 
     // Is it worth extracting cursor movement logic to a class?
-    auto & cursor_x = _win._cursor.get_mut().x;
+    auto cursor_x = _win._cursor.get().x;
     wrap_cursor(cols, cursor_x);
     cursor_x.subcolumn++;
 
@@ -1587,6 +1764,8 @@ void PatternEditorPanel::right_pressed() {
             cursor_x.column = 0;
         }
     }
+
+    _win._cursor.set_x(cursor_x);
 }
 
 // TODO implement comparison between subcolumn variants,
@@ -1599,7 +1778,7 @@ void PatternEditorPanel::scroll_left_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    auto & cursor_x = _win._cursor.get_mut().x;
+    auto cursor_x = _win._cursor.get().x;
     if (cursor_x.column > 0) {
         cursor_x.column--;
     } else {
@@ -1608,23 +1787,27 @@ void PatternEditorPanel::scroll_left_pressed() {
 
     cursor_x.subcolumn =
         std::min(cursor_x.subcolumn, nsubcol(cols, cursor_x.column) - 1);
+
+    _win._cursor.set_x(cursor_x);
 }
 
 void PatternEditorPanel::scroll_right_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    auto & cursor_x = _win._cursor.get_mut().x;
+    auto cursor_x = _win._cursor.get().x;
     cursor_x.column++;
     wrap_cursor(cols, cursor_x);
     cursor_x.subcolumn =
         std::min(cursor_x.subcolumn, nsubcol(cols, cursor_x.column) - 1);
+
+    _win._cursor.set_x(cursor_x);
 }
 
 // Begin document mutation
 
 void PatternEditorPanel::escape_pressed() {
-    _win._select_begin = {};
+    _win._cursor.clear_select();
 }
 
 void PatternEditorPanel::toggle_edit_pressed() {
