@@ -4,6 +4,7 @@
 #include "gui/lib/format.h"
 #include "gui/lib/painter_ext.h"
 #include "gui/cursor.h"
+#include "gui/move_cursor.h"
 #include "gui/main_window.h"
 #include "gui_common.h"
 #include "chip_kinds.h"
@@ -1486,9 +1487,17 @@ void PatternEditorPanel::next_beat_pressed() {
     move_down<beats_from_beats, beats_from_beats>(*this);
 }
 
-// TODO depends on horizontal cursor position.
-void PatternEditorPanel::prev_event_pressed() {}
-void PatternEditorPanel::next_event_pressed() {}
+void PatternEditorPanel::prev_event_pressed() {
+    doc::Document const & document = get_document();
+    auto ev = move_cursor::prev_event(document, _win._cursor.get());
+    _win._cursor.get_mut().y = ev.time;
+}
+
+void PatternEditorPanel::next_event_pressed() {
+    doc::Document const & document = get_document();
+    auto ev = move_cursor::next_event(document, _win._cursor.get());
+    _win._cursor.get_mut().y = ev.time;
+}
 
 /// To avoid an infinite loop,
 /// avoid scrolling more than _ patterns in a single Page Down keystroke.
