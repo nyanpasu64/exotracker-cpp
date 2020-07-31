@@ -1555,9 +1555,9 @@ inline void switch_seq_entry_index(PatternEditorPanel & self) {
 
     // If cursor is out of bounds, move to last row in pattern.
     if (cursor_y.beat >= nbeats) {
-        BeatFraction rows = rows_from_beats(self, nbeats);
-        int prev_row = frac_prev(rows);
-        cursor_y.beat = beats_from_rows(self, prev_row);
+        BeatFraction rows = nbeats * self._rows_per_beat;
+        int prev_row = util::math::frac_prev(rows);
+        cursor_y.beat = BeatFraction{prev_row, self._rows_per_beat};
     }
 }
 
