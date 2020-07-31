@@ -1462,13 +1462,6 @@ static inline BeatFraction beats_from_rows(
     return rows / BeatFraction{self._rows_per_beat};
 }
 
-template<typename T>
-static inline BeatFraction beats_from_beats(
-    [[maybe_unused]] PatternEditorPanel const & self, T beats
-) {
-    return beats;
-}
-
 // Cursor movement
 
 void PatternEditorPanel::up_pressed() {
@@ -1479,13 +1472,23 @@ void PatternEditorPanel::down_pressed() {
     move_down<rows_from_beats, beats_from_rows>(*this);
 }
 
+
 void PatternEditorPanel::prev_beat_pressed() {
-    move_up<beats_from_beats, beats_from_beats>(*this);
+    doc::Document const & document = get_document();
+    auto const & move_cfg = get_app().options().move_cfg;
+
+    auto & cursor_y = _win._cursor.get_mut().y;
+    cursor_y = move_cursor::prev_beat(document, cursor_y, move_cfg);
 }
 
 void PatternEditorPanel::next_beat_pressed() {
-    move_down<beats_from_beats, beats_from_beats>(*this);
+    doc::Document const & document = get_document();
+    auto const & move_cfg = get_app().options().move_cfg;
+
+    auto & cursor_y = _win._cursor.get_mut().y;
+    cursor_y = move_cursor::next_beat(document, cursor_y, move_cfg);
 }
+
 
 void PatternEditorPanel::prev_event_pressed() {
     doc::Document const & document = get_document();
@@ -1498,6 +1501,7 @@ void PatternEditorPanel::next_event_pressed() {
     auto ev = move_cursor::next_event(document, _win._cursor.get());
     _win._cursor.get_mut().y = ev.time;
 }
+
 
 /// To avoid an infinite loop,
 /// avoid scrolling more than _ patterns in a single Page Down keystroke.

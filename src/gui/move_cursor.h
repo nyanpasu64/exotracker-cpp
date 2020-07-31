@@ -2,6 +2,7 @@
 
 #include "cursor.h"
 #include "doc.h"
+#include "gui/config/cursor.h"
 #include "timing_common.h"
 #include "chip_common.h"
 #include "util/compare.h"
@@ -37,5 +38,22 @@ SwitchEventResult prev_event(doc::Document const& document, cursor::Cursor curso
 /// If the channel has no events, returns {original time, wrapped=true}.
 [[nodiscard]]
 SwitchEventResult next_event(doc::Document const& document, cursor::Cursor cursor);
+
+
+// # Moving cursor by beats
+
+using config::cursor::MovementConfig;
+
+[[nodiscard]] PatternAndBeat prev_beat(
+    doc::Document const& document,
+    PatternAndBeat cursor_y,
+    MovementConfig const& move_cfg
+);
+
+[[nodiscard]] PatternAndBeat next_beat(
+    doc::Document const& document,
+    PatternAndBeat cursor_y,
+    MovementConfig const& move_cfg
+);
 
 }
