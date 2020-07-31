@@ -1110,8 +1110,12 @@ static void draw_pattern_background(
             );
             painter.fillRect(select_rect, select_grad);
 
-            painter.setPen(visual.select_border);
-            draw_top_border(painter, select_rect);
+            auto border_grad = make_gradient(
+                select_top, select_grad_bottom, visual.select_border, 255, 0
+            );
+            painter.fillRect(top_border(painter, select_rect), border_grad);
+            painter.fillRect(left_border(painter, select_rect), border_grad);
+            painter.fillRect(right_border(painter, select_rect), border_grad);
         }
     }
 
