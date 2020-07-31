@@ -64,7 +64,8 @@ inline namespace keys {
         constexpr static Qt::Key escape{Qt::Key_Escape};
         constexpr static Qt::Key toggle_edit{Qt::Key_Space};
         constexpr static Qt::Key delete_key{Qt::Key_Delete};
-        constexpr static Qt::Key note_cut{Qt::Key_QuoteLeft};  // backtick
+        KeyInt note_cut{Qt::Key_QuoteLeft};  // backtick
+        KeyInt selection_padding{chord(Qt::SHIFT, Qt::Key_Space)};
 
         std::array<KeyboardRow, 2> piano_keys{get_octave_0(), get_octave_1()};
     };

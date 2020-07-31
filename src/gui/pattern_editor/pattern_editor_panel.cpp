@@ -1898,6 +1898,16 @@ void PatternEditorPanel::note_cut_pressed() {
     }
 }
 
+void PatternEditorPanel::selection_padding_pressed() {
+    if (auto & select = _win._cursor.raw_select_mut()) {
+        // If selection enabled, toggle whether to include bottom row.
+        select->toggle_padding(_rows_per_beat);
+    } else {
+        // Otherwise create a single-cell selection.
+        _win._cursor.enable_select(_rows_per_beat);
+    }
+}
+
 void add_instrument_digit(
     PatternEditorPanel & self,
     doc::ChipIndex chip,

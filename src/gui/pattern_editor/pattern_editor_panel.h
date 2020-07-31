@@ -85,7 +85,8 @@ struct ShortcutPair {
     X(escape) SEP\
     X(toggle_edit) SEP\
     X(delete_key) SEP\
-    X(note_cut)
+    X(note_cut) SEP\
+    X(selection_padding)
 
 struct PatternEditorShortcuts {
     // [0] is just the keystroke, [1] is with Shift pressed.
