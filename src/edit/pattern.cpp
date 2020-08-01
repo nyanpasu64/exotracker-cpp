@@ -34,6 +34,7 @@ struct PatternEdit {
             document.sequence[_seq_entry_index].chip_channel_events[_chip][_channel];
         for (auto & ev : doc_events) {
             assert(ev.v != doc::RowEvent{});
+            (void) ev;
         }
         doc_events.swap(_events);
     }
