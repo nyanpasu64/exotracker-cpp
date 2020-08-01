@@ -42,8 +42,12 @@ struct Selection {
 };
 
 struct RawSelection {
-    /// Starting point of the selection. The other endpoint is the cursor.
+    /// Starting point of the selection.
     Cursor begin;
+
+    /// Endpoint of the selection. Always updated when the cursor moves,
+    /// but select-all can move selection without moving cursor.
+    Cursor end;
 
     /// How many beats to select below the bottom endpoint
     /// (whichever of _begin and cursor is lower).
@@ -74,6 +78,7 @@ public:
     Cursor const& operator*() const;
     Cursor const* operator->() const;
 
+    /// Moving the cursor always updates the selection endpoint.
     void set(Cursor cursor);
     void set_x(CursorX x);
     void set_y(PatternAndBeat y);

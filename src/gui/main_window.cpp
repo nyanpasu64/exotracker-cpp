@@ -72,16 +72,25 @@ cursor::Cursor const* CursorAndSelection::operator->() const {
 
 void CursorAndSelection::set(Cursor cursor) {
     _cursor = cursor;
+    if (_select) {
+        _select->end = _cursor;
+    }
     reset_digit();
 }
 
 void CursorAndSelection::set_x(CursorX x) {
     _cursor.x = x;
+    if (_select) {
+        _select->end = _cursor;
+    }
     reset_digit();
 }
 
 void CursorAndSelection::set_y(PatternAndBeat y) {
     _cursor.y = y;
+    if (_select) {
+        _select->end = _cursor;
+    }
     reset_digit();
 }
 
@@ -107,8 +116,8 @@ std::optional<RawSelection> & CursorAndSelection::raw_select_mut() {
 
 std::optional<Selection> CursorAndSelection::get_select() const {
     if (_select) {
-        auto [left, right] = std::minmax(_select->begin.x, _cursor.x);
-        auto [top, bottom] = std::minmax(_select->begin.y, _cursor.y);
+        auto [left, right] = std::minmax(_select->begin.x, _select->end.x);
+        auto [top, bottom] = std::minmax(_select->begin.y, _select->end.y);
         // you can't mutate bottom, because C++ unpacking is half-baked.
 
         Selection out {
@@ -127,7 +136,7 @@ std::optional<Selection> CursorAndSelection::get_select() const {
 void CursorAndSelection::enable_select(int rows_per_beat) {
     if (!_select) {
         // 1 row * beats/row
-        _select = RawSelection{_cursor, BeatFraction{1, rows_per_beat}};
+        _select = RawSelection{_cursor, _cursor, BeatFraction{1, rows_per_beat}};
     }
 }
 
