@@ -182,10 +182,10 @@ public:
     }
 
 public slots:
-    // update() is called by timers and user input.
+    // update_time() is called by timer receiving latest time from audio thread.
     // It mutates state (cached audio playback position) and calls repaint().
-    void update(timing::MaybeSequencerTime maybe_seq_time);
-    W_SLOT(update, (timing::MaybeSequencerTime))
+    void update_time(timing::MaybeSequencerTime maybe_seq_time);
+    W_SLOT(update_time, (timing::MaybeSequencerTime))
 
 protected:
 

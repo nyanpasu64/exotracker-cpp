@@ -128,7 +128,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
             self._win._select_begin.x = self._win._cursor->x;
             self._win._select_begin.y = self._win._cursor->y;
         }
-        self.repaint();
+        self.update();
     };
 
     auto connect_shortcut_pair = [&] (ShortcutPair & pair, Method method) {
@@ -272,7 +272,7 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * parent)
         &MainWindow::gui_refresh,
         this,
         [this] (MaybeSequencerTime maybe_seq_time) {
-            update(maybe_seq_time);
+            update_time(maybe_seq_time);
         }
     );
 }
@@ -281,6 +281,7 @@ void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
 
     create_image(*this);
+    // Qt automatically calls paintEvent().
 }
 
 // # Column layout
@@ -1342,7 +1343,7 @@ void PatternEditorPanel::paintEvent(QPaintEvent *event) {
 
 // # Following audio thread
 
-void PatternEditorPanel::update(timing::MaybeSequencerTime maybe_seq_time) {
+void PatternEditorPanel::update_time(timing::MaybeSequencerTime maybe_seq_time) {
     if (maybe_seq_time.has_value()) {
         // Update cursor to sequencer position (from audio thread).
         auto const seq_time = maybe_seq_time.value();
@@ -1361,10 +1362,11 @@ void PatternEditorPanel::update(timing::MaybeSequencerTime maybe_seq_time) {
             }
         }
 
-        _win._cursor.get_mut().y = new_cursor_y;
+        if (_win._cursor->y != new_cursor_y) {
+            _win._cursor.get_mut().y = new_cursor_y;
+            update();
+        }
     }
-
-    repaint();
 }
 
 // # Cursor movement
@@ -1839,6 +1841,7 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
                 if (curr_key == keycode) {
                     auto note = doc::Note{doc::ChromaticInt(chromatic)};
                     note_pressed(*this, chip, channel, note);
+                    update();
                     return;
                 }
             }
@@ -1848,6 +1851,7 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
     if (std::get_if<subcolumns::Instrument>(subp)) {
         if (auto digit = format::hex_from_key(*event)) {
             add_instrument_digit(*this, chip, channel, *digit);
+            update();
         }
     }
 }

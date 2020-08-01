@@ -389,6 +389,7 @@ public:
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
             _cursor.get_mut() = cursor_edit->before_cursor;
             _history.undo();
+            _pattern_editor_panel->update();  // depends on _cursor and _history
         }
     }
 
@@ -397,6 +398,7 @@ public:
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
             _cursor.get_mut() = cursor_edit->after_cursor;
             _history.redo();
+            _pattern_editor_panel->update();  // depends on _cursor and _history
         }
     }
 
@@ -421,12 +423,14 @@ public:
         bind_editor_action(_play_pause);
         connect_action(_play_pause, [this] () {
             _audio_component.play_pause(*this);
+            _pattern_editor_panel->update();  // this->update() works too.
         });
 
         _play_from_row.setShortcut(QKeySequence{shortcuts.play_from_row});
         bind_editor_action(_play_from_row);
         connect_action(_play_from_row, [this] () {
             _audio_component.play_from_row(*this);
+            _pattern_editor_panel->update();
         });
 
         _undo.setShortcuts(QKeySequence::Undo);
