@@ -60,6 +60,20 @@ using util::reverse::reverse;
 
 using timing::MaybeSequencerTime;
 
+PatternEditorShortcuts::PatternEditorShortcuts(QWidget * widget) :
+    #define COMMA ,
+
+    #define X(PAIR) \
+        PAIR{QShortcut{widget}, QShortcut{widget}}
+    SHORTCUT_PAIRS(X, COMMA)
+    #undef X
+    #undef COMMA
+
+    #define X(KEY)  ,KEY{widget}
+    SHORTCUTS(X, )
+    #undef X
+{}
+
 W_OBJECT_IMPL(PatternEditorPanel)
 
 /*

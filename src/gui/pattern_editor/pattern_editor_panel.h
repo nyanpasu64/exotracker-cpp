@@ -100,19 +100,7 @@ struct PatternEditorShortcuts {
     SHORTCUTS(X, )
     #undef X
 
-    PatternEditorShortcuts(QWidget * widget) :
-        #define COMMA ,
-
-        #define X(PAIR) \
-            PAIR{QShortcut{widget}, QShortcut{widget}}
-        SHORTCUT_PAIRS(X, COMMA)
-        #undef X
-        #undef COMMA
-
-        #define X(KEY)  ,KEY{widget}
-        SHORTCUTS(X, )
-        #undef X
-    {}
+    explicit PatternEditorShortcuts(QWidget * widget);
 };
 
 // This is undefined behavior. I don't care.
