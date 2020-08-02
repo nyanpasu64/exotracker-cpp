@@ -50,6 +50,9 @@ inline namespace keys {
         KeyInt scroll_prev{Qt::Key_PageUp};
         KeyInt scroll_next{Qt::Key_PageDown};
 
+        KeyInt top{Qt::Key_Home};
+        KeyInt bottom{Qt::Key_End};
+
         KeyInt prev_pattern{chord(Qt::CTRL, Qt::Key_PageUp)};
         KeyInt next_pattern{chord(Qt::CTRL, Qt::Key_PageDown)};
 

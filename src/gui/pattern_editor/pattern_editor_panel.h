@@ -71,6 +71,8 @@ struct ShortcutPair {
     X(next_event) SEP \
     X(scroll_prev) SEP \
     X(scroll_next) SEP \
+    X(top) SEP\
+    X(bottom) SEP\
     X(prev_pattern) SEP \
     X(next_pattern) SEP \
     X(left) SEP \

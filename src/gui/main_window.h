@@ -81,6 +81,10 @@ public:
 
     [[nodiscard]] Selection get_select() const;
 
+    [[nodiscard]] doc::BeatFraction bottom_padding() const {
+        return _bottom_padding;
+    }
+
     void set_end(Cursor end);
 
     void toggle_padding(int rows_per_beat);

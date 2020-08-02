@@ -1682,6 +1682,67 @@ void PatternEditorPanel::scroll_next_pressed() {
     _win._cursor.set_y(cursor_y);
 }
 
+void PatternEditorPanel::top_pressed() {
+    auto cursor_y = _win._cursor.get().y;
+
+    if (get_app().options().move_cfg.home_end_switch_patterns && cursor_y.beat <= 0) {
+        if (cursor_y.seq_entry_index > 0) {
+            cursor_y.seq_entry_index--;
+        }
+    }
+
+    cursor_y.beat = 0;
+    _win._cursor.set_y(cursor_y);
+}
+
+void PatternEditorPanel::bottom_pressed() {
+    doc::Document const& document = get_document();
+    auto raw_select = _win._cursor.raw_select();
+
+    // TODO pick a way of handling edge cases.
+    //  We should use the same method of moving the cursor to end of pattern,
+    //  as switching patterns uses (switch_seq_entry_index()).
+    //  calc_bottom() is dependent on selection's cached rows_per_beat (limitation)
+    //  but selects one pattern exactly (good).
+
+    auto calc_bottom = [&] (PatternAndBeat cursor_y) -> BeatFraction {
+        BeatFraction bottom_padding{1, _rows_per_beat};
+
+        /*
+        If a selection is active and bottom_padding() == 0,
+        the naive approach would place the cursor at the end of a pattern,
+        which is undesired (you can place otherwise-unreachable notes,
+        and pressing down has no visual change).
+
+        One option is to place the cursor on the next pattern.
+        But at the end of the document, there is no next pattern.
+
+        I decided to skip selecting the bottom row of the pattern.
+        This is a tradeoff. There is no perfect solution.
+        */
+        if (raw_select && raw_select->bottom_padding() > 0) {
+            bottom_padding = raw_select->bottom_padding();
+        }
+        return document.sequence[cursor_y.seq_entry_index].nbeats - bottom_padding;
+    };
+
+    auto cursor_y = _win._cursor.get().y;
+    auto bottom_beat = calc_bottom(cursor_y);
+
+    if (
+        get_app().options().move_cfg.home_end_switch_patterns
+        && cursor_y.beat >= bottom_beat
+    ) {
+        if (cursor_y.seq_entry_index + 1 < document.sequence.size()) {
+            cursor_y.seq_entry_index++;
+            bottom_beat = calc_bottom(cursor_y);
+        }
+    }
+
+    cursor_y.beat = bottom_beat;
+    _win._cursor.set_y(cursor_y);
+}
+
 template<void alter_mod(SeqEntryIndex & x, SeqEntryIndex den)>
 inline void switch_seq_entry_index(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
