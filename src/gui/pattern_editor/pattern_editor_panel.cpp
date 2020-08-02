@@ -1910,6 +1910,22 @@ void PatternEditorPanel::note_cut_pressed() {
     }
 }
 
+void PatternEditorPanel::select_all_pressed() {
+    doc::Document const& document = get_document();
+
+    ColumnList column_list = gen_column_list(*this, document);
+
+    std::vector<cursor::SubColumnIndex> col_to_nsubcol;
+    col_to_nsubcol.reserve(column_list.size());
+    for (auto & col : column_list) {
+        col_to_nsubcol.push_back(cursor::SubColumnIndex(col.subcolumns.size()));
+    }
+
+    // TODO add a method abstraction?
+    _win._cursor.enable_select(_rows_per_beat);
+    _win._cursor.raw_select_mut()->select_all(document, col_to_nsubcol, _rows_per_beat);
+}
+
 void PatternEditorPanel::selection_padding_pressed() {
     if (auto & select = _win._cursor.raw_select_mut()) {
         // If selection enabled, toggle whether to include bottom row.

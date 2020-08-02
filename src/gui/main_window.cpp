@@ -49,12 +49,90 @@ using util::math::ceildiv;
 using edit::edit_doc::set_ticks_per_beat;
 
 
+RawSelection::RawSelection(Cursor cursor, int rows_per_beat)
+    : _begin(cursor)
+    , _end(cursor)
+    , _bottom_padding(BeatFraction{1, rows_per_beat})
+{}
+
+Selection RawSelection::get_select() const {
+    auto [left, right] = std::minmax(_begin.x, _end.x);
+    auto [top, bottom] = std::minmax(_begin.y, _end.y);
+    // you can't mutate bottom, because C++ unpacking is half-baked.
+
+    Selection out {
+        .left = left,
+        .right = right,
+        .top = top,
+        .bottom = bottom,
+    };
+
+    out.bottom.beat += _bottom_padding;
+    return out;
+}
+
+void RawSelection::set_end(Cursor end) {
+    _end = end;
+    _mode = SelectionMode::Normal;
+}
+
 void RawSelection::toggle_padding(int rows_per_beat) {
-    if (bottom_padding == 0) {
+    if (_bottom_padding == 0) {
         // 1 row * beats/row
-        bottom_padding = BeatFraction{1, rows_per_beat};
+        _bottom_padding = BeatFraction{1, rows_per_beat};
     } else {
-        bottom_padding = 0;
+        _bottom_padding = 0;
+    }
+}
+
+void RawSelection::select_all(
+    doc::Document const& document,
+    ColumnToNumSubcol col_to_nsubcol,
+    int rows_per_beat
+) {
+    using doc::SeqEntryIndex;
+    using cursor::ColumnIndex;
+
+    Selection select = get_select();
+    SeqEntryIndex top_seq = select.top.seq_entry_index;
+    SeqEntryIndex bottom_seq = select.bottom.seq_entry_index;
+
+    // Unconditionally enable padding below bottom of selection.
+    _bottom_padding = BeatFraction{1, rows_per_beat};
+
+    auto select_block = [this, &document, col_to_nsubcol, top_seq, bottom_seq] (
+        ColumnIndex left_col, ColumnIndex right_col
+    ) {
+        release_assert(left_col < col_to_nsubcol.size());
+        release_assert(right_col < col_to_nsubcol.size());
+
+        _begin.x = CursorX{left_col, 0};
+        _begin.y = PatternAndBeat{top_seq, 0};
+
+        _end.x = CursorX{right_col, col_to_nsubcol[right_col] - 1};
+        _end.y = PatternAndBeat{
+            bottom_seq, document.sequence[bottom_seq].nbeats - _bottom_padding
+        };
+    };
+
+    if (_mode == SelectionMode::Normal) {
+        // Select all sequence entries and channels the current selection occupies.
+        _orig_left = select.left.column;
+        _orig_right = select.right.column;
+
+        select_block(_orig_left, _orig_right);
+        _mode = SelectionMode::SelectChannels;
+
+    } else if (_mode == SelectionMode::SelectChannels) {
+        // Select all sequence entries the current selection occupies,
+        // and all channels unconditionally.
+        select_block(0, ColumnIndex(col_to_nsubcol.size() - 1));
+        _mode = SelectionMode::SelectAll;
+
+    } else if (_mode == SelectionMode::SelectAll) {
+        // Select all sequence entries and channels the original selection occupied.
+        select_block(_orig_left, _orig_right);
+        _mode = SelectionMode::SelectChannels;
     }
 }
 
@@ -73,7 +151,7 @@ cursor::Cursor const* CursorAndSelection::operator->() const {
 void CursorAndSelection::set(Cursor cursor) {
     _cursor = cursor;
     if (_select) {
-        _select->end = _cursor;
+        _select->set_end(_cursor);
     }
     reset_digit();
 }
@@ -81,7 +159,7 @@ void CursorAndSelection::set(Cursor cursor) {
 void CursorAndSelection::set_x(CursorX x) {
     _cursor.x = x;
     if (_select) {
-        _select->end = _cursor;
+        _select->set_end(_cursor);
     }
     reset_digit();
 }
@@ -89,7 +167,7 @@ void CursorAndSelection::set_x(CursorX x) {
 void CursorAndSelection::set_y(PatternAndBeat y) {
     _cursor.y = y;
     if (_select) {
-        _select->end = _cursor;
+        _select->set_end(_cursor);
     }
     reset_digit();
 }
@@ -116,27 +194,14 @@ std::optional<RawSelection> & CursorAndSelection::raw_select_mut() {
 
 std::optional<Selection> CursorAndSelection::get_select() const {
     if (_select) {
-        auto [left, right] = std::minmax(_select->begin.x, _select->end.x);
-        auto [top, bottom] = std::minmax(_select->begin.y, _select->end.y);
-        // you can't mutate bottom, because C++ unpacking is half-baked.
-
-        Selection out {
-            .left = left,
-            .right = right,
-            .top = top,
-            .bottom = bottom,
-        };
-
-        out.bottom.beat += _select->bottom_padding;
-        return out;
+        return _select->get_select();
     }
     return {};
 }
 
 void CursorAndSelection::enable_select(int rows_per_beat) {
     if (!_select) {
-        // 1 row * beats/row
-        _select = RawSelection{_cursor, _cursor, BeatFraction{1, rows_per_beat}};
+        _select = RawSelection(_cursor, rows_per_beat);
     }
 }
 

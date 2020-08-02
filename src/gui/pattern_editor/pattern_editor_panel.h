@@ -86,6 +86,7 @@ struct ShortcutPair {
     X(toggle_edit) SEP\
     X(delete_key) SEP\
     X(note_cut) SEP\
+    X(select_all) SEP\
     X(selection_padding)
 
 struct PatternEditorShortcuts {

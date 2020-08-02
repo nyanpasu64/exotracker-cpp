@@ -10,6 +10,7 @@
 #include "timing_common.h"
 #include "audio/output.h"
 
+#include <gsl/span>
 #include <verdigris/wobjectdefs.h>
 
 #include <QMainWindow>
@@ -34,6 +35,15 @@ enum class AudioState {
 using cursor::Cursor;
 using cursor::CursorX;
 
+/// A user selection in the document.
+///
+/// left and right are both inclusive, and must lie in bounds.
+///
+/// top is inclusive, but bottom is exclusive.
+///
+/// top.seq_entry_index must lie in-bounds, and top.beat generally remains in-bounds.
+/// bottom.seq_entry_index must lie in-bounds,
+/// but bottom.beat can equal the sequence entry length.
 struct Selection {
     CursorX left;
     CursorX right;
@@ -41,20 +51,45 @@ struct Selection {
     PatternAndBeat bottom;
 };
 
-struct RawSelection {
+enum class SelectionMode {
+    Normal,
+    SelectChannels,
+    SelectAll,
+};
+
+using ColumnToNumSubcol = gsl::span<cursor::SubColumnIndex>;
+
+class RawSelection {
     /// Starting point of the selection.
-    Cursor begin;
+    Cursor _begin;
 
     /// Endpoint of the selection. Always updated when the cursor moves,
     /// but select-all can move selection without moving cursor.
-    Cursor end;
+    Cursor _end;
+
+    SelectionMode _mode = SelectionMode::Normal;
+    cursor::ColumnIndex _orig_left = cursor::ColumnIndex(-1);
+    cursor::ColumnIndex _orig_right = cursor::ColumnIndex(-1);
 
     /// How many beats to select below the bottom endpoint
     /// (whichever of _begin and cursor is lower).
-    doc::BeatFraction bottom_padding;
+    doc::BeatFraction _bottom_padding;
 
     // impl
+public:
+    explicit RawSelection(Cursor cursor, int rows_per_beat);
+
+    [[nodiscard]] Selection get_select() const;
+
+    void set_end(Cursor end);
+
     void toggle_padding(int rows_per_beat);
+
+    void select_all(
+        doc::Document const& document,
+        ColumnToNumSubcol col_to_nsubcol,
+        int rows_per_beat
+    );
 };
 
 /// Stores cursor, selection,
