@@ -44,6 +44,7 @@ using chip_common::ChannelIndex;
 
 /// Clear the focused subcolumn of all events
 /// anchored exactly to the current beat fraction.
+/// Deleting the note column also clears instrument and volume.
 EditBox delete_cell(
     Document const & document,
     ChipIndex chip,
