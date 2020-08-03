@@ -54,12 +54,19 @@ inline namespace note_ {
     }
 }
 
+/// SNES supports negative volumes.
+/// But keep it unsigned for type-consistency with other fields, and hex display.
+/// This way I can write an "edit" function operating on optional<uint8_t>
+/// regardless of the field being changed.
+using Volume = uint8_t;
+
 struct RowEvent {
     std::optional<Note> note;
     std::optional<InstrumentIndex> instr = {};
-    // TODO volumes and []effects
+    std::optional<Volume> volume = {};
+    // TODO []effects
 
-    EQUALABLE(RowEvent)
+    DEFAULT_EQUALABLE(RowEvent)
 };
 
 // end namespace

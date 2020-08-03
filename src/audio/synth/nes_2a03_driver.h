@@ -5,6 +5,7 @@
 #include "music_driver_common.h"
 #include "envelope.h"
 #include "sequencer.h"
+#include "doc.h"
 #include "chip_kinds.h"
 
 #include "util/copy_move.h"
@@ -51,6 +52,7 @@ class Apu1PulseDriver {
     Apu1PulseDriver_FOREACH_RAW(X, ITER_NAME)
 
     doc::Note _prev_note;
+    int _prev_volume;
 
 public:
     // Reading a ADD_BITFIELD_MEMBER does not sign-extend it.
@@ -88,15 +90,7 @@ private:
     DEFAULT_MOVE(Apu1PulseDriver)
 
 public:
-    Apu1PulseDriver(PulseNum pulse_num, TuningRef tuning_table) noexcept :
-        _pulse_num(pulse_num),
-        _base_address(Address(0x4000 + 0x4 * pulse_num)),
-        _tuning_table(tuning_table),
-        _volume_iter(&doc::Instrument::volume, MAX_VOLUME),
-        _arpeggio_iter(&doc::Instrument::arpeggio, 0),
-        _wave_index_iter(&doc::Instrument::wave_index, 0),
-        _prev_note(0)
-    {}
+    Apu1PulseDriver(PulseNum pulse_num, TuningRef tuning_table) noexcept;
 
     void stop_playback(RegisterWriteQueue &/*mut*/ register_writes);
 
@@ -129,7 +123,6 @@ TEST_PUBLIC:
     Apu1PulseDriver _pulse2_driver;
 
 public:
-
     // TODO Apu1PulseDriver doesn't hold reference to _tuning_table,
     // but is passed one on each tick.
     Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
