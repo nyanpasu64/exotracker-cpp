@@ -87,34 +87,34 @@ target_compile_options(lib-3rdparty PRIVATE ${options-3rdparty})
 
 # Core library, does not use Qt
 add_library(exotracker-lib
-        ## Audio
-        3rdparty/Blip_Buffer/Blip_Buffer.cpp
+    ## Audio
+    3rdparty/Blip_Buffer/Blip_Buffer.cpp
 
-        # Library (widely used, uncoupled)
-        src/audio/event_queue.cpp
+    # Library (widely used, uncoupled)
+    src/audio/event_queue.cpp
 
-        # Common files (tightly coupled)
-        src/audio/audio_common.cpp
-        src/audio/synth_common.cpp
-        src/audio/synth/envelope.cpp
-        src/audio/synth/sequencer.cpp
-        src/audio/synth/music_driver_common.cpp
+    # Common files (tightly coupled)
+    src/audio/audio_common.cpp
+    src/audio/synth_common.cpp
+    src/audio/synth/envelope.cpp
+    src/audio/synth/sequencer.cpp
+    src/audio/synth/music_driver_common.cpp
 
-        src/chip_common.cpp
+    src/chip_common.cpp
 
-        # Implementation files
-        src/audio/synth.cpp
+    # Implementation files
+    src/audio/synth.cpp
 
-        # 2A03 audio
-        src/audio/synth/nes_2a03.cpp
-        src/audio/synth/nes_2a03_driver.cpp
+    # 2A03 audio
+    src/audio/synth/nes_2a03.cpp
+    src/audio/synth/nes_2a03_driver.cpp
 
-        # Glue files
-        src/doc.cpp
-        src/doc/events.cpp
-        src/doc/timed_events.cpp
-        src/timing_common.cpp
-        )
+    # Glue files
+    src/doc.cpp
+    src/doc/events.cpp
+    src/doc/timed_events.cpp
+    src/timing_common.cpp
+)
 target_compile_options(exotracker-lib PRIVATE "${options}")
 target_link_libraries(exotracker-lib PRIVATE lib-3rdparty rtaudio)
 target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
@@ -128,27 +128,27 @@ endif()
 
 # GUI editor, uses Qt
 add_executable(exotracker-bin
-        # GUI/audio communication
-        src/audio/output.cpp
-        src/cmd_queue.cpp
+    # GUI/audio communication
+    src/audio/output.cpp
+    src/cmd_queue.cpp
 
-        # GUI
-        src/main.cpp
-        src/gui/app.cpp
-        src/gui/main_window.cpp
-        src/gui/config.cpp
+    # GUI
+    src/main.cpp
+    src/gui/app.cpp
+    src/gui/main_window.cpp
+    src/gui/config.cpp
 
-        src/sample_docs.cpp
-        src/edit/edit_doc.cpp
-        src/edit/edit_pattern.cpp
-        src/edit_util/kv.cpp
-        src/gui/history.cpp
-        src/gui/lib/color.cpp
-        src/gui/lib/format.cpp
-        src/gui/lib/painter_ext.cpp
-        src/gui/move_cursor.cpp
-        src/gui/pattern_editor/pattern_editor_panel.cpp
-        )
+    src/sample_docs.cpp
+    src/edit/edit_doc.cpp
+    src/edit/edit_pattern.cpp
+    src/edit_util/kv.cpp
+    src/gui/history.cpp
+    src/gui/lib/color.cpp
+    src/gui/lib/format.cpp
+    src/gui/lib/painter_ext.cpp
+    src/gui/move_cursor.cpp
+    src/gui/pattern_editor/pattern_editor_panel.cpp
+)
 target_compile_options(exotracker-bin PRIVATE "${options}")
 target_link_libraries(exotracker-bin PRIVATE exotracker-lib rtaudio Qt5::Widgets qkeycode)
 target_compile_definitions(exotracker-bin PRIVATE EXO_BIN)
@@ -162,24 +162,24 @@ endif()
 
 # Unit tests
 add_executable(exotracker-tests
-        tests/run_tests.cpp
-        tests/test_blip_buffer.cpp
-        tests/test_document.cpp
-        tests/test_math.cpp
-        tests/audio/test_event_queue.cpp
-        tests/audio/test_sequencer.cpp
-        tests/audio/test_synth.cpp
-        tests/test_utils/parameterize.cpp
-        tests/test_utils/test_parameterize.cpp
+    tests/run_tests.cpp
+    tests/test_blip_buffer.cpp
+    tests/test_document.cpp
+    tests/test_math.cpp
+    tests/audio/test_event_queue.cpp
+    tests/audio/test_sequencer.cpp
+    tests/audio/test_synth.cpp
+    tests/test_utils/parameterize.cpp
+    tests/test_utils/test_parameterize.cpp
 
-        src/doc.cpp  # for #ifdef UNITTEST
-        src/edit_util/kv.cpp
-        src/gui/move_cursor.cpp
-        src/cmd_queue.cpp
-        src/sample_docs.cpp
-        src/audio/synth/envelope.cpp
-        src/audio/synth/nes_2a03_driver.cpp
-        )
+    src/doc.cpp  # for #ifdef UNITTEST
+    src/edit_util/kv.cpp
+    src/gui/move_cursor.cpp
+    src/cmd_queue.cpp
+    src/sample_docs.cpp
+    src/audio/synth/envelope.cpp
+    src/audio/synth/nes_2a03_driver.cpp
+)
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests PRIVATE exotracker-lib)
