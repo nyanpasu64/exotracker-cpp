@@ -37,7 +37,7 @@ namespace detail {
     };
 }
 
-[[nodiscard]] std::optional<uint8_t> hex_from_key(const QKeyEvent & key) {
+[[nodiscard]] std::optional<uint8_t> hex_from_key(QKeyEvent const & key) {
     // avoid accidental copies of COW strings 🤢
     QString const text = key.text();
     if (text.isEmpty()) {
