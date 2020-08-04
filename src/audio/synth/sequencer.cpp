@@ -11,6 +11,8 @@
 #include <string>
 #include <type_traits>  // std::is_signed_v
 
+//#define SEQUENCER_DEBUG 1
+
 namespace audio::synth::sequencer {
 
 COMPARABLE_IMPL(BeatPlusTick, (self.beat, self.dtick))
@@ -155,8 +157,8 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 ) {
     #ifdef SEQUENCER_DEBUG
     print_chip_channel(*this);
-    fmt::print(stderr, "begin tick {}, {}, {}\n", _now.seq_entry, _now.next_tick.beat, _now.next_tick.dtick);
-    fmt::print(stderr, "\tcurrent event {}, {}\n", _next_event.seq_entry, _next_event.event_idx);
+    fmt::print(stderr, "begin tick, seq {}, beat time {}+{}\n", _now.seq_entry, _now.next_tick.beat, _now.next_tick.dtick);
+    fmt::print(stderr, "\tcurrent event seq {}, index {}\n", _next_event.seq_entry, _next_event.event_idx);
     #endif
 
     _events_this_tick.clear();
@@ -245,6 +247,9 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         // reduces the risk of integer overflow.
 
         if (_pattern_offset.event_is_ahead()) {
+            #ifdef SEQUENCER_DEBUG
+            fmt::print(stderr, "\tevent is ahead now\n");
+            #endif
             // If event is on next pattern,
             // and _now is over 1 beat from reaching the next pattern,
             // don't play the next pattern.
@@ -256,6 +261,9 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             now -= now_pattern_len;
 
         } else if (_pattern_offset.event_is_behind()) {
+            #ifdef SEQUENCER_DEBUG
+            fmt::print(stderr, "\tevent is behind now\n");
+            #endif
             // If event is on previous pattern, wait indefinitely.
             // Treat previous pattern as ending at time 0.
             next_ev_time -= ev_pattern_len;
@@ -288,7 +296,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             #ifdef SEQUENCER_DEBUG
             fmt::print(
                 stderr,
-                "\tadding event {} -> {}+{}\n",
+                "\tplaying event beat {} -> time {}+{}\n",
                 format_frac(next_ev.time.anchor_beat),
                 next_ev_time.beat,
                 next_ev_time.dtick
