@@ -144,6 +144,7 @@ add_executable(exotracker-bin
         src/gui/lib/color.cpp
         src/gui/lib/format.cpp
         src/gui/lib/painter_ext.cpp
+        src/gui/move_cursor.cpp
         src/gui/pattern_editor/pattern_editor_panel.cpp
         )
 target_compile_options(exotracker-bin PRIVATE "${options}")
@@ -171,6 +172,7 @@ add_executable(exotracker-tests
 
         src/doc.cpp  # for #ifdef UNITTEST
         src/edit_util/kv.cpp
+        src/gui/move_cursor.cpp
         src/cmd_queue.cpp
         src/sample_docs.cpp
         src/audio/synth/envelope.cpp

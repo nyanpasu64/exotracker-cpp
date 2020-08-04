@@ -4,6 +4,7 @@
 #include "gui/lib/format.h"
 #include "gui/lib/painter_ext.h"
 #include "gui/cursor.h"
+#include "gui/move_cursor.h"
 #include "gui/main_window.h"
 #include "gui_common.h"
 #include "chip_kinds.h"
@@ -52,8 +53,6 @@ using namespace gui::lib::painter_ext;
 
 using util::math::increment_mod;
 using util::math::decrement_mod;
-using util::math::frac_floor;
-using util::math::frac_ceil;
 using util::reverse::reverse;
 
 using timing::MaybeSequencerTime;
@@ -92,7 +91,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     using config::KeyInt;
     using config::chord;
 
-    auto & shortcut_keys = get_app().options().pattern_keys;
+    config::PatternKeys const& shortcut_keys = get_app().options().pattern_keys;
 
     auto init_shortcut = [&] (QShortcut & shortcut, QKeySequence const & key) {
         shortcut.setContext(Qt::WidgetShortcut);
@@ -1368,127 +1367,60 @@ void PatternEditorPanel::update_time(timing::MaybeSequencerTime maybe_seq_time) 
 
 // # Cursor movement
 
-static doc::FractionInt frac_prev(BeatFraction frac) {
-    return frac_ceil(frac) - 1;
-}
-
-static doc::FractionInt frac_next(BeatFraction frac) {
-    return frac_floor(frac) + 1;
-}
-
-using BeatsToUnits = BeatFraction (*)(PatternEditorPanel const &, BeatFraction);
-using UnitsToBeats = BeatFraction (*)(PatternEditorPanel const &, doc::FractionInt);
-
-// Move the cursor, snapping to the nearest unit.
-
-template<BeatsToUnits to_units, UnitsToBeats to_beats>
-void move_up(PatternEditorPanel & self) {
-    doc::Document const & document = self.get_document();
-    auto const & move_cfg = get_app().options().move_cfg;
-
-    auto & cursor_y = self._win._cursor.get_mut().y;
-
-    auto const orig_unit = to_units(self, cursor_y.beat);
-    doc::FractionInt const up_unit = frac_prev(orig_unit);
-    doc::FractionInt out_unit;
-
-    if (up_unit >= 0) {
-        out_unit = up_unit;
-
-    } else if (move_cfg.wrap_cursor) {
-        if (move_cfg.wrap_across_frames) {
-            decrement_mod(
-                cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
-            );
-        }
-
-        auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
-        out_unit = frac_prev(to_units(self, seq_entry.nbeats));
-
-    } else {
-        out_unit = 0;
-    }
-
-    cursor_y.beat = to_beats(self, out_unit);
-}
-
-template<BeatsToUnits to_units, UnitsToBeats to_beats>
-void move_down(PatternEditorPanel & self) {
-    doc::Document const & document = self.get_document();
-    auto const & move_cfg = get_app().options().move_cfg;
-
-    auto & cursor_y = self._win._cursor.get_mut().y;
-
-    auto const & seq_entry = document.sequence[cursor_y.seq_entry_index];
-    auto const num_units = to_units(self, seq_entry.nbeats);
-
-    auto const orig_unit = to_units(self, cursor_y.beat);
-    doc::FractionInt const down_unit = frac_next(orig_unit);
-    doc::FractionInt out_unit;
-
-    if (down_unit < num_units) {
-        out_unit = down_unit;
-
-    } else if (move_cfg.wrap_cursor) {
-        if (move_cfg.wrap_across_frames) {
-            increment_mod(
-                cursor_y.seq_entry_index, (SeqEntryIndex)document.sequence.size()
-            );
-        }
-
-        out_unit = 0;
-
-    } else {
-        // don't move the cursor.
-        return;
-    }
-
-    cursor_y.beat = to_beats(self, out_unit);
-}
-
-// Beat conversion functions
-
-static inline BeatFraction rows_from_beats(
-    PatternEditorPanel const & self, BeatFraction beats
-) {
-    return beats * self._rows_per_beat;
-}
-
-template<typename T>
-static inline BeatFraction beats_from_rows(
-    PatternEditorPanel const & self, T rows
-) {
-    return rows / BeatFraction{self._rows_per_beat};
-}
-
-template<typename T>
-static inline BeatFraction beats_from_beats(
-    [[maybe_unused]] PatternEditorPanel const & self, T beats
-) {
-    return beats;
-}
-
-// Cursor movement
-
 void PatternEditorPanel::up_pressed() {
-    move_up<rows_from_beats, beats_from_rows>(*this);
+    doc::Document const & document = get_document();
+    move_cursor::MoveCursorYArgs args{
+        .rows_per_beat = _rows_per_beat,
+        .step = _step,
+    };
+    auto const& move_cfg = get_app().options().move_cfg;
+
+    auto & cursor = _win._cursor.get_mut();
+    cursor.y = move_cursor::move_up(document, cursor, args, move_cfg);
 }
 
 void PatternEditorPanel::down_pressed() {
-    move_down<rows_from_beats, beats_from_rows>(*this);
+    doc::Document const & document = get_document();
+    move_cursor::MoveCursorYArgs args{
+        .rows_per_beat = _rows_per_beat,
+        .step = _step,
+    };
+    auto const& move_cfg = get_app().options().move_cfg;
+
+    auto & cursor = _win._cursor.get_mut();
+    cursor.y = move_cursor::move_down(document, cursor, args, move_cfg);
 }
 
+
 void PatternEditorPanel::prev_beat_pressed() {
-    move_up<beats_from_beats, beats_from_beats>(*this);
+    doc::Document const & document = get_document();
+    auto const & move_cfg = get_app().options().move_cfg;
+
+    auto & cursor_y = _win._cursor.get_mut().y;
+    cursor_y = move_cursor::prev_beat(document, cursor_y, move_cfg);
 }
 
 void PatternEditorPanel::next_beat_pressed() {
-    move_down<beats_from_beats, beats_from_beats>(*this);
+    doc::Document const & document = get_document();
+    auto const & move_cfg = get_app().options().move_cfg;
+
+    auto & cursor_y = _win._cursor.get_mut().y;
+    cursor_y = move_cursor::next_beat(document, cursor_y, move_cfg);
 }
 
-// TODO depends on horizontal cursor position.
-void PatternEditorPanel::prev_event_pressed() {}
-void PatternEditorPanel::next_event_pressed() {}
+
+void PatternEditorPanel::prev_event_pressed() {
+    doc::Document const & document = get_document();
+    auto ev = move_cursor::prev_event(document, _win._cursor.get());
+    _win._cursor.get_mut().y = ev.time;
+}
+
+void PatternEditorPanel::next_event_pressed() {
+    doc::Document const & document = get_document();
+    auto ev = move_cursor::next_event(document, _win._cursor.get());
+    _win._cursor.get_mut().y = ev.time;
+}
+
 
 /// To avoid an infinite loop,
 /// avoid scrolling more than _ patterns in a single Page Down keystroke.
@@ -1546,9 +1478,9 @@ inline void switch_seq_entry_index(PatternEditorPanel & self) {
 
     // If cursor is out of bounds, move to last row in pattern.
     if (cursor_y.beat >= nbeats) {
-        BeatFraction rows = rows_from_beats(self, nbeats);
-        int prev_row = frac_prev(rows);
-        cursor_y.beat = beats_from_rows(self, prev_row);
+        BeatFraction rows = nbeats * self._rows_per_beat;
+        int prev_row = util::math::frac_prev(rows);
+        cursor_y.beat = BeatFraction{prev_row, self._rows_per_beat};
     }
 }
 
@@ -1678,6 +1610,25 @@ void PatternEditorPanel::scroll_right_pressed() {
 }
 
 // Begin document mutation
+
+void PatternEditorPanel::toggle_edit_pressed() {
+    _edit_mode = !_edit_mode;
+}
+
+cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
+    doc::Document const & document = self.get_document();
+    auto cursor = self._win._cursor.get();
+    move_cursor::MoveCursorYArgs args{
+        .rows_per_beat = self._rows_per_beat,
+        .step = self._step,
+    };
+    auto const& move_cfg = get_app().options().move_cfg;
+
+    cursor.y = move_cursor::cursor_step(document, cursor, args, move_cfg);
+
+    return cursor;
+}
+
 namespace ed = edit::edit_pattern;
 
 auto calc_cursor_x(PatternEditorPanel const & self) ->
@@ -1690,18 +1641,6 @@ auto calc_cursor_x(PatternEditorPanel const & self) ->
     SubColumn subcolumn = column.subcolumns[cursor_x.subcolumn];
 
     return {column.chip, column.channel, subcolumn};
-}
-
-void PatternEditorPanel::toggle_edit_pressed() {
-    _edit_mode = !_edit_mode;
-}
-
-MainWindow::MaybeMoveCursor step_cursor_down(PatternEditorPanel & self) {
-    return [&self] () {
-        for (int i = 0; i < self._step; i++) {
-            self.down_pressed();
-        }
-    };
 }
 
 // TODO Is there a more reliable method for me to ensure that
@@ -1772,9 +1711,7 @@ void add_instrument_digit(
     if (self._win._cursor.digit_index() == 0) {
         // Erase instrument field and enter first digit.
         self._win.push_edit(
-            ed::instrument_digit_1(document, chip, channel, cursor_y, nybble),
-            nullptr,
-            true
+            ed::instrument_digit_1(document, chip, channel, cursor_y, nybble), {}, true
         );
         self._win._instrument = nybble;
     } else {

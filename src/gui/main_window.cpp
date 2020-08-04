@@ -485,7 +485,7 @@ public:
 
         _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
         connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
-            push_edit(set_ticks_per_beat(ticks_per_beat), nullptr, false);
+            push_edit(set_ticks_per_beat(ticks_per_beat), {}, false);
         });
     }
 
@@ -498,19 +498,16 @@ public:
     }
 
     void push_edit(
-        edit::EditBox command, MaybeMoveCursor move_cursor, bool advance_digit
+        edit::EditBox command,
+        std::optional<Cursor> maybe_cursor,
+        bool advance_digit = false
     ) override {
         _audio_component.send_edit(*this, command->box_clone());
 
         Cursor old_cursor = *_cursor;
 
-        // okay this is some incredibly janky and un-Rust-like API design.
-        // move_cursor holds a reference to PatternEditorPanel,
-        // which holds a reference to MainWindow,
-        // allowing move_cursor() to mutate MainWindow::_cursor
-        // despite not being passed a reference.
-        if (move_cursor) {
-            move_cursor();
+        if (maybe_cursor) {
+            _cursor.set(*maybe_cursor);
         }
 
         _history.push(edit::CursorEdit{std::move(command), old_cursor, *_cursor});

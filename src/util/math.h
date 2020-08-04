@@ -57,4 +57,14 @@ inline typename RationalT::int_type frac_ceil(RationalT x) {
     return ceildiv(x.numerator(), x.denominator());
 }
 
+template<typename RationalT>
+inline typename RationalT::int_type frac_prev(RationalT frac) {
+    return frac_ceil(frac) - 1;
+}
+
+template<typename RationalT>
+inline typename RationalT::int_type frac_next(RationalT frac) {
+    return frac_floor(frac) + 1;
+}
+
 }
