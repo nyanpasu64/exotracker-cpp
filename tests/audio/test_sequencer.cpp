@@ -258,7 +258,7 @@ TEST_CASE("Ensure sequencer behaves the same with and without reloading tempo") 
 ///
 /// beat = 0 or 1.
 /// delay = [0, 10) or so.
-static Document parametric_doc(uint32_t beat, TickT delay) {
+static Document parametric_doc(uint32_t beat, TickT delay, int peak_delay) {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 10,
     };
@@ -288,7 +288,7 @@ static Document parametric_doc(uint32_t beat, TickT delay) {
     }());
 
     // The second pattern is ✨different✨.
-    delay = 10 - delay;
+    delay = peak_delay - delay;
 
     // seq ind 1
     sequence.push_back([&] {
@@ -354,7 +354,7 @@ TEST_CASE("Randomly switch between randomly generated documents") {
             // the new document was always there (and ignores misorderings).
             auto beat = rand_u32{0, 2}(rng);
             auto delay = rand_tick{0, 9}(rng);
-            return parametric_doc(beat, delay);
+            return parametric_doc(beat, delay, 10);
         };
 
         Document document = random_doc(rng);
@@ -432,9 +432,9 @@ TEST_CASE("Randomly switch between random tempos") {
             // `beat + 2` can overflow the end of the pattern.
             // Events are misordered, but doc_edited() pretends
             // the new document was always there (and ignores misorderings).
-            auto beat = rand_u32{0, 2}(rng);
-            auto delay = rand_tick{0, 9}(rng);
-            return parametric_doc(beat, delay);
+            auto beat = rand_u32{0, 1}(rng);
+            auto delay = rand_tick{0, 1}(rng);
+            return parametric_doc(beat, delay, 1);
         };
 
         Document document = random_doc(rng);
