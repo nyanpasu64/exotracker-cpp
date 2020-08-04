@@ -3,6 +3,7 @@
 #include "lib/layout_macros.h"
 #include "gui_common.h"
 #include "cmd_queue.h"
+#include "edit/edit_doc.h"
 #include "util/release_assert.h"
 #include "util/math.h"
 
@@ -42,6 +43,7 @@ using std::make_unique;
 
 using gui::pattern_editor::PatternEditorPanel;
 using util::math::ceildiv;
+using edit::edit_doc::set_ticks_per_beat;
 
 
 const cursor::Cursor & CursorAndDigit::get() const {
@@ -480,6 +482,11 @@ public:
         );
 
         BIND_SPIN(step)
+
+        _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
+        connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
+            push_edit(set_ticks_per_beat(ticks_per_beat), nullptr, false);
+        });
     }
 
     std::optional<AudioThreadHandle> const & audio_handle() const override {

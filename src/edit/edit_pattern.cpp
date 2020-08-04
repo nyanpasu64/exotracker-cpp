@@ -1,5 +1,6 @@
 #include "edit_pattern.h"
 #include "edit_impl.h"
+#include "edit/modified.h"
 #include "edit_util/kv.h"
 #include "util/typeid_cast.h"
 
@@ -28,6 +29,7 @@ struct PatternEdit {
     doc::EventList _events;
 
     PatternEditType _type = Type::Other;
+    ModifiedFlags _modified = ModifiedFlags::Patterns;
 
     void apply_swap(doc::Document & document) {
         auto & doc_events =

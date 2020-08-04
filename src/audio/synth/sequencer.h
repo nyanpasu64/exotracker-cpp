@@ -125,6 +125,11 @@ ChannelSequencer_INTERNAL:
     /// Mutations are not affected by _next_event.
     RealTime _now;
 
+    /// "is playing" = (_curr_ticks_per_beat != 0).
+    TickT _curr_ticks_per_beat;
+
+    bool _ignore_ordering_errors;
+
     /// Next event in document to be played.
     /// May not even be in the same pattern as _now.
     /// Mutations are affected by _now.
@@ -142,16 +147,39 @@ public:
         _chan_index = chan_index;
     }
 
+    /// Sets _now and _curr_ticks_per_beat to 0.
+    ///
+    /// Postconditions:
+    /// - not playing (_curr_ticks_per_beat == 0)
+    void stop_playback();
+
     /// Recompute _now based on timestamp.
     /// Recompute _next_event based on document and timestamp.
     /// Doesn't matter if document was edited or not.
+    ///
+    /// Postconditions:
+    /// - playing (_curr_ticks_per_beat != 0)
     void seek(doc::Document const & document, PatternAndBeat time);
 
     /// Recompute _next_event based on _now and edited document.
-    /// Assumption: ticks_per_beat unchanged.
+    ///
+    /// Preconditions:
+    /// - playing (_curr_ticks_per_beat != 0)
+    /// - ticks_per_beat unchanged from previous call to seek/tempo_changed/next_tick.
     void doc_edited(doc::Document const & document);
 
+    /// Recompute _now based on timestamp and document tempo. Ignores events entirely.
+    /// Can be called before doc_edited() if both tempo and events edited.
+    ///
+    /// Preconditions:
+    /// - playing (_curr_ticks_per_beat != 0)
+    void tempo_changed(doc::Document const & document);
+
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
+    ///
+    /// Preconditions:
+    /// - playing (_curr_ticks_per_beat != 0)
+    ///
     /// Return: SequencerTime is current tick (just occurred), not next tick.
     std::tuple<SequencerTime, EventsRef> next_tick(doc::Document const & document);
 };
@@ -170,6 +198,12 @@ public:
         }
     }
 
+    void stop_playback() {
+        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
+            _channel_sequencers[chan].stop_playback();
+        }
+    }
+
     void seek(doc::Document const & document, PatternAndBeat time) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             _channel_sequencers[chan].seek(document, time);
@@ -179,6 +213,12 @@ public:
     void doc_edited(doc::Document const & document) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             _channel_sequencers[chan].doc_edited(document);
+        }
+    }
+
+    void tempo_changed(doc::Document const & document) {
+        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
+            _channel_sequencers[chan].tempo_changed(document);
         }
     }
 

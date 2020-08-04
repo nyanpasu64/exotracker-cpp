@@ -1,15 +1,27 @@
 #define ChannelSequencer_INTERNAL public
 #include "sequencer.h"
-
 #include "util/release_assert.h"
+#include "util/math.h"
+
+#include <fmt/core.h>
 
 #include <algorithm>  // std::min
 #include <limits>  // std::numeric_limits
+#include <string>
 #include <type_traits>  // std::is_signed_v
 
 namespace audio::synth::sequencer {
 
 using doc::BeatFraction;
+
+static std::string format_frac(BeatFraction frac) {
+    return fmt::format(
+        "{} {}/{}",
+        frac.numerator() / frac.denominator(),
+        frac.numerator() % frac.denominator(),
+        frac.denominator()
+    );
+}
 
 // TODO add support for grooves.
 // We need to remove usages of `doc::round_to_int()`
@@ -46,6 +58,19 @@ ChannelSequencer::ChannelSequencer() {
     We should never reach or exceed 4 events simultaneously.
     */
     _events_this_tick.reserve(4);
+    stop_playback();  // initializes _curr_ticks_per_beat
+}
+
+void ChannelSequencer::stop_playback() {
+    _now = {};
+
+    // Set is-playing to false.
+    _curr_ticks_per_beat = 0;
+
+    _ignore_ordering_errors = false;
+
+    // This is not a full state reset yet. I don't know if that's a problem.
+    // seek() should clear all applicable state before any other method can see it.
 }
 
 doc::MaybeSeqEntryIndex calc_next_entry(
@@ -67,11 +92,18 @@ doc::MaybeSeqEntryIndex calc_next_entry(
     // change function to return both a pattern and a beat.
 }
 
+using RoundFrac = doc::FractionInt (*)(BeatFraction);
+
+template<RoundFrac round_frac = doc::round_to_int>
 static BeatPlusTick frac_to_tick(TickT ticks_per_beat, BeatFraction beat) {
     doc::FractionInt ibeat = beat.numerator() / beat.denominator();
     BeatFraction fbeat = beat - ibeat;
 
-    doc::FractionInt dtick = doc::round_to_int(fbeat * ticks_per_beat);
+    doc::FractionInt dtick = round_frac(fbeat * ticks_per_beat);
+
+    ibeat += dtick / ticks_per_beat;
+    dtick %= ticks_per_beat;
+
     return BeatPlusTick{.beat=ibeat, .dtick=dtick};
 }
 
@@ -111,10 +143,23 @@ EventPos event_vs_now(TickT ticks_per_beat, BeatPlusTick now, BeatPlusTick ev) {
     }
 };
 
+void print_chip_channel(ChannelSequencer const& self) {
+    fmt::print(stderr, "seq {},{} ", self._chip_index, self._chan_index);
+}
+
 std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     doc::Document const & document
 ) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "begin tick {}, {}, {}\n", _now.seq_entry, _now.next_tick.beat, _now.next_tick.dtick);
+    fmt::print(stderr, "\tcurrent event {}, {}\n", _next_event.seq_entry, _next_event.event_idx);
+    #endif
+
     _events_this_tick.clear();
+
+    // Assert that seek() was called earlier.
+    release_assert(_curr_ticks_per_beat != 0);
 
     // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
@@ -124,6 +169,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
+    _curr_ticks_per_beat = ticks_per_beat;
 
     // SequencerTime is current tick (just occurred), not next tick.
     // This is a subjective choice?
@@ -223,20 +269,29 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         auto event_pos = event_vs_now(ticks_per_beat, now, next_ev_time);
 
         // Past events are overdue and should never happen.
-        if (event_pos == EventPos::Past) {
+        if (!_ignore_ordering_errors && event_pos == EventPos::Past) {
             auto time = next_ev.time;
             fmt::print(
                 stderr,
-                "invalid document: event at seq {} time {}/{} + {} is in the past!\n",
+                "invalid document: event at seq {} time {} + {} is in the past!\n",
                 _next_event.seq_entry,
-                time.anchor_beat.numerator(),
-                time.anchor_beat.denominator(),
+                format_frac(time.anchor_beat),
                 time.tick_offset
             );
         }
 
         // Past and present events should be played.
         if (event_pos != EventPos::Future) {
+            #ifdef SEQUENCER_DEBUG
+            fmt::print(
+                stderr,
+                "\tadding event {} -> {}+{}\n",
+                format_frac(next_ev.time.anchor_beat),
+                next_ev_time.beat,
+                next_ev_time.dtick
+            );
+            #endif
+
             _events_this_tick.push_back(next_ev.v);
 
             // _next_event.event_idx may be out of bounds.
@@ -302,10 +357,16 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         check_invariants(*this);
     }
 
+    _ignore_ordering_errors = false;
     return {seq_chan_time, _events_this_tick};
 }
 
 void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "seek {}, {}\n", time.seq_entry_index, format_frac(time.beat));
+    #endif
+
     // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
     release_assert(_chip_index < nchip);
@@ -314,6 +375,9 @@ void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time)
 
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
+
+    // Set is-playing to true.
+    _curr_ticks_per_beat = ticks_per_beat;
 
     // Set real time.
     {
@@ -403,6 +467,7 @@ void ChannelSequencer::seek(doc::Document const & document, PatternAndBeat time)
         _next_event.event_idx++;
     }
     end_loop:
+    _ignore_ordering_errors = false;
     return;
 }
 
@@ -418,6 +483,11 @@ then round down when converting back to a tick
 */
 
 void ChannelSequencer::doc_edited(doc::Document const & document) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "doc_edited\n");
+    #endif
+
     // Document-level operations, not bound to current sequence entry.
     auto const nchip = document.chips.size();
     release_assert(_chip_index < nchip);
@@ -426,6 +496,9 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
 
     doc::SequencerOptions const options = document.sequencer_options;
     TickT const ticks_per_beat = options.ticks_per_beat;
+
+    // *everything* needs to be overhauled when I add mid-song tempo changes.
+    release_assert_equal(_curr_ticks_per_beat, ticks_per_beat);
 
     // Set next event to play.
     if (
@@ -537,7 +610,61 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
         }
     }
     end_loop:
+    _ignore_ordering_errors = false;
     return;
+}
+
+void ChannelSequencer::tempo_changed(doc::Document const & document) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "tempo_changed {}\n", document.sequencer_options.ticks_per_beat);
+    #endif
+
+    // beat must be based on the current value of _now,
+    // not the previously returned "start of beat".
+    // Or else, reassigning _now could erase pattern transitions
+    // and break invariants.
+
+    // Assert that seek() was called earlier.
+    release_assert(_curr_ticks_per_beat != 0);
+
+    doc::BeatFraction beat{
+        _now.next_tick.beat + doc::BeatFraction{
+            _now.next_tick.dtick, _curr_ticks_per_beat
+        }
+    };
+    TickT const ticks_per_beat = document.sequencer_options.ticks_per_beat;
+
+    // Set real time.
+    _now.next_tick = frac_to_tick<util::math::frac_floor>(ticks_per_beat, beat);
+
+    /*
+    Sometimes it's impossible to avoid putting events in the past.
+    Suppose you start with _now = 0 and ticks/beat = 1.
+
+    When next_tick() is called at ticks/beat = 1:
+    - _next_event (ceil-rounded) will advance until it's greater than _now
+      (1/4 rounds up to 1 > _now=0)
+    - _now will advance by 1 tick (_now := 1)
+
+    When tempo_changed() is called at ticks/beat = 11:
+    - _now stays at 1
+
+    When next_tick() is called at ticks/beat = 11:
+    - _next_event is at 1/4, which rounds to 3.
+    - _now rounds to 11.
+    - The event is in the past.
+
+    How would we fix this?
+    Setting frac_to_tick to frac_floor() (towards the past)
+    seems to resolve time paradoxes in the absence of delayed/early notes.
+    Switching between custom user grooves can cause semi-random time paradoxes.
+    Delayed/early notes can cause unavoidable time paradoxes
+    (not just due to rounding/quantization).
+
+    So set a flag saying "ignore past event errors".
+    */
+    _ignore_ordering_errors = true;
 }
 
 // end namespaces
