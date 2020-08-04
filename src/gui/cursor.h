@@ -19,8 +19,8 @@ struct CursorX {
 };
 
 struct Cursor {
-    CursorX x;
-    timing::PatternAndBeat y;
+    CursorX x{};
+    timing::PatternAndBeat y{};
 };
 
 }

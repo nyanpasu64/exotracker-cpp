@@ -168,6 +168,7 @@ add_executable(exotracker-tests
     tests/test_blip_buffer.cpp
     tests/test_document.cpp
     tests/test_math.cpp
+    tests/test_edit_history.cpp
     tests/audio/test_event_queue.cpp
     tests/audio/test_sequencer.cpp
     tests/audio/test_synth.cpp
@@ -185,6 +186,8 @@ add_executable(exotracker-tests
     src/edit_util/kv.cpp
     src/cmd_queue.cpp
     src/sample_docs.cpp
+    src/gui/history.cpp
+    src/edit/edit_pattern.cpp
 )
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
