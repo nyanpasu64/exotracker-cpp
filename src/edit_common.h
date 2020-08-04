@@ -31,11 +31,11 @@ public:
     // Object slicing is prevented by pure-virtual methods.
 
     // Mark destructor as virtual.
-    virtual ~BaseEditCommand() {};
+    virtual ~BaseEditCommand() = default;
 
     /// Not bounded-time.
     /// Called on the GUI thread. Return value is sent to the audio thread.
-    virtual EditBox box_clone() const = 0;
+    [[nodiscard]] virtual EditBox box_clone() const = 0;
 
     /// Bounded-time. Safe to call on both GUI and audio thread.
     ///

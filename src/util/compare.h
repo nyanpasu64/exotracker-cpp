@@ -34,5 +34,10 @@
         return this->FIELD != other.FIELD; \
     } \
 
+/// Requires #include <compare>
 #define DEFAULT_COMPARE(T) \
     auto operator<=>(T const&) const = default;
+
+/// Does not require #include <compare>
+#define DEFAULT_EQUALABLE(T) \
+    bool operator==(T const&) const = default;

@@ -11,27 +11,25 @@ namespace edit::edit_impl {
 /// This approach also allows us to define cloning once,
 /// instead of repeating the boilerplate in each command class.
 template<typename Body>
-struct ImplEditCommand : BaseEditCommand {
-    Body _body;
-
-    ImplEditCommand(Body body)
-        : BaseEditCommand{}, _body{std::move(body)}
+struct ImplEditCommand : BaseEditCommand, Body {
+    explicit ImplEditCommand(Body body)
+        : BaseEditCommand{}, Body{std::move(body)}
     {}
 
-    EditBox box_clone() const override {
-        return std::make_unique<ImplEditCommand>(_body);
+    [[nodiscard]] EditBox box_clone() const override {
+        return std::make_unique<ImplEditCommand>(*(Body *)this);
     }
 
     void apply_swap(doc::Document & document) override {
-        return _body.apply_swap(document);
+        return Body::apply_swap(document);
     }
 
     bool can_coalesce(BaseEditCommand & prev) const override {
-        return _body.can_coalesce(prev);
+        return Body::can_coalesce(prev);
     }
 
-    ModifiedFlags modified() const override {
-        return _body._modified;
+    [[nodiscard]] ModifiedFlags modified() const override {
+        return Body::_modified;
     }
 };
 

@@ -1419,6 +1419,14 @@ static void draw_pattern_foreground(
                         }
                     }
 
+                    CASE(sc::Volume) {
+                        if (row_event.volume) {
+                            painter.setPen(visual.volume);
+                            auto s = format_hex_2(uint8_t(*row_event.volume));
+                            draw(s);
+                        }
+                    }
+
                     #undef CASE
                 }
 
@@ -2011,35 +2019,51 @@ void PatternEditorPanel::selection_padding_pressed() {
     }
 }
 
-void add_instrument_digit(
+static void add_digit(
+    PatternEditorPanel & self,
+    doc::ChipIndex chip,
+    doc::ChannelIndex channel,
+    uint8_t nybble,
+    ed::MultiDigitField field
+) {
+    auto const& document = self.get_document();
+    auto cursor_y = self._win._cursor->y;
+
+    int digit_index = self._win._cursor.digit_index();
+    auto [instr, box] = ed::add_digit(
+        document, chip, channel, cursor_y, field, digit_index, nybble
+    );
+
+    if (digit_index == 0) {
+        // Erase field and enter first digit.
+        self._win.push_edit(std::move(box), {}, true);
+
+    } else {
+        // Move current digit to the left, append second digit,
+        // and move cursor down.
+        self._win.push_edit(std::move(box), step_cursor_down(self));
+    }
+    self._win._instrument = instr;
+
+}
+
+static void add_instrument_digit(
     PatternEditorPanel & self,
     doc::ChipIndex chip,
     doc::ChannelIndex channel,
     uint8_t nybble
 ) {
-    auto const& document = self.get_document();
-    auto cursor_y = self._win._cursor->y;
+    add_digit(self, chip, channel, nybble, subcolumns::Instrument{});
+}
 
-    if (self._win._cursor.digit_index() == 0) {
-        // Erase instrument field and enter first digit.
-        self._win.push_edit(
-            ed::instrument_digit_1(document, chip, channel, cursor_y, nybble), {}, true
-        );
-        self._win._instrument = nybble;
-    } else {
-        // Move current instrument digit to the left, append second digit,
-        // and move cursor down.
-
-        // NOTE: instrument_digit_2() assumes the cursor's target event
-        // is still valid and has a single digit.
-        // To ensure this, both moving the cursor and mutating the document
-        // clears _cursor.digit_index() and resets input to the first digit.
-        // The only exception is "mutating the document to insert first digit".
-        auto [instr, box] =
-            ed::instrument_digit_2(document, chip, channel, cursor_y, nybble);
-        self._win.push_edit(std::move(box), step_cursor_down(self));
-        self._win._instrument = instr;
-    }
+static void add_volume_digit(
+    PatternEditorPanel & self,
+    doc::ChipIndex chip,
+    doc::ChannelIndex channel,
+    uint8_t nybble
+) {
+    // TODO add support for single-digit volume?
+    add_digit(self, chip, channel, nybble, subcolumns::Volume{});
 }
 
 /// Handles events based on physical layout rather than shortcuts.
@@ -2097,6 +2121,12 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
     if (std::get_if<subcolumns::Instrument>(subp)) {
         if (auto digit = format::hex_from_key(*event)) {
             add_instrument_digit(*this, chip, channel, *digit);
+            update();
+        }
+    } else
+    if (std::get_if<subcolumns::Volume>(subp)) {
+        if (auto digit = format::hex_from_key(*event)) {
+            add_volume_digit(*this, chip, channel, *digit);
             update();
         }
     }

@@ -1,4 +1,5 @@
 #include "nes_2a03_driver.h"
+#include "volume_calc_common.h"
 
 #include <algorithm>  // std::clamp
 #include <cmath>  // lround
@@ -48,6 +49,20 @@ TuningOwned make_tuning_table(
     }
     return out;
 }
+
+
+Apu1PulseDriver::Apu1PulseDriver(
+    Apu1PulseDriver::PulseNum pulse_num, TuningRef tuning_table
+) noexcept
+    : _pulse_num(pulse_num)
+    , _base_address(Address(0x4000 + 0x4 * pulse_num))
+    , _tuning_table(tuning_table)
+    , _volume_iter(&doc::Instrument::volume, MAX_VOLUME)
+    , _arpeggio_iter(&doc::Instrument::arpeggio, 0)
+    , _wave_index_iter(&doc::Instrument::wave_index, 0)
+    , _prev_note(0)
+    , _prev_volume(MAX_VOLUME)
+{}
 
 void Apu1PulseDriver::stop_playback(
     [[maybe_unused]] RegisterWriteQueue & register_writes
@@ -113,25 +128,35 @@ void Apu1PulseDriver::tick(
                 #define NOTE_CUT(iter)  iter.note_cut()
                 Apu1PulseDriver_FOREACH(NOTE_CUT)
             }
-        } else if (event.instr.has_value()) {
+        }
+        if (event.instr.has_value()) {
             #define SWITCH_INSTRUMENT(iter)  iter.switch_instrument(*event.instr);
             Apu1PulseDriver_FOREACH(SWITCH_INSTRUMENT)
         }
+        if (event.volume.has_value()) {
+            _prev_volume = std::clamp(int(*event.volume), 0, MAX_VOLUME);
+        }
     }
 
-    _next_state.volume = _volume_iter.next(document);
+    // Set chip volume and increment volume envelope.
+    _next_state.volume =
+        volume_calc::volume_mul_4x4_4(_prev_volume, _volume_iter.next(document));
+
+    // Set chip duty and increment duty envelope.
     _next_state.duty = _wave_index_iter.next(document);
 
-    if (_next_state.volume) {
+    // Set chip pitch and increment arpeggio envelope.
+    _next_state.period_reg = [&] {
+        // In 0CC, arpeggios are processed and pitch registers are written to
+        // even if volume is 0, but not after a note cut.
+        //
         // Changing pitch may write to $4003, which resets phase and creates a click.
         // There is a way to avoid this click: http://forums.nesdev.com/viewtopic.php?t=231
         // I did not implement that method, so I get clicks.
         auto note = _prev_note.value + _arpeggio_iter.next(document);
-        _next_state.period_reg = _tuning_table[
-            (size_t) std::clamp(note, 0, doc::CHROMATIC_COUNT - 1)
-        ];
-    }
-
+        note = std::clamp(note, 0, doc::CHROMATIC_COUNT - 1);
+        return _tuning_table[(size_t) note];
+    }();
 
     /*
     - https://wiki.nesdev.com/w/index.php/APU#Pulse_.28.244000-4007.29

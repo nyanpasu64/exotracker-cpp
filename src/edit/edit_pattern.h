@@ -5,6 +5,7 @@
 #include "chip_common.h"
 #include "timing_common.h"
 
+#include <cstdint>
 #include <memory>
 #include <tuple>
 #include <variant>
@@ -13,16 +14,23 @@ namespace edit::edit_pattern {
 
 namespace subcolumns {
     struct Note {
+        DEFAULT_EQUALABLE(Note)
     };
     struct Instrument {
+        DEFAULT_EQUALABLE(Instrument)
     };
     struct Volume {
+        DEFAULT_EQUALABLE(Volume)
     };
     struct EffectName {
         uint8_t effect_col;
+
+        DEFAULT_EQUALABLE(EffectName)
     };
     struct EffectValue {
         uint8_t effect_col;
+
+        DEFAULT_EQUALABLE(EffectValue)
     };
 
     using SubColumn = std::variant<
@@ -66,23 +74,25 @@ EditBox insert_note(
     std::optional<doc::InstrumentIndex> instrument
 );
 
-/// Erases an instrument field and replaces it with the nybble entered by the user.
-EditBox instrument_digit_1(
-    Document const & document,
-    ChipIndex chip,
-    ChannelIndex channel,
-    PatternAndBeat time,
-    uint8_t nybble
-);
+using MultiDigitField = std::variant<subcolumns::Instrument, subcolumns::Volume>;
 
-/// Takes an instrument field with one nybble filled in,
-/// moves the nybble to the left, and appends the nybble entered by the user.
-/// Will be merged with previous instrument_digit_1() in undo history.
-std::tuple<doc::InstrumentIndex, EditBox> instrument_digit_2(
+/// Called when the user enters notes into a two-digit hex field.
+///
+/// On first keypress, digit_index is 0, and this function erases the field
+/// and replaces it with the nybble entered by the user.
+///
+/// If the user presses another key immediately afterwards (without moving the cursor),
+/// add_digit() is called with digit_index = 1.
+/// It moves the existing nybble to the left, and adds the nybble entered by the user.
+/// When the second keypress is sent to History, key0.can_coalesce(key1) returns true,
+/// and the two inputs are merged in the undo history.
+std::tuple<uint8_t, EditBox> add_digit(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
     PatternAndBeat time,
+    MultiDigitField subcolumn,
+    int digit_index,
     uint8_t nybble
 );
 

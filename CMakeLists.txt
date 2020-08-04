@@ -107,6 +107,7 @@ add_library(exotracker-lib
     src/audio/synth.cpp
 
     # 2A03 audio
+    src/audio/synth/volume_calc_common.cpp
     src/audio/synth/nes_2a03.cpp
     src/audio/synth/nes_2a03_driver.cpp
 
@@ -173,13 +174,17 @@ add_executable(exotracker-tests
     tests/test_utils/parameterize.cpp
     tests/test_utils/test_parameterize.cpp
 
-    src/doc.cpp  # for #ifdef UNITTEST
-    src/edit_util/kv.cpp
+    # for #ifdef UNITTEST
+    src/doc.cpp
     src/gui/move_cursor.cpp
-    src/cmd_queue.cpp
-    src/sample_docs.cpp
     src/audio/synth/envelope.cpp
     src/audio/synth/nes_2a03_driver.cpp
+    src/audio/synth/volume_calc_common.cpp
+
+    # Required at link time, but not provided by exotracker-lib
+    src/edit_util/kv.cpp
+    src/cmd_queue.cpp
+    src/sample_docs.cpp
 )
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
