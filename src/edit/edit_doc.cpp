@@ -26,9 +26,17 @@ struct Setter {
     }
 
     bool can_coalesce(BaseEditCommand & prev) const {
-        if (auto p = typeid_cast<edit_impl::ImplEditCommand<Setter> *>(&prev)) {
-            return _field == p->_body._field;
+        using ImplPatternEdit = edit_impl::ImplEditCommand<Setter>;
+
+        // Is it really a good idea to coalesce spinbox changes?
+        // If you undo to after a spinbox edit, and spin it again,
+        // the previous undo state is destroyed!
+
+        if (auto p = typeid_cast<ImplPatternEdit *>(&prev)) {
+            Setter & prev = *p;
+            return prev._field == _field;
         }
+
         return false;
     }
 };

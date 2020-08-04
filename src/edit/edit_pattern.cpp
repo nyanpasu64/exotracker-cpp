@@ -7,18 +7,17 @@
 #include <algorithm>  // std::swap
 #include <cassert>
 #include <memory>  // make_unique. <memory> is already included for EditBox though.
+#include <stdexcept>
 
 namespace edit::edit_pattern {
 
 using namespace doc;
 using edit_impl::make_command;
 
-enum class PatternEditType {
-    Other,
-    InstrumentDigit1,
-    InstrumentDigit2,
+struct MultiDigitEdit {
+    MultiDigitField field;
+    int digit_index;
 };
-using Type = PatternEditType;
 
 /// Implements EditCommand. Other classes can store a vector of multiple PatternEdit.
 struct PatternEdit {
@@ -28,7 +27,7 @@ struct PatternEdit {
 
     doc::EventList _events;
 
-    PatternEditType _type = Type::Other;
+    std::optional<MultiDigitEdit> _multi_digit{};
     ModifiedFlags _modified = ModifiedFlags::Patterns;
 
     void apply_swap(doc::Document & document) {
@@ -42,25 +41,31 @@ struct PatternEdit {
     }
 
     bool can_coalesce(BaseEditCommand & prev) const {
-        switch (_type) {
+        using ImplPatternEdit = edit_impl::ImplEditCommand<PatternEdit>;
 
-        case Type::InstrumentDigit2:
-            if (auto p = typeid_cast<edit_impl::ImplEditCommand<PatternEdit> *>(&prev)) {
-                auto & prev = p->_body;
-                if (prev._type == Type::InstrumentDigit1) {
-                    assert(_seq_entry_index == prev._seq_entry_index);
-                    assert(_chip == prev._chip);
-                    assert(_channel == prev._channel);
-                    return _seq_entry_index == prev._seq_entry_index
-                        && _chip == prev._chip
-                        && _channel == prev._channel;
-                }
+        if (auto p = typeid_cast<ImplPatternEdit *>(&prev)) {
+            PatternEdit & prev = *p;
+
+            // Coalesce first/second edits of the same two-digit field.
+            if (
+                prev._multi_digit
+                && _multi_digit
+                && prev._multi_digit->field == _multi_digit->field
+                && prev._multi_digit->digit_index == 0
+                && _multi_digit->digit_index == 1
+            ) {
+                assert(prev._seq_entry_index == _seq_entry_index);
+                assert(prev._chip == _chip);
+                assert(prev._channel == _channel);
+                return (
+                    prev._seq_entry_index == _seq_entry_index
+                    && prev._chip == _chip
+                    && prev._channel == _channel
+                );
             }
-            return false;
-
-        default:
-            return false;
         }
+
+        return false;
     }
 };
 
@@ -100,13 +105,13 @@ EditBox delete_cell(
             if (std::get_if<subcolumns::Note>(p)) {
                 event.note = {};
                 event.instr = {};
-                // TODO v.volume = {};
+                event.volume = {};
             } else
             if (std::get_if<subcolumns::Instrument>(p)) {
                 event.instr = {};
             } else
             if (std::get_if<subcolumns::Volume>(p)) {
-                // TODO v.volume = {};
+                event.volume = {};
             } else
             if (auto eff = std::get_if<subcolumns::EffectName>(p)) {
                 // TODO v.effects[eff->effect_col]
@@ -165,14 +170,14 @@ EditBox insert_note(
     });
 }
 
-// TODO Add function_ref<uint8_t & (RowEvent&)> parameter
-// to reuse logic for volume and effect value.
 // TODO add similar function for effect name (two ASCII characters, not nybbles).
-EditBox instrument_digit_1(
+std::tuple<uint8_t, EditBox> add_digit(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
     PatternAndBeat time,
+    MultiDigitField subcolumn,
+    int digit_index,
     uint8_t nybble
 ) {
     // Copy event list.
@@ -180,50 +185,40 @@ EditBox instrument_digit_1(
         document.sequence[time.seq_entry_index].chip_channel_events[chip][channel];
 
     // Insert instrument.
-    edit_util::kv::KV kv{events};
-    auto & ev = kv.get_or_insert(time.beat);
 
-    ev.v.instr = nybble;
+    std::optional<uint8_t> & field = [&] () -> auto& {
+        edit_util::kv::KV kv{events};
+        auto & ev = kv.get_or_insert(time.beat);
 
-    return make_command(PatternEdit{
-        time.seq_entry_index,
-        chip,
-        channel,
-        std::move(events),
-        Type::InstrumentDigit1,
-    });
-}
+        if (std::holds_alternative<subcolumns::Instrument>(subcolumn)) {
+            return ev.v.instr;
+        }
+        if (std::holds_alternative<subcolumns::Volume>(subcolumn)) {
+            return ev.v.volume;
+        }
+        throw std::invalid_argument("Invalid subcolumn");
+    }();
 
-std::tuple<doc::InstrumentIndex, EditBox> instrument_digit_2(
-    Document const & document,
-    ChipIndex chip,
-    ChannelIndex channel,
-    PatternAndBeat time,
-    uint8_t nybble
-) {
-    // Copy event list.
-    doc::EventList events =
-        document.sequence[time.seq_entry_index].chip_channel_events[chip][channel];
+    if (digit_index == 0) {
+        field = nybble;
+    } else {
+        // TODO non-fatal popup if assertion failed.
+        assert(field.has_value());
+        assert(field.value() < 0x10);
 
-    // Insert instrument.
-    edit_util::kv::KV kv{events};
-    auto & ev = kv.get_or_insert(time.beat);
-
-    // TODO non-fatal popup if assertion failed.
-    assert(ev.v.instr.has_value());
-    assert(ev.v.instr.value() < 0x10);
-
-    uint8_t old_nybble = ev.v.instr.value_or(0);
-    ev.v.instr = (old_nybble << 4) | nybble;
+        // field is optional<u8> but make this a u32 to avoid promotion to signed int.
+        uint32_t old_nybble = field.value_or(0);
+        field = (old_nybble << 4u) | nybble;
+    }
 
     return {
-        *ev.v.instr,
+        *field,
         make_command(PatternEdit{
             time.seq_entry_index,
             chip,
             channel,
             std::move(events),
-            Type::InstrumentDigit2,
+            MultiDigitEdit{subcolumn, digit_index},
         })
     };
 }
