@@ -82,6 +82,7 @@ struct ShortcutPair {
 //    X(next_channel)
 
 #define SHORTCUTS(X, SEP) \
+    X(escape) SEP\
     X(toggle_edit) SEP\
     X(delete_key) SEP\
     X(note_cut)

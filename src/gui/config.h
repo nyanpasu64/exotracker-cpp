@@ -61,6 +61,7 @@ inline namespace keys {
         KeyInt scroll_left{chord(Qt::ALT, Qt::Key_Left)};
         KeyInt scroll_right{chord(Qt::ALT, Qt::Key_Right)};
 
+        constexpr static Qt::Key escape{Qt::Key_Escape};
         constexpr static Qt::Key toggle_edit{Qt::Key_Space};
         constexpr static Qt::Key delete_key{Qt::Key_Delete};
         constexpr static Qt::Key note_cut{Qt::Key_QuoteLeft};  // backtick
@@ -112,6 +113,10 @@ inline namespace visual {
         QColor cell{255, 255, 96};
         int cell_top_alpha = 96;
         int cell_bottom_alpha = 96;
+
+        /// Selection color.
+        QColor select_bg{134, 125, 242, 192};
+        QColor select_border{150, 146, 211};
 
         /// Foreground line color, also used as note text color.
         QColor note_line_beat{255, 255, 96};

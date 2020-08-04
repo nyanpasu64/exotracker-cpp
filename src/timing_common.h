@@ -1,6 +1,7 @@
 #pragma once
 
 #include "doc.h"
+#include "util/compare.h"
 #include "util/copy_move.h"
 
 #include <cstdint>
@@ -11,7 +12,7 @@ struct PatternAndBeat {
     doc::SeqEntryIndex seq_entry_index = 0;
     doc::BeatFraction beat = 0;
 
-    COMPARABLE(PatternAndBeat, (seq_entry_index, beat))
+    COMPARABLE(PatternAndBeat)
 };
 
 // Atomically written by audio thread, atomically read by GUI.
@@ -44,7 +45,7 @@ struct [[nodiscard]] alignas(uint64_t) SequencerTime {
     constexpr SequencerTime() : SequencerTime{0, 1, 0, 0} {}
 
     CONSTEXPR_COPY(SequencerTime)
-    EQUALABLE(SequencerTime, (seq_entry_index, curr_ticks_per_beat, beats, ticks))
+    EQUALABLE(SequencerTime)
 };
 static_assert(sizeof(SequencerTime) <= 8, "SequencerTime over 8 bytes, not atomic");
 
@@ -76,7 +77,7 @@ public:
     // std::optional also has constexpr move, but what does that mean?
     DEFAULT_MOVE(MaybeSequencerTime)
 
-    constexpr bool has_value() const {
+    bool has_value() const {
         return *this != none();
     }
 

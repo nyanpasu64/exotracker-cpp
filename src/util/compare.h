@@ -1,52 +1,24 @@
+/// Comparisons are not constexpr because they're defined elsewhere.
+
 #pragma once
 
-#include <tuple>  // std::tie
+#define COMPARE_ONLY(T) \
+    [[nodiscard]] bool operator<(T const& other) const; \
+    [[nodiscard]] bool operator>(T const& other) const; \
+    [[nodiscard]] bool operator>=(T const& other) const; \
+    [[nodiscard]] bool operator<=(T const& other) const;
 
-// Adapted from https://www.fluentcpp.com/2019/04/09/how-to-emulate-the-spaceship-operator-before-c20-with-crtp/
+#define EQUALABLE(T) \
+    [[nodiscard]] bool operator==(T const& other) const; \
+    [[nodiscard]] bool operator!=(T const& other) const;
 
-// I'd call this _KEY, but _[Uppercase] names are reserved by the compiler.
-#define ZZ_KEY(method, paren_of_fields) \
-    constexpr auto method() const { \
-        return std::tie paren_of_fields; \
-    } \
+#define COMPARABLE(T) \
+    COMPARE_ONLY(T) \
+    EQUALABLE(T)
 
-#define ZZ_COMPARE_INTERNAL(method, T) \
-    [[nodiscard]] constexpr bool operator<(T const& other) const { \
-        return this->method() < other.method(); \
-    } \
-    [[nodiscard]] constexpr bool operator>(T const& other) const { \
-        return this->method() > other.method(); \
-    } \
-    [[nodiscard]] constexpr bool operator>=(T const& other) const { \
-        return this->method() >= other.method(); \
-    } \
-    [[nodiscard]] constexpr bool operator<=(T const& other) const { \
-        return this->method() <= other.method(); \
-    } \
 
-#define ZZ_EQUAL_INTERNAL(method, T) \
-    [[nodiscard]] constexpr bool operator==(T const& other) const { \
-        return this->method() == other.method(); \
-    } \
-    [[nodiscard]] constexpr bool operator!=(T const& other) const { \
-        return this->method() != other.method(); \
-    } \
-
-#define COMPARE_ONLY(T, paren_of_fields) \
-    ZZ_KEY(compare_only_, paren_of_fields) \
-    ZZ_COMPARE_INTERNAL(compare_only_, T)
-
-#define EQUALABLE(T, paren_of_fields) \
-    ZZ_KEY(equalable_, paren_of_fields) \
-    ZZ_EQUAL_INTERNAL(equalable_, T)
-
-#define COMPARABLE(T, paren_of_fields) \
-    ZZ_KEY(comparable_, paren_of_fields)\
-    ZZ_EQUAL_INTERNAL(comparable_, T) \
-    ZZ_COMPARE_INTERNAL(comparable_, T)
-
-/// Compiles faster than EQUALABLE.
-#define EQUALABLE_SIMPLE(T, FIELD) \
+/// Constexpr unlike EQUALABLE.
+#define EQUALABLE_CONSTEXPR(T, FIELD) \
     [[nodiscard]] constexpr bool operator==(T const& other) const { \
         return this->FIELD == other.FIELD; \
     } \
@@ -54,3 +26,13 @@
         return this->FIELD != other.FIELD; \
     } \
 
+#define EQUALABLE_SIMPLE(T, FIELD) \
+    [[nodiscard]] bool operator==(T const& other) const { \
+        return this->FIELD == other.FIELD; \
+    } \
+    [[nodiscard]] bool operator!=(T const& other) const { \
+        return this->FIELD != other.FIELD; \
+    } \
+
+#define DEFAULT_COMPARE(T) \
+    auto operator<=>(T const&) const = default;

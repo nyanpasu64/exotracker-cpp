@@ -1,5 +1,6 @@
 #include "main_window.h"
 #include "gui/pattern_editor/pattern_editor_panel.h"
+#include "gui/move_cursor.h"
 #include "lib/layout_macros.h"
 #include "gui_common.h"
 #include "cmd_queue.h"
@@ -30,6 +31,7 @@
 #include <QScreen>
 #include <QTimer>
 
+#include <algorithm>  // std::min/max
 #include <chrono>
 #include <functional>  // reference_wrapper
 #include <iostream>
@@ -42,41 +44,96 @@ using std::unique_ptr;
 using std::make_unique;
 
 using gui::pattern_editor::PatternEditorPanel;
+using doc::BeatFraction;
 using util::math::ceildiv;
 using edit::edit_doc::set_ticks_per_beat;
 
 
-const cursor::Cursor & CursorAndDigit::get() const {
+void RawSelection::toggle_padding(int rows_per_beat) {
+    if (bottom_padding == 0) {
+        // 1 row * beats/row
+        bottom_padding = BeatFraction{1, rows_per_beat};
+    } else {
+        bottom_padding = 0;
+    }
+}
+
+cursor::Cursor const& CursorAndSelection::get() const {
     return _cursor;
 }
 
-const cursor::Cursor & CursorAndDigit::operator*() const {
+cursor::Cursor const& CursorAndSelection::operator*() const {
     return _cursor;
 }
 
-const cursor::Cursor * CursorAndDigit::operator->() const {
+cursor::Cursor const* CursorAndSelection::operator->() const {
     return &_cursor;
 }
 
-cursor::Cursor & CursorAndDigit::get_mut() {
+void CursorAndSelection::set(Cursor cursor) {
+    _cursor = cursor;
     reset_digit();
-    return _cursor;
 }
 
-void CursorAndDigit::set(cursor::Cursor cursor) {
-    get_mut() = cursor;
+void CursorAndSelection::set_x(CursorX x) {
+    _cursor.x = x;
+    reset_digit();
 }
 
-int CursorAndDigit::digit_index() const {
+void CursorAndSelection::set_y(PatternAndBeat y) {
+    _cursor.y = y;
+    reset_digit();
+}
+
+int CursorAndSelection::digit_index() const {
     return _digit;
 }
 
-int CursorAndDigit::advance_digit() {
+int CursorAndSelection::advance_digit() {
     return ++_digit;
 }
 
-void CursorAndDigit::reset_digit() {
+void CursorAndSelection::reset_digit() {
     _digit = 0;
+}
+
+std::optional<RawSelection> CursorAndSelection::raw_select() {
+    return _select;
+}
+
+std::optional<RawSelection> & CursorAndSelection::raw_select_mut() {
+    return _select;
+}
+
+std::optional<Selection> CursorAndSelection::get_select() const {
+    if (_select) {
+        auto [left, right] = std::minmax(_select->begin.x, _cursor.x);
+        auto [top, bottom] = std::minmax(_select->begin.y, _cursor.y);
+        // you can't mutate bottom, because C++ unpacking is half-baked.
+
+        Selection out {
+            .left = left,
+            .right = right,
+            .top = top,
+            .bottom = bottom,
+        };
+
+        out.bottom.beat += _select->bottom_padding;
+        return out;
+    }
+    return {};
+}
+
+void CursorAndSelection::enable_select(int rows_per_beat) {
+    if (!_select) {
+        // 1 row * beats/row
+        _select = RawSelection{_cursor, BeatFraction{1, rows_per_beat}};
+    }
+}
+
+void CursorAndSelection::clear_select() {
+    _select = {};
+    // TODO reset digit?
 }
 
 
@@ -90,7 +147,6 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
 {}
 
-using doc::BeatFraction;
 using cmd_queue::CommandQueue;
 using cmd_queue::AudioCommand;
 
@@ -387,7 +443,7 @@ public:
             _audio_state = AudioState::Starting;
 
             // Move cursor to right spot, while waiting for audio thread to respond.
-            win._cursor.get_mut().y = time;
+            win._cursor.set_y(time);
         }
 
         void stop_play([[maybe_unused]] MainWindowImpl & win) {
@@ -649,7 +705,7 @@ public:
     void undo() {
         if (auto cursor_edit = _history.get_undo()) {
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
-            _cursor.get_mut() = cursor_edit->before_cursor;
+            _cursor.set(cursor_edit->before_cursor);
             _history.undo();
             _pattern_editor_panel->update();  // depends on _cursor and _history
         }
@@ -658,7 +714,7 @@ public:
     void redo() {
         if (auto cursor_edit = _history.get_redo()) {
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
-            _cursor.get_mut() = cursor_edit->after_cursor;
+            _cursor.set(cursor_edit->after_cursor);
             _history.redo();
             _pattern_editor_panel->update();  // depends on _cursor and _history
         }

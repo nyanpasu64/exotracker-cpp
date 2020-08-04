@@ -29,7 +29,7 @@ struct BeatPlusTick {
     int32_t beat;
     int32_t dtick;
 
-    COMPARABLE(BeatPlusTick, (beat, dtick))
+    COMPARABLE(BeatPlusTick)
 
     BeatPlusTick & operator+=(BeatPlusTick const & other) {
         beat += other.beat;

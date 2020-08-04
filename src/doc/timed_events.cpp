@@ -1,4 +1,5 @@
 #include "timed_events.h"
+#include "util/compare_impl.h"
 #include "util/math.h"
 
 namespace doc::timed_events {
@@ -27,5 +28,7 @@ This simulates this swing to some extent, but doesn't match 0CC in subdivisions.
 FractionInt round_to_int(BeatFraction v) {
     return util::math::frac_ceil(v);
 }
+
+COMPARABLE_IMPL(TimeInPattern, (self.anchor_beat, self.tick_offset))
 
 }
