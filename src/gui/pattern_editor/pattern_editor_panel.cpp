@@ -1419,6 +1419,14 @@ static void draw_pattern_foreground(
                         }
                     }
 
+                    CASE(sc::Volume) {
+                        if (row_event.volume) {
+                            painter.setPen(visual.volume);
+                            auto s = format_hex_2(uint8_t(*row_event.volume));
+                            draw(s);
+                        }
+                    }
+
                     #undef CASE
                 }
 
