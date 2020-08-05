@@ -19,6 +19,12 @@ struct MultiDigitEdit {
     int digit_index;
 };
 
+/// assert() only takes effect on debug builds.
+/// On release builds, skip coalescing instead.
+#define assert_or_false(EXPR) \
+    assert((EXPR)); \
+    if (!(EXPR)) return false
+
 /// Implements EditCommand. Other classes can store a vector of multiple PatternEdit.
 struct PatternEdit {
     SeqEntryIndex _seq_entry_index;
@@ -41,28 +47,41 @@ struct PatternEdit {
     }
 
     bool can_coalesce(BaseEditCommand & prev) const {
-        using ImplPatternEdit = edit_impl::ImplEditCommand<PatternEdit>;
+        /*
+        Invariant: the GUI pushes "second digit" edit commands
+        only after matching "first digit" commands.
 
-        if (auto p = typeid_cast<ImplPatternEdit *>(&prev)) {
-            PatternEdit & prev = *p;
+        What stops you from inserting a "second digit" in the wrong channel/field/time?
+        All cursor movement (CursorAndSelection::set()) resets digit to 0.
+
+        What stops you from inserting a "second digit" after a non-first-digit?
+        All edits (MainWindow::push_edit()) reset digit to 0,
+        except for entering the first digit.
+
+        Right now, all undo/redo operations set the cursor position
+        (which resets digit to 0).
+        If non-cursor-moving undo/redo operations are added,
+        and if they don't explicitly reset the cursor digit to 0,
+        the resulting effects will be difficult to understand
+        and may violate the invariant.
+        */
+
+        if (_multi_digit && _multi_digit->digit_index == 1) {
+            using ImplPatternEdit = edit_impl::ImplEditCommand<PatternEdit>;
 
             // Coalesce first/second edits of the same two-digit field.
-            if (
-                prev._multi_digit
-                && _multi_digit
-                && prev._multi_digit->field == _multi_digit->field
-                && prev._multi_digit->digit_index == 0
-                && _multi_digit->digit_index == 1
-            ) {
-                assert(prev._seq_entry_index == _seq_entry_index);
-                assert(prev._chip == _chip);
-                assert(prev._channel == _channel);
-                return (
-                    prev._seq_entry_index == _seq_entry_index
-                    && prev._chip == _chip
-                    && prev._channel == _channel
-                );
-            }
+            auto prev_pattern_edit_maybe = typeid_cast<ImplPatternEdit *>(&prev);
+            assert_or_false(prev_pattern_edit_maybe);
+            PatternEdit & prev = *prev_pattern_edit_maybe;
+
+            assert_or_false(prev._multi_digit);
+            assert_or_false(prev._multi_digit->field == _multi_digit->field);
+            assert_or_false(prev._multi_digit->digit_index == 0);
+            assert_or_false(prev._seq_entry_index == _seq_entry_index);
+            assert_or_false(prev._chip == _chip);
+            assert_or_false(prev._channel == _channel);
+
+            return true;
         }
 
         return false;
