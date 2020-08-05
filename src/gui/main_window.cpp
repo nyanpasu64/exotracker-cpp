@@ -613,10 +613,19 @@ public:
 
         BIND_SPIN(step)
 
-        _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
+        // _ticks_per_beat obtains its value through update_gui_from_doc().
         connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
             push_edit(set_ticks_per_beat(ticks_per_beat), {}, false);
         });
+
+        update_gui_from_doc(document);
+    }
+
+    void update_gui_from_doc(doc::Document const& document) {
+        {
+            auto b = QSignalBlocker(_ticks_per_beat);
+            _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
+        }
     }
 
     std::optional<AudioThreadHandle> const & audio_handle() const override {
@@ -781,6 +790,7 @@ public:
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
             _cursor.set(cursor_edit->before_cursor);
             _history.undo();
+            update_gui_from_doc(_history.get_document());
             _pattern_editor_panel->update();  // depends on _cursor and _history
         }
     }
@@ -790,6 +800,7 @@ public:
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
             _cursor.set(cursor_edit->after_cursor);
             _history.redo();
+            update_gui_from_doc(_history.get_document());
             _pattern_editor_panel->update();  // depends on _cursor and _history
         }
     }
