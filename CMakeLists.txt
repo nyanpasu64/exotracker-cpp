@@ -86,8 +86,10 @@ add_library(lib-3rdparty STATIC
 )
 target_compile_options(lib-3rdparty PRIVATE ${options-3rdparty})
 
-# Core library, does not use Qt
-add_library(exotracker-lib
+# Core library, document and synth only (used for future player plugins).
+# No editing or command support.
+# (cmd_queue.cpp may be added later for playback commands.)
+add_library(exotracker-core
     ## Audio
     3rdparty/Blip_Buffer/Blip_Buffer.cpp
 
@@ -117,46 +119,63 @@ add_library(exotracker-lib
     src/doc/timed_events.cpp
     src/timing_common.cpp
 )
-target_compile_options(exotracker-lib PRIVATE "${options}")
-target_link_libraries(exotracker-lib PRIVATE lib-3rdparty rtaudio)
-target_link_libraries(exotracker-lib PUBLIC fmt::fmt)
-target_compile_definitions(exotracker-lib PRIVATE EXO_LIB)
+target_compile_options(exotracker-core PRIVATE "${options}")
+target_link_libraries(exotracker-core PRIVATE lib-3rdparty rtaudio)
+target_link_libraries(exotracker-core PUBLIC fmt::fmt)
 
 if(COMMAND target_precompile_headers)
-    target_precompile_headers(exotracker-lib PRIVATE
+    target_precompile_headers(exotracker-core PRIVATE
         precompiled_headers/exotracker_lib.h
     )
 endif()
 
-# GUI editor, uses Qt
-add_executable(exotracker-bin
+
+# Qt-independent GUI libraries, used/tested by GUI and unit tests
+add_library(exotracker-headless
     # GUI/audio communication
     src/audio/output.cpp
     src/cmd_queue.cpp
 
+    # Document editing code
+    src/sample_docs.cpp
+    src/edit/edit_doc.cpp
+    src/edit/edit_pattern.cpp
+    src/edit_util/kv.cpp
+    src/gui/history.cpp
+
+    # Pattern editor backend
+    src/gui/move_cursor.cpp
+)
+target_compile_options(exotracker-headless PRIVATE "${options}")
+target_link_libraries(exotracker-headless
+    PRIVATE rtaudio
+    PUBLIC exotracker-core
+)
+if(COMMAND target_precompile_headers)
+    target_precompile_headers(exotracker-headless PRIVATE
+        precompiled_headers/exotracker_lib.h
+    )
+endif()
+
+
+# GUI editor, uses Qt
+add_executable(exotracker-qt
     # GUI
     src/main.cpp
     src/gui/app.cpp
     src/gui/main_window.cpp
     src/gui/config.cpp
 
-    src/sample_docs.cpp
-    src/edit/edit_doc.cpp
-    src/edit/edit_pattern.cpp
-    src/edit_util/kv.cpp
-    src/gui/history.cpp
     src/gui/lib/color.cpp
-    src/gui/lib/format.cpp
+    src/gui/lib/format.cpp  # Unfortunately tied to QString.
     src/gui/lib/painter_ext.cpp
-    src/gui/move_cursor.cpp
     src/gui/pattern_editor/pattern_editor_panel.cpp
 )
-target_compile_options(exotracker-bin PRIVATE "${options}")
-target_link_libraries(exotracker-bin PRIVATE exotracker-lib rtaudio Qt5::Widgets qkeycode)
-target_compile_definitions(exotracker-bin PRIVATE EXO_BIN)
+target_compile_options(exotracker-qt PRIVATE "${options}")
+target_link_libraries(exotracker-qt PRIVATE exotracker-headless rtaudio Qt5::Widgets qkeycode)
 
 if(COMMAND target_precompile_headers)
-    target_precompile_headers(exotracker-bin PRIVATE
+    target_precompile_headers(exotracker-qt PRIVATE
         precompiled_headers/exotracker_lib.h
         precompiled_headers/exotracker_bin.h
     )
@@ -181,17 +200,10 @@ add_executable(exotracker-tests
     src/audio/synth/envelope.cpp
     src/audio/synth/nes_2a03_driver.cpp
     src/audio/synth/volume_calc_common.cpp
-
-    # Required at link time, but not provided by exotracker-lib
-    src/edit_util/kv.cpp
-    src/cmd_queue.cpp
-    src/sample_docs.cpp
-    src/gui/history.cpp
-    src/edit/edit_pattern.cpp
 )
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
-target_link_libraries(exotracker-tests PRIVATE exotracker-lib)
+target_link_libraries(exotracker-tests PRIVATE exotracker-headless)
 target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
 
 if(COMMAND target_precompile_headers)
