@@ -14,6 +14,17 @@ using std::unique_ptr;
 using gui::main_window::MainWindow;
 
 
+static std::string list_documents() {
+    std::string out;
+
+    for (auto && [doc_name, _] : sample_docs::DOCUMENTS) {
+        out += fmt::format("  {}\n", doc_name);
+    }
+
+    return out;
+}
+
+
 struct ReturnCode {
     int value;
 };
@@ -29,6 +40,14 @@ struct Arguments {
 
         app.add_option("doc_name", /*mut*/ doc_name, "Name of sample document to load");
         app.failure_message(CLI::FailureMessage::help);
+        app.footer([] {
+            std::string out;
+            out += "Sample document names:\n";
+            out += list_documents();
+            // Remove newline because the output looks too long.
+            out.erase(out.size() - 1);
+            return out;
+        });
 
         try {
             app.parse(argc, argv);
@@ -57,13 +76,7 @@ int main(int argc, char *argv[])
         fmt::print(
             stderr, "Invalid document name \"{}\". Valid names are:\n\n", arg.doc_name
         );
-
-        std::vector<std::string> keys;
-        keys.reserve(DOCUMENTS.size());
-        for (auto && [doc_name, _] : DOCUMENTS) {
-            fmt::print(stderr, "  {}\n", doc_name);
-        }
-
+        fmt::print("{}", list_documents());
         return 1;
     }
     auto const & document = sample_docs::DOCUMENTS.at(arg.doc_name);
