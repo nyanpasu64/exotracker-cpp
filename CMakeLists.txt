@@ -181,6 +181,25 @@ if(COMMAND target_precompile_headers)
     )
 endif()
 
+# Generate .pdb files for release builds (https://stackoverflow.com/a/57479289)
+# The majority of end-user crashes happen in release builds,
+# and debugging their memory dumps is difficult without symbols.
+# So generate symbols to aid debugging.
+if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC" AND CMAKE_BUILD_TYPE MATCHES "Release")
+    target_compile_options(exotracker-qt PRIVATE /Zi)
+
+    # Tell linker to include symbol data
+    set_target_properties(exotracker-qt PROPERTIES
+        LINK_FLAGS "/INCREMENTAL:NO /DEBUG /OPT:REF /OPT:ICF"
+    )
+
+    # Set file name & location
+    set_target_properties(exotracker-qt PROPERTIES
+        COMPILE_PDB_NAME exotracker-qt
+        COMPILE_PDB_OUTPUT_DIR ${CMAKE_BINARY_DIR}
+    )
+endif()
+
 # Unit tests
 add_executable(exotracker-tests
     tests/run_tests.cpp
