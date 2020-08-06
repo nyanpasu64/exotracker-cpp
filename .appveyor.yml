@@ -17,14 +17,15 @@
 # # Do not build on tags
 # skip_tags: true
 
-# Skipping commits with particular message or from specific user
-skip_commits:
-  message: /Created.*\.(png|jpg|jpeg|bmp|gif|md)/ # Regex for matching commit message
-  files:
-    - "*.md"
-    - "*.txt"
-    - "LICENSE"
-    - ".gitignore"
+# Don't skip CI when HEAD is a text-only commit,
+# because multiple commits may be pushed at once
+# skip_commits:
+#   message: /Created.*\.(png|jpg|jpeg|bmp|gif|md)/ # Regex for matching commit message
+#   files:
+#     - "*.md"
+#     - "*.txt"
+#     - "LICENSE"
+#     - ".gitignore"
 
 #---------------------------------#
 #    environment configuration    #
