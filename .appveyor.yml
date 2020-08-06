@@ -1,0 +1,84 @@
+# Based off https://github.com/rerrahkr/BambooTracker/blob/a83795f12a66a540c7d1a84108f4a25a4d4aa6a9/.appveyor.yml
+# and https://www.appveyor.com/docs/appveyor-yml/
+
+#---------------------------------#
+#      general configuration      #
+#---------------------------------#
+
+# version format
+# version: ???.{build}
+
+# # branches to build
+# branches:
+#   # whitelist
+#   only:
+#     - master
+
+# # Do not build on tags
+# skip_tags: true
+
+# Skipping commits with particular message or from specific user
+skip_commits:
+  message: /Created.*\.(png|jpg|jpeg|bmp|gif|md)/ # Regex for matching commit message
+  files:
+    - "*.md"
+    - "*.txt"
+    - "LICENSE"
+    - ".gitignore"
+
+#---------------------------------#
+#    environment configuration    #
+#---------------------------------#
+
+# set clone depth
+clone_depth: 3 # clone entire repository history if not defined
+
+environment:
+  APPVEYOR_YML_DISABLE_PS_LINUX: true
+  matrix:
+    - APPVEYOR_JOB_NAME: Windows MSVC 64
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+
+      # x86, x64, or /clean_env
+      VCVARS: x64
+
+      # Used by CMake
+      CC: cl
+      CXX: cl
+      Qt5_DIR: C:/Qt/5.15/msvc2019_64
+
+#---------------------------------#
+#       build configuration       #
+#---------------------------------#
+
+# build platform, i.e. x86, x64, Any CPU. This setting is optional.
+# platform: Any CPU
+
+configuration:
+  - Debug
+  - Release
+
+# to run your custom scripts instead of automatic MSBuild
+build_script:
+  - cmd: '"C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Auxiliary/Build/vcvarsall.bat" %VCVARS%'
+  - cmd: py -3 ci/build_appveyor.py build
+
+# to run your custom scripts instead of automatic tests
+test_script:
+  - cmd: py -3 ci/build_appveyor.py test
+
+# scripts to run after tests
+# Archive up all files and upload as an artifact.
+after_test:
+  - cmd: "path %Qt5_DIR%/bin;%PATH%"
+  - cmd: py -3 ci/build_appveyor.py archive
+  # - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+#---------------------------------#
+#      artifacts configuration    #
+#---------------------------------#
+
+artifacts:
+  # pushing a single file
+  - path: 'exotracker-*.7z'
+  - path: 'exotracker-*.pdb'
