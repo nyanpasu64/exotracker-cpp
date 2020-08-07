@@ -1,58 +1,45 @@
 cmake_minimum_required(VERSION 3.8.0)
 
-#Remove /W3 from MSVC global flags.
+# Remove /W3 from MSVC global flags.
 cmake_policy(SET CMP0092 NEW)
 project(exotracker)
 
-#Initialize environment
+
+## Initialize environment
 set(RTAUDIO_BUILD_STATIC_LIBS TRUE)
 set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Build (rtaudio, fmt, ...?) as shared library")
 
-# On MSVC, CMake defaults to dynamic msvcrt (and exotracker uses that default).
-# But if you link RtAudio statically, it forces static msvcrt for itself
-# (but not targets including RtAudio).
-# This causes LNK2038 errors: https://github.com/thestk/rtaudio/issues/256
-# I patched RtAudio so you can specify whether to make msvcrt static or dynamic.
+# RtAudio uses string replacement to achieve static MSVCRT.
+# Turn it off to avoid weirdness.
 set(RTAUDIO_STATIC_MSVCRT FALSE)
 
 include(cmake_user_begin.cmake OPTIONAL)
 #End initialize environment
 
 
-set(CMAKE_AUTORCC ON)
-
-find_package(Qt5 COMPONENTS Widgets REQUIRED)
-
-set(RTAUDIO_BUILD_TESTING FALSE)
-add_subdirectory(
-    "3rdparty/rtaudio"
-    EXCLUDE_FROM_ALL
-)
-
-add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
-
-add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
-
-# Configure global settings
-include_directories(src)
-include_directories(SYSTEM 3rdparty 3rdparty/fmt_/include)
+## Configure global settings
 set(CMAKE_CXX_STANDARD 20)
+
 if (WIN32)
     add_compile_definitions(UNICODE _UNICODE)
+    # rtaudio_c.cpp uses strncpy and the like. I don't actually use that file lol
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+
     if (MSVC)
         add_compile_options(/EHsc)
         add_compile_options(/permissive-)
-        # rtaudio_c.cpp uses strncpy and the like. I don't actually use that file lol
-        add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
     endif ()
 endif ()
 
-if (CMAKE_BUILD_TYPE STREQUAL DEBUG)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(DEBUG=1)
 endif()
 
 # https://foonathan.net/2018/10/cmake-warnings/
 # more warning flags at https://stackoverflow.com/questions/5088460
+
+# cmake generator expressions are an esolang.
+# no spaces allowed in generator expressions, since whitespace becomes semicolons.
 set(options-3rdparty $<$<CXX_COMPILER_ID:MSVC>:/W3>)
 set(
     options
@@ -80,13 +67,30 @@ set(
     #   https://developercommunity.visualstudio.com/content/problem/1057493/externalwd-option-not-recognized.html
 )
 
+include_directories(src)
+include_directories(SYSTEM 3rdparty 3rdparty/fmt_/include)
+
+
+## Add dependencies
+
+set(CMAKE_AUTORCC ON)
+find_package(Qt5 COMPONENTS Widgets REQUIRED)
+
+set(RTAUDIO_BUILD_TESTING FALSE)
+add_subdirectory("3rdparty/rtaudio" EXCLUDE_FROM_ALL)
+
+add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
+
+add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
+
 add_library(lib-3rdparty STATIC
     3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
     3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
 )
 target_compile_options(lib-3rdparty PRIVATE ${options-3rdparty})
 
-# Core library, document and synth only (used for future player plugins).
+
+## Core library, document and synth only (used for future player plugins).
 # No editing or command support.
 # (cmd_queue.cpp may be added later for playback commands.)
 add_library(exotracker-core
@@ -130,7 +134,7 @@ if(COMMAND target_precompile_headers)
 endif()
 
 
-# Qt-independent GUI libraries, used/tested by GUI and unit tests
+## Qt-independent GUI libraries, used/tested by GUI and unit tests
 add_library(exotracker-headless
     # GUI/audio communication
     src/audio/output.cpp
@@ -158,7 +162,7 @@ if(COMMAND target_precompile_headers)
 endif()
 
 
-# GUI editor, uses Qt
+## GUI editor, uses Qt
 add_executable(exotracker-qt
     # GUI
     src/main.cpp
@@ -185,8 +189,8 @@ endif()
 # The majority of end-user crashes happen in release builds,
 # and debugging their memory dumps is difficult without symbols.
 # So generate symbols to aid debugging.
-if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC" AND CMAKE_BUILD_TYPE MATCHES "Release")
-    target_compile_options(exotracker-qt PRIVATE /Zi)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
 
     # Tell linker to include symbol data
     set_target_properties(exotracker-qt PROPERTIES
@@ -200,7 +204,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC" AND CMAKE_BUILD_TYPE MATCHES "Release")
     )
 endif()
 
-# Unit tests
+# Generate .pdb files for release Windows Clang builds.
+# If you're using MinGW Clang, you should remove this line to reduce binary size.
+if(
+    WIN32
+    AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+    AND CMAKE_BUILD_TYPE STREQUAL "Release"
+)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+endif()
+
+
+## Unit tests
 add_executable(exotracker-tests
     tests/run_tests.cpp
     tests/test_blip_buffer.cpp
@@ -230,6 +245,7 @@ if(COMMAND target_precompile_headers)
         precompiled_headers/exotracker_lib.h
     )
 endif()
+
 
 # This can be used to enable asan (-fsanitize=memory/undefined/leak).
 include(cmake_user_end.cmake OPTIONAL)

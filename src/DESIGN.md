@@ -6,7 +6,32 @@ Code is stored in src/, dependencies in 3rdparty/.
 
 Classes have member variables prefixed with a single underscore, like `_var`, to distinguish from locals. Not all classes follow this convention yet (but they should eventually).
 
-src/gui/history.h has `gui::history::History`. There is only 1 instance, and it owns tracker pattern state. The pattern editor and audio thread read from `History`.
+## Build notes
+
+### Windows
+
+MSVC, MinGW, and Clang are supported. Clang compiles main.cpp very slowly because of CLI11 command-line handling. clang-cl is not supported because it doesn't understand all MSVC flags. Clang with GCC ABI is not tested.
+
+If you want .pdb debug symbols, compile under MSVC or Clang under Release configuration.
+
+### Does RelWithDebugInfo slow down the binary?
+
+On Windows, I compared compiler flags (compile_commands.json) between Release and RelWithDebugInfo. I found that enabling RelWithDebugInfo decreases optimization along with enabling debugging:
+
+- MSVC: `/O2 /Ob2` to `/O2 /Ob1 -Zi`
+    - binary increases from 881KB to 1165KB.
+- Clang: `-O3` to `-O2 -g`
+    - binary increases from 615KB to 1510KB.
+- MinGW GCC: `-O3` to `-O3` (no change to optimization)
+    - binary increases from 2MB to >20MB from symbols.
+
+I modified CMakeLists.txt to enable release-build .pdb generation for both Clang and MSVC.
+
+### Windows C++ runtime
+
+Linking to static MSVCRT only increases binary size by around 200KB, and prevents "missing DLL" errors from users. However it interferes with windeployqt and causes problems when allocating/freeing memory in different modules.
+
+Install the VS2019 redistributable at https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads#section-2.
 
 ## Code style
 
@@ -86,7 +111,7 @@ As a result, I have defined several functions to implement my drawing model in t
 
 ## Document/undo architecture
 
-MainWindow and OverallSynth each keep their own copy of the document. Both threads can access their copy of the document without mutexes or locking of any kind.
+MainWindow and OverallSynth each keep their own copy of the document. Both threads can access their copy of the document without mutexes or locking of any kind. MainWindow doesn't store a document directly, but instead owns a `History` which stores undo/redo state.
 
 Whenever the user edits the document, both copies need to be edited in sync. To achieve this, all document mutations are reified as "command objects", or subclasses of `edit::BaseEditCommand`. This exposes a *very* simple interface, summarized below:
 
