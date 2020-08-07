@@ -67,6 +67,15 @@ set(
     #   https://developercommunity.visualstudio.com/content/problem/1057493/externalwd-option-not-recognized.html
 )
 
+# Strip bloat from release Windows MinGW builds.
+if (
+    WIN32
+    AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+    AND CMAKE_BUILD_TYPE STREQUAL "Release"
+)
+    add_link_options(-Wl,--strip-all -Wl,--insert-timestamp -Wl,--gc-sections -Wl,--discard-all)
+endif()
+
 include_directories(src)
 include_directories(SYSTEM 3rdparty 3rdparty/fmt_/include)
 
