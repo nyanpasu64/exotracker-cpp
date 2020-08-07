@@ -1630,14 +1630,14 @@ void PatternEditorPanel::next_beat_pressed() {
 
 void PatternEditorPanel::prev_event_pressed() {
     doc::Document const & document = get_document();
-    auto ev = move_cursor::prev_event(document, _win._cursor.get());
-    _win._cursor.set_y(ev.time);
+    auto ev_time = move_cursor::prev_event(document, _win._cursor.get());
+    _win._cursor.set_y(ev_time);
 }
 
 void PatternEditorPanel::next_event_pressed() {
     doc::Document const & document = get_document();
-    auto ev = move_cursor::next_event(document, _win._cursor.get());
-    _win._cursor.set_y(ev.time);
+    auto ev_time = move_cursor::next_event(document, _win._cursor.get());
+    _win._cursor.set_y(ev_time);
 }
 
 

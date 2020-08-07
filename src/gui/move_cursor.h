@@ -16,11 +16,6 @@ using timing::PatternAndBeat;
 
 // # Moving cursor by events
 
-struct SwitchEventResult {
-    PatternAndBeat time;
-    bool wrapped;
-};
-
 /// Return the timestamp of the nearest event
 /// whose beat fraction is strictly less than the cursor's.
 ///
@@ -28,7 +23,7 @@ struct SwitchEventResult {
 ///
 /// If the channel has no events, returns {original time, wrapped=true}.
 [[nodiscard]]
-SwitchEventResult prev_event(doc::Document const& document, cursor::Cursor cursor);
+PatternAndBeat prev_event(doc::Document const& document, cursor::Cursor cursor);
 
 /// Return the timestamp of the next event
 /// whose beat fraction is strictly greater than the cursor's.
@@ -37,7 +32,7 @@ SwitchEventResult prev_event(doc::Document const& document, cursor::Cursor curso
 ///
 /// If the channel has no events, returns {original time, wrapped=true}.
 [[nodiscard]]
-SwitchEventResult next_event(doc::Document const& document, cursor::Cursor cursor);
+PatternAndBeat next_event(doc::Document const& document, cursor::Cursor cursor);
 
 
 // # Moving cursor by beats
