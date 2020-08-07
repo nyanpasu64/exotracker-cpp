@@ -278,19 +278,6 @@ struct MainWindowUi : MainWindow {
                 return w;
             }());
 
-            tb->addSeparator();
-
-            tb->addWidget([] {
-                auto w = new QLabel{tr("Rows/beat")};
-                w->setMargin(6);
-                return w;
-            }());
-            tb->addWidget([this] {
-                auto w = _rows_per_beat = new QSpinBox;
-                w->setRange(1, 64);
-                return w;
-            }());
-
             // TODO add zoom checkbox
         }
 
@@ -421,6 +408,11 @@ struct MainWindowUi : MainWindow {
             {form__w(QCheckBox(tr("Key repetition")));
                 _key_repeat = w;
                 w->setEnabled(false);
+            }
+
+            {form__label_w(tr("Zoom"), QSpinBox);
+                _rows_per_beat = w;
+                w->setRange(1, 64);
             }
         }
     } }
