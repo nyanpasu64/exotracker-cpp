@@ -14,9 +14,13 @@ To get the most up-to-date code, checkout and follow the `dev` branch. Note that
 
 At the moment, I primarily develop on local HEAD and branches, instead of using pull requests to update the GitHub/GitLab repository. I may switch to pull requests if more users.
 
+## Download
+
+Pre-built development binaries are available at Appveyor ([master](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/master), [dev](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/dev)). On Windows, you will need the Universal C Runtime to run these programs. It is installed by default on some machines, or can be downloaded from [Microsoft](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads#section-2).
+
 ## Building
 
-This project is built using CMake. I recommend using Ninja as a target build system since it behaves consistently across OSes and supports parallelism and automatic core counting.
+This project is built using CMake. I recommend using Ninja as a target build system since it behaves consistently across OSes and supports parallelism and automatic core counting. Make will probably work too.
 
 ```sh
 mkdir build...
@@ -25,9 +29,15 @@ cmake .. -DCMAKE_BUILD_TYPE={Release, Debug, ...} -G Ninja
 ninja
 ```
 
-### Build Dependencies
+I use Qt Creator and CLion IDEs for this project. You can import it into Visual Studio 2019 as a CMake project, but profiling will be tricky-to-impossible to set up. Telling CMake to generate Visual Studio .sln projects will probably not work (switching build types in Visual Studio will not change flags).
 
-exotracker-cpp requires a compiler with C++20 support. On Linux, it compiles on GCC 10 and Clang 10 (not sure about older versions). On Windows, it compiles on mingw-w64 GCC and MSVC 2019. On Mac, it compiles using XCode's Clang.
+exotracker-cpp requires a compiler with C++20 support.
+
+- On Linux, I've had good results with GCC 10 and Clang 10 (not sure about older versions).
+- On Windows, I recommend using MSVC 2019 or Clang (not clang-cl); mingw-w64 produces larger binaries and requires either static libc or DLLs most people don't have.
+- On Mac, it compiles using XCode's Clang.
+
+### Build Dependencies
 
 exotracker-cpp depends on Qt. All other libraries are bundled, compiled, and linked statically. On Linux, you need to install ALSA/PulseAudio/JACK headers to obtain each backend.
 

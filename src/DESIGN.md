@@ -33,6 +33,10 @@ Linking to static MSVCRT only increases binary size by around 200KB, and prevent
 
 Install the VS2019 redistributable at https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads#section-2.
 
+### MinGW runtime
+
+exotracker does not link to the MinGW runtime statically. Enabling it removes the need for DLLs, but increases EXE file size by around 900KB. In any case, MinGW binaries are larger even after stripping (904KB) and require larger MinGW Qt DLLs, so are unsuitable for dev builds or releases (regardless of static/dynamic runtime).
+
 ## Code style
 
 I am following some Rust-inspired rules in the codebase.
