@@ -30,6 +30,25 @@ inline namespace keys {
     struct GlobalKeys {
         KeyInt play_pause{Qt::Key_Return};
         KeyInt play_from_row{Qt::Key_Apostrophe};
+
+        // Zoom shortcuts are layout-specific because +/- are shifted on some layouts.
+        // These shortcuts only make sense on keyboards where + is shift+=
+        // (eg. US QWERTY).
+        // Eventually these will be user-configurable.
+        //
+        // Maybe zoom_in_triplet and zoom_out_triplet should be getter methods,
+        // automatically adding SHIFT to zoom_in/out.
+        // That would break layouts where + and - are shifted versions of each other
+        // (if they exist).
+        // It would also reduce user configurability.
+        KeyInt zoom_out = chord(Qt::CTRL, Qt::Key_Minus);
+        KeyInt zoom_in = chord(Qt::CTRL, Qt::Key_Equal);
+
+        KeyInt zoom_out_half = chord(Qt::CTRL | Qt::SHIFT, Qt::Key_Minus);
+        KeyInt zoom_in_half = chord(Qt::CTRL | Qt::SHIFT, Qt::Key_Equal);
+
+        KeyInt zoom_out_triplet = chord(Qt::CTRL | Qt::ALT, Qt::Key_Minus);
+        KeyInt zoom_in_triplet = chord(Qt::CTRL | Qt::ALT, Qt::Key_Equal);
     };
 
     // Allow a few notes of the following octave. Match 0CC's behavior.
@@ -41,6 +60,7 @@ inline namespace keys {
     KeyboardRow get_octave_1();
 
     struct PatternKeys {
+        // # Cursor movement shortcuts that create selections when Shift held.
         constexpr static Qt::Key up{Qt::Key_Up};
         constexpr static Qt::Key down{Qt::Key_Down};
 
@@ -67,9 +87,11 @@ inline namespace keys {
         KeyInt scroll_left{chord(Qt::ALT, Qt::Key_Left)};
         KeyInt scroll_right{chord(Qt::ALT, Qt::Key_Right)};
 
+        // # Single-key shortcuts.
         constexpr static Qt::Key escape{Qt::Key_Escape};
         constexpr static Qt::Key toggle_edit{Qt::Key_Space};
         constexpr static Qt::Key delete_key{Qt::Key_Delete};
+
         KeyInt note_cut{Qt::Key_QuoteLeft};  // backtick
         // TODO switch to QKeySequence::SelectAll?
         KeyInt select_all{chord(Qt::CTRL, Qt::Key_A)};

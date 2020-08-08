@@ -6,8 +6,9 @@
 #include "gui_common.h"
 #include "cmd_queue.h"
 #include "edit/edit_doc.h"
-#include "util/release_assert.h"
 #include "util/math.h"
+#include "util/release_assert.h"
+#include "util/reverse.h"
 
 #include <fmt/core.h>
 #include <rtaudio/RtAudio.h>
@@ -34,7 +35,7 @@
 #include <QScreen>
 #include <QTimer>
 
-#include <algorithm>  // std::min/max
+#include <algorithm>  // std::min/max, std::sort
 #include <chrono>
 #include <functional>  // reference_wrapper
 #include <iostream>
@@ -51,6 +52,7 @@ using gui::timeline_editor::TimelineEditor;
 using doc::BeatFraction;
 using util::math::ceildiv;
 using util::math::frac_floor;
+using util::reverse::reverse;
 namespace edit_doc = edit::edit_doc;
 
 
@@ -361,6 +363,8 @@ struct MainWindowUi : MainWindow {
         }
     }
 
+    static constexpr int MAX_ZOOM_LEVEL = 64;
+
     void setup_panel(QBoxLayout * l) { {  // needed to allow shadowing
         l__c_l(QWidget, QHBoxLayout);
         c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -486,7 +490,7 @@ struct MainWindowUi : MainWindow {
 
             {form__label_w(tr("Zoom"), QSpinBox);
                 _rows_per_beat = w;
-                w->setRange(1, 64);
+                w->setRange(1, MAX_ZOOM_LEVEL);
             }
         }
     } }
@@ -788,6 +792,14 @@ public:
     QAction _undo;
     QAction _redo;
 
+    // Zoom actions:
+    QAction _zoom_out;
+    QAction _zoom_in;
+    QAction _zoom_out_half;
+    QAction _zoom_in_half;
+    QAction _zoom_out_triplet;
+    QAction _zoom_in_triplet;
+
     // Global actions:
     QAction _restart_audio;
 
@@ -1017,6 +1029,27 @@ public:
         update_widgets();
     }
 
+    /// Compute the fixed zoom sequence, consisting of powers of 2
+    /// and an optional factor of 3.
+    static std::vector<int> calc_zoom_levels() {
+        std::vector<int> zoom_levels;
+
+        // Add regular zoom levels.
+        for (int i = 1; i <= MAX_ZOOM_LEVEL; i *= 2) {
+            zoom_levels.push_back(i);
+        }
+        // Add triplet zoom levels.
+        for (int i = 3; i <= MAX_ZOOM_LEVEL; i *= 2) {
+            zoom_levels.push_back(i);
+        }
+        // Sort in increasing order.
+        std::sort(zoom_levels.begin(), zoom_levels.end());
+
+        return zoom_levels;
+    }
+
+    std::vector<int> _zoom_levels = calc_zoom_levels();
+
     /// Clears existing bindings and rebinds shortcuts.
     /// Can be called multiple times.
     void reload_shortcuts() {
@@ -1039,15 +1072,17 @@ public:
             connect(&action, &QAction::triggered, this, func, Qt::UniqueConnection);
         };
 
-        _play_pause.setShortcut(QKeySequence{shortcuts.play_pause});
-        bind_editor_action(_play_pause);
+        #define BIND_FROM_CONFIG(NAME) \
+            _##NAME.setShortcut(QKeySequence{shortcuts.NAME}); \
+            bind_editor_action(_##NAME)
+
+        BIND_FROM_CONFIG(play_pause);
         connect_action(_play_pause, [this] () {
             _audio.play_pause(*this);
             update_widgets();
         });
 
-        _play_from_row.setShortcut(QKeySequence{shortcuts.play_from_row});
-        bind_editor_action(_play_from_row);
+        BIND_FROM_CONFIG(play_from_row);
         connect_action(_play_from_row, [this] () {
             _audio.play_from_row(*this);
             update_widgets();
@@ -1060,6 +1095,65 @@ public:
         _redo.setShortcuts(QKeySequence::Redo);
         bind_editor_action(_redo);
         connect_action(_redo, &MainWindowImpl::redo);
+
+        // TODO maybe these shortcuts should be inactive when order editor is focused
+        BIND_FROM_CONFIG(zoom_out);
+        connect_action(_zoom_out, [this] () {
+            int const curr_zoom = _rows_per_beat->value();
+
+            // Pick the next smaller zoom level in the fixed zoom sequence.
+            for (int const new_zoom : reverse(_zoom_levels)) {
+                if (new_zoom < curr_zoom) {
+                    _rows_per_beat->setValue(new_zoom);
+                    return;
+                }
+            }
+            // If we're already at minimum zoom, don't change zoom level.
+        });
+
+        BIND_FROM_CONFIG(zoom_in);
+        connect_action(_zoom_in, [this] () {
+            int const curr_zoom = _rows_per_beat->value();
+
+            // Pick the next larger zoom level in the fixed zoom sequence.
+            for (int const new_zoom : _zoom_levels) {
+                if (new_zoom > curr_zoom) {
+                    _rows_per_beat->setValue(new_zoom);
+                    return;
+                }
+            }
+            // If we're already at maximum zoom, don't change zoom level.
+        });
+
+        BIND_FROM_CONFIG(zoom_out_half);
+        connect_action(_zoom_out_half, [this] () {
+            // Halve zoom, rounded down. QSpinBox will clamp minimum to 1.
+            _rows_per_beat->setValue(_rows_per_beat->value() / 2);
+        });
+
+        BIND_FROM_CONFIG(zoom_in_half);
+        connect_action(_zoom_in_half, [this] () {
+            // Double zoom. QSpinBox will truncate to maximum value.
+            _rows_per_beat->setValue(_rows_per_beat->value() * 2);
+        });
+
+        BIND_FROM_CONFIG(zoom_out_triplet);
+        connect_action(_zoom_out_triplet, [this] () {
+            // Multiply zoom by 2/3, rounded down. QSpinBox will clamp minimum to 1.
+            _rows_per_beat->setValue(_rows_per_beat->value() * 2 / 3);
+        });
+
+        BIND_FROM_CONFIG(zoom_in_triplet);
+        connect_action(_zoom_in_triplet, [this] () {
+            // Multiply zoom by 3/2, rounded up.
+            // If we rounded down, zooming 1 would result in 1, which is bad.
+            // QSpinBox will truncate to maximum value.
+            //
+            // Rounding up has the nice property that zoom_in_triplet() followed by
+            // zoom_out_triplet() always produces the value we started with
+            // (assuming no truncation).
+            _rows_per_beat->setValue(ceildiv(_rows_per_beat->value() * 3, 2));
+        });
 
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
