@@ -27,9 +27,6 @@ TEST_CASE("Generate the product set of all subcases.") {
     int y;
 
     PICK(range_0_3(x, range_0_4(y)));
-    fmt::print("x={}, y={}\n", x, y);
-    // CHECK_UNARY(false);
-
     sum_x += x;
     sum_y += y;
 
