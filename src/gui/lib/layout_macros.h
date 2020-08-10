@@ -77,6 +77,14 @@
 // l->addWidget(w) sets w.parent.
 
 
+/// Add leaf widget to QBoxLayout.
+#define l__w_factory(qwidget_make) \
+    auto * w = qwidget_make; \
+    l->addWidget(w); \
+    HIDE(l) \
+    \
+    require_semicolon
+
 /// Add QBoxLayout to QBoxLayout.
 #define l__l(qlayout) \
     auto * parentL = l; \
