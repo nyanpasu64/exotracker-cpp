@@ -136,6 +136,8 @@ void RawSelection::select_all(
     }
 }
 
+W_OBJECT_IMPL(CursorAndSelection)
+
 cursor::Cursor const& CursorAndSelection::get() const {
     return _cursor;
 }
@@ -154,6 +156,7 @@ void CursorAndSelection::set(Cursor cursor) {
         _select->set_end(_cursor);
     }
     reset_digit();
+    emit cursor_moved();
 }
 
 void CursorAndSelection::set_x(CursorX x) {
@@ -162,6 +165,7 @@ void CursorAndSelection::set_x(CursorX x) {
         _select->set_end(_cursor);
     }
     reset_digit();
+    emit cursor_moved();
 }
 
 void CursorAndSelection::set_y(PatternAndBeat y) {
@@ -170,6 +174,7 @@ void CursorAndSelection::set_y(PatternAndBeat y) {
         _select->set_end(_cursor);
     }
     reset_digit();
+    emit cursor_moved();
 }
 
 int CursorAndSelection::digit_index() const {
@@ -177,18 +182,27 @@ int CursorAndSelection::digit_index() const {
 }
 
 int CursorAndSelection::advance_digit() {
-    return ++_digit;
+    ++_digit;
+    emit cursor_moved();
+    return _digit;
 }
 
 void CursorAndSelection::reset_digit() {
     _digit = 0;
+    emit cursor_moved();
 }
 
-std::optional<RawSelection> CursorAndSelection::raw_select() {
+std::optional<RawSelection> CursorAndSelection::raw_select() const {
     return _select;
 }
 
 std::optional<RawSelection> & CursorAndSelection::raw_select_mut() {
+    // don't emit cursor_moved(), because we don't know when it'll get altered.
+    // Hopefully this shouldn't be a problem,
+    // since we only use raw_select_mut() for toggling selection bottom
+    // (which has minimal effect on GUI updates).
+    // and RawSelection has no way to emit the signal.
+    // and the caller? nah
     return _select;
 }
 
@@ -202,12 +216,14 @@ std::optional<Selection> CursorAndSelection::get_select() const {
 void CursorAndSelection::enable_select(int rows_per_beat) {
     if (!_select) {
         _select = RawSelection(_cursor, rows_per_beat);
+        emit cursor_moved();
     }
 }
 
 void CursorAndSelection::clear_select() {
     _select = {};
     // TODO reset digit?
+    emit cursor_moved();
 }
 
 
@@ -693,6 +709,15 @@ public:
                 emit gui_refresh(maybe_seq_time);
             }
         );
+
+        // Redraw all editors when cursor moved.
+        connect(
+            &_cursor,
+            &CursorAndSelection::cursor_moved,
+            _pattern_editor_panel,
+            qOverload<>(&PatternEditorPanel::update)  // zero-argument overload
+        );
+
         setup_screen();
         // TODO setup_screen() when primaryScreen changed
         // TODO setup_timer() when refreshRate changed
@@ -777,13 +802,18 @@ public:
         );
     }
 
+    /// Called after document/cursor mutated.
+    void update_editors() {
+        _pattern_editor_panel->update();  // depends on _cursor and _history
+    }
+
     void undo() {
         if (auto cursor_edit = _history.get_undo()) {
             _audio_component.send_edit(*this, std::move(cursor_edit->edit));
             _cursor.set(cursor_edit->before_cursor);
             _history.undo();
             update_gui_from_doc(_history.get_document());
-            _pattern_editor_panel->update();  // depends on _cursor and _history
+            update_editors();
         }
     }
 
@@ -793,7 +823,7 @@ public:
             _cursor.set(cursor_edit->after_cursor);
             _history.redo();
             update_gui_from_doc(_history.get_document());
-            _pattern_editor_panel->update();  // depends on _cursor and _history
+            update_editors();
         }
     }
 
@@ -818,14 +848,14 @@ public:
         bind_editor_action(_play_pause);
         connect_action(_play_pause, [this] () {
             _audio_component.play_pause(*this);
-            _pattern_editor_panel->update();  // this->update() works too.
+            update_editors();
         });
 
         _play_from_row.setShortcut(QKeySequence{shortcuts.play_from_row});
         bind_editor_action(_play_from_row);
         connect_action(_play_from_row, [this] () {
             _audio_component.play_from_row(*this);
-            _pattern_editor_panel->update();
+            update_editors();
         });
 
         _undo.setShortcuts(QKeySequence::Undo);

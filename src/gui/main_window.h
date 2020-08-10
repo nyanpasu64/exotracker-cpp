@@ -105,7 +105,10 @@ public:
 ///
 /// Selections are a hard problem. Requirements which led to this API design at
 /// https://docs.google.com/document/d/1HBrF1W_5vKFMwHbaN6ONvtnmGAgawlJYsdZTbTUClmA/edit#heading=h.q2iq7gfnt5i8
-class CursorAndSelection {
+class CursorAndSelection : public QObject {
+    W_OBJECT(CursorAndSelection)
+
+private:
     Cursor _cursor;
     int _digit = 0;
     std::optional<RawSelection> _select{};
@@ -116,6 +119,8 @@ public:
     [[nodiscard]] Cursor const& get() const;
     Cursor const& operator*() const;
     Cursor const* operator->() const;
+
+    void cursor_moved() W_SIGNAL(cursor_moved)
 
     /// Moving the cursor always updates the selection endpoint.
     void set(Cursor cursor);
@@ -128,7 +133,7 @@ public:
     void reset_digit();
 
     // # Selection
-    [[nodiscard]] std::optional<RawSelection> raw_select();
+    [[nodiscard]] std::optional<RawSelection> raw_select() const;
     [[nodiscard]] std::optional<RawSelection> & raw_select_mut();
     [[nodiscard]] std::optional<Selection> get_select() const;
 
