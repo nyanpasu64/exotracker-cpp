@@ -137,7 +137,7 @@ PatternEditorPanel_INTERNAL:
     /// Stores document and undo/redo history.
     /// Is read by PatternEditorPanel running in main thread.
     /// When switching documents, can be reassigned by MainWindow(?) running in main thread.
-    std::reference_wrapper<history::History> _history;
+    std::reference_wrapper<history::History const> _history;
 
     // Cached private state. Be sure to update when changing fonts.
     PatternFontMetrics _pattern_font_metrics;
@@ -165,7 +165,7 @@ PatternEditorPanel_INTERNAL:
     // impl
 public:
     /// Called by main function.
-    void set_history(history::History & history) {
+    void set_history(history::History const& history) {
         _history = history;
     }
 
@@ -201,8 +201,7 @@ protected:
 
 PatternEditorPanel_INTERNAL:
 
-    doc::Document const & get_document() const {
-        // Change this method if we change how history works.
+    [[nodiscard]] doc::Document const & get_document() const {
         return _history.get().get_document();
     }
 
