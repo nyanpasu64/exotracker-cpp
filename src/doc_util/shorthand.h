@@ -10,7 +10,7 @@ namespace doc {
     using namespace doc::event_list;
 }
 
-namespace edit_util::shorthand {
+namespace doc_util::shorthand {
 
 using doc::TimeInPattern;
 using doc::BeatFraction;

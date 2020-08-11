@@ -1,6 +1,6 @@
 #include "doc.h"
-#include "edit_util/kv.h"
-#include "edit_util/shorthand.h"
+#include "doc_util/kv.h"
+#include "doc_util/shorthand.h"
 
 #include <fmt/core.h>
 
@@ -34,8 +34,8 @@ TEST_CASE("Test that TimeInPattern comparisons work properly.") {
 
 TEST_CASE ("Test that EventList and KV search is implemented properly.") {
     using namespace doc;
-    using edit_util::kv::KV;
-    using namespace edit_util::shorthand;
+    using doc_util::kv::KV;
+    using namespace doc_util::shorthand;
 
     doc::EventList events;
     events.push_back({at(0), {}});

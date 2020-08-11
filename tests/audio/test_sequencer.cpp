@@ -2,7 +2,7 @@
 #include "chip_kinds.h"
 #include "timing_common.h"
 #include "sample_docs.h"
-#include "edit_util/shorthand.h"
+#include "doc_util/shorthand.h"
 #include "test_utils/parameterize.h"
 
 #include <fmt/core.h>
@@ -19,7 +19,7 @@ namespace audio::synth::sequencer {
 
 using namespace doc;
 using chip_kinds::ChipKind;
-using namespace edit_util::shorthand;
+using namespace doc_util::shorthand;
 
 static Document simple_doc() {
     SequencerOptions sequencer_options{

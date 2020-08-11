@@ -2,7 +2,7 @@
 
 #include "doc.h"
 #include "chip_kinds.h"
-#include "edit_util/shorthand.h"
+#include "doc_util/shorthand.h"
 #include "util/release_assert.h"
 
 #include <cmath>
@@ -10,7 +10,7 @@
 namespace sample_docs {
 
 using namespace doc;
-using namespace edit_util::shorthand;
+using namespace doc_util::shorthand;
 
 /// Excerpt from "Chrono Cross - Dream Fragments".
 /// This tests the ability to nudge notes both early and later,

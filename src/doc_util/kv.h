@@ -4,7 +4,7 @@
 
 #include <optional>
 
-namespace edit_util::kv {
+namespace doc_util::kv {
 
 using namespace doc::timed_events;
 using namespace doc::event_list;

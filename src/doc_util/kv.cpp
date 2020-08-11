@@ -3,7 +3,7 @@
 #include <algorithm>  // std::lower_bound
 #include <type_traits>
 
-namespace edit_util::kv {
+namespace doc_util::kv {
 
 static TimeInPattern const & time_and_offset(const TimedRowEvent & a) {
     return a.time;

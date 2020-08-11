@@ -1,5 +1,5 @@
 #include "move_cursor.h"
-#include "edit_util/kv.h"
+#include "doc_util/kv.h"
 #include "util/math.h"
 #include "util/compare_impl.h"
 #include "util/release_assert.h"
@@ -44,7 +44,7 @@ using ChannelList = std::vector<CursorChannel>;
 
 // # Moving cursor by events
 
-using edit_util::kv::KV;
+using doc_util::kv::KV;
 
 /// When moving the cursor around,
 /// we need to compare whether the next event or row is closer to the cursor.
@@ -397,13 +397,13 @@ PatternAndBeat cursor_step(
 #include "timing_common.h"
 #include "doc.h"
 #include "chip_kinds.h"
-#include "edit_util/shorthand.h"
+#include "doc_util/shorthand.h"
 
 namespace gui::move_cursor {
 
 using namespace doc;
 using chip_kinds::ChipKind;
-using namespace edit_util::shorthand;
+using namespace doc_util::shorthand;
 
 static Document empty_doc(int n_seq_entry) {
     SequencerOptions sequencer_options{
