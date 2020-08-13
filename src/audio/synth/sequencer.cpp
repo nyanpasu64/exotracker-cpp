@@ -125,7 +125,7 @@ static void advance_event_seq_entry(
         // TODO halt playback
         next_event.seq_entry = 0;
     }
-};
+}
 
 static void check_invariants(ChannelSequencer const & self) {
     // If two sequential patterns are different,
@@ -134,7 +134,7 @@ static void check_invariants(ChannelSequencer const & self) {
     if (self._next_event.seq_entry != self._now.seq_entry) {
         release_assert(self._pattern_offset.event_minus_now() != 0);
     }
-};
+}
 
 EventPos event_vs_now(TickT ticks_per_beat, BeatPlusTick now, BeatPlusTick ev) {
     TickT ev_minus_now =
@@ -146,7 +146,7 @@ EventPos event_vs_now(TickT ticks_per_beat, BeatPlusTick now, BeatPlusTick ev) {
     } else {
         return EventPos::Now;
     }
-};
+}
 
 void print_chip_channel(ChannelSequencer const& self) {
     fmt::print(stderr, "seq {},{} ", self._chip_index, self._chan_index);
