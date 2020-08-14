@@ -624,7 +624,7 @@ static void draw_header(
         inner_rect.y1() += pen_width;
         inner_rect.y2() -= pen_width;
 
-        painter.setPen(Qt::white);
+        painter.setPen(self.palette().light().color());
         draw_top_border(painter, inner_rect);
         draw_left_border(painter, inner_rect);
     };
