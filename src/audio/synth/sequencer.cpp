@@ -31,7 +31,7 @@ static TickT time_to_ticks(doc::TimeInPattern time, doc::SequencerOptions option
         + time.tick_offset;
 }
 
-using TimedEventsRef = gsl::span<doc::TimedRowEvent const>;
+using doc::TimedEventsRef;
 
 enum class EventPos {
     Past,
