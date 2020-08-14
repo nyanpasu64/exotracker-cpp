@@ -1466,13 +1466,6 @@ static void draw_pattern_foreground(
 
         // Draw cursor cell outline:
         auto cursor_x = self._win._cursor->x;
-        auto ncol = columns.cols.size();
-
-        // Handle special-case of past-the-end cursors separately.
-        if (cursor_x.column >= ncol) {
-            cursor_x.column = 0;
-            cursor_x.subcolumn = 0;
-        }
 
         // If cursor is on-screen, draw cell outline.
         if (auto & col = columns.cols[cursor_x.column]) {
