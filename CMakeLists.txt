@@ -130,6 +130,8 @@ add_library(exotracker-core
     src/doc.cpp
     src/doc/events.cpp
     src/doc/timed_events.cpp
+    src/doc/timeline.cpp
+    src/timeline_iter.cpp
     src/timing_common.cpp
     src/util/format.cpp
 )

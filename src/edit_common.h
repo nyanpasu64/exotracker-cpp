@@ -52,6 +52,9 @@ public:
     /// After undoing, store it as a redoer.
     virtual void apply_swap(doc::Document & document) = 0;
 
+    /// Upon initially pushing an operation `curr` into undo history,
+    /// History calls curr.can_coalesce(prev) *after* calling curr.apply_swap().
+    ///
     /// Only true if:
     /// - prev and this should be combined in undo history.
     /// - prev and this mutate the same state,

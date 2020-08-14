@@ -16,7 +16,7 @@ namespace audio::synth::sequencer {
 
 using namespace chip_common;
 using timing::SequencerTime;
-using timing::PatternAndBeat;
+using timing::GridAndBeat;
 
 using EventsRef = gsl::span<doc::RowEvent const>;
 using doc::EventIndex;
@@ -45,57 +45,107 @@ struct BeatPlusTick {
 };
 
 struct RealTime {
-    doc::SeqEntryIndex seq_entry = 0;
+    doc::GridIndex grid{0};
     // Idea: In ticked/timed code, never use "curr" in variable names.
     // Only ever use prev and next. This may reduce bugs, or not.
     BeatPlusTick next_tick = {0, 0};
 };
 
-struct EventIterator {
-    // Not read yet, but will be used to handle document mutations in the future.
-    doc::MaybeSeqEntryIndex prev_seq_entry = {};
+using doc::TimelineCellIter;
 
-    doc::SeqEntryIndex seq_entry = 0;
+/// Like doc::PatternRef but doesn't hold a persistent reference to the document
+/// (which will dangle if parts of the document are replaced during mutation).
+struct PatternIndex {
+    doc::BlockIndex block;
+    // int loop;
+
+    /// Timestamps within the current grid cell.
+    doc::BeatIndex begin_time{};
+    doc::BeatFraction end_time{};
+
+    /// This pattern loop, only play the first `num_events` events.
+    EventIndex num_events;
+
+    static PatternIndex from(doc::PatternRef pattern) {
+        return PatternIndex {
+            .block = pattern.block,
+            .begin_time = pattern.begin_time,
+            .end_time = pattern.end_time,
+            .num_events = (EventIndex) pattern.events.size(),
+        };
+    }
+};
+
+struct EventIterator {
+    /*
+    Assume we're past the last event in a grid cell, so event is past now.
+    Then an event is added on the "now" grid cell.
+    So we need to backtrack to the "now" grid cell (prev_grid).
+
+    Should we backtrack by 1 grid or 1 block?
+    Whichever we choose, we need to properly update GridRunahead,
+    which tracks whether either of EventIterator or RealTime is ahead in grid cells.
+
+    Reverting EventIterator to the previous grid cell will always revert
+    GridRunahead's event iterator by 1 grid.
+
+    Reverting EventIterator to the previous block may or may not revert GridRunahead,
+    so we need to store a separate "now grid advanced from prev grid" field
+    that is true even for looping documents.
+
+    Another factor is that adding/removing blocks from a grid can corrupt `block`,
+    just like it corrupts `event_idx`. So we should reset block to 0.
+
+    The TimelineCellIter abstraction means that we no longer care about blocks at all!
+    */
+
+    doc::MaybeGridIndex prev_grid = {};
+
+    doc::GridIndex grid{0};
+    std::optional<doc::TimelineCellIter> pattern_iter{};
+
+    /// If current and next grid cell are empty, don't hold onto a pattern.
+    std::optional<PatternIndex> pattern = {};
     EventIndex event_idx = 0;
 };
 
-/// How many patterns EventIterator is ahead of RealTime.
-/// Should be 0 within patterns, 1 if we're playing notes delayed past a pattern,
-/// and -1 if we're playing notes pushed before a pattern.
+/// How many grid cells EventIterator is ahead of RealTime.
+/// Should be 0 within a cell, 1 if we're playing notes delayed past a gridline,
+/// and -1 if we're playing notes pushed before a gridline.
 ///
-/// You can't just compare sequence entry numbers, because of looping.
-class PatternOffset {
+/// You can't just compare gridline indexes, because of looping.
+class GridRunahead {
     int _event_minus_now = 0;
 
 public:
     using Success = bool;
 
     /// you really shouldn't need this, but whatever.
-    auto event_minus_now() const {
+    [[nodiscard]] int event_minus_now() const {
         return _event_minus_now;
     }
 
-    Success advance_event() {
-        if (event_is_ahead()) {
+    [[nodiscard]] Success advance_event_grid() {
+        if (event_grid_ahead()) {
             return false;
         }
         _event_minus_now += 1;
         return true;
     }
 
-    Success advance_now() {
-        if (event_is_behind()) {
+    [[nodiscard]] Success advance_now_grid() {
+        if (event_grid_behind()) {
             return false;
         }
         _event_minus_now -= 1;
         return true;
     }
 
-    bool event_is_ahead() const {
+    [[nodiscard]] bool event_grid_ahead() const {
         return _event_minus_now > 0;
     }
 
-    bool event_is_behind() const {
+    [[nodiscard]] bool event_grid_behind() const {
         return _event_minus_now < 0;
     }
 };
@@ -135,8 +185,8 @@ ChannelSequencer_INTERNAL:
     /// Mutations are affected by _now.
     EventIterator _next_event;
 
-    /// Track whether EventIterator is at an earlier/later pattern than RealTime.
-    PatternOffset _pattern_offset;
+    /// Track whether EventIterator is at an earlier/later grid cell than RealTime.
+    GridRunahead _grid_runahead;
 
 public:
     // impl
@@ -159,7 +209,7 @@ public:
     ///
     /// Postconditions:
     /// - playing (_curr_ticks_per_beat != 0)
-    void seek(doc::Document const & document, PatternAndBeat time);
+    void seek(doc::Document const & document, GridAndBeat time);
 
     /// Recompute _next_event based on _now and edited document.
     ///
@@ -204,7 +254,7 @@ public:
         }
     }
 
-    void seek(doc::Document const & document, PatternAndBeat time) {
+    void seek(doc::Document const & document, GridAndBeat time) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             _channel_sequencers[chan].seek(document, time);
         }

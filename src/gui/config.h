@@ -107,6 +107,7 @@ inline namespace visual {
         QColor channel_divider = gray(160);
 
         /// Background gridline color.
+        /// TODO disambiguate pattern grid and beat grid
         QColor gridline_beat = gray(128);
         QColor gridline_non_beat = gray(80);
 

@@ -5,13 +5,12 @@
 #include "gui/config/cursor.h"
 #include "timing_common.h"
 #include "chip_common.h"
-#include "util/compare.h"
 
 #include <vector>
 
 namespace gui::move_cursor {
 
-using timing::PatternAndBeat;
+using timing::GridAndBeat;
 
 
 // # Moving cursor by events
@@ -23,7 +22,7 @@ using timing::PatternAndBeat;
 ///
 /// If the channel has no events, returns {original time, wrapped=true}.
 [[nodiscard]]
-PatternAndBeat prev_event(doc::Document const& document, cursor::Cursor cursor);
+GridAndBeat prev_event(doc::Document const& document, cursor::Cursor cursor);
 
 /// Return the timestamp of the next event
 /// whose beat fraction is strictly greater than the cursor's.
@@ -32,22 +31,22 @@ PatternAndBeat prev_event(doc::Document const& document, cursor::Cursor cursor);
 ///
 /// If the channel has no events, returns {original time, wrapped=true}.
 [[nodiscard]]
-PatternAndBeat next_event(doc::Document const& document, cursor::Cursor cursor);
+GridAndBeat next_event(doc::Document const& document, cursor::Cursor cursor);
 
 
 // # Moving cursor by beats
 
 using config::cursor::MovementConfig;
 
-[[nodiscard]] PatternAndBeat prev_beat(
+[[nodiscard]] GridAndBeat prev_beat(
     doc::Document const& document,
-    PatternAndBeat cursor_y,
+    GridAndBeat cursor_y,
     MovementConfig const& move_cfg
 );
 
-[[nodiscard]] PatternAndBeat next_beat(
+[[nodiscard]] GridAndBeat next_beat(
     doc::Document const& document,
-    PatternAndBeat cursor_y,
+    GridAndBeat cursor_y,
     MovementConfig const& move_cfg
 );
 
@@ -62,7 +61,7 @@ struct MoveCursorYArgs {
 ///   and prev_event() doesn't wrap and is closer than the nearest row above,
 ///   jump up to prev_event().time.
 /// - Move to nearest row above.
-[[nodiscard]] PatternAndBeat move_up(
+[[nodiscard]] GridAndBeat move_up(
     doc::Document const& document,
     cursor::Cursor cursor,
     MoveCursorYArgs const& args,
@@ -74,7 +73,7 @@ struct MoveCursorYArgs {
 ///   and next_event() doesn't wrap and is closer than the nearest row below,
 ///   jump down to next_event().time.
 /// - Move to nearest row below.
-[[nodiscard]] PatternAndBeat move_down(
+[[nodiscard]] GridAndBeat move_down(
     doc::Document const& document,
     cursor::Cursor cursor,
     MoveCursorYArgs const& args,
@@ -86,7 +85,7 @@ struct MoveCursorYArgs {
 ///   and next_event() doesn't wrap and is closer than the nearest row below,
 ///   jump down to next_event().time.
 /// - Move to nearest row below `step` times.
-[[nodiscard]] PatternAndBeat cursor_step(
+[[nodiscard]] GridAndBeat cursor_step(
     doc::Document const& document,
     cursor::Cursor cursor,
     MoveCursorYArgs const& args,

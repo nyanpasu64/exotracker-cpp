@@ -20,7 +20,7 @@ struct CursorX {
 
 struct Cursor {
     CursorX x{};
-    timing::PatternAndBeat y{};
+    timing::GridAndBeat y{};
 };
 
 }

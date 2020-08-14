@@ -9,6 +9,7 @@
 #include <doctest.h>
 #include <gsl/span_ext>  // span == span
 
+#include <algorithm>  // std::max
 #include <random>
 
 namespace audio::synth::sequencer {
@@ -26,29 +27,24 @@ static Document simple_doc() {
         .ticks_per_beat = 10,
     };
 
-    Sequence sequence;
+    GridCells grid_cells;
 
-    // seq ind 0
-    sequence.push_back([] {
-        BeatFraction nbeats = 2;
+    grid_cells.push_back({2});
 
-        ChipChannelTo<EventList> chip_channel_events;
-        chip_channel_events.push_back({
-            // channel 0
-            {
+    Timeline channel_0;
+    Timeline channel_1;
+
+    // time 0
+    channel_0.push_back({
+        TimelineBlock{0, END_OF_GRID,
+            Pattern{EventList{
                 // TimeInPattern, RowEvent
                 {at(0), {0}},
                 {at(1), {1}},
-            },
-            // channel 1
-            {},
-        });
-
-        return SequenceEntry {
-            .nbeats = nbeats,
-            .chip_channel_events = chip_channel_events,
-        };
-    }());
+            }}
+        }
+    });
+    channel_1.push_back(TimelineCell{});
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -56,7 +52,8 @@ static Document simple_doc() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
-        .sequence = sequence
+        .grid_cells = grid_cells,
+        .chip_channel_timelines = {{channel_0, channel_1}},
     };
 }
 
@@ -65,7 +62,7 @@ static ChannelSequencer make_channel_sequencer(
 ) {
     ChannelSequencer seq;
     seq.set_chip_chan(chip_index, chan_index);
-    seq.seek(document, PatternAndBeat{});
+    seq.seek(document, GridAndBeat{});
     return seq;
 }
 
@@ -141,7 +138,7 @@ TEST_CASE("Test seeking") {
         return seq.next_tick(document);
     };
 
-    seq.seek(document, PatternAndBeat{0, {1, 2}});
+    seq.seek(document, GridAndBeat{0, {1, 2}});
 
     for (int16_t i = 5; i < 10; i++) {
         auto [t, ev] = next_tick();
@@ -176,10 +173,18 @@ TEST_CASE("Ensure sequencer behaves the same with and without reloading position
             auto normal = make_channel_sequencer(0, chan, document);
             auto reload = make_channel_sequencer(0, chan, document);
 
+            int ticks = 0;
             int normal_loops = 0;
             int reload_loops = 0;
             while (true) {
+                CAPTURE(ticks);
+
                 auto [normal_time, normal_ev] = normal.next_tick(document);
+                // CAPTURE() creates a [&] lambda which cannot capture a
+                // structured binding.
+                auto normal_time_v = normal_time;
+                CAPTURE(normal_time_v);
+
                 if (
                     normal_time
                     == SequencerTime{0, normal_time.curr_ticks_per_beat, 0, 0}
@@ -202,6 +207,7 @@ TEST_CASE("Ensure sequencer behaves the same with and without reloading position
                 if (normal_loops == 2 || reload_loops == 2) {
                     break;
                 }
+                ticks++;
             }
         }
     }
@@ -258,59 +264,57 @@ TEST_CASE("Ensure sequencer behaves the same with and without reloading tempo") 
 ///
 /// beat = 0 or 1.
 /// delay = [0, 10) or so.
-static Document parametric_doc(uint32_t beat, TickT delay, int peak_delay) {
+/// loop_length = ???
+static Document parametric_doc(
+    uint32_t beat, TickT delay, int peak_delay, MaybeNonZero<uint32_t> loop_length
+) {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 10,
     };
 
-    Sequence sequence;
+    GridCells grid_cells {
+        {.nbeats = 4},
+        {.nbeats = 4},
+    };
 
-    // seq ind 0
-    sequence.push_back([&] {
-        BeatFraction nbeats = 4;
+    Timeline channel_0;
+    Timeline channel_1;
 
-        ChipChannelTo<EventList> chip_channel_events;
-        chip_channel_events.push_back({
-            // channel 0
+    // grid 0
+    channel_0.push_back({
+        TimelineBlock{0, END_OF_GRID, Pattern{
             {
                 // TimeInPattern, RowEvent
                 {at_delay(beat, delay), {0}},
                 {at_delay(beat + 2, -delay), {1}},
             },
-            // channel 1
-            {},
-        });
-
-        return SequenceEntry {
-            .nbeats = nbeats,
-            .chip_channel_events = chip_channel_events,
-        };
-    }());
+            loop_length
+        }}
+    });
+    channel_1.push_back({});
 
     // The second pattern is ✨different✨.
     delay = peak_delay - delay;
 
-    // seq ind 1
-    sequence.push_back([&] {
-        BeatFraction nbeats = 4;
-
-        ChipChannelTo<EventList> chip_channel_events;
-        chip_channel_events.push_back({
-            // channel 0
+    // grid 1
+    channel_0.push_back({
+        // Add two blocks into one grid cell, as a test case.
+        TimelineBlock{(BeatIndex) beat, beat + 2, Pattern{
             {
                 // TimeInPattern, RowEvent
-                {at_delay(beat, delay), {2}},
-                {at_delay(beat + 2, -delay), {3}},
+                {at_delay(0, delay), {2}},
             },
-            // channel 1
-            {},
-        });
-
-        return SequenceEntry {
-            .nbeats = nbeats,
-            .chip_channel_events = chip_channel_events,
-        };
-    }());
+            loop_length
+        }},
+        TimelineBlock{(BeatIndex) beat + 2, END_OF_GRID, Pattern{
+            {
+                // TimeInPattern, RowEvent
+                {at_delay(0, -delay), {3}},
+            },
+            loop_length
+        }},
+    });
+    channel_1.push_back({});
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -318,7 +322,97 @@ static Document parametric_doc(uint32_t beat, TickT delay, int peak_delay) {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
-        .sequence = sequence
+        .grid_cells = grid_cells,
+        .chip_channel_timelines = {{channel_0, channel_1}},
+    };
+}
+
+/// Single-grid document intended to test for looping bugs.
+///
+/// nbeat = [0, 4]. Controls how many events are emitted. If 0, document is empty.
+/// delay = [-4, 4] or less at fast tempos.
+/// loop_length >= nbeat and >= 0.
+static Document short_doc(
+    uint32_t nbeat, TickT delay, MaybeNonZero<uint32_t> loop_length
+) {
+    SequencerOptions sequencer_options{
+        .ticks_per_beat = 10,
+    };
+
+    GridCells grid_cells {
+        {.nbeats = 4},
+    };
+
+    Timeline channel_0;
+    Timeline channel_1;
+
+    EventList events;
+    for (uint32_t beat = 0; beat < nbeat; beat++) {
+        events.push_back({at_delay(beat, delay), {beat}});
+    }
+
+    // grid 0
+    channel_0.push_back({
+        // Add two blocks into one grid cell, as a test case.
+        TimelineBlock{0, END_OF_GRID, Pattern{events, loop_length}}
+    });
+    channel_1.push_back({});
+
+    return DocumentCopy{
+        .sequencer_options = sequencer_options,
+        .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
+        .instruments = Instruments(),
+        .chips = {ChipKind::Apu1},
+        .grid_cells = grid_cells,
+        .chip_channel_timelines = {{channel_0, channel_1}},
+    };
+}
+
+/// Document with many empty grid cells (no blocks).
+static Document gap_doc(
+    uint32_t nbeat, TickT delay, MaybeNonZero<uint32_t> loop_length
+) {
+    SequencerOptions sequencer_options{
+        .ticks_per_beat = 10,
+    };
+
+    GridCells grid_cells {
+        {.nbeats = 4},
+        {.nbeats = 4},
+        {.nbeats = 4},
+    };
+
+    Timeline channel_0;
+    Timeline channel_1;
+
+    EventList events;
+    for (uint32_t beat = 0; beat < nbeat; beat++) {
+        events.push_back({at_delay(beat, delay), {beat}});
+    }
+
+    // grid 0
+    channel_0.push_back({
+        TimelineBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}}
+    });
+    channel_1.push_back({});
+
+    // grid 1
+    channel_0.push_back({});
+    channel_1.push_back({});
+
+    // grid 2
+    channel_0.push_back({});
+    channel_1.push_back({});
+
+    return DocumentCopy{
+        .sequencer_options = sequencer_options,
+        .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
+        .instruments = Instruments(),
+        .chips = {ChipKind::Apu1},
+        .grid_cells = grid_cells,
+        .chip_channel_timelines = {{channel_0, channel_1}},
     };
 }
 
@@ -334,10 +428,12 @@ TEST_CASE("Randomly switch between randomly generated documents") {
     // and is completely unnecessary given the way I implemented doc_edited()...
     // (doc_edited() ignores our position in the old document, and only keeps _now.)
 
+    // UPDATE: i have underestimated my ability to break existing code during rewrites.
+
     using RNG = std::minstd_rand;
     RNG rng{rd()};
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 300; i++) {
         // Capture state if test fails.
         std::ostringstream ss;
         ss << rng;
@@ -348,13 +444,42 @@ TEST_CASE("Randomly switch between randomly generated documents") {
         using rand_tick = std::uniform_int_distribution<TickT>;
         using rand_bool = std::bernoulli_distribution;
 
-        auto random_doc = [] (RNG & rng) {
-            // `beat + 2` can overflow the end of the pattern.
-            // Events are misordered, but doc_edited() pretends
-            // the new document was always there (and ignores misorderings).
-            auto beat = rand_u32{0, 2}(rng);
-            auto delay = rand_tick{0, 9}(rng);
-            return parametric_doc(beat, delay, 10);
+        // TODO switch doc durations randomly
+        // TODO edit sequencer to add support for changing block lengths/counts
+        auto const which_doc = rand_u32{0, 2}(rng);
+
+        bool negative_ticks = false;
+        auto random_doc = [which_doc, &negative_ticks] (RNG & rng) {
+            switch (which_doc) {
+            case 0: {
+                // `beat + 2` can overflow the end of the pattern.
+                // Events are misordered, but doc_edited() pretends
+                // the new document was always there (and ignores misorderings).
+                auto begin_beat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{0, 9}(rng);
+                auto peak_delay = rand_bool{0.5}(rng) ? 10 : 0;
+                auto loop_length = rand_bool{0.5}(rng) ? begin_beat + 2 : 0;
+                return parametric_doc(begin_beat, delay, peak_delay, loop_length);
+
+            }
+            case 1: {
+                auto nbeat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{-4, 4}(rng);
+                auto loop_length = rand_u32{std::max(nbeat, 1u), 4}(rng);
+
+                negative_ticks = delay < 0;
+                return short_doc(nbeat, delay, loop_length);
+            }
+            case 2: {
+                auto nbeat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{-4, 4}(rng);
+                auto loop_length = rand_u32{std::max(nbeat, 1u), 4}(rng);
+
+                negative_ticks = delay < 0;
+                return gap_doc(nbeat, delay, loop_length);
+            }
+            }
+            throw std::logic_error("Unknown document type");
         };
 
         Document document = random_doc(rng);
@@ -366,17 +491,33 @@ TEST_CASE("Randomly switch between randomly generated documents") {
             CAPTURE(tick);
             // Randomly decide whether to switch documents.
             if (rand_bool{0.1}(rng)) {
-                document = random_doc(rng);
+                /*
+                If you add negative delays at the beginning of a document,
+                then call doc_edited() before tick 0,
+                then only the edited sequencer will skip the negative-delay notes.
 
-                // The ground truth is trained on the new document from scratch.
-                // Replaying the entire history is O(n^2) but whatever.
-                pure = make_channel_sequencer(0, 0, document);
-                for (int j = 0; j < tick; j++) {
-                    pure.next_tick(document);
+                If you reduce the number of events but don't call doc_edited(),
+                then the sequencer could crash.
+
+                So don't add negative delays on tick 0.
+                (Desync doesn't happen if you edit a document
+                to remove negative delays.)
+                */
+
+                Document new_doc = random_doc(rng);
+                if (!(tick == 0 && negative_ticks)) {
+                    document = std::move(new_doc);
+
+                    // The ground truth is trained on the new document from scratch.
+                    // Replaying the entire history is O(n^2) but whatever.
+                    pure = make_channel_sequencer(0, 0, document);
+                    for (int j = 0; j < tick; j++) {
+                        pure.next_tick(document);
+                    }
+
+                    // The dirty sequencer is informed the document has changed.
+                    dirty.doc_edited(document);
                 }
-
-                // The dirty sequencer is informed the document has changed.
-                dirty.doc_edited(document);
             }
 
             // Make sure both sequencers agree.
@@ -417,7 +558,7 @@ TEST_CASE("Randomly switch between random tempos") {
     using RNG = std::minstd_rand;
     RNG rng{rd()};
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 300; i++) {
         // Capture state if test fails.
         std::ostringstream ss;
         ss << rng;
@@ -428,13 +569,34 @@ TEST_CASE("Randomly switch between random tempos") {
         using rand_tick = std::uniform_int_distribution<TickT>;
         using rand_bool = std::bernoulli_distribution;
 
-        auto random_doc = [] (RNG & rng) {
-            // `beat + 2` can overflow the end of the pattern.
-            // Events are misordered, but doc_edited() pretends
-            // the new document was always there (and ignores misorderings).
-            auto beat = rand_u32{0, 1}(rng);
-            auto delay = rand_tick{0, 1}(rng);
-            return parametric_doc(beat, delay, 1);
+        auto const which_doc = rand_u32{0, 2}(rng);
+
+        auto random_doc = [which_doc] (RNG & rng) {
+            switch (which_doc) {
+            case 0: {
+                auto begin_beat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{0, 1}(rng);
+                auto peak_delay = 1;
+                auto loop_length = rand_bool{0.5}(rng) ? begin_beat + 2 : 0;
+                return parametric_doc(begin_beat, delay, peak_delay, loop_length);
+
+            }
+            case 1: {
+                auto nbeat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{-1, 1}(rng);
+                auto loop_length = rand_u32{std::max(nbeat, 1u), 4}(rng);
+
+                return short_doc(nbeat, delay, loop_length);
+            }
+            case 2: {
+                auto nbeat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{-1, 1}(rng);
+                auto loop_length = rand_u32{std::max(nbeat, 1u), 4}(rng);
+
+                return gap_doc(nbeat, delay, loop_length);
+            }
+            }
+            throw std::logic_error("Unknown document type");
         };
 
         Document document = random_doc(rng);

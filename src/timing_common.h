@@ -8,17 +8,39 @@
 
 namespace timing {
 
-struct PatternAndBeat {
-    doc::SeqEntryIndex seq_entry_index = 0;
+struct GridBlockBeat {
+    doc::GridIndex grid{0};
+    doc::BlockIndex block{0};
+
+    /// Time from block begin to now.
     doc::BeatFraction beat = 0;
 
-    COMPARABLE(PatternAndBeat)
+    COMPARABLE(GridBlockBeat)
 };
+
+struct GridAndBlock {
+    doc::GridIndex grid{0};
+    doc::BlockIndex block{0};
+
+    static GridAndBlock from(GridBlockBeat other) {
+        return GridAndBlock{other.grid, other.block};
+    }
+
+    COMPARABLE(GridAndBlock)
+};
+
+struct GridAndBeat {
+    doc::GridIndex grid{0};
+    doc::BeatFraction beat = 0;
+
+    COMPARABLE(GridAndBeat)
+};
+
 
 // Atomically written by audio thread, atomically read by GUI.
 // Make sure this fits within 8 bytes.
 struct [[nodiscard]] alignas(uint64_t) SequencerTime {
-    uint16_t seq_entry_index;
+    uint16_t grid;
 
     // should this be removed, or should the audio thread keep track of this
     // for the GUI thread rendering?
@@ -31,12 +53,12 @@ struct [[nodiscard]] alignas(uint64_t) SequencerTime {
     int16_t ticks;
 
     constexpr SequencerTime(
-        uint16_t seq_entry_index,
+        uint16_t grid,
         uint16_t curr_ticks_per_beat,
         int16_t beats,
         int16_t ticks
     )
-        : seq_entry_index{seq_entry_index}
+        : grid{grid}
         , curr_ticks_per_beat{curr_ticks_per_beat}
         , beats{beats}
         , ticks{ticks}
@@ -127,7 +149,7 @@ static_assert(
 namespace timing {
     static std::ostream& operator<< (std::ostream& os, SequencerTime const & value) {
         os << fmt::format("SequencerTime{{{}, {}, {}, {}}}",
-            value.seq_entry_index,
+            value.grid,
             value.curr_ticks_per_beat,
             value.beats,
             value.ticks
@@ -135,9 +157,17 @@ namespace timing {
         return os;
     }
 
-    static std::ostream& operator<< (std::ostream& os, PatternAndBeat const & value) {
-        os << fmt::format("PatternAndBeat{{{}, {}}}",
-            value.seq_entry_index,
+    static std::ostream& operator<< (std::ostream& os, GridAndBeat const & value) {
+        os << fmt::format("GridAndBeat{{{}, {}}}",
+            value.grid,
+            format_frac(value.beat)
+        );
+        return os;
+    }
+
+    static std::ostream& operator<< (std::ostream& os, GridBlockBeat const & value) {
+        os << fmt::format("GridBlockBeat{{{}, {}}}",
+            value.block,
             format_frac(value.beat)
         );
         return os;

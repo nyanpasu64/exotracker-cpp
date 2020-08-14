@@ -23,7 +23,7 @@
 namespace gui::main_window {
 
 using audio::output::AudioThreadHandle;
-using timing::PatternAndBeat;
+using timing::GridAndBeat;
 using timing::MaybeSequencerTime;
 
 enum class AudioState {
@@ -41,14 +41,14 @@ using cursor::CursorX;
 ///
 /// top is inclusive, but bottom is exclusive.
 ///
-/// top.seq_entry_index must lie in-bounds, and top.beat generally remains in-bounds.
-/// bottom.seq_entry_index must lie in-bounds,
-/// but bottom.beat can equal the sequence entry length.
+/// top.grid must lie in-bounds, and top.beat generally remains in-bounds.
+/// bottom.grid must lie in-bounds,
+/// but bottom.beat can equal the grid cell length.
 struct Selection {
     CursorX left;
     CursorX right;
-    PatternAndBeat top;
-    PatternAndBeat bottom;
+    GridAndBeat top;
+    GridAndBeat bottom;
 };
 
 enum class SelectionMode {
@@ -100,7 +100,7 @@ public:
 /// and how many beats to select below the bottom endpoint.
 ///
 /// Some pattern cells (like instruments, volumes, and effects)
-/// have multiple characters entered in sequence.
+/// have multiple characters entered in order.
 /// digit_index() stores the typing progress within those cells.
 ///
 /// Selections are a hard problem. Requirements which led to this API design at
@@ -125,7 +125,7 @@ public:
     /// Moving the cursor always updates the selection endpoint.
     void set(Cursor cursor);
     void set_x(CursorX x);
-    void set_y(PatternAndBeat y);
+    void set_y(GridAndBeat y);
 
     // # Digits within a cell
     [[nodiscard]] int digit_index() const;

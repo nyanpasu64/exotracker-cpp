@@ -67,8 +67,8 @@ public:
     virtual ~ChipInstance() = default;
 
     /// Seek the sequencer to this time in the document
-    /// (sequence entry and beat fraction).
-    virtual void seek(doc::Document const & document, timing::PatternAndBeat time) = 0;
+    /// (grid cell and beat fraction).
+    virtual void seek(doc::Document const & document, timing::GridAndBeat time) = 0;
 
     /// May/not mutate _register_writes.
     /// You are required to call driver_tick() afterwards on the same tick,

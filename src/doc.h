@@ -7,7 +7,7 @@
 #include "doc/events.h"
 #include "doc/timed_events.h"
 #include "doc/event_list.h"
-#include "doc/sequence.h"
+#include "doc/timeline.h"
 #include "doc/instr.h"
 #include "doc/accidental_common.h"
 #include "chip_common.h"
@@ -21,7 +21,7 @@ namespace doc {
 using namespace ::doc::events;
 using namespace ::doc::timed_events;
 using namespace ::doc::event_list;
-using namespace ::doc::sequence;
+using namespace ::doc::timeline;
 using namespace ::doc::instr;
 using accidental::AccidentalMode;
 
@@ -74,8 +74,21 @@ struct DocumentCopy {
     /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
     ChipList chips;
 
-    // Sequence.size() in [1..MAX_SEQUENCE_LEN] inclusive (not enforced yet).
-    Sequence sequence;
+    /// The order editor is replaced with a global timeline grid for placing patterns in.
+    /// We don't store the absolute times of gridlines,
+    /// but instead the distance between them.
+    ///
+    /// Grid cells lie between gridlines.
+    /// Each cell has a duration consisting of an integer(?) number of beats.
+    /// This variable stores cell durations, not block/pattern data.
+    /// ----
+    /// Timeline cell `i` has duration `grid_cells[i].nbeats`.
+    /// Valid gridlines are `0 .. grid_cells.size()` inclusive.
+    /// However, the last grid cell is at size() - 1.
+    GridCells grid_cells;
+
+    /// This variable stores document pattern data.
+    ChipChannelTo<Timeline> chip_channel_timelines;
 
     // Methods
     chip_common::ChannelIndex chip_index_to_nchan(chip_common::ChipIndex index) const {

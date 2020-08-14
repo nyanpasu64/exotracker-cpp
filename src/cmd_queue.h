@@ -14,9 +14,9 @@ namespace cmd_queue {
 #endif
 
 struct SeekTo {
-    timing::PatternAndBeat time;
+    timing::GridAndBeat time;
 
-    SeekTo(timing::PatternAndBeat time)
+    SeekTo(timing::GridAndBeat time)
         : time{time}
     {}
 

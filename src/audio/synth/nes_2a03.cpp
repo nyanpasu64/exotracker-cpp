@@ -95,7 +95,7 @@ public:
     }
 
     // impl ChipInstance
-    void seek(doc::Document const & document, timing::PatternAndBeat time) override {
+    void seek(doc::Document const & document, timing::GridAndBeat time) override {
         _chip_sequencer.seek(document, time);
     }
 

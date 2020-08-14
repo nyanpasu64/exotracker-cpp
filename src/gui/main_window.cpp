@@ -90,12 +90,12 @@ void RawSelection::select_all(
     ColumnToNumSubcol col_to_nsubcol,
     int rows_per_beat
 ) {
-    using doc::SeqEntryIndex;
+    using doc::GridIndex;
     using cursor::ColumnIndex;
 
     Selection select = get_select();
-    SeqEntryIndex top_seq = select.top.seq_entry_index;
-    SeqEntryIndex bottom_seq = select.bottom.seq_entry_index;
+    GridIndex top_seq = select.top.grid;
+    GridIndex bottom_seq = select.bottom.grid;
 
     // Unconditionally enable padding below bottom of selection.
     _bottom_padding = BeatFraction{1, rows_per_beat};
@@ -107,16 +107,16 @@ void RawSelection::select_all(
         release_assert(right_col < col_to_nsubcol.size());
 
         _begin.x = CursorX{left_col, 0};
-        _begin.y = PatternAndBeat{top_seq, 0};
+        _begin.y = GridAndBeat{top_seq, 0};
 
         _end.x = CursorX{right_col, col_to_nsubcol[right_col] - 1};
-        _end.y = PatternAndBeat{
-            bottom_seq, document.sequence[bottom_seq].nbeats - _bottom_padding
+        _end.y = GridAndBeat{
+            bottom_seq, document.grid_cells[bottom_seq].nbeats - _bottom_padding
         };
     };
 
     if (_mode == SelectionMode::Normal) {
-        // Select all sequence entries and channels the current selection occupies.
+        // Select all grid cells and channels the current selection occupies.
         _orig_left = select.left.column;
         _orig_right = select.right.column;
 
@@ -124,13 +124,13 @@ void RawSelection::select_all(
         _mode = SelectionMode::SelectChannels;
 
     } else if (_mode == SelectionMode::SelectChannels) {
-        // Select all sequence entries the current selection occupies,
+        // Select all grid cells the current selection occupies,
         // and all channels unconditionally.
         select_block(0, ColumnIndex(col_to_nsubcol.size() - 1));
         _mode = SelectionMode::SelectAll;
 
     } else if (_mode == SelectionMode::SelectAll) {
-        // Select all sequence entries and channels the original selection occupied.
+        // Select all grid cells and channels the original selection occupied.
         select_block(_orig_left, _orig_right);
         _mode = SelectionMode::SelectChannels;
     }
@@ -168,7 +168,7 @@ void CursorAndSelection::set_x(CursorX x) {
     emit cursor_moved();
 }
 
-void CursorAndSelection::set_y(PatternAndBeat y) {
+void CursorAndSelection::set_y(GridAndBeat y) {
     _cursor.y = y;
     if (_select) {
         _select->set_end(_cursor);
@@ -260,7 +260,7 @@ struct MainWindowUi : MainWindow {
     QComboBox * _end_action;
     QSpinBox * _end_jump_to;
 
-    // Order entry settings
+    // TODO rework settings GUI
     QSpinBox * _length_beats;
 
     // Global state (editing)
@@ -321,15 +321,15 @@ struct MainWindowUi : MainWindow {
         l__c_l(QWidget, QHBoxLayout);
         c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
-        struct OrderEditor : QLabel {
+        struct TimelineEditor : QLabel {
             using QLabel::QLabel;
             QSize sizeHint() const override {
                 return QSize{256, 0};
             }
         };
 
-        // Order editor.
-        {l__w(OrderEditor(tr("pretend there's an\norder editor here")));
+        // Timeline editor.
+        {l__w(TimelineEditor(tr("pretend there's a\ntimeline editor here")));
             w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
         }
 
@@ -375,17 +375,17 @@ struct MainWindowUi : MainWindow {
                     {l__w(QSpinBox);
                         _end_jump_to = w;
                         w->setEnabled(false);
-                        w->setRange(0, doc::MAX_SEQUENCE_LEN - 1);
+                        w->setRange(0, doc::MAX_GRID_CELLS - 1);
                     }
                 }
             }
 
-            // Order entry settings
+            // TODO rework settings GUI
             {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("Order entry"));
+                c->setTitle(tr("Grid cell"));
 
                 form->addRow(
-                    new QLabel(tr("Pattern length")),
+                    new QLabel(tr("Length (beats)")),
                     [this] {
                         auto w = _length_beats = new QSpinBox;
                         w->setRange(1, MAX_BEATS_PER_PATTERN);
@@ -398,7 +398,7 @@ struct MainWindowUi : MainWindow {
 
         // Pattern editing.
         {l__c_form(QGroupBox, QFormLayout);
-            c->setTitle(tr("Pattern editing"));
+            c->setTitle(tr("Note entry"));
 
             {form__label_w(tr("Octave"), QSpinBox);
                 _octave = w;
@@ -520,7 +520,7 @@ public:
         }
 
     private:
-        void play_from(MainWindowImpl & win, PatternAndBeat time) {
+        void play_from(MainWindowImpl & win, GridAndBeat time) {
             _command_queue.push(cmd_queue::SeekTo{time});
             _audio_state = AudioState::Starting;
 

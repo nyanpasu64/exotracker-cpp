@@ -41,8 +41,7 @@ namespace subcolumns {
 using subcolumns::SubColumn;
 
 using doc::Document;
-using timing::PatternAndBeat;
-using doc::SeqEntryIndex;
+using timing::GridAndBeat;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 
@@ -50,15 +49,30 @@ using chip_common::ChannelIndex;
 // because Cursor stores (column: int, subcolumn: int)
 // but edit functions need (chip: int, channel: int, subcolumn: SubColumn).
 
+/// Calling this in space not occupied by a block creates a block.
+/// Calling this in space not occupied by a block returns a no-op edit.
+///
+/// Currently only used by unit tests. Could be exposed to users through the GUI,
+/// but the functionality can be achieved by inserting a note
+/// (or maybe even deleting a non-existent event).
+EditBox create_block(
+    Document const & document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    GridAndBeat abs_time
+);
+
 /// Clear the focused subcolumn of all events
 /// anchored exactly to the current beat fraction.
 /// Deleting the note column also clears instrument and volume.
+///
+/// Calling this in space not occupied by a block returns a no-op edit.
 EditBox delete_cell(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
     SubColumn subcolumn,
-    PatternAndBeat time
+    GridAndBeat abs_time
 );
 
 /// Insert note at current beat fraction, reusing last existing event if it exists.
@@ -69,7 +83,7 @@ EditBox insert_note(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
-    PatternAndBeat time,
+    GridAndBeat abs_time,
     doc::Note note,
     std::optional<doc::InstrumentIndex> instrument
 );
@@ -90,7 +104,7 @@ std::tuple<uint8_t, EditBox> add_digit(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
-    PatternAndBeat time,
+    GridAndBeat abs_time,
     MultiDigitField subcolumn,
     int digit_index,
     uint8_t nybble

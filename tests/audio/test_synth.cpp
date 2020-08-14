@@ -30,31 +30,30 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
     using namespace doc;
 
     ChipList chips;
-    ChipChannelTo<EventList> chip_channel_events;
+
+    auto const chip_kind = chip_kinds::ChipKind::Apu1;
+    using ChannelID = chip_kinds::Apu1ChannelID;
+
+    chips.push_back(chip_kind);
+
+    EventList one_note {{{0, 0}, {pitch}}};
+    EventList blank {};
 
     // chip 0
-    {
-        auto const chip_kind = chip_kinds::ChipKind::Apu1;
-        using ChannelID = chip_kinds::Apu1ChannelID;
+    Timeline pulse_1;
+    pulse_1.push_back({TimelineBlock{0, END_OF_GRID,
+        Pattern{which_channel == TestChannelID::Pulse1 ? one_note : blank}
+    }});
 
-        chips.push_back(chip_kind);
-        chip_channel_events.push_back([&]() {
-            ChannelTo<EventList> channel_events;
+    Timeline pulse_2;
+    pulse_2.push_back({TimelineBlock{0, END_OF_GRID,
+        Pattern{which_channel == TestChannelID::Pulse2 ? one_note : blank}
+    }});
 
-            EventList one_note {{{0, 0}, {pitch}}};
-            EventList blank {};
+    ChipChannelTo<Timeline> chip_channel_timelines =
+        {{std::move(pulse_1), std::move(pulse_2)}};
 
-            channel_events.push_back(
-                which_channel == TestChannelID::Pulse1 ? one_note : blank
-            );
-            channel_events.push_back(
-                which_channel == TestChannelID::Pulse2 ? one_note : blank
-            );
-
-            release_assert(channel_events.size() == (int)ChannelID::COUNT);
-            return channel_events;
-        }());
-    }
+    release_assert(chip_channel_timelines[0].size() == (int)ChannelID::COUNT);
 
     return DocumentCopy {
         .sequencer_options = SequencerOptions{
@@ -64,12 +63,8 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = {},
         .chips = chips,
-        .sequence = {
-            SequenceEntry {
-                .nbeats = 4,
-                .chip_channel_events = chip_channel_events,
-            }
-        },
+        .grid_cells = {{.nbeats = 4}},
+        .chip_channel_timelines = std::move(chip_channel_timelines),
     };
 }
 
@@ -81,7 +76,7 @@ using cmd_queue::CommandQueue;
 
 CommandQueue play_from_begin() {
     CommandQueue out;
-    out.push(cmd_queue::SeekTo{timing::PatternAndBeat{0, 0}});
+    out.push(cmd_queue::SeekTo{timing::GridAndBeat{0, 0}});
     return out;
 }
 

@@ -38,4 +38,20 @@ static EditBox make_command(Body body) {
     return std::make_unique<ImplEditCommand<Body>>(std::move(body));
 }
 
+/// When pushed into undo history, remembers cursor position,
+/// but doesn't modify the document.
+struct NullEditCommand {
+
+    void apply_swap(doc::Document & document) {
+        (void) document;
+    }
+
+    bool can_coalesce(BaseEditCommand & prev) const {
+        (void) prev;
+        return false;
+    }
+
+    constexpr static ModifiedFlags _modified = (ModifiedFlags) 0;
+};
+
 }

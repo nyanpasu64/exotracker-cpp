@@ -35,7 +35,18 @@ void post_init(Document & document) {
     document.frequency_table.resize(CHROMATIC_COUNT);
 
     // Reserve 256 elements to ensure that insert/delete is bounded-time.
-    document.sequence.reserve(MAX_SEQUENCE_LEN);
+    document.grid_cells.reserve(MAX_GRID_CELLS);
+
+    for (auto & chan_timelines : document.chip_channel_timelines) {
+        for (auto & timeline : chan_timelines) {
+            timeline.reserve(MAX_GRID_CELLS);
+
+            // Reserve 32 elements to ensure that adding blocks is bounded-time.
+            for (auto & cell : timeline) {
+                cell._raw_blocks.reserve(MAX_BLOCKS_PER_CELL);
+            }
+        }
+    }
 }
 
 Document::Document(const DocumentCopy & other) : DocumentCopy(other) {

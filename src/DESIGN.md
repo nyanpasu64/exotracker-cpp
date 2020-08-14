@@ -162,19 +162,39 @@ When you call `edit_box->apply_swap(document)` a second time, since the `optiona
 
 The "remove order entry at location" function can returns the same `BaseEditCommand` subclass, only initialized to be empty instead of holding a value. Then `apply_swap()` will remove and save the corresponding entry from the document.
 
-## Document format (unfinished, subject to change)
+## Pattern reuse philosophy
 
-In FamiTracker, the list of valid patterns is not exposed to the user. You can often dredge up old patterns by manually changing pattern IDs in the sequence table. You can ask FT to "Remove unused patterns".
+In FamiTracker, the list of valid patterns is not exposed to the user. You can often dredge up old patterns by manually changing pattern IDs in the frame editor. To get rid of these, you can ask FT to "Remove unused patterns". I have never had a use for dredging up old patterns, but apparently other people use this feature.
 
-In Exotracker, currently the order/sequence owns patterns directly, making reuse impossible. If I add reuse through PatternID, it will be an opaque identifier not visible to the user. Non-shared patterns are shown on the GUI as a dash. Shared pattern are shown on the GUI as the SequenceIndex of its first usage. This will make "dredging up old patterns" impossible.
+My goal in exploring alternative approaches is not file-size efficiency (deleting unused patterns when saving to disk), but searching for a mental model where patterns are (by default) used in only one place, and multiple uses of a single pattern is explicitly specified. My goals are clear warning signs when editing a pattern used in multiple places, and clear indications of a reused pattern's purpose (a name) and all usages.
 
-I have never had a use for dredging up old patterns. However apparently other people use this feature.
+## Timeline
 
-----
+The frame/order editor is replaced with a timeline editor, and its functionality is changed significantly.
 
-File-size efficiency (deleting unused patterns when saving to disk) was never my goal. The mental model is that patterns belong to frames, aka sequence entries.
+The pattern grid structure from existing trackers is carried over (under the name of grid cells). Each grid cell has its own length which can vary between cells (like OpenMPT, unlike FamiTracker). However, grid cells are not patterns, and events are not placed directly in grid cells.
 
-There's no reason i couldn't implement both ft-style "sequence to pattern mapping" and filesystem-style "pattern IDs are hidden from the user" GUIs, on the same data format. And "delete unused patterns" would be a toggle option.
+Events are placed in a separate nested structure. Each channel has its own timeline, or an array of one timeline cell per global grid cell. The length of a timeline cell is determined by the corresponding grid cell. A timeline cell can hold zero or more blocks, which carry a start and end time (in integer beats) and a pattern. These blocks have nonzero length, do not overlap in time, occur in increasing time order, and lie between 0 and the timeline cell's length (the last block's end time can take on a special value corresponding to "end of cell")[1].
+
+Each block contains a single pattern, consisting of a list of events and an optional loop duration (in integer beats). The pattern starts playing when absolute time reaches the block's start time, and stops playing when absolute time reaches the block's end time. If the loop duration is set, whenever relative time (within the pattern) reaches the loop duration, playback jumps back to the pattern's begin. A block can cut off a pattern's events early when time reaches the block's end time (either the pattern's initial play or during a loop). However a block cannot start playback partway into a pattern (no plans to add support yet).
+
+Eventually, patterns can be reused in multiple blocks at different times (and possibly different channels).
+
+[1] I'm not sure what to do if a user shrinks a grid cell, which causes an absolute-end block to end past the cell, or an "end of cell" block to have a size ≤ 0, etc.
+
+### Motivation
+
+The timeline system is intended to allow treating the program like FamiStudio or a tracker, with timestamps encoded relative to current pattern/frame begin, and reuse at pattern-level granularity. If you try to enter a note/volume/effect in a region without a block in place, a block is automatically created in the current channel, filling all empty space available (up to an entire grid cell) (not implemented yet).
+
+It is also intended to have a similar degree of flexibility as a DAW like Reaper (fine-grained block splitting and looping). The tradeoff is that because global timestamps are relative to grid cell begin, blocks are not allowed to cross grid cell boundaries (otherwise it would be painful to convert between block/pattern-relative and global timestamps).
+
+### Implementation
+
+I added classes `TimelineCellIter` and `TimelineCellIterRef` to loop each block's patterns for as long as it's playing. These classes (which act like coroutines/generators) are constructed with a `TimelineCell` and its duration, and yield `PatternRef` objects until exhausted.
+
+For each block in the cell, `TimelineCellIter(Ref)` will yield a `PatternRef` with the block's pattern either once (if the pattern doesn't loop), or once for each time the pattern loops within the block. The `PatternRef` stores the time the pattern plays within the grid cell, and a span (pointer, size) to the events that should be played (excluding all events past the block's end time, but currently not excluding events at the beginning).
+
+To add support for starting playback partway through a pattern, a `PatternRef` would have to store a timestamp to subtract from all events when calculating the absolute time (relative to the grid cell) the events play at.
 
 ## Audio architecture
 

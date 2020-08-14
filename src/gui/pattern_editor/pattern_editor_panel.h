@@ -37,10 +37,10 @@ enum class ColumnCollapse {
     NotesOnly,
 };
 
-using doc::SeqEntryIndex;
+using doc::GridIndex;
 using RowIndex = uint32_t;
 using doc::BeatFraction;
-using timing::PatternAndBeat;
+using timing::GridAndBeat;
 
 struct ShortcutPair {
     // You can't use an array of 2 elements. Why?
@@ -160,7 +160,7 @@ PatternEditorPanel_INTERNAL:
     bool _is_zoomed = false;
 
     // Non-empty if free scrolling is enabled.
-    std::optional<PatternAndBeat> _free_scroll_position;
+    std::optional<GridAndBeat> _free_scroll_position;
 
     // impl
 public:
