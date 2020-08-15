@@ -42,6 +42,14 @@
 #include <variant>
 #include <vector>
 
+//#define PATTERN_EDITOR_DEBUG
+
+#ifdef PATTERN_EDITOR_DEBUG
+    #define DEBUG_PRINT(...)  fmt::print(stderr, __VA_ARGS__)
+#else
+    #define DEBUG_PRINT(...)
+#endif
+
 namespace gui::pattern_editor {
 
 using gui::lib::color::lerp;
@@ -2063,8 +2071,7 @@ static void add_volume_digit(
 /// Basically note and effect/hex input only.
 void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
     auto keycode = qkeycode::toKeycode(event);
-    fmt::print(
-        stderr,
+    DEBUG_PRINT(
         "KeyPress {}=\"{}\", modifier {}, repeat? {}\n",
         keycode,
         qkeycode::KeycodeConverter::DomCodeToCodeString(keycode),
@@ -2127,14 +2134,14 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
 
 void PatternEditorPanel::keyReleaseEvent(QKeyEvent * event) {
     auto dom_code = qkeycode::toKeycode(event);
-    fmt::print(
-        stderr,
+    DEBUG_PRINT(
         "KeyRelease {}=\"{}\", modifier {}, repeat? {}\n",
         dom_code,
         qkeycode::KeycodeConverter::DomCodeToCodeString(dom_code),
         event->modifiers(),
         event->isAutoRepeat()
     );
+    Q_UNUSED(dom_code)
 
     Super::keyReleaseEvent(event);
 }
