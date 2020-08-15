@@ -101,7 +101,7 @@ inline namespace visual {
     };
 
     struct PatternAppearance {
-        QColor overall_bg = gray(48);
+        QColor overall_bg = gray(38);
 
         /// Vertical line to the right of each channel.
         QColor channel_divider = gray(160);
