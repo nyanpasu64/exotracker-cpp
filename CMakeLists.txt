@@ -131,6 +131,7 @@ add_library(exotracker-core
     src/doc/events.cpp
     src/doc/timed_events.cpp
     src/timing_common.cpp
+    src/util/format.cpp
 )
 target_compile_options(exotracker-core PRIVATE "${options}")
 target_link_libraries(exotracker-core PRIVATE lib-3rdparty rtaudio)

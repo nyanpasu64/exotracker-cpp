@@ -1,6 +1,7 @@
 #define ChannelSequencer_INTERNAL public
 #include "sequencer.h"
 #include "util/compare_impl.h"
+#include "util/format.h"
 #include "util/release_assert.h"
 #include "util/math.h"
 
@@ -18,15 +19,6 @@ namespace audio::synth::sequencer {
 COMPARABLE_IMPL(BeatPlusTick, (self.beat, self.dtick))
 
 using doc::BeatFraction;
-
-static std::string format_frac(BeatFraction frac) {
-    return fmt::format(
-        "{} {}/{}",
-        frac.numerator() / frac.denominator(),
-        frac.numerator() % frac.denominator(),
-        frac.denominator()
-    );
-}
 
 // TODO add support for grooves.
 // We need to remove usages of `doc::round_to_int()`

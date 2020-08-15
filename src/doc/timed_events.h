@@ -69,21 +69,14 @@ struct TimedRowEvent {
 
 #ifdef UNITTEST
 
+#include "util/format.h"
+
 #include <fmt/core.h>
 
 #include <ostream>
 #include <string>
 
 namespace boost {
-    static std::string format_frac(doc::timed_events::BeatFraction frac) {
-        return fmt::format(
-            "{} {}/{}",
-            frac.numerator() / frac.denominator(),
-            frac.numerator() % frac.denominator(),
-            frac.denominator()
-        );
-    }
-
     static std::ostream& operator<< (std::ostream& os, doc::timed_events::BeatFraction const & frac) {
         os << format_frac(frac);
         return os;
