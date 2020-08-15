@@ -1333,9 +1333,6 @@ static void draw_pattern_foreground(
         PainterScope scope{painter};
         painter.translate(0, pos.top);
 
-        auto xleft = column.left_px;
-        auto xright = column.right_px;
-
         // https://bugs.llvm.org/show_bug.cgi?id=33236
         // the original C++17 spec broke const struct unpacking.
         for (doc::TimedRowEvent timed_event : pattern.events) {
@@ -1351,11 +1348,7 @@ static void draw_pattern_foreground(
             PainterScope scope{painter};
             painter.translate(0, yPx);
 
-            // Draw top line.
             // TODO add coarse/fine highlight fractions
-            QPoint left_top{xleft, 0};
-            QPoint right_top{xright, 0};
-
             QColor note_color;
 
             if (beat.denominator() == 1) {
@@ -1368,6 +1361,15 @@ static void draw_pattern_foreground(
                 // Off-grid misaligned notes (not possible in traditional trackers)
                 note_color = visual.note_line_fractional;
             }
+
+            auto draw_top_line = [&painter, &note_color] (SubColumnPx sub) {
+                QPoint left_top{sub.left_px, 0};
+                QPoint right_top{sub.right_px, 0};
+
+                // Draw top border. Do it after each note clears the background.
+                painter.setPen(note_color);
+                draw_top_border(painter, left_top, right_top);
+            };
 
             // Draw text.
             for (auto const & subcolumn : column.subcolumns) {
@@ -1416,6 +1418,8 @@ static void draw_pattern_foreground(
                             );
                             draw_text(s);
                         }
+
+                        draw_top_line(subcolumn);
                     }
                 }
                 CASE(sc::Instrument) {
@@ -1423,6 +1427,8 @@ static void draw_pattern_foreground(
                         painter.setPen(visual.instrument);
                         auto s = format_hex_2(uint8_t(*row_event.instr));
                         draw_text(s);
+
+                        draw_top_line(subcolumn);
                     }
                 }
 
@@ -1431,17 +1437,13 @@ static void draw_pattern_foreground(
                         painter.setPen(visual.volume);
                         auto s = format_hex_2(uint8_t(*row_event.volume));
                         draw_text(s);
+
+                        draw_top_line(subcolumn);
                     }
                 }
 
                 #undef CASE
             }
-
-            // Draw top border. Do it after each note clears the background.
-            // Exclude the leftmost column, so we don't overwrite channel dividers.
-            painter.setPen(note_color);
-            int pen_width = painter.pen().width();
-            draw_top_border(painter, left_top + QPoint{pen_width, 0}, right_top);
         }
     };
 
