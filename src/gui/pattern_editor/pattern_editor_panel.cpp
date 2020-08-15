@@ -1285,7 +1285,7 @@ static void draw_pattern_foreground(
     }
 
     painter.setFont(visual.pattern_font);
-    DrawText draw_text{painter.font()};
+    DrawText text_painter{painter.font()};
 
     // Dimensions of the note cut/release rectangles.
     int const rect_height = std::max(qRound(self._pixels_per_row / 8.0), 2);
@@ -1373,7 +1373,7 @@ static void draw_pattern_foreground(
             for (auto const & subcolumn : column.subcolumns) {
                 namespace sc = subcolumns;
 
-                auto draw = [&](QString & text) {
+                auto draw_text = [&](QString & text) {
                     // Clear background using unmodified copy free of rendered text.
                     // Unlike alpha transparency, this doesn't break ClearType
                     // and may be faster as well.
@@ -1389,7 +1389,7 @@ static void draw_pattern_foreground(
 
                     // Text is being drawn relative to top-left of current row (not cell).
                     // subcolumn.center_px is relative to screen left (not cell).
-                    draw_text.draw_text(
+                    text_painter.draw_text(
                         painter,
                         subcolumn.center_px,
                         visual.font_tweaks.pixels_above_text,
@@ -1414,7 +1414,7 @@ static void draw_pattern_foreground(
                             QString s = format::midi_to_note_name(
                                 note_cfg, document.accidental_mode, note
                             );
-                            draw(s);
+                            draw_text(s);
                         }
                     }
                 }
@@ -1422,7 +1422,7 @@ static void draw_pattern_foreground(
                     if (row_event.instr) {
                         painter.setPen(visual.instrument);
                         auto s = format_hex_2(uint8_t(*row_event.instr));
-                        draw(s);
+                        draw_text(s);
                     }
                 }
 
@@ -1430,7 +1430,7 @@ static void draw_pattern_foreground(
                     if (row_event.volume) {
                         painter.setPen(visual.volume);
                         auto s = format_hex_2(uint8_t(*row_event.volume));
-                        draw(s);
+                        draw_text(s);
                     }
                 }
 
