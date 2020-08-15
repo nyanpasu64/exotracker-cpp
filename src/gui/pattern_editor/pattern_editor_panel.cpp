@@ -358,6 +358,7 @@ struct ColumnPx {
     chip_common::ChannelIndex channel;
     int left_px;
     int right_px;
+    SubColumnPx block_handle;
     SubColumnLayout subcolumns;  // all endpoints lie within [left_px, left_px + width]
 };
 
@@ -430,8 +431,10 @@ struct ColumnLayout {
         }
     };
 
-    auto center_sub = [&x_px, width_per_char] (SubColumnPx & sub, int nchar) {
-        int dwidth = width_per_char * nchar;
+    auto center_sub = [&x_px, width_per_char] (
+        SubColumnPx & sub, int nchar_num, int nchar_den = 1
+    ) {
+        int dwidth = int(width_per_char * nchar_num / nchar_den);
         sub.center_px = x_px + dwidth / qreal(2.0);
         x_px += dwidth;
     };
@@ -463,6 +466,13 @@ struct ColumnLayout {
             channel_index++
         ) {
             int const orig_left_px = x_px;
+
+            // SubColumn doesn't matter.
+            SubColumnPx block_handle{subcolumns::Note{}};
+
+            begin_sub(block_handle);
+            center_sub(block_handle, 1, 2);
+            end_sub(block_handle);
 
             SubColumnLayout subcolumns;
             // TODO change doc to list how many effect colums there are
@@ -510,6 +520,7 @@ struct ColumnLayout {
                 .channel = channel_index,
                 .left_px = orig_left_px,
                 .right_px = x_px,
+                .block_handle = block_handle,
                 .subcolumns = subcolumns,
             });
         }
@@ -926,6 +937,7 @@ static void draw_pattern_background(
     #define COMPUTE_DIVIDER_COLOR(OUT, BG, FG) \
         QColor OUT##_divider = lerp_colors(BG, FG, visual.subcolumn_divider_blend);
 
+    COMPUTE_DIVIDER_COLOR(note, visual.note_bg, visual.note_line_beat)
     COMPUTE_DIVIDER_COLOR(instrument, visual.instrument_bg, visual.instrument)
     COMPUTE_DIVIDER_COLOR(volume, visual.volume_bg, visual.volume)
     COMPUTE_DIVIDER_COLOR(effect, visual.effect_bg, visual.effect)
@@ -974,7 +986,7 @@ static void draw_pattern_background(
 
                 // Don't draw the note column's divider line,
                 // since it lies right next to the previous channel's channel divider.
-                CASE_NO_FG(sc::Note, visual.note_bg)
+                CASE(sc::Note, visual.note_bg, note_divider)
                 CASE(sc::Instrument, visual.instrument_bg, instrument_divider)
                 CASE(sc::Volume, visual.volume_bg, volume_divider)
                 CASE(sc::EffectName, visual.effect_bg, effect_divider)
@@ -1018,6 +1030,127 @@ static void draw_pattern_background(
     };
 
     foreach_grid(draw_pattern_bg);
+
+    /// Draw divider "just past right" of each column.
+    /// This replaces the "note divider" of the next column.
+    /// The last column draws a divider in the void.
+    auto draw_divider = [&painter, &inner_size] (int x) {
+        QPoint right_top{x, 0};
+        QPoint right_bottom{x, inner_size.height()};
+
+        draw_left_border(painter, right_top, right_bottom);
+    };
+
+    painter.setPen(visual.channel_divider);
+
+    draw_divider(columns.ruler.right_px);
+    for (auto & column : columns.cols) {
+        if (column) {
+            draw_divider(column->right_px);
+        }
+    }
+
+    auto pattern_draw_blocks = [&] (
+        ColumnPx const & column, PatternPosition const & pos, doc::PatternRef pattern
+    ) {
+        PainterScope scope{painter};
+        painter.translate(0, pos.top);
+
+        // Draw block handle.
+        auto sub = column.block_handle;
+        GridRect sub_rect{
+            QPoint{sub.left_px, 0},
+            QPoint{sub.right_px + painter.pen().width(), pos.bottom - pos.top}
+        };
+
+        // Draw background.
+        using gui::lib::color::lerp_colors;
+        using config::gray;
+
+        auto border_blend = visual.block_handle.value() >= visual.overall_bg.value()
+            ? gray(255)
+            : gray(0);
+
+        auto base = visual.block_handle;
+        auto border = lerp_colors(base, border_blend, 0.4);
+
+        painter.fillRect(sub_rect, base);
+
+        // Draw frame.
+        painter.setPen(border);
+        draw_left_border(painter, sub_rect);
+
+        if (pattern.is_block_begin) {
+            draw_top_border(painter, sub_rect);
+
+        } else {
+            // Draw loop indicator triangles.
+
+            qreal x0 = sub.left_px + 1;
+            qreal x1 = sub.right_px;
+            qreal y0 = painter.pen().widthF() * 0.5;
+
+            auto width = x1 - x0;
+            auto dx = width / qreal(3.0);
+            auto dy = width / qreal(3.0);
+
+            QPolygonF left_tri;
+            left_tri
+                << QPointF(x0 + 0 , y0 - dy)
+                << QPointF(x0 + dx, y0 + 0 )
+                << QPointF(x0 + 0 , y0 + dy);
+
+            QPolygonF right_tri;
+            right_tri
+                << QPointF(x1 - 0 , y0 - dy)
+                << QPointF(x1 - dx, y0 + 0 )
+                << QPointF(x1 - 0 , y0 + dy);
+
+            PainterScope scope{painter};
+
+            painter.setPen({});
+            painter.setBrush(border);
+            painter.setRenderHint(QPainter::Antialiasing);
+
+            painter.drawPolygon(left_tri);
+            painter.drawPolygon(right_tri);
+        }
+
+        painter.setPen(border);
+        if (pattern.is_block_end) {
+            draw_bottom_border(painter, sub_rect);
+        }
+        // Should this be drawn or not?
+        draw_right_border(painter, sub_rect);
+    };
+
+    foreach_grid([&self, &columns, &document, &pattern_draw_blocks] (
+        GridCellPosition const& pos
+    ) {
+        for (auto const& maybe_col : columns.cols) {
+            if (!maybe_col) continue;
+            ColumnPx const& col = *maybe_col;
+
+            auto const& cell =
+                document.chip_channel_timelines[col.chip][col.channel][pos.grid];
+
+            CellIter iter{cell, document.grid_cells[pos.grid]};
+
+            while (auto p = iter.next()) {
+                auto pattern = *p;
+                PxInt top = pos.top + pixels_from_beat(self, pattern.begin_time);
+                PxInt bottom = pos.top + pixels_from_beat(self, pattern.end_time);
+
+                PatternPosition pattern_pos {
+                    .grid = pos.grid,
+                    .top = top,
+                    .bottom = bottom,
+                };
+
+                pattern_draw_blocks(col, pattern_pos, *p);
+            }
+        }
+    });
 
     // Draw selection.
     if (auto maybe_select = self._win._cursor.get_select()) {
@@ -1145,25 +1278,6 @@ static void draw_pattern_background(
             painter.fillRect(top_border(painter, select_rect), border_grad);
             painter.fillRect(left_border(painter, select_rect), border_grad);
             painter.fillRect(right_border(painter, select_rect), border_grad);
-        }
-    }
-
-    /// Draw divider "just past right" of each column.
-    /// This replaces the "note divider" of the next column.
-    /// The last column draws a divider in the void.
-    auto draw_divider = [&painter, &inner_size] (int x) {
-        QPoint right_top{x, 0};
-        QPoint right_bottom{x, inner_size.height()};
-
-        draw_left_border(painter, right_top, right_bottom);
-    };
-
-    painter.setPen(visual.channel_divider);
-
-    draw_divider(columns.ruler.right_px);
-    for (auto & column : columns.cols) {
-        if (column) {
-            draw_divider(column->right_px);
         }
     }
 
@@ -1331,6 +1445,10 @@ static void draw_pattern_foreground(
         ColumnPx const & column, PatternPosition const & pos, doc::PatternRef pattern
     ) {
         PainterScope scope{painter};
+
+        // Right now, only draw_pattern_foreground() and not draw_pattern_background()
+        // calls translate(pos.top).
+        // This should be made consistent so it's easier to copy code between them.
         painter.translate(0, pos.top);
 
         // https://bugs.llvm.org/show_bug.cgi?id=33236
@@ -1362,8 +1480,10 @@ static void draw_pattern_foreground(
                 note_color = visual.note_line_fractional;
             }
 
-            auto draw_top_line = [&painter, &note_color] (SubColumnPx sub) {
-                QPoint left_top{sub.left_px, 0};
+            auto draw_top_line = [&painter, &note_color] (
+                SubColumnPx sub, int left_offset = 0
+            ) {
+                QPoint left_top{sub.left_px + left_offset, 0};
                 QPoint right_top{sub.right_px, 0};
 
                 // Draw top border. Do it after each note clears the background.
@@ -1419,7 +1539,7 @@ static void draw_pattern_foreground(
                             draw_text(s);
                         }
 
-                        draw_top_line(subcolumn);
+                        draw_top_line(subcolumn, painter.pen().width());
                     }
                 }
                 CASE(sc::Instrument) {

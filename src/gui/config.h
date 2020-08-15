@@ -125,6 +125,9 @@ inline namespace visual {
         QColor select_bg{134, 125, 242, 192};
         QColor select_border{150, 146, 211};
 
+        /// Block handle to the left of each channel.
+        QColor block_handle = gray(114);
+
         /// Foreground line color, also used as note text color.
         QColor note_line_beat{255, 255, 96};
         QColor note_line_non_beat{0, 255, 0};
