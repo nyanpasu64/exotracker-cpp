@@ -157,7 +157,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
         }
         if (alter_selection == AlterSelection::Extend) {
             // Begin or extend selection at old cursor position.
-            self._win._cursor.enable_select(self._rows_per_beat);
+            self._win._cursor.enable_select(self._zoom_level);
         }
         // Move cursor.
         std::invoke(method, self);
@@ -708,7 +708,7 @@ using PxInt = int;
 /// Convert a relative timestamp to a vertical display offset.
 PxInt pixels_from_beat(PatternEditorPanel const & widget, BeatFraction beat) {
     PxInt out = doc::round_to_int(
-        beat * widget._rows_per_beat * widget._pixels_per_row
+        beat * widget._zoom_level * widget._pixels_per_row
     );
     return out;
 }
@@ -1029,7 +1029,7 @@ static void draw_pattern_background(
         // Draw rows.
         // Begin loop(row)
         int row = 0;
-        BeatFraction const beats_per_row{1, self._rows_per_beat};
+        BeatFraction const beats_per_row{1, self._zoom_level};
         BeatFraction curr_beats = 0;
         for (;
             curr_beats < grid_cell.nbeats;
@@ -1201,7 +1201,7 @@ static void draw_pattern_background(
             auto calc_row = [&] (GridAndBeat y, std::optional<PxInt> & select_pos) {
                 // If row is in pattern, return exact position.
                 if (y.grid == pos.grid) {
-                    Frac row = y.beat * self._rows_per_beat;
+                    Frac row = y.beat * self._zoom_level;
                     PxInt yPx = doc::round_to_int(self._pixels_per_row * row);
 
                     select_pos = pos.top + yPx;
@@ -1364,7 +1364,7 @@ static void draw_pattern_background(
         // Draw rows.
         // Begin loop(row)
         int row = 0;
-        BeatFraction const beats_per_row{1, self._rows_per_beat};
+        BeatFraction const beats_per_row{1, self._zoom_level};
         BeatFraction curr_beats = 0;
         for (;
             curr_beats < grid_cell.nbeats;
@@ -1490,7 +1490,7 @@ static void draw_pattern_foreground(
 
             // Compute where to draw row.
             Frac beat = time.anchor_beat;
-            Frac row = beat * self._rows_per_beat;
+            Frac row = beat * self._zoom_level;
             int yPx = doc::round_to_int(self._pixels_per_row * row);
 
             // Move painter relative to current row (not cell).
@@ -1739,7 +1739,7 @@ void PatternEditorPanel::paintEvent(QPaintEvent *event) {
 void PatternEditorPanel::up_pressed() {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
-        .rows_per_beat = _rows_per_beat,
+        .rows_per_beat = _zoom_level,
         .step = _step,
     };
     auto const& move_cfg = get_app().options().move_cfg;
@@ -1751,7 +1751,7 @@ void PatternEditorPanel::up_pressed() {
 void PatternEditorPanel::down_pressed() {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
-        .rows_per_beat = _rows_per_beat,
+        .rows_per_beat = _zoom_level,
         .step = _step,
     };
     auto const& move_cfg = get_app().options().move_cfg;
@@ -1864,7 +1864,7 @@ void PatternEditorPanel::bottom_pressed() {
     //  but selects one pattern exactly (good).
 
     auto calc_bottom = [&] (GridAndBeat cursor_y) -> BeatFraction {
-        BeatFraction bottom_padding{1, _rows_per_beat};
+        BeatFraction bottom_padding{1, _zoom_level};
 
         /*
         If a selection is active and bottom_padding() == 0,
@@ -1912,9 +1912,9 @@ inline void switch_grid_index(PatternEditorPanel & self) {
 
     // If cursor is out of bounds, move to last row in pattern.
     if (cursor_y.beat >= nbeats) {
-        BeatFraction rows = nbeats * self._rows_per_beat;
+        BeatFraction rows = nbeats * self._zoom_level;
         int prev_row = util::math::frac_prev(rows);
-        cursor_y.beat = BeatFraction{prev_row, self._rows_per_beat};
+        cursor_y.beat = BeatFraction{prev_row, self._zoom_level};
     }
 
     self._win._cursor.set_y(cursor_y);
@@ -2045,7 +2045,7 @@ static cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
     doc::Document const & document = self.get_document();
     auto cursor = self._win._cursor.get();
     move_cursor::MoveCursorYArgs args{
-        .rows_per_beat = self._rows_per_beat,
+        .rows_per_beat = self._zoom_level,
         .step = self._step,
     };
     auto const& move_cfg = get_app().options().move_cfg;
@@ -2138,17 +2138,17 @@ void PatternEditorPanel::select_all_pressed() {
     }
 
     // TODO add a method abstraction?
-    _win._cursor.enable_select(_rows_per_beat);
-    _win._cursor.raw_select_mut()->select_all(document, col_to_nsubcol, _rows_per_beat);
+    _win._cursor.enable_select(_zoom_level);
+    _win._cursor.raw_select_mut()->select_all(document, col_to_nsubcol, _zoom_level);
 }
 
 void PatternEditorPanel::selection_padding_pressed() {
     if (auto & select = _win._cursor.raw_select_mut()) {
         // If selection enabled, toggle whether to include bottom row.
-        select->toggle_padding(_rows_per_beat);
+        select->toggle_padding(_zoom_level);
     } else {
         // Otherwise create a single-cell selection.
-        _win._cursor.enable_select(_rows_per_beat);
+        _win._cursor.enable_select(_zoom_level);
     }
 }
 

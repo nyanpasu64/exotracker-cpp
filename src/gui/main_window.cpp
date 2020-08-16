@@ -294,7 +294,7 @@ struct MainWindowUi : MainWindow {
     QCheckBox * _compact_view;
 
     // Per-song ephemeral state
-    QSpinBox * _rows_per_beat;
+    QSpinBox * _zoom_level;
 
     // Song options
     QSpinBox * _ticks_per_beat;
@@ -489,7 +489,7 @@ struct MainWindowUi : MainWindow {
             }
 
             {form__label_w(tr("Zoom"), QSpinBox);
-                _rows_per_beat = w;
+                _zoom_level = w;
                 w->setRange(1, MAX_ZOOM_LEVEL);
             }
         }
@@ -837,7 +837,7 @@ public:
 
         // If cursor is out of bounds, move to last row in pattern.
         if (cursor_y.beat >= nbeats) {
-            auto rows_per_beat = _pattern_editor_panel->rows_per_beat();
+            auto rows_per_beat = _pattern_editor_panel->zoom_level();
 
             BeatFraction rows = nbeats * rows_per_beat;
             int prev_row = util::math::frac_prev(rows);
@@ -879,7 +879,7 @@ public:
                 // Update cursor to sequencer position (from audio thread).
 
                 GridAndBeat play_time =
-                    [seq_time, rows_per_beat = _rows_per_beat->value()]
+                    [seq_time, rows_per_beat = _zoom_level->value()]
                 {
                     GridAndBeat play_time{seq_time.grid, seq_time.beats};
 
@@ -976,7 +976,7 @@ public:
                 pattern_setter(&PatternEditorPanel::set_##METHOD) \
             );
 
-        BIND_SPIN(_rows_per_beat, rows_per_beat)
+        BIND_SPIN(_zoom_level, zoom_level)
 
         auto gui_bottom_octave = [] () {
             return get_app().options().note_names.gui_bottom_octave;
@@ -1099,12 +1099,12 @@ public:
         // TODO maybe these shortcuts should be inactive when order editor is focused
         BIND_FROM_CONFIG(zoom_out);
         connect_action(_zoom_out, [this] () {
-            int const curr_zoom = _rows_per_beat->value();
+            int const curr_zoom = _zoom_level->value();
 
             // Pick the next smaller zoom level in the fixed zoom sequence.
             for (int const new_zoom : reverse(_zoom_levels)) {
                 if (new_zoom < curr_zoom) {
-                    _rows_per_beat->setValue(new_zoom);
+                    _zoom_level->setValue(new_zoom);
                     return;
                 }
             }
@@ -1113,12 +1113,12 @@ public:
 
         BIND_FROM_CONFIG(zoom_in);
         connect_action(_zoom_in, [this] () {
-            int const curr_zoom = _rows_per_beat->value();
+            int const curr_zoom = _zoom_level->value();
 
             // Pick the next larger zoom level in the fixed zoom sequence.
             for (int const new_zoom : _zoom_levels) {
                 if (new_zoom > curr_zoom) {
-                    _rows_per_beat->setValue(new_zoom);
+                    _zoom_level->setValue(new_zoom);
                     return;
                 }
             }
@@ -1128,19 +1128,19 @@ public:
         BIND_FROM_CONFIG(zoom_out_half);
         connect_action(_zoom_out_half, [this] () {
             // Halve zoom, rounded down. QSpinBox will clamp minimum to 1.
-            _rows_per_beat->setValue(_rows_per_beat->value() / 2);
+            _zoom_level->setValue(_zoom_level->value() / 2);
         });
 
         BIND_FROM_CONFIG(zoom_in_half);
         connect_action(_zoom_in_half, [this] () {
             // Double zoom. QSpinBox will truncate to maximum value.
-            _rows_per_beat->setValue(_rows_per_beat->value() * 2);
+            _zoom_level->setValue(_zoom_level->value() * 2);
         });
 
         BIND_FROM_CONFIG(zoom_out_triplet);
         connect_action(_zoom_out_triplet, [this] () {
             // Multiply zoom by 2/3, rounded down. QSpinBox will clamp minimum to 1.
-            _rows_per_beat->setValue(_rows_per_beat->value() * 2 / 3);
+            _zoom_level->setValue(_zoom_level->value() * 2 / 3);
         });
 
         BIND_FROM_CONFIG(zoom_in_triplet);
@@ -1152,7 +1152,7 @@ public:
             // Rounding up has the nice property that zoom_in_triplet() followed by
             // zoom_out_triplet() always produces the value we started with
             // (assuming no truncation).
-            _rows_per_beat->setValue(ceildiv(_rows_per_beat->value() * 3, 2));
+            _zoom_level->setValue(ceildiv(_zoom_level->value() * 3, 2));
         });
 
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});

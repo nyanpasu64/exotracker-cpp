@@ -154,7 +154,7 @@ PatternEditorPanel_INTERNAL:
     bool _edit_mode = false;
 
     // # Editing state, set by user interactions.
-    int _rows_per_beat = 4;
+    int _zoom_level = 4;
     int _octave = 5;
     int _step = 1;  // can't remember if it will be saved on close, or defaulted via settings dialog
     bool _is_zoomed = false;
@@ -183,7 +183,7 @@ public:
             update(); \
         }
 
-    PROPERTY(int, _rows_per_beat, rows_per_beat)
+    PROPERTY(int, _zoom_level, zoom_level)
     PROPERTY(int, _octave, octave)
     PROPERTY(int, _step, step)
 
