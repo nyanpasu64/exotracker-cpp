@@ -4,8 +4,6 @@
 #include "doc.h"
 #include "util/typeid_cast.h"
 
-#include <functional>
-
 namespace edit::edit_doc {
 
 using edit_impl::make_command;
