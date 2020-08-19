@@ -1,9 +1,9 @@
-#include "kv.h"
+#include "event_search.h"
 
 #include <algorithm>  // std::lower_bound
 #include <type_traits>
 
-namespace doc_util::kv {
+namespace doc_util::event_search {
 
 static TimeInPattern const & time_and_offset(const TimedRowEvent & a) {
     return a.time;
@@ -29,17 +29,24 @@ public:
     }
 };
 
+#define IMPL_IMPL(THIS, FUNC_NAME, BOUND, KEY_T, CONST, ITERATOR, KEY_FUNC) \
+    THIS::ITERATOR THIS::FUNC_NAME(KEY_T t) CONST { \
+        return BOUND( \
+            _event_list.begin(), _event_list.end(), t, KeyedCmp<KEY_FUNC>{} \
+        ); \
+    } \
+
+using Const = EventSearch;
+using MutBase = EventSearchMutBase;
+using MutImpl = EventSearchMut;
+
+
 #define IMPL(FUNC_NAME, BOUND, KEY_T, KEY_FUNC) \
-    KV::ConstIterator KV::FUNC_NAME(KEY_T t) const { \
-        return BOUND( \
-            _event_list.begin(), _event_list.end(), t, KeyedCmp<KEY_FUNC>{} \
-        ); \
-    } \
-    KV::Iterator KV::FUNC_NAME(KEY_T t) { \
-        return BOUND( \
-            _event_list.begin(), _event_list.end(), t, KeyedCmp<KEY_FUNC>{} \
-        ); \
-    } \
+    template<> \
+    IMPL_IMPL(Const, FUNC_NAME, BOUND, KEY_T, const, ConstIterator, KEY_FUNC) \
+    template<> \
+    IMPL_IMPL(MutBase, FUNC_NAME, BOUND, KEY_T, const, ConstIterator, KEY_FUNC) \
+    IMPL_IMPL(MutImpl, FUNC_NAME, BOUND, KEY_T, , Iterator, KEY_FUNC) \
 
 IMPL(greater_equal, std::lower_bound, TimeInPattern, time_and_offset)
 IMPL(greater, std::upper_bound, TimeInPattern, time_and_offset)
@@ -47,7 +54,7 @@ IMPL(greater, std::upper_bound, TimeInPattern, time_and_offset)
 IMPL(beat_begin, std::lower_bound, BeatFraction, time)
 IMPL(beat_end, std::upper_bound, BeatFraction, time)
 
-TimedRowEvent & KV::get_or_insert(BeatFraction beat) {
+TimedRowEvent & EventSearchMut::get_or_insert(BeatFraction beat) {
     // Last event anchored to this beat fraction.
     EventList::reverse_iterator it{beat_end(beat)};
 

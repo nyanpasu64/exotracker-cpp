@@ -1,7 +1,7 @@
 #include "edit_pattern.h"
 #include "edit_impl.h"
 #include "edit/modified.h"
-#include "doc_util/kv.h"
+#include "doc_util/event_search.h"
 #include "util/typeid_cast.h"
 
 #include <algorithm>  // std::swap
@@ -99,6 +99,8 @@ static void erase_empty(EventList & v) {
     v.erase(new_end, v.end());
 }
 
+using doc_util::event_search::EventSearchMut;
+
 EditBox delete_cell(
     Document const & document,
     ChipIndex chip,
@@ -112,7 +114,7 @@ EditBox delete_cell(
 
     // Erase certain event fields, based on where the cursor was positioned.
     {
-        doc_util::kv::KV kv{events};
+        EventSearchMut kv{events};
 
         auto ev_begin = kv.beat_begin(time.beat);
         auto ev_end = kv.beat_end(time.beat);
@@ -167,7 +169,7 @@ EditBox insert_note(
         document.sequence[time.seq_entry_index].chip_channel_events[chip][channel];
 
     // Insert note.
-    doc_util::kv::KV kv{events};
+    EventSearchMut kv{events};
     auto & ev = kv.get_or_insert(time.beat);
 
     ev.v.note = note;
@@ -206,7 +208,7 @@ std::tuple<uint8_t, EditBox> add_digit(
     // Insert instrument.
 
     std::optional<uint8_t> & field = [&] () -> auto& {
-        doc_util::kv::KV kv{events};
+        EventSearchMut kv{events};
         auto & ev = kv.get_or_insert(time.beat);
 
         if (std::holds_alternative<subcolumns::Instrument>(subcolumn)) {

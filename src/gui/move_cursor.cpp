@@ -1,5 +1,5 @@
 #include "move_cursor.h"
-#include "doc_util/kv.h"
+#include "doc_util/event_search.h"
 #include "util/math.h"
 #include "util/compare_impl.h"
 #include "util/release_assert.h"
@@ -44,7 +44,7 @@ using ChannelList = std::vector<CursorChannel>;
 
 // # Moving cursor by events
 
-using doc_util::kv::KV;
+using doc_util::event_search::EventSearch;
 
 /// When moving the cursor around,
 /// we need to compare whether the next event or row is closer to the cursor.
@@ -78,7 +78,7 @@ MoveCursorResult prev_event_impl(doc::Document const& document, cursor::Cursor c
     auto wrapped = Wrap::None;
 
     auto const get_pattern =
-        [&, chip=chip, channel=channel] () -> doc::EventList const&
+        [&, chip=chip, channel=channel] () -> doc::TimedEventsRef
     {
         auto & seq_entry = document.sequence[seq_i];
         return seq_entry.chip_channel_events[chip][channel];
@@ -96,13 +96,13 @@ MoveCursorResult prev_event_impl(doc::Document const& document, cursor::Cursor c
         return MoveCursorResult{wrapped, PatternAndBeat{seq_i, ev.time.anchor_beat}};
     };
 
-    using Rev = doc::EventList::const_reverse_iterator;
+    using Rev = doc::TimedEventsRef::reverse_iterator;
 
     {
-        auto & event_list = get_pattern();
+        doc::TimedEventsRef event_list = get_pattern();
 
         // it's not UB, i swear
-        auto const kv = KV{const_cast<doc::EventList &>(event_list)};
+        auto const kv = EventSearch{event_list};
         auto x = Rev{kv.beat_begin(cursor.y.beat)};
 
         // Find nearest event before given time.
@@ -114,7 +114,7 @@ MoveCursorResult prev_event_impl(doc::Document const& document, cursor::Cursor c
     while (true) {
         // Mutates seq_i and wrapped.
         advance_pattern();
-        auto & event_list = get_pattern();
+        auto event_list = get_pattern();
 
         // Find last event.
         if (event_list.size() > 0) {
@@ -140,7 +140,7 @@ MoveCursorResult next_event_impl(doc::Document const& document, cursor::Cursor c
     auto wrapped = Wrap::None;
 
     auto const get_pattern =
-        [&, chip=chip, channel=channel] () -> doc::EventList const&
+        [&, chip=chip, channel=channel] () -> doc::TimedEventsRef
     {
         auto & seq_entry = document.sequence[seq_i];
         return seq_entry.chip_channel_events[chip][channel];
@@ -161,10 +161,10 @@ MoveCursorResult next_event_impl(doc::Document const& document, cursor::Cursor c
     };
 
     {
-        auto & event_list = get_pattern();
+        auto event_list = get_pattern();
 
         // it's not UB, i swear
-        auto const kv = KV{const_cast<doc::EventList &>(event_list)};
+        auto const kv = EventSearch{event_list};
         auto x = kv.beat_end(cursor.y.beat);
 
         // Find first event past given time.
@@ -176,7 +176,7 @@ MoveCursorResult next_event_impl(doc::Document const& document, cursor::Cursor c
     while (true) {
         // Mutates seq_i and wrapped.
         advance_pattern();
-        auto & event_list = get_pattern();
+        auto event_list = get_pattern();
 
         // Find first event.
         if (event_list.size() > 0) {

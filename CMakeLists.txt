@@ -154,7 +154,7 @@ add_library(exotracker-headless
     src/sample_docs.cpp
     src/edit/edit_doc.cpp
     src/edit/edit_pattern.cpp
-    src/doc_util/kv.cpp
+    src/doc_util/event_search.cpp
     src/gui/history.cpp
 
     # Pattern editor backend
