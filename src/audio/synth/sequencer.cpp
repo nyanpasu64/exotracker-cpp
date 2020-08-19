@@ -603,7 +603,11 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
         }
     }
     end_loop:
-    _ignore_ordering_errors = false;
+    // Users may use early notes at the beginning or middle of patterns.
+    // If the user initiates playback at a time with early notes,
+    // just play them immediately instead of complaining about past notes,
+    // since the document isn't invalid.
+    _ignore_ordering_errors = true;
 }
 
 /*
