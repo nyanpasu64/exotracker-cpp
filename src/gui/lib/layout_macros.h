@@ -1,6 +1,6 @@
 #pragma once
 
-#define require_semicolon do {} while (0)
+#define require_semicolon //do {} while (0)
 
 // unexplored C++20 idea: `addWidget/addLayout(w __VA_OPT__(,) __VA_ARGS__)`.
 

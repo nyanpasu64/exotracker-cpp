@@ -22,6 +22,7 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QToolBar>
+#include <QToolButton>
 // Layouts
 #include <QBoxLayout>
 #include <QFormLayout>
@@ -251,6 +252,16 @@ struct MainWindowUi : MainWindow {
 
     TimelineEditor * _timeline_editor;
 
+    struct Timeline {
+        QAction * add_cell;
+        QAction * remove_cell;
+
+        QAction * move_up;
+        QAction * move_down;
+
+        QAction * clone_row;
+    } _timeline;
+
     // Global state (view)
     QCheckBox * _follow_playback;
     QCheckBox * _compact_view;
@@ -274,6 +285,12 @@ struct MainWindowUi : MainWindow {
     QCheckBox * _key_repeat;
 
     PatternEditorPanel * _pattern_editor_panel;
+
+    static QToolButton * toolbar_widget(QToolBar * tb, QAction * action) {
+        auto out = qobject_cast<QToolButton *>(tb->widgetForAction(action));
+        assert(out);
+        return out;
+    }
 
     /// Output: _pattern_editor_panel.
     void setup_widgets() {
@@ -326,9 +343,30 @@ struct MainWindowUi : MainWindow {
         c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
         // Timeline editor.
-        {l__w_factory(TimelineEditor::make(this));
-            _timeline_editor = w;
-            // w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+        {l__c_l(QGroupBox, QVBoxLayout)
+            {l__w_factory(TimelineEditor::make(this))
+                _timeline_editor = w;
+                // w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+            }
+            {l__w(QToolBar)
+                // TODO add icons.
+
+                _timeline.add_cell = w->addAction("➕");
+                // Disable flat mode.
+                toolbar_widget(w, _timeline.add_cell)->setAutoRaise(false);
+
+                _timeline.remove_cell = w->addAction("➖");
+                toolbar_widget(w, _timeline.remove_cell)->setAutoRaise(false);
+
+                _timeline.move_up = w->addAction("⬆");
+                toolbar_widget(w, _timeline.move_up)->setAutoRaise(false);
+
+                _timeline.move_down = w->addAction("⬇");
+                toolbar_widget(w, _timeline.move_down)->setAutoRaise(false);
+
+                _timeline.clone_row = w->addAction("📄");
+                toolbar_widget(w, _timeline.clone_row)->setAutoRaise(false);
+            }
         }
 
         // Song options.
