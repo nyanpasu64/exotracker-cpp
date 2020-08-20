@@ -55,7 +55,7 @@ using chip_common::ChannelIndex;
 /// Currently only used by unit tests. Could be exposed to users through the GUI,
 /// but the functionality can be achieved by inserting a note
 /// (or maybe even deleting a non-existent event).
-EditBox create_block(
+[[nodiscard]] EditBox create_block(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
@@ -67,7 +67,7 @@ EditBox create_block(
 /// Deleting the note column also clears instrument and volume.
 ///
 /// Calling this in space not occupied by a block returns a no-op edit.
-EditBox delete_cell(
+[[nodiscard]] EditBox delete_cell(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
@@ -79,7 +79,7 @@ EditBox delete_cell(
 /// If note is cut, erases instrument (not volume) and ignores argument.
 /// If instrument is passed in, overwrites instrument. Otherwise leaves existing value.
 /// TODO If volume is passed in, overwrites volume. Otherwise leaves existing value.
-EditBox insert_note(
+[[nodiscard]] EditBox insert_note(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
@@ -100,7 +100,7 @@ using MultiDigitField = std::variant<subcolumns::Instrument, subcolumns::Volume>
 /// It moves the existing nybble to the left, and adds the nybble entered by the user.
 /// When the second keypress is sent to History, key0.can_coalesce(key1) returns true,
 /// and the two inputs are merged in the undo history.
-std::tuple<uint8_t, EditBox> add_digit(
+[[nodiscard]] std::tuple<uint8_t, EditBox> add_digit(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,

@@ -4,6 +4,6 @@
 
 namespace edit::edit_doc {
 
-EditBox set_ticks_per_beat(int ticks_per_beat);
+[[nodiscard]] EditBox set_ticks_per_beat(int ticks_per_beat);
 
 }

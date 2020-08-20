@@ -25,7 +25,7 @@ using EditBox = std::unique_ptr<BaseEditCommand>;
 using modified::ModifiedInt;
 using modified::ModifiedFlags;
 
-class BaseEditCommand {
+class [[nodiscard]] BaseEditCommand {
 public:
     // Copy/move constructor are defaulted to allow subclasses to copy/move themselves.
     // Object slicing is prevented by pure-virtual methods.
@@ -70,7 +70,7 @@ public:
 
 using gui::cursor::Cursor;
 
-struct CursorEdit {
+struct [[nodiscard]] CursorEdit {
     EditBox edit;
 
     // TODO mark as optional, to support non-pattern edit commands
