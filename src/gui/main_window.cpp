@@ -1,5 +1,6 @@
 #include "main_window.h"
 #include "gui/pattern_editor/pattern_editor_panel.h"
+#include "gui/timeline_editor.h"
 #include "gui/move_cursor.h"
 #include "lib/layout_macros.h"
 #include "gui_common.h"
@@ -44,6 +45,7 @@ using std::unique_ptr;
 using std::make_unique;
 
 using gui::pattern_editor::PatternEditorPanel;
+using gui::timeline_editor::TimelineEditor;
 using doc::BeatFraction;
 using util::math::ceildiv;
 using edit::edit_doc::set_ticks_per_beat;
@@ -247,6 +249,8 @@ struct MainWindowUi : MainWindow {
 
     // Use raw pointers since QObjects automatically destroy children.
 
+    TimelineEditor * _timeline_editor;
+
     // Global state (view)
     QCheckBox * _follow_playback;
     QCheckBox * _compact_view;
@@ -321,16 +325,10 @@ struct MainWindowUi : MainWindow {
         l__c_l(QWidget, QHBoxLayout);
         c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
-        struct TimelineEditor : QLabel {
-            using QLabel::QLabel;
-            QSize sizeHint() const override {
-                return QSize{256, 0};
-            }
-        };
-
         // Timeline editor.
-        {l__w(TimelineEditor(tr("pretend there's a\ntimeline editor here")));
-            w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+        {l__w_factory(TimelineEditor::make(this));
+            _timeline_editor = w;
+            // w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
         }
 
         // Song options.
@@ -689,6 +687,7 @@ public:
         // Setup GUI.
         setup_widgets();  // Output: _pattern_editor_panel.
         _pattern_editor_panel->set_history(_history);
+        _timeline_editor->set_history(_history);
 
         // Hook up refresh timer.
         connect(
@@ -716,6 +715,12 @@ public:
             &CursorAndSelection::cursor_moved,
             _pattern_editor_panel,
             qOverload<>(&PatternEditorPanel::update)  // zero-argument overload
+        );
+        connect(
+            &_cursor,
+            &CursorAndSelection::cursor_moved,
+            _timeline_editor,
+            &TimelineEditor::update_cursor
         );
 
         setup_screen();
@@ -805,6 +810,7 @@ public:
     /// Called after document/cursor mutated.
     void update_editors() {
         _pattern_editor_panel->update();  // depends on _cursor and _history
+        _timeline_editor->update_cursor();
     }
 
     void undo() {
