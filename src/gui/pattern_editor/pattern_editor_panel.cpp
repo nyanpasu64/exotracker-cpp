@@ -2031,7 +2031,7 @@ static void add_digit(
     auto cursor_y = self._win._cursor->y;
 
     int digit_index = self._win._cursor.digit_index();
-    auto [instr, box] = ed::add_digit(
+    auto [number, box] = ed::add_digit(
         document, chip, channel, cursor_y, field, digit_index, nybble
     );
 
@@ -2044,8 +2044,13 @@ static void add_digit(
         // and move cursor down.
         self._win.push_edit(std::move(box), step_cursor_down(self));
     }
-    self._win._instrument = instr;
 
+    // Update saved instrument number.
+    if (std::holds_alternative<subcolumns::Instrument>(field)) {
+        self._win._instrument = number;
+    }
+
+    // TODO update saved volume number? (is it useful?)
 }
 
 static void add_instrument_digit(
