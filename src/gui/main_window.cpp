@@ -50,6 +50,7 @@ using gui::pattern_editor::PatternEditorPanel;
 using gui::timeline_editor::TimelineEditor;
 using doc::BeatFraction;
 using util::math::ceildiv;
+using util::math::frac_floor;
 namespace edit_doc = edit::edit_doc;
 
 
@@ -445,7 +446,7 @@ struct MainWindowUi : MainWindow {
 
             // TODO rework settings GUI
             {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("Grid cell"));
+                c->setTitle(tr("Timeline row"));
 
                 form->addRow(
                     new QLabel(tr("Length (beats)")),
@@ -844,14 +845,32 @@ public:
             push_edit(edit_doc::set_ticks_per_beat(ticks_per_beat), {}, false);
         });
 
+        // TODO connect _length_beats to edit_doc::set_timeline_row_length()
+
         set_widgets_from_doc();
     }
+
+    // # Updating GUI from document
 
     void set_widgets_from_doc() {
         doc::Document const& document = get_document();
 
-        auto b = QSignalBlocker(_ticks_per_beat);
-        _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
+        {
+            auto b = QSignalBlocker(_ticks_per_beat);
+            _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
+        }
+
+        set_widgets_from_cursor();
+    }
+
+    void set_widgets_from_cursor() {
+        auto & doc = get_document();
+
+        {
+            auto nbeats = frac_floor(doc.grid_cells[_cursor->y.grid].nbeats);
+            auto b = QSignalBlocker(_length_beats);
+            _length_beats->setValue(nbeats);
+        }
     }
 
     AudioState audio_state() const override {
@@ -926,6 +945,7 @@ public:
             &CursorAndSelection::cursor_moved,
             this,
             [this] () {
+                set_widgets_from_cursor();
                 _pattern_editor_panel->update();
                 _timeline_editor->update_cursor();
             }
