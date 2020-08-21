@@ -30,6 +30,7 @@
 #include <QAction>
 #include <QDebug>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QScreen>
 #include <QTimer>
 
@@ -305,6 +306,12 @@ struct MainWindowUi : MainWindow {
     /// Output: _pattern_editor_panel.
     void setup_widgets() {
 
+        // TODO move to main or GuiApp.
+        QIcon::setThemeSearchPaths(
+            QIcon::themeSearchPaths() << "C:/Users/nyanpasu/code/exotracker-icons/out"
+        );
+        QIcon::setThemeName("exotracker");
+
         auto main = this;
 
         {main__tb(QToolBar);
@@ -348,34 +355,43 @@ struct MainWindowUi : MainWindow {
         }
     }
 
+    void add_toolbar_action(
+        QToolBar * tb, QAction * & action, QString alt, QString icon
+    ) {
+        action = tb->addAction(alt);
+        action->setIcon(QIcon::fromTheme(icon));
+        // Disable flat mode.
+        toolbar_widget(tb, action)->setAutoRaise(false);
+    }
+
     void setup_panel(QBoxLayout * l) { {  // needed to allow shadowing
         l__c_l(QWidget, QHBoxLayout);
         c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
         // Timeline editor.
         {l__c_l(QGroupBox, QVBoxLayout)
+            c->setTitle(tr("Timeline"));
             {l__w_factory(TimelineEditor::make(this))
                 _timeline_editor = w;
                 // w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
             }
             {l__w(QToolBar)
-                // TODO add icons.
-
-                _timeline.add_cell = w->addAction("➕");
-                // Disable flat mode.
-                toolbar_widget(w, _timeline.add_cell)->setAutoRaise(false);
-
-                _timeline.remove_cell = w->addAction("➖");
-                toolbar_widget(w, _timeline.remove_cell)->setAutoRaise(false);
-
-                _timeline.move_up = w->addAction("⬆");
-                toolbar_widget(w, _timeline.move_up)->setAutoRaise(false);
-
-                _timeline.move_down = w->addAction("⬇");
-                toolbar_widget(w, _timeline.move_down)->setAutoRaise(false);
-
-                _timeline.clone_row = w->addAction("📄");
-                toolbar_widget(w, _timeline.clone_row)->setAutoRaise(false);
+                w->setIconSize(w->iconSize() * 2 / 3);
+                add_toolbar_action(
+                    w, _timeline.add_cell, tr("Add Cell Row"), "document-new"
+                );
+                add_toolbar_action(
+                    w, _timeline.remove_cell, tr("Delete Cell Row"), "edit-delete"
+                );
+                add_toolbar_action(
+                    w, _timeline.move_up, tr("Move Row Up"), "go-up"
+                );
+                add_toolbar_action(
+                    w, _timeline.move_down, tr("Move Row Down"), "go-down"
+                );
+                add_toolbar_action(
+                    w, _timeline.clone_row, tr("Clone Row"), "edit-copy"
+                );
             }
         }
 
