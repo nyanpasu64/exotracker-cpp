@@ -3,6 +3,9 @@
 #include "edit/modified.h"
 #include "doc.h"
 #include "util/typeid_cast.h"
+#include "util/release_assert.h"
+
+#include <variant>
 
 namespace edit::edit_doc {
 
@@ -48,6 +51,97 @@ EditBox set_ticks_per_beat(int ticks_per_beat) {
         mut_ticks_per_beat,
         ticks_per_beat,
         ModifiedFlags::Tempo,
+    });
+}
+
+// # Timeline operations.
+
+using namespace doc;
+
+enum class CellOperation {
+    Add,
+    Remove,
+};
+
+struct EditCell {
+    doc::GridIndex _grid;
+    CellOperation _oper;
+    doc::GridCell _nbeats;
+    doc::ChipChannelTo<doc::TimelineCell> _chip_channel_cells;
+
+    void apply_swap(doc::Document & document) {
+        if (_oper == CellOperation::Add) {
+            document.grid_cells.insert(document.grid_cells.begin() + _grid, _nbeats);
+        }
+        auto ncell = document.grid_cells.size();
+
+        auto nchip = (ChipIndex) document.chips.size();
+        release_assert_equal(document.chip_channel_timelines.size(), nchip);
+        release_assert_equal(_chip_channel_cells.size(), nchip);
+
+        for (ChipIndex chip = 0; chip < nchip; chip++) {
+            auto nchan = document.chip_index_to_nchan(chip);
+            auto & channel_timelines = document.chip_channel_timelines[chip];
+            auto & channel_cells = _chip_channel_cells[chip];
+
+            release_assert_equal(channel_timelines.size(), nchan);
+            release_assert_equal(channel_cells.size(), nchan);
+
+            for (ChannelIndex chan = 0; chan < nchan; chan++) {
+                auto & timeline = channel_timelines[chan];
+                auto & cell = channel_cells[chan];
+
+                if (_oper == CellOperation::Add) {
+                    timeline.insert(timeline.begin() + _grid, std::move(cell));
+                    release_assert_equal(timeline.size(), ncell);
+                } else {
+                    release_assert_equal(timeline.size(), ncell);
+                    assert(cell._raw_blocks.capacity() == 0);
+                    cell = std::move(timeline[_grid]);
+                    timeline.erase(timeline.begin() + _grid);
+                }
+            }
+        }
+
+        if (_oper == CellOperation::Add) {
+            _oper = CellOperation::Remove;
+
+        } else {
+            _nbeats = document.grid_cells[_grid];
+            document.grid_cells.erase(document.grid_cells.begin() + _grid);
+            _oper = CellOperation::Add;
+        }
+    }
+
+    bool can_coalesce(BaseEditCommand & prev) const {
+        (void) prev;
+        return false;
+    }
+
+    constexpr static ModifiedFlags _modified = ModifiedFlags::GridCells;
+};
+
+EditBox add_timeline_row(
+    doc::Document const& document, doc::GridIndex grid_pos, doc::BeatFraction nbeats
+) {
+    ChipChannelTo<TimelineCell> chip_channel_cells;
+    auto nchip = (ChipIndex) document.chips.size();
+    for (ChipIndex chip = 0; chip < nchip; chip++) {
+
+        ChannelTo<TimelineCell> channel_cells;
+        auto nchan = document.chip_index_to_nchan(chip);
+        for (ChannelIndex chan = 0; chan < nchan; chan++) {
+            channel_cells.push_back(TimelineCell{});
+        }
+
+        chip_channel_cells.push_back(std::move(channel_cells));
+    }
+
+    return make_command(EditCell{
+        grid_pos,
+        CellOperation::Add,
+        {nbeats},
+        chip_channel_cells,
     });
 }
 

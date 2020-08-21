@@ -50,7 +50,7 @@ using gui::pattern_editor::PatternEditorPanel;
 using gui::timeline_editor::TimelineEditor;
 using doc::BeatFraction;
 using util::math::ceildiv;
-using edit::edit_doc::set_ticks_per_beat;
+namespace edit_doc = edit::edit_doc;
 
 
 // # impl RawSelection
@@ -451,7 +451,7 @@ struct MainWindowUi : MainWindow {
                     [this] {
                         auto w = _length_beats = new QSpinBox;
                         w->setRange(1, MAX_BEATS_PER_PATTERN);
-                        w->setEnabled(false);
+                        w->setValue(16);
                         return w;
                     }()
                 );
@@ -840,7 +840,7 @@ public:
 
         // _ticks_per_beat obtains its value through update_gui_from_doc().
         connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
-            push_edit(set_ticks_per_beat(ticks_per_beat), {}, false);
+            push_edit(edit_doc::set_ticks_per_beat(ticks_per_beat), {}, false);
         });
 
         set_widgets_from_doc();
@@ -945,6 +945,20 @@ public:
         }
     }
 
+    void add_timeline_row() {
+        auto & document = get_document();
+        if (document.grid_cells.size() + 1 >= doc::MAX_GRID_CELLS) {
+            return;
+        }
+
+        push_edit(
+            edit_doc::add_timeline_row(
+                document, _cursor->y.grid + 1, _length_beats->value()
+            ),
+            {}
+        );
+    }
+
     /// Clears existing bindings and rebinds shortcuts.
     /// Can be called multiple times.
     void reload_shortcuts() {
@@ -983,6 +997,8 @@ public:
         _redo.setShortcuts(QKeySequence::Redo);
         bind_editor_action(_redo);
         connect_action(_redo, &MainWindowImpl::redo);
+
+        connect_action(*_timeline.add_row, &MainWindowImpl::add_timeline_row);
 
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
