@@ -716,13 +716,18 @@ public:
     ) {
         send_edit(*this, command->box_clone());
 
-        Cursor old_cursor = *state._cursor;
+        edit::MaybeCursor before_cursor{};
+        edit::MaybeCursor after_cursor{};
 
         if (maybe_cursor) {
+            before_cursor = *state._cursor;
             state._cursor.set(*maybe_cursor);
+            after_cursor = *state._cursor;
         }
 
-        _history.push(edit::CursorEdit{std::move(command), old_cursor, *state._cursor});
+        _history.push(
+            edit::CursorEdit{std::move(command), before_cursor, after_cursor}
+        );
         if (advance_digit) {
             state._cursor.advance_digit();
         } else {
@@ -733,7 +738,9 @@ public:
     bool undo(StateComponent & state) {
         if (auto cursor_edit = _history.get_undo()) {
             send_edit(*this, std::move(cursor_edit->edit));
-            state._cursor.set(cursor_edit->before_cursor);
+            if (cursor_edit->before_cursor) {
+                state._cursor.set(*cursor_edit->before_cursor);
+            }
             _history.undo();
             return true;
         }
@@ -743,7 +750,9 @@ public:
     bool redo(StateComponent & state) {
         if (auto cursor_edit = _history.get_redo()) {
             send_edit(*this, std::move(cursor_edit->edit));
-            state._cursor.set(cursor_edit->after_cursor);
+            if (cursor_edit->after_cursor) {
+                state._cursor.set(*cursor_edit->after_cursor);
+            }
             _history.redo();
             return true;
         }

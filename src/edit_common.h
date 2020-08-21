@@ -69,14 +69,15 @@ public:
 };
 
 using gui::cursor::Cursor;
+using MaybeCursor = std::optional<Cursor>;
 
 struct [[nodiscard]] CursorEdit {
     EditBox edit;
 
     // TODO mark as optional, to support non-pattern edit commands
     // that don't move the cursor.
-    Cursor before_cursor;
-    Cursor after_cursor;
+    MaybeCursor before_cursor;
+    MaybeCursor after_cursor;
 
     // impl
     CursorEdit clone() const {

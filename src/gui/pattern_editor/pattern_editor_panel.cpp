@@ -2056,7 +2056,11 @@ void PatternEditorPanel::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;
 }
 
-cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
+static cursor::Cursor keep_cursor(PatternEditorPanel const& self) {
+    return self._win._cursor.get();
+}
+
+static cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
     doc::Document const & document = self.get_document();
     auto cursor = self._win._cursor.get();
     move_cursor::MoveCursorYArgs args{
@@ -2184,7 +2188,7 @@ static void add_digit(
 
     if (digit_index == 0) {
         // Erase field and enter first digit.
-        self._win.push_edit(std::move(box), {}, true);
+        self._win.push_edit(std::move(box), keep_cursor(self), true);
 
     } else {
         // Move current digit to the left, append second digit,

@@ -174,11 +174,11 @@ public:
 
     virtual AudioState audio_state() const = 0;
 
-    /// If maybe_cursor is present, assigns it to _cursor.
+    /// If maybe_cursor is present, assigns it to _cursor and saves old/new cursor.
+    /// Otherwise, cursor is not saved in undo history.
+    ///
     /// If advance_digit is true, calls _cursor.advance_digit(),
     /// otherwise reset_digit().
-    /// push_edit() saves (command, old_cursor, _cursor) into the undo history,
-    /// and resets _cursor.digit_index() unless preserve_digit is true.
     virtual void push_edit(
         edit::EditBox command,
         std::optional<Cursor> maybe_cursor,
