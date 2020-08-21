@@ -184,10 +184,6 @@ public:
         std::optional<Cursor> maybe_cursor,
         bool advance_digit = false
     ) = 0;
-
-signals:
-    void gui_refresh(MaybeSequencerTime maybe_seq_time)
-        W_SIGNAL(gui_refresh, (MaybeSequencerTime), maybe_seq_time)
 };
 
 

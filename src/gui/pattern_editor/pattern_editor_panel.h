@@ -187,12 +187,6 @@ public:
     PROPERTY(int, octave)
     PROPERTY(int, step)
 
-public slots:
-    // update_time() is called by timer receiving latest time from audio thread.
-    // It mutates state (cached audio playback position) and calls repaint().
-    void update_time(timing::MaybeSequencerTime maybe_seq_time);
-    W_SLOT(update_time, (timing::MaybeSequencerTime))
-
 protected:
 
     // paintEvent() is a pure function (except for screen output).

@@ -320,6 +320,7 @@ struct MainWindowUi : MainWindow {
             // View options.
             tb->addWidget([this] {
                 auto w = _follow_playback = new QCheckBox;
+                w->setChecked(true);
                 w->setEnabled(false);
                 w->setText(tr("Follow playback"));
                 return w;
@@ -883,7 +884,39 @@ public:
         connect(
             &_gui_refresh_timer, &QTimer::timeout,
             this, [this] () {
-                emit gui_refresh(_audio.maybe_seq_time());
+                auto maybe_seq_time = _audio.maybe_seq_time();
+                if (!maybe_seq_time) return;
+                auto const seq_time = *maybe_seq_time;
+
+                // Update cursor to sequencer position (from audio thread).
+
+                GridAndBeat play_time =
+                    [seq_time, rows_per_beat = _rows_per_beat->value()]
+                {
+                    GridAndBeat play_time{seq_time.grid, seq_time.beats};
+
+                    // Find row.
+                    for (int curr_row = rows_per_beat - 1; curr_row >= 0; curr_row--) {
+                        auto curr_ticks = curr_row / doc::BeatFraction{rows_per_beat}
+                            * seq_time.curr_ticks_per_beat;
+
+                        if (doc::round_to_int(curr_ticks) <= seq_time.ticks) {
+                            play_time.beat += BeatFraction{curr_row, rows_per_beat};
+                            break;
+                        }
+                    }
+                    return play_time;
+                }();
+
+                // Optionally set cursor to match play time.
+                if (_follow_playback->isChecked()) {
+                    if (_cursor->y != play_time) {
+                        _cursor.set_y(play_time);
+                    }
+                }
+
+                // TODO write to _play_time field (even if cursor doesn't follow
+                // playback), and redraw audio/timeline editor.
             }
         );
 
@@ -891,14 +924,11 @@ public:
         connect(
             &_cursor,
             &CursorAndSelection::cursor_moved,
-            _pattern_editor_panel,
-            qOverload<>(&PatternEditorPanel::update)  // zero-argument overload
-        );
-        connect(
-            &_cursor,
-            &CursorAndSelection::cursor_moved,
-            _timeline_editor,
-            &TimelineEditor::update_cursor
+            this,
+            [this] () {
+                _pattern_editor_panel->update();
+                _timeline_editor->update_cursor();
+            }
         );
 
         setup_screen();

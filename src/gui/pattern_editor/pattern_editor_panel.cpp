@@ -301,15 +301,6 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
 
     // setAttribute(Qt::WA_Hover);  (generates paint events when mouse cursor enters/exits)
     // setContextMenuPolicy(Qt::CustomContextMenu);
-
-    connect(
-        win,
-        &MainWindow::gui_refresh,
-        this,
-        [this] (MaybeSequencerTime maybe_seq_time) {
-            update_time(maybe_seq_time);
-        }
-    );
 }
 
 void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
@@ -1701,34 +1692,6 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
 
 void PatternEditorPanel::paintEvent(QPaintEvent *event) {
     draw_pattern(*this, event->rect());
-}
-
-// # Following audio thread
-
-void PatternEditorPanel::update_time(timing::MaybeSequencerTime maybe_seq_time) {
-    if (maybe_seq_time.has_value()) {
-        // Update cursor to sequencer position (from audio thread).
-        auto const seq_time = maybe_seq_time.value();
-
-        GridAndBeat new_cursor_y{seq_time.grid, seq_time.beats};
-
-        // Find row.
-        for (int curr_row = _rows_per_beat - 1; curr_row >= 0; curr_row--) {
-
-            auto curr_ticks = curr_row / BeatFraction{_rows_per_beat}
-                * seq_time.curr_ticks_per_beat;
-
-            if (doc::round_to_int(curr_ticks) <= seq_time.ticks) {
-                new_cursor_y.beat += BeatFraction{curr_row, _rows_per_beat};
-                break;
-            }
-        }
-
-        if (_win._cursor->y != new_cursor_y) {
-            _win._cursor.set_y(new_cursor_y);
-            update();
-        }
-    }
 }
 
 // # Cursor movement
