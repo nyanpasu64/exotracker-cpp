@@ -65,12 +65,16 @@ public:
 
     /// The return value is atomically stored into the audio synth,
     /// and read by the audio thread.
-    AudioCommand * begin() const {
+    AudioCommand * begin() const noexcept {
         return _begin;
     }
 
-    AudioCommand * end() const {
+    AudioCommand * end() const noexcept {
         return _end;
+    }
+
+    bool is_empty() const noexcept {
+        return _begin == _end;
     }
 
     template <typename ...Args>

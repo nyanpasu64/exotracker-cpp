@@ -109,7 +109,7 @@ class CursorAndSelection : public QObject {
     W_OBJECT(CursorAndSelection)
 
 private:
-    Cursor _cursor;
+    Cursor _cursor{};
     int _digit = 0;
     std::optional<RawSelection> _select{};
 
@@ -145,25 +145,20 @@ public:
     void clear_select();
 };
 
-/// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
-class MainWindow : public QMainWindow
-{
-    W_OBJECT(MainWindow)
-
-public:
-    // Just make it a grab bag of fields for now.
-    // We really don't need a "cursor_moved" signal.
+struct StateComponent {
+    // If we don't use QListView, we really don't need a "cursor_moved" signal.
     // Each method updates the cursor location, then the screen is redrawn at 60fps.
-
-    // TODO encapsulate selection begin (x, y) and cursor (x, y)
-    // into a Selection class.
-    // set_cursor() and select_to()?
-    // set_cursor(bool select)?
-
-    CursorAndSelection _cursor;
+    CursorAndSelection _cursor{};
 
     int _instrument = 0;
     bool _insert_instrument = true;
+};
+
+/// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
+class MainWindow : public QMainWindow, public StateComponent {
+    W_OBJECT(MainWindow)
+
+public:
 
 public:
     // impl
@@ -176,8 +171,6 @@ public:
     MainWindow(QWidget *parent = nullptr);
     virtual void _() = 0;
     virtual ~MainWindow();
-
-    virtual std::optional<AudioThreadHandle> const & audio_handle() const = 0;
 
     virtual AudioState audio_state() const = 0;
 
@@ -195,10 +188,6 @@ public:
 signals:
     void gui_refresh(MaybeSequencerTime maybe_seq_time)
         W_SIGNAL(gui_refresh, (MaybeSequencerTime), maybe_seq_time)
-
-public slots:
-    virtual void restart_audio_thread() = 0;
-    W_SLOT(restart_audio_thread)
 };
 
 

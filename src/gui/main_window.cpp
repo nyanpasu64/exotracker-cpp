@@ -52,6 +52,8 @@ using util::math::ceildiv;
 using edit::edit_doc::set_ticks_per_beat;
 
 
+// # impl RawSelection
+
 RawSelection::RawSelection(Cursor cursor, int rows_per_beat)
     : _begin(cursor)
     , _end(cursor)
@@ -138,6 +140,9 @@ void RawSelection::select_all(
         _mode = SelectionMode::SelectChannels;
     }
 }
+
+
+// # impl CursorAndSelection
 
 W_OBJECT_IMPL(CursorAndSelection)
 
@@ -230,6 +235,8 @@ void CursorAndSelection::clear_select() {
 }
 
 
+// # impl MainWindow
+
 W_OBJECT_IMPL(MainWindow)
 
 static MainWindow * instance;
@@ -239,6 +246,9 @@ MainWindow::MainWindow(QWidget *parent) :
     // But it's only a problem since C++ lacks pervasive `self`.
     QMainWindow(parent)
 {}
+
+
+// # MainWindow components
 
 using cmd_queue::CommandQueue;
 using cmd_queue::AudioCommand;
@@ -470,13 +480,266 @@ struct MainWindowUi : MainWindow {
     } }
 };
 
+using gui::history::History;
+
+class AudioComponent {
+    // GUI/audio communication.
+    AudioState _audio_state = AudioState::Stopped;
+    CommandQueue _command_queue{};
+
+    // fields
+    History _history;
+
+    // Audio.
+    RtAudio _rt{};
+    unsigned int _curr_audio_device{};
+
+    // Points to History and CommandQueue, must be listed after them.
+    std::optional<AudioThreadHandle> _audio_handle;
+
+    // impl
+public:
+    AudioComponent(doc::Document document) : _history(std::move(document)) {
+    }
+
+    AudioState audio_state() const {
+        return _audio_state;
+    }
+
+    History & history() {
+        return _history;
+    }
+
+    doc::Document const& get_document() const {
+        return _history.get_document();
+    }
+
+    // # Command queue.
+
+private:
+    /// Return a command to be sent to the audio thread.
+    /// It ignores the command's contents,
+    /// but monitors its "next" pointer for new commands.
+    AudioCommand * stub_command() {
+        return _command_queue.begin();
+    }
+
+    void gc_command_queue() {
+        // Every time GUI pushes an event, it moves _command_queue.end().
+        // Once the audio thread is done processing events,
+        // the GUI thread's next call to gc_command_queue()
+        // will advance _command_queue.begin().
+        // To run code once after the audio thread catches up on events,
+        // check if we drain 1+ event, then end with an empty queue.
+
+        auto & audio_handle = _audio_handle.value();
+
+        if (_command_queue.begin() != _command_queue.end()) {
+            auto x = audio_handle.seen_command();
+            while (_command_queue.begin() != x) {
+                _command_queue.pop();
+            }
+            if (_command_queue.begin() == _command_queue.end()) {
+                // once GUI sees audio caught up on commands, it must see audio's new time.
+                if (_audio_state == AudioState::Starting) {
+                    _audio_state = AudioState::PlayHasStarted;
+                }
+            }
+        }
+    }
+
+    // # Lifecycle transitions.
+
+private:
+    /// Output: _curr_audio_device.
+    void scan_devices() {
+        std::cout << "Devices {\n";
+
+        using fmt::print;
+
+        // Determine the number of devices available
+        unsigned int n_devices = _rt.getDeviceCount();
+
+        // Scan through devices for various capabilities
+        for (unsigned int i = 0; i < n_devices; i++) {
+            print("    {}: ", i);
+
+            RtAudio::DeviceInfo info = _rt.getDeviceInfo(i);
+            if (info.probed == true) {
+                print(
+                    "name={}, rate={}, out_nchan={}\n",
+                    info.name,
+                    info.preferredSampleRate,
+                    info.outputChannels
+                );
+            } else {
+                print("probe failed\n");
+            }
+        }
+
+        std::cout << "}\n";
+        fflush(stdout);
+
+        if (n_devices == 0) {
+            std::cout << "No devices available\n";
+            return;
+        }
+
+        print("Default device index: {}\n", _rt.getDefaultOutputDevice());
+        fflush(stdout);
+
+        _curr_audio_device = _rt.getDefaultOutputDevice();
+    }
+
+public:
+    /// Output: _audio_handle.
+    void setup_audio() {
+        // TODO should this be handled by the constructor?
+        // Initializes _curr_audio_device.
+        scan_devices();
+
+        release_assert(_command_queue.is_empty());
+
+        // Begin playing audio. Destroying this variable makes audio stop.
+        _audio_handle = AudioThreadHandle::make(
+            _rt, _curr_audio_device, get_document().clone(), stub_command()
+        );
+    }
+
+    void restart_audio_thread() {
+        // Only one stream can be running at a time.
+        // The lifetimes of the old and new audio thread must not overlap.
+        // So destroy the old before constructing the new.
+        _audio_handle = {};  // joins on audio thread
+
+        _audio_state = AudioState::Stopped;
+        _command_queue.clear();
+
+        _audio_handle = AudioThreadHandle::make(
+            _rt, _curr_audio_device, get_document().clone(), stub_command()
+        );
+    }
+
+    // # Play/pause commands.
+
+public:
+    MaybeSequencerTime maybe_seq_time() {
+        // not const because of gc_command_queue().
+
+        MaybeSequencerTime maybe_seq_time{};
+
+        if (_audio_handle.has_value()) {
+            auto & audio_handle = _audio_handle.value();
+
+            gc_command_queue();
+
+            if (audio_state() == AudioState::PlayHasStarted) {
+                maybe_seq_time = audio_handle.play_time();
+            }
+        }
+
+        return maybe_seq_time;
+    }
+
+    void play_pause(StateComponent & state) {
+        if (_audio_handle.has_value()) {
+            gc_command_queue();
+
+            if (_audio_state == AudioState::Stopped) {
+                auto cursor = state._cursor->y;
+                cursor.beat = 0;
+                play_from(state, cursor);
+            } else {
+                stop_play();
+            }
+        }
+    }
+
+    void play_from_row(StateComponent & state) {
+        if (_audio_handle.has_value()) {
+            gc_command_queue();
+
+            if (_audio_state == AudioState::Stopped) {
+                play_from(state, state._cursor->y);
+            } else {
+                stop_play();
+            }
+        }
+    }
+
+private:
+    void play_from(StateComponent & state, GridAndBeat time) {
+        _command_queue.push(cmd_queue::SeekTo{time});
+        _audio_state = AudioState::Starting;
+
+        // Move cursor to right spot, while waiting for audio thread to respond.
+        state._cursor.set_y(time);
+    }
+
+    void stop_play() {
+        _command_queue.push(cmd_queue::StopPlayback{});
+        _audio_state = AudioState::Stopped;
+    }
+
+    // # Document edit commands.
+
+private:
+    void send_edit(AudioComponent & audio, edit::EditBox command) {
+        if (audio._audio_handle.has_value()) {
+            gc_command_queue();
+            _command_queue.push(std::move(command));
+        }
+    }
+
+public:
+    void push_edit(
+        StateComponent & state,
+        edit::EditBox command,
+        std::optional<Cursor> maybe_cursor,
+        bool advance_digit
+    ) {
+        send_edit(*this, command->box_clone());
+
+        Cursor old_cursor = *state._cursor;
+
+        if (maybe_cursor) {
+            state._cursor.set(*maybe_cursor);
+        }
+
+        _history.push(edit::CursorEdit{std::move(command), old_cursor, *state._cursor});
+        if (advance_digit) {
+            state._cursor.advance_digit();
+        } else {
+            state._cursor.reset_digit();
+        }
+    }
+
+    bool undo(StateComponent & state) {
+        if (auto cursor_edit = _history.get_undo()) {
+            send_edit(*this, std::move(cursor_edit->edit));
+            state._cursor.set(cursor_edit->before_cursor);
+            _history.undo();
+            return true;
+        }
+        return false;
+    }
+
+    bool redo(StateComponent & state) {
+        if (auto cursor_edit = _history.get_redo()) {
+            send_edit(*this, std::move(cursor_edit->edit));
+            state._cursor.set(cursor_edit->after_cursor);
+            _history.redo();
+            return true;
+        }
+        return false;
+    }
+};
+
+
 // module-private
 class MainWindowImpl : public MainWindowUi {
      W_OBJECT(MainWindowImpl)
 public:
-    // fields
-    gui::history::History _history;
-
     // GUI widgets/etc.
     QScreen * _screen;
     QTimer _gui_refresh_timer;
@@ -495,123 +758,16 @@ public:
     // Global actions:
     QAction _restart_audio;
 
-    /// This API is a bit too broad for my liking, but whatever.
-    class AudioComponent {
-        // GUI/audio communication.
-        AudioState _audio_state = AudioState::Stopped;
-        CommandQueue _command_queue;
-
-    public:
-        bool is_empty() const {
-            return _command_queue.begin() == _command_queue.end();
-        }
-
-        /// Return a command to be sent to the audio thread.
-        /// It ignores the command's contents,
-        /// but monitors its "next" pointer for new commands.
-        AudioCommand * stub_command() {
-            return _command_queue.begin();
-        }
-
-        AudioState audio_state() const {
-            return _audio_state;
-        }
-
-        void reset() {
-            _command_queue.clear();
-            _audio_state = AudioState::Stopped;
-        }
-
-        void play_pause(MainWindowImpl & win) {
-            if (win._audio_handle.has_value()) {
-                gc_command_queue(win._audio_handle.value());
-
-                if (_audio_state == AudioState::Stopped) {
-                    auto cursor = win._cursor->y;
-                    cursor.beat = 0;
-                    play_from(win, cursor);
-                } else {
-                    stop_play(win);
-                }
-            }
-        }
-
-        void play_from_row(MainWindowImpl & win) {
-            if (win._audio_handle.has_value()) {
-                gc_command_queue(win._audio_handle.value());
-
-                if (_audio_state == AudioState::Stopped) {
-                    play_from(win, win._cursor->y);
-                } else {
-                    stop_play(win);
-                }
-            }
-        }
-
-        void send_edit(MainWindowImpl & win, edit::EditBox command) {
-            if (win._audio_handle.has_value()) {
-                gc_command_queue(win._audio_handle.value());
-                _command_queue.push(std::move(command));
-            }
-        }
-
-    private:
-        void play_from(MainWindowImpl & win, GridAndBeat time) {
-            _command_queue.push(cmd_queue::SeekTo{time});
-            _audio_state = AudioState::Starting;
-
-            // Move cursor to right spot, while waiting for audio thread to respond.
-            win._cursor.set_y(time);
-        }
-
-        void stop_play([[maybe_unused]] MainWindowImpl & win) {
-            _command_queue.push(cmd_queue::StopPlayback{});
-            _audio_state = AudioState::Stopped;
-        }
-
-    public:
-        void gc_command_queue(AudioThreadHandle & audio_handle) {
-            // Every time GUI pushes an event, it moves _command_queue.end().
-            // Once the audio thread is done processing events,
-            // the GUI thread's next call to gc_command_queue()
-            // will advance _command_queue.begin().
-            // To run code once after the audio thread catches up on events,
-            // check if we drain 1+ event, then end with an empty queue.
-
-            if (_command_queue.begin() != _command_queue.end()) {
-                auto x = audio_handle.seen_command();
-                while (_command_queue.begin() != x) {
-                    _command_queue.pop();
-                }
-                if (_command_queue.begin() == _command_queue.end()) {
-                    // once GUI sees audio caught up on commands, it must see audio's new time.
-                    if (_audio_state == AudioState::Starting) {
-                        _audio_state = AudioState::PlayHasStarted;
-                    }
-                }
-            }
-        }
-    };
-
-    AudioComponent _audio_component;
-
-    // Audio.
-    RtAudio _rt;
-    unsigned int _curr_audio_device;
-
-    // Points to _history and _audio_component, must be listed after them.
-    std::optional<AudioThreadHandle> _audio_handle;
-
-    // Used to compute GUI redraw FPS. Currently unused.
-    using Clock = std::chrono::steady_clock;
-    Clock::time_point _prev_time;
+    AudioComponent _audio;
 
     // impl MainWindow
     void _() override {}
 
-    void on_startup(
-        config::Options const& options, doc::Document const& document
-    ) {
+    doc::Document const& get_document() const {
+        return _audio.get_document();
+    }
+
+    void on_startup(config::Options const& options) {
         // Upon application startup, pattern editor panel is focused.
         _pattern_editor_panel->setFocus();
 
@@ -662,22 +818,18 @@ public:
             push_edit(set_ticks_per_beat(ticks_per_beat), {}, false);
         });
 
-        update_gui_from_doc(document);
+        set_widgets_from_doc();
     }
 
-    void update_gui_from_doc(doc::Document const& document) {
-        {
-            auto b = QSignalBlocker(_ticks_per_beat);
-            _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
-        }
-    }
+    void set_widgets_from_doc() {
+        doc::Document const& document = get_document();
 
-    std::optional<AudioThreadHandle> const & audio_handle() const override {
-        return _audio_handle;
+        auto b = QSignalBlocker(_ticks_per_beat);
+        _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
     }
 
     AudioState audio_state() const override {
-        return _audio_component.audio_state();
+        return _audio.audio_state();
     }
 
     void push_edit(
@@ -685,65 +837,24 @@ public:
         std::optional<Cursor> maybe_cursor,
         bool advance_digit = false
     ) override {
-        _audio_component.send_edit(*this, command->box_clone());
-
-        Cursor old_cursor = *_cursor;
-
-        if (maybe_cursor) {
-            _cursor.set(*maybe_cursor);
-        }
-
-        _history.push(edit::CursorEdit{std::move(command), old_cursor, *_cursor});
-        if (advance_digit) {
-            _cursor.advance_digit();
-        } else {
-            _cursor.reset_digit();
-        }
-    }
-
-    void restart_audio_thread() override {
-        // Only one stream can be running at a time.
-        // The lifetimes of the old and new audio thread must not overlap.
-        // So destroy the old before constructing the new.
-        _audio_handle = {};
-        _audio_component.reset();
-        _audio_handle = AudioThreadHandle::make(
-            _rt,
-            _curr_audio_device,
-            _history.get_document().clone(),
-            _audio_component.stub_command()
-        );
+        _audio.push_edit(*this, std::move(command), maybe_cursor, advance_digit);
     }
 
     // private methods
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindowUi(parent)
-        , _history{std::move(document)}
-        , _rt{}
-        , _audio_handle{}
+        , _audio(std::move(document))
     {
         // Setup GUI.
         setup_widgets();  // Output: _pattern_editor_panel.
-        _pattern_editor_panel->set_history(_history);
-        _timeline_editor->set_history(_history);
+        _pattern_editor_panel->set_history(_audio.history());
+        _timeline_editor->set_history(_audio.history());
 
         // Hook up refresh timer.
         connect(
             &_gui_refresh_timer, &QTimer::timeout,
             this, [this] () {
-                MaybeSequencerTime maybe_seq_time{};
-
-                if (_audio_handle.has_value()) {
-                    auto & audio_handle = _audio_handle.value();
-
-                    _audio_component.gc_command_queue(audio_handle);
-
-                    if (_audio_component.audio_state() == AudioState::PlayHasStarted) {
-                        maybe_seq_time = audio_handle.play_time();
-                    }
-                }
-
-                emit gui_refresh(maybe_seq_time);
+                emit gui_refresh(_audio.maybe_seq_time());
             }
         );
 
@@ -765,13 +876,13 @@ public:
         // TODO setup_screen() when primaryScreen changed
         // TODO setup_timer() when refreshRate changed
 
-        setup_audio();
+        _audio.setup_audio();
 
         reload_shortcuts();
         // TODO reload_shortcuts() when shortcut keybinds changed
 
         // Last thing.
-        on_startup(get_app().options(), _history.get_document());
+        on_startup(get_app().options());
     }
 
     void setup_screen() {
@@ -789,85 +900,23 @@ public:
     }
     // W_SLOT(setup_timer)
 
-    /// Output: _audio_device.
-    void scan_devices() {
-        std::cout << "Devices {\n";
-
-        using fmt::print;
-
-        // Determine the number of devices available
-        unsigned int n_devices = _rt.getDeviceCount();
-
-        // Scan through devices for various capabilities
-        for (unsigned int i = 0; i < n_devices; i++) {
-            print("    {}: ", i);
-
-            RtAudio::DeviceInfo info = _rt.getDeviceInfo(i);
-            if (info.probed == true) {
-                print(
-                    "name={}, rate={}, out_nchan={}\n",
-                    info.name,
-                    info.preferredSampleRate,
-                    info.outputChannels
-                );
-            } else {
-                print("probe failed\n");
-            }
-        }
-
-        std::cout << "}\n";
-        fflush(stdout);
-
-        if (n_devices == 0) {
-            std::cout << "No devices available\n";
-            return;
-        }
-
-        print("Default device index: {}\n", _rt.getDefaultOutputDevice());
-        fflush(stdout);
-
-        _curr_audio_device = _rt.getDefaultOutputDevice();
-    }
-
-    /// Output: _audio_handle.
-    void setup_audio() {
-        // Initializes _audio_device.
-        scan_devices();
-
-        release_assert(_audio_component.is_empty());
-
-        // Begin playing audio. Destroying this variable makes audio stop.
-        _audio_handle = AudioThreadHandle::make(
-            _rt,
-            _curr_audio_device,
-            _history.get_document().clone(),
-            _audio_component.stub_command()
-        );
-    }
-
     /// Called after document/cursor mutated.
-    void update_editors() {
+    void repaint_children() {
         _pattern_editor_panel->update();  // depends on _cursor and _history
         _timeline_editor->update_cursor();
     }
 
     void undo() {
-        if (auto cursor_edit = _history.get_undo()) {
-            _audio_component.send_edit(*this, std::move(cursor_edit->edit));
-            _cursor.set(cursor_edit->before_cursor);
-            _history.undo();
-            update_gui_from_doc(_history.get_document());
-            update_editors();
+        if (_audio.undo(*this)) {
+            set_widgets_from_doc();
+            repaint_children();
         }
     }
 
     void redo() {
-        if (auto cursor_edit = _history.get_redo()) {
-            _audio_component.send_edit(*this, std::move(cursor_edit->edit));
-            _cursor.set(cursor_edit->after_cursor);
-            _history.redo();
-            update_gui_from_doc(_history.get_document());
-            update_editors();
+        if (_audio.redo(*this)) {
+            set_widgets_from_doc();
+            repaint_children();
         }
     }
 
@@ -891,15 +940,15 @@ public:
         _play_pause.setShortcut(QKeySequence{shortcuts.play_pause});
         bind_editor_action(_play_pause);
         connect_action(_play_pause, [this] () {
-            _audio_component.play_pause(*this);
-            update_editors();
+            _audio.play_pause(*this);
+            repaint_children();
         });
 
         _play_from_row.setShortcut(QKeySequence{shortcuts.play_from_row});
         bind_editor_action(_play_from_row);
         connect_action(_play_from_row, [this] () {
-            _audio_component.play_from_row(*this);
-            update_editors();
+            _audio.play_from_row(*this);
+            repaint_children();
         });
 
         _undo.setShortcuts(QKeySequence::Undo);
@@ -913,7 +962,9 @@ public:
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
         this->addAction(&_restart_audio);
-        connect_action(_restart_audio, &MainWindow::restart_audio_thread);
+        connect_action(_restart_audio, [this] () {
+            _audio.restart_audio_thread();
+        });
     }
 };
 
