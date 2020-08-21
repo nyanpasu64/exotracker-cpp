@@ -167,4 +167,26 @@ EditBox add_timeline_row(
     });
 }
 
+EditBox remove_timeline_row(doc::Document const& document, doc::GridIndex grid_pos) {
+    ChipChannelTo<TimelineCell> chip_channel_cells;
+    auto nchip = (ChipIndex) document.chips.size();
+    for (ChipIndex chip = 0; chip < nchip; chip++) {
+
+        ChannelTo<TimelineCell> channel_cells;
+        auto nchan = document.chip_index_to_nchan(chip);
+        for (ChannelIndex chan = 0; chan < nchan; chan++) {
+            channel_cells.push_back(TimelineCell{});
+        }
+
+        chip_channel_cells.push_back(std::move(channel_cells));
+    }
+
+    return make_command<EditRow>(EditRowInner{
+        grid_pos,
+        CellOperation::Remove,
+        {},  // nbeats will be populated upon apply_swap().
+        chip_channel_cells,
+    });
+}
+
 }

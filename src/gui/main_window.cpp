@@ -959,6 +959,15 @@ public:
         );
     }
 
+    void remove_timeline_row() {
+        auto & document = get_document();
+        if (document.grid_cells.size() <= 1) {
+            return;
+        }
+
+        push_edit(edit_doc::remove_timeline_row(document, _cursor->y.grid), {});
+    }
+
     /// Clears existing bindings and rebinds shortcuts.
     /// Can be called multiple times.
     void reload_shortcuts() {
@@ -999,6 +1008,7 @@ public:
         connect_action(_redo, &MainWindowImpl::redo);
 
         connect_action(*_timeline.add_row, &MainWindowImpl::add_timeline_row);
+        connect_action(*_timeline.remove_row, &MainWindowImpl::remove_timeline_row);
 
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
