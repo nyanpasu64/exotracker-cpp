@@ -264,8 +264,8 @@ struct MainWindowUi : MainWindow {
     TimelineEditor * _timeline_editor;
 
     struct Timeline {
-        QAction * add_cell;
-        QAction * remove_cell;
+        QAction * add_row;
+        QAction * remove_row;
 
         QAction * move_up;
         QAction * move_down;
@@ -378,10 +378,10 @@ struct MainWindowUi : MainWindow {
             {l__w(QToolBar)
                 w->setIconSize(w->iconSize() * 2 / 3);
                 add_toolbar_action(
-                    w, _timeline.add_cell, tr("Add Cell Row"), "document-new"
+                    w, _timeline.add_row, tr("Add Timeline Row"), "document-new"
                 );
                 add_toolbar_action(
-                    w, _timeline.remove_cell, tr("Delete Cell Row"), "edit-delete"
+                    w, _timeline.remove_row, tr("Delete Timeline Row"), "edit-delete"
                 );
                 add_toolbar_action(
                     w, _timeline.move_up, tr("Move Row Up"), "go-up"
