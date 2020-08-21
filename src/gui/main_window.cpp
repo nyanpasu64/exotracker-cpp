@@ -863,6 +863,10 @@ public:
         bool advance_digit = false
     ) override {
         _audio.push_edit(*this, std::move(command), maybe_cursor, advance_digit);
+
+        // Somehow, this call is not necessary to redraw the pattern editor
+        // when you press the "add row" button.
+        repaint_children();
     }
 
     // private methods
@@ -928,6 +932,10 @@ public:
     /// Called after document/cursor mutated.
     void repaint_children() {
         _pattern_editor_panel->update();  // depends on _cursor and _history
+
+        // TODO find a less hacky way to update item count
+        _timeline_editor->set_history(_audio.history());
+
         _timeline_editor->update_cursor();
     }
 
