@@ -63,16 +63,13 @@ enum class CellOperation {
     Remove,
 };
 
-struct EditCell {
+struct EditRowInner {
     doc::GridIndex _grid;
     CellOperation _oper;
     doc::GridCell _nbeats;
     doc::ChipChannelTo<doc::TimelineCell> _chip_channel_cells;
 
     void apply_swap(doc::Document & document) {
-        if (_oper == CellOperation::Add) {
-            document.grid_cells.insert(document.grid_cells.begin() + _grid, _nbeats);
-        }
         auto ncell = document.grid_cells.size();
 
         auto nchip = (ChipIndex) document.chips.size();
@@ -91,12 +88,16 @@ struct EditCell {
                 auto & timeline = channel_timelines[chan];
                 auto & cell = channel_cells[chan];
 
+                release_assert_equal(timeline.size(), ncell);
                 if (_oper == CellOperation::Add) {
+                    assert(cell._raw_blocks.capacity() >= doc::MAX_BLOCKS_PER_CELL);
                     timeline.insert(timeline.begin() + _grid, std::move(cell));
-                    release_assert_equal(timeline.size(), ncell);
                 } else {
-                    release_assert_equal(timeline.size(), ncell);
                     assert(cell._raw_blocks.capacity() == 0);
+                    assert(
+                        timeline[_grid]._raw_blocks.capacity()
+                        >= doc::MAX_BLOCKS_PER_CELL
+                    );
                     cell = std::move(timeline[_grid]);
                     timeline.erase(timeline.begin() + _grid);
                 }
@@ -104,6 +105,7 @@ struct EditCell {
         }
 
         if (_oper == CellOperation::Add) {
+            document.grid_cells.insert(document.grid_cells.begin() + _grid, _nbeats);
             _oper = CellOperation::Remove;
 
         } else {
@@ -119,6 +121,26 @@ struct EditCell {
     }
 
     constexpr static ModifiedFlags _modified = ModifiedFlags::GridCells;
+};
+
+/// If the command holds a row to be inserted, reserve memory for each cell.
+/// Once a cell gets swapped into the document, adding blocks must not allocate memory,
+/// to prevent blocking the audio thread.
+struct EditRow : EditRowInner {
+    EditRow(EditRowInner cell) : EditRowInner(std::move(cell)) {
+        if (_oper == CellOperation::Add) {
+            for (auto & channel_cells : _chip_channel_cells) {
+                for (auto & cell : channel_cells) {
+                    cell._raw_blocks.reserve(doc::MAX_BLOCKS_PER_CELL);
+                    assert(cell._raw_blocks.capacity() >= doc::MAX_BLOCKS_PER_CELL);
+                }
+            }
+        }
+    }
+
+    EditRow(EditRow const& other) : EditRow((EditRowInner const&) other) {}
+
+    EditRow(EditRow && other) : EditRow((EditRowInner &&) other) {}
 };
 
 EditBox add_timeline_row(
@@ -137,7 +159,7 @@ EditBox add_timeline_row(
         chip_channel_cells.push_back(std::move(channel_cells));
     }
 
-    return make_command(EditCell{
+    return make_command<EditRow>(EditRowInner{
         grid_pos,
         CellOperation::Add,
         {nbeats},
