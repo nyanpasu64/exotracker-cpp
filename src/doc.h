@@ -100,14 +100,10 @@ struct DocumentCopy {
 struct Document : DocumentCopy {
     Document clone() const;
 
-    // Document(Document.clone())
     Document(DocumentCopy const & other);
     Document(DocumentCopy && other);
 
-private:
-    DEFAULT_COPY(Document)
-
-public:
+    DISABLE_COPY(Document)
     DEFAULT_MOVE(Document)
 };
 

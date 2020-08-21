@@ -26,7 +26,7 @@ inline namespace tuning {
 }
 
 Document Document::clone() const {
-    return *this;
+    return (DocumentCopy const&) *this;
 }
 
 void post_init(Document & document) {
