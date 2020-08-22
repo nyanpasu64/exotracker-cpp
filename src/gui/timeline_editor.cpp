@@ -29,14 +29,14 @@ struct HistoryWrapper : QAbstractListModel {
     }
 
     void set_history(History const& history) {
-        auto old_n = int(get_document().grid_cells.size());
+        auto old_n = int(get_document().timeline.size());
         if (old_n > 0) {
             emit beginRemoveRows({}, 0, old_n - 1);
             _history = &_dummy_history;
             emit endRemoveRows();
         }
 
-        auto n = int(history.get_document().grid_cells.size());
+        auto n = int(history.get_document().timeline.size());
         emit beginInsertRows({}, 0, n - 1);
         _history = &history;
         emit endInsertRows();
@@ -44,11 +44,11 @@ struct HistoryWrapper : QAbstractListModel {
 
     // impl QAbstractListModel
     [[nodiscard]] int rowCount(QModelIndex const & parent) const override {
-        return int(get_document().grid_cells.size());
+        return int(get_document().timeline.size());
     }
 
     [[nodiscard]] QVariant data(QModelIndex const & index, int role) const override {
-        auto & x = get_document().grid_cells;
+        auto & x = get_document().timeline;
 
         if (!index.isValid())
             return QVariant();

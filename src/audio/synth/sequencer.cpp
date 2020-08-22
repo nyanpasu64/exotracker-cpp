@@ -73,10 +73,10 @@ void ChannelSequencer::stop_playback() {
 // # Grid-cell/pattern code.
 
 doc::MaybeGridIndex calc_next_grid(
-    doc::GridCells const& grid_cells, doc::GridIndex grid_index
+    doc::Timeline const& timeline, doc::GridIndex grid_index
 ) {
     grid_index++;
-    if ((size_t) grid_index >= grid_cells.size()) {
+    if ((size_t) grid_index >= timeline.size()) {
         // If song ends, return {}.
         return doc::GridIndex(0);
     }
@@ -110,8 +110,7 @@ struct NextPattern {
 ///
 /// The caller of this function is expected to handle this case.
 static NextPattern calc_next_pattern(
-    doc::GridCells const& grid_cells,
-    doc::Timeline const& timeline,
+    doc::TimelineChannelRef timeline,
     doc::GridIndex grid,
     TimelineCellIter pattern_iter
 ) {
@@ -120,12 +119,12 @@ static NextPattern calc_next_pattern(
     auto pattern = pattern_iter.next(timeline[grid]);
     if (!pattern) {
         grid++;
-        if ((size_t) grid >= timeline.size()) {
+        if (grid >= timeline.size()) {
             grid = 0;
             wrapped = true;
         }
 
-        pattern_iter = TimelineCellIter(grid_cells[grid]);
+        pattern_iter = TimelineCellIter();
         pattern = pattern_iter.next(timeline[grid]);
     }
 
@@ -142,12 +141,11 @@ struct EventIteratorResult {
 ///
 /// Return = did we switch grid cells.
 [[nodiscard]] static EventIteratorResult ev_iter_advance_pattern(
-    doc::GridCells const& grid_cells,
-    doc::Timeline const& timeline,
+    doc::TimelineChannelRef timeline,
     EventIterator orig_event
 ) {
     NextPattern v = calc_next_pattern(
-        grid_cells, timeline, orig_event.grid, *orig_event.pattern_iter
+        timeline, orig_event.grid, *orig_event.pattern_iter
     );
     bool switched_cells = v.wrapped || v.grid != orig_event.grid;
 
@@ -255,40 +253,29 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         (int16_t) _now.next_tick.dtick,
     };
 
-    doc::Timeline const& timeline = [&] () -> auto & {
-        auto & chip_channel_timelines = document.chip_channel_timelines;
+    auto timeline =
+        doc::TimelineChannelRef(document.timeline, _chip_index, _chan_index);
 
-        // [chip_index]
-        release_assert(chip_channel_timelines.size() == nchip);
-        auto & channel_timelines = chip_channel_timelines[_chip_index];
-
-        // [chip_index][chan_index]
-        release_assert(channel_timelines.size() == nchan);
-        return channel_timelines[_chan_index];
-    }();
-
-    BeatPlusTick const now_grid_len = [&] {
-        doc::GridCell const & now_grid = document.grid_cells[_now.grid];
-        return frac_to_tick(ticks_per_beat, now_grid.nbeats);
-    }();
+    BeatPlusTick const now_grid_len =
+        frac_to_tick(ticks_per_beat, timeline[_now.grid].nbeats);
 
     TimedEventsRef events{};
     doc::BeatIndex pattern_start{};
     BeatPlusTick ev_grid_len{};
 
     auto get_events = [
-        this, &document, &timeline, ticks_per_beat,
+        this, &timeline, ticks_per_beat,
         // mutate these
         &events, &pattern_start, &ev_grid_len
     ]() {
-        auto nbeats = document.grid_cells[_next_event.grid].nbeats;
-        auto & cell = timeline[_next_event.grid];
+        doc::TimelineCellRef cell_ref = timeline[_next_event.grid];
 
         // mutate environment
         if (_next_event.pattern) {
             PatternIndex pattern = *_next_event.pattern;
-            events = TimedEventsRef(cell._raw_blocks[pattern.block].pattern.events)
-                .subspan(0, pattern.num_events);
+            events = TimedEventsRef(
+                cell_ref.cell._raw_blocks[pattern.block].pattern.events
+            ).subspan(0, pattern.num_events);
             pattern_start = _next_event.pattern->begin_time;
 
         } else {
@@ -296,7 +283,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             pattern_start = 0;
         }
 
-        ev_grid_len = frac_to_tick(ticks_per_beat, nbeats);
+        ev_grid_len = frac_to_tick(ticks_per_beat, cell_ref.nbeats);
     };
 
     check_invariants(*this);
@@ -307,8 +294,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         while (_next_event.event_idx >= events.size()) {
             // Current pattern has no more events to play. Check the next pattern.
 
-            auto result =
-                ev_iter_advance_pattern(document.grid_cells, timeline, _next_event);
+            auto result = ev_iter_advance_pattern(timeline, _next_event);
             if (result.switched_grid) {
                 if (!_grid_runahead.advance_event_grid()) {
                     // _next_event is already 1 cell past real time.
@@ -449,7 +435,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 
             while (true) {
                 auto result =
-                    ev_iter_advance_pattern(document.grid_cells, timeline, _next_event);
+                    ev_iter_advance_pattern(timeline, _next_event);
                 if (result.switched_grid) {
                     _next_event = result.next_event;
                     break;
@@ -458,7 +444,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         }
         now_tick = {0, 0};
 
-        auto next_grid = calc_next_grid(document.grid_cells, _now.grid);
+        auto next_grid = calc_next_grid(document.timeline, _now.grid);
         if (next_grid.has_value()) {
             _now.grid = *next_grid;
         } else {
@@ -499,18 +485,9 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
         _now = RealTime{.grid=time.grid, .next_tick=now_ticks};
     }
 
-    doc::Timeline const& timeline = [&] () -> auto & {
-        auto & chip_channel_timelines = document.chip_channel_timelines;
-
-        // [chip_index]
-        release_assert(chip_channel_timelines.size() == nchip);
-        auto & channel_timelines = chip_channel_timelines[_chip_index];
-
-        // [chip_index][chan_index]
-        release_assert(channel_timelines.size() == nchan);
-        return channel_timelines[_chan_index];
-    }();
-    auto nbeats = document.grid_cells[time.grid];
+    auto timeline =
+        doc::TimelineChannelRef(document.timeline, _chip_index, _chan_index);
+    auto nbeats = document.timeline[time.grid];
 
     // Set next event to play.
     _grid_runahead = GridRunahead{};
@@ -518,7 +495,7 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
     _next_event = EventIterator{
         .prev_grid = {},
         .grid = time.grid,
-        .pattern_iter = TimelineCellIter(nbeats),
+        .pattern_iter = TimelineCellIter(),
         .pattern = {},
         .event_idx = 0,
     };
@@ -537,13 +514,14 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
         // mutate these
         &events, &pattern_start
     ]() {
-        auto & cell = timeline[_next_event.grid];
+        doc::TimelineCellRef cell_ref = timeline[_next_event.grid];
 
         // mutate environment
         if (_next_event.pattern) {
             PatternIndex pattern = *_next_event.pattern;
-            events = TimedEventsRef(cell._raw_blocks[pattern.block].pattern.events)
-                .subspan(0, pattern.num_events);
+            events = TimedEventsRef(
+                cell_ref.cell._raw_blocks[pattern.block].pattern.events
+            ).subspan(0, pattern.num_events);
             pattern_start = _next_event.pattern->begin_time;
 
         } else {
@@ -560,8 +538,7 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
         while (_next_event.event_idx >= events.size()) {
             // Current pattern has no more events to play. Check the next pattern.
 
-            auto result =
-                ev_iter_advance_pattern(document.grid_cells, timeline, _next_event);
+            auto result = ev_iter_advance_pattern(timeline, _next_event);
             if (result.switched_grid) {
                 if (!_grid_runahead.advance_event_grid()) {
                     // _next_event is already 1 cell past real time.
@@ -656,7 +633,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
         _next_event.prev_grid && !_grid_runahead.event_grid_behind()
     ) {
         doc::GridIndex grid = *_next_event.prev_grid;
-        auto nbeats = document.grid_cells[grid];
+        auto nbeats = document.timeline[grid];
 
         bool success = _grid_runahead.advance_now_grid();
         release_assert(success);
@@ -664,7 +641,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
         _next_event = EventIterator{
             .prev_grid = {},
             .grid = grid,
-            .pattern_iter = TimelineCellIter(nbeats),
+            .pattern_iter = TimelineCellIter(),
             .pattern = {},
             .event_idx = 0,
         };
@@ -672,51 +649,40 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
     } else {
         auto prev_grid = _next_event.prev_grid;
         auto grid = _next_event.grid;
-        auto nbeats = document.grid_cells[grid];
+        auto nbeats = document.timeline[grid];
 
         _next_event = EventIterator{
             .prev_grid = prev_grid,
             .grid = grid,
-            .pattern_iter = TimelineCellIter(nbeats),
+            .pattern_iter = TimelineCellIter(),
             .pattern = {},
             .event_idx = 0,
         };
     }
 
-    doc::Timeline const& timeline = [&] () -> auto & {
-        auto & chip_channel_timelines = document.chip_channel_timelines;
+    auto timeline =
+        doc::TimelineChannelRef(document.timeline, _chip_index, _chan_index);
 
-        // [chip_index]
-        release_assert(chip_channel_timelines.size() == nchip);
-        auto & channel_timelines = chip_channel_timelines[_chip_index];
-
-        // [chip_index][chan_index]
-        release_assert(channel_timelines.size() == nchan);
-        return channel_timelines[_chan_index];
-    }();
-
-    BeatPlusTick const now_grid_len = [&] {
-        doc::GridCell const & now_grid = document.grid_cells[_now.grid];
-        return frac_to_tick(ticks_per_beat, now_grid.nbeats);
-    }();
+    BeatPlusTick const now_grid_len =
+        frac_to_tick(ticks_per_beat, timeline[_now.grid].nbeats);
 
     TimedEventsRef events{};
     doc::BeatIndex pattern_start{};
     BeatPlusTick ev_grid_len{};
 
     auto get_events = [
-        this, &document, &timeline, ticks_per_beat,
+        this, &timeline, ticks_per_beat,
         // mutate these
         &events, &pattern_start, &ev_grid_len
     ]() {
-        auto nbeats = document.grid_cells[_next_event.grid].nbeats;
-        auto & cell = timeline[_next_event.grid];
+        doc::TimelineCellRef cell_ref = timeline[_next_event.grid];
 
         // mutate environment
         if (_next_event.pattern) {
             PatternIndex pattern = *_next_event.pattern;
-            events = TimedEventsRef(cell._raw_blocks[pattern.block].pattern.events)
-                .subspan(0, pattern.num_events);
+            events = TimedEventsRef(
+                cell_ref.cell._raw_blocks[pattern.block].pattern.events
+            ).subspan(0, pattern.num_events);
             pattern_start = _next_event.pattern->begin_time;
 
         } else {
@@ -724,7 +690,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
             pattern_start = 0;
         }
 
-        ev_grid_len = frac_to_tick(ticks_per_beat, nbeats);
+        ev_grid_len = frac_to_tick(ticks_per_beat, cell_ref.nbeats);
     };
 
     check_invariants(*this);
@@ -735,8 +701,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
         while (_next_event.event_idx >= events.size()) {
             // Current pattern has no more events to play. Check the next pattern.
 
-            auto result =
-                ev_iter_advance_pattern(document.grid_cells, timeline, _next_event);
+            auto result = ev_iter_advance_pattern(timeline, _next_event);
             if (result.switched_grid) {
                 if (!_grid_runahead.advance_event_grid()) {
                     // _next_event is already 1 cell past real time.

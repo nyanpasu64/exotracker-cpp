@@ -35,14 +35,12 @@ void post_init(Document & document) {
     document.frequency_table.resize(CHROMATIC_COUNT);
 
     // Reserve 256 elements to ensure that insert/delete is bounded-time.
-    document.grid_cells.reserve(MAX_GRID_CELLS);
+    document.timeline.reserve(MAX_GRID_CELLS);
 
-    for (auto & chan_timelines : document.chip_channel_timelines) {
-        for (auto & timeline : chan_timelines) {
-            timeline.reserve(MAX_GRID_CELLS);
-
-            // Reserve 32 elements to ensure that adding blocks is bounded-time.
-            for (auto & cell : timeline) {
+    // Reserve 32 elements to ensure that adding blocks is bounded-time.
+    for (auto & row : document.timeline) {
+        for (auto & chan_cells : row.chip_channel_cells) {
+            for (auto & cell : chan_cells) {
                 cell._raw_blocks.reserve(MAX_BLOCKS_PER_CELL);
             }
         }

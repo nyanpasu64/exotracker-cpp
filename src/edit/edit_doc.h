@@ -13,7 +13,6 @@ namespace edit::edit_doc {
     doc::Document const& document, doc::GridIndex grid_pos, doc::BeatFraction nbeats
 );
 
-[[nodiscard]]
-EditBox remove_timeline_row(doc::Document const& document, doc::GridIndex grid_pos);
+[[nodiscard]] EditBox remove_timeline_row(doc::GridIndex grid_pos);
 
 }

@@ -799,13 +799,13 @@ public:
 
 private:
     bool valid_grid_cell() const {
-        return (size_t) _curr_grid_index < _document.grid_cells.size();
+        return (size_t) _curr_grid_index < _document.timeline.size();
     }
 
     /// Precondition: valid_grid_cell() is true.
     inline PxInt curr_grid_height() const {
         return pixels_from_beat(
-            _widget, _document.grid_cells[_curr_grid_index].nbeats
+            _widget, _document.timeline[_curr_grid_index].nbeats
         );
     }
 
@@ -946,7 +946,7 @@ static void draw_pattern_background(
     ForeachGrid foreach_grid{seq};
 
     auto draw_pattern_bg = [&] (GridCellPosition const & pos) {
-        doc::GridCell const & grid_cell = document.grid_cells[pos.grid];
+        doc::TimelineRow const & grid_cell = document.timeline[pos.grid];
 
         // Draw background columns.
         for (MaybeColumnPx const & maybe_column : columns.cols) {
@@ -1122,10 +1122,9 @@ static void draw_pattern_background(
             if (!maybe_col) continue;
             ColumnPx const& col = *maybe_col;
 
-            auto const& cell =
-                document.chip_channel_timelines[col.chip][col.channel][pos.grid];
-
-            CellIter iter{cell, document.grid_cells[pos.grid]};
+            auto timeline =
+                doc::TimelineChannelRef(document.timeline, col.chip, col.channel);
+            auto iter = CellIter(timeline[pos.grid]);
 
             while (auto p = iter.next()) {
                 auto pattern = *p;
@@ -1333,7 +1332,7 @@ static void draw_pattern_background(
     }
 
     auto draw_row_numbers = [&] (GridCellPosition const & pos) {
-        doc::GridCell const & grid_cell = document.grid_cells[pos.grid];
+        auto const & grid_cell = document.timeline[pos.grid];
 
         // Draw rows.
         // Begin loop(row)
@@ -1569,10 +1568,9 @@ static void draw_pattern_foreground(
             if (!maybe_col) continue;
             ColumnPx const& col = *maybe_col;
 
-            auto const& cell =
-                document.chip_channel_timelines[col.chip][col.channel][pos.grid];
-
-            CellIter iter{cell, document.grid_cells[pos.grid]};
+            auto timeline =
+                doc::TimelineChannelRef(document.timeline, col.chip, col.channel);
+            auto iter = CellIter(timeline[pos.grid]);
 
             while (auto p = iter.next()) {
                 auto pattern = *p;
@@ -1766,9 +1764,9 @@ void PatternEditorPanel::scroll_prev_pressed() {
     for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
         if (cursor_y.beat < 0) {
             decrement_mod(
-                cursor_y.grid, (GridIndex) document.grid_cells.size()
+                cursor_y.grid, (GridIndex) document.timeline.size()
             );
-            cursor_y.beat += document.grid_cells[cursor_y.grid].nbeats;
+            cursor_y.beat += document.timeline[cursor_y.grid].nbeats;
         } else {
             break;
         }
@@ -1786,11 +1784,11 @@ void PatternEditorPanel::scroll_next_pressed() {
     cursor_y.beat += move_cfg.page_down_distance;
 
     for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
-        auto const & grid_cell = document.grid_cells[cursor_y.grid];
+        auto const & grid_cell = document.timeline[cursor_y.grid];
         if (cursor_y.beat >= grid_cell.nbeats) {
             cursor_y.beat -= grid_cell.nbeats;
             increment_mod(
-                cursor_y.grid, (GridIndex) document.grid_cells.size()
+                cursor_y.grid, (GridIndex) document.timeline.size()
             );
         } else {
             break;
@@ -1841,7 +1839,7 @@ void PatternEditorPanel::bottom_pressed() {
         if (raw_select && raw_select->bottom_padding() > 0) {
             bottom_padding = raw_select->bottom_padding();
         }
-        return document.grid_cells[cursor_y.grid].nbeats - bottom_padding;
+        return document.timeline[cursor_y.grid].nbeats - bottom_padding;
     };
 
     auto cursor_y = _win._cursor.get().y;
@@ -1851,7 +1849,7 @@ void PatternEditorPanel::bottom_pressed() {
         get_app().options().move_cfg.home_end_switch_patterns
         && cursor_y.beat >= bottom_beat
     ) {
-        if (cursor_y.grid + 1 < document.grid_cells.size()) {
+        if (cursor_y.grid + 1 < document.timeline.size()) {
             cursor_y.grid++;
             bottom_beat = calc_bottom(cursor_y);
         }
@@ -1866,9 +1864,9 @@ inline void switch_grid_index(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
     auto cursor_y = self._win._cursor.get().y;
 
-    alter_mod(cursor_y.grid, (GridIndex) document.grid_cells.size());
+    alter_mod(cursor_y.grid, (GridIndex) document.timeline.size());
 
-    BeatFraction nbeats = document.grid_cells[cursor_y.grid].nbeats;
+    BeatFraction nbeats = document.timeline[cursor_y.grid].nbeats;
 
     // If cursor is out of bounds, move to last row in pattern.
     if (cursor_y.beat >= nbeats) {

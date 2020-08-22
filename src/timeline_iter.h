@@ -33,9 +33,7 @@ using timing::GridAndBlock;
 /// If there exists no pattern where pattern.end > beat,
 /// returns (cell.size(), empty slice) which is out-of-bounds!
 [[nodiscard]]
-doc::PatternRef pattern_or_end(
-    doc::GridCell nbeats, doc::TimelineCell const& cell, BeatFraction beat
-);
+doc::PatternRef pattern_or_end(doc::TimelineCellRef cell_ref, BeatFraction beat);
 
 
 #if 0
@@ -90,8 +88,7 @@ namespace detail {
         // Please don't poke this class's fields.
         // I'm marking them public to silence Clang warnings.
         scrDefine;
-        doc::GridCells const& _grid_cells;
-        doc::Timeline const& _timeline;
+        doc::TimelineChannelRef _timeline;
 
         GridIndex const _orig_grid;
         BeatFraction const _orig_pattern_start;
@@ -105,9 +102,7 @@ namespace detail {
     public:
 
         [[nodiscard]] static
-        BlockIterator from_beat(
-            doc::GridCells const& grid_cells, doc::Timeline const& timeline, GridAndBeat now
-        );
+        BlockIterator from_beat(doc::TimelineChannelRef timeline, GridAndBeat now);
 
         /// First call:
         /// - If original state is valid, return it as-is.

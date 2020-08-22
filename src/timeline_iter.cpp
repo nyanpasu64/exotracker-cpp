@@ -20,9 +20,9 @@ using CellIter = doc::TimelineCellIterRef;
 
 static
 std::tuple<doc::MaybePatternRef, CellIter> pattern_iter_seek(
-    doc::GridCell nbeats, doc::TimelineCell const& cell, BeatFraction beat
+    doc::TimelineCellRef cell_ref, BeatFraction beat
 ) {
-    auto iter = CellIter(cell, nbeats);
+    auto iter = CellIter(cell_ref);
 
     // The cursor remains at a fixed point.
     // Each block occurs later than the previous block.
@@ -36,11 +36,9 @@ std::tuple<doc::MaybePatternRef, CellIter> pattern_iter_seek(
     return {{}, iter};
 }
 
-doc::PatternRef pattern_or_end(
-    doc::GridCell nbeats, doc::TimelineCell const& cell, BeatFraction beat
-) {
-    return std::get<0>(pattern_iter_seek(nbeats, cell, beat))
-        .value_or(doc::PatternRef{cell.size()});
+doc::PatternRef pattern_or_end(doc::TimelineCellRef cell_ref, BeatFraction beat) {
+    return std::get<0>(pattern_iter_seek(cell_ref, beat))
+        .value_or(doc::PatternRef{cell_ref.cell.size()});
 }
 
 #if 0
@@ -63,10 +61,9 @@ GridAndBeat real_time(
 // if now is between blocks. But that'll be done later.
 template<>
 ForwardBlockIterator ForwardBlockIterator::from_beat(
-    doc::GridCells const& grid_cells, doc::Timeline const& timeline, GridAndBeat now
+    doc::TimelineChannelRef timeline, GridAndBeat now
 ) {
-    auto [pat, iter] =
-        pattern_iter_seek(grid_cells[now.grid], timeline[now.grid], now.beat);
+    auto [pat, iter] = pattern_iter_seek(timeline[now.grid], now.beat);
 
     std::vector<doc::PatternRef> cell_patterns;
 
@@ -78,11 +75,10 @@ ForwardBlockIterator ForwardBlockIterator::from_beat(
     }
 
     return BlockIterator {
-        ._grid_cells = grid_cells,
         ._timeline = timeline,
 
         ._orig_grid = now.grid,
-        ._orig_pattern_start = (pat ? pat->begin_time : grid_cells[now.grid].nbeats),
+        ._orig_pattern_start = (pat ? pat->begin_time : timeline[now.grid].nbeats),
 
         ._grid = now.grid,
         ._cell_patterns = std::move(cell_patterns),
@@ -92,9 +88,9 @@ ForwardBlockIterator ForwardBlockIterator::from_beat(
 
 template<>
 ReverseBlockIterator ReverseBlockIterator::from_beat(
-    doc::GridCells const& grid_cells, doc::Timeline const& timeline, GridAndBeat now
+    doc::TimelineChannelRef timeline, GridAndBeat now
 ) {
-    auto iter = CellIter(timeline[now.grid], grid_cells[now.grid]);
+    auto iter = CellIter(timeline[now.grid]);
 
     std::vector<doc::PatternRef> cell_patterns;
 
@@ -107,7 +103,6 @@ ReverseBlockIterator ReverseBlockIterator::from_beat(
     }
 
     return BlockIterator {
-        ._grid_cells = grid_cells,
         ._timeline = timeline,
 
         ._orig_grid = now.grid,
@@ -126,15 +121,15 @@ template<>
 std::optional<BlockIteratorRef> ForwardBlockIterator::next() {
     scrBegin;
 
-    release_assert(size_t(_grid) < _timeline.size());
+    release_assert(_grid < _timeline.size());
     goto begin;
 
     for (; _wrap_count <= 1; _wrap_count++) {
-        for (_grid = 0; size_t(_grid) < _timeline.size(); _grid++) {
+        for (_grid = 0; _grid < _timeline.size(); _grid++) {
             {
                 _cell_patterns.clear();
 
-                auto cell_iter = CellIter(_timeline[_grid], _grid_cells[_grid]);
+                auto cell_iter = CellIter(_timeline[_grid]);
                 while (auto p = cell_iter.next()) {
                     _cell_patterns.push_back(*p);
                 }
@@ -178,16 +173,16 @@ template<>
 std::optional<BlockIteratorRef> ReverseBlockIterator::next() {
     scrBegin;
 
-    release_assert(size_t(_grid) < _timeline.size());
+    release_assert(_grid < _timeline.size());
     goto begin;
 
     for (; _wrap_count >= -1; _wrap_count--) {
         if (_timeline.size())
-        for (_grid = GridIndex(_timeline.size() - 1); ; ) {
+        for (_grid = _timeline.size() - 1; ; ) {
             {
                 _cell_patterns.clear();
 
-                auto cell_iter = CellIter(_timeline[_grid], _grid_cells[_grid]);
+                auto cell_iter = CellIter(_timeline[_grid]);
                 while (auto p = cell_iter.next()) {
                     _cell_patterns.push_back(*p);
                 }

@@ -58,7 +58,8 @@ struct PatternEdit {
 
     void apply_swap(doc::Document & document) {
         auto & doc_blocks =
-            document.chip_channel_timelines[_chip][_channel][_grid_index]._raw_blocks;
+            document.timeline[_grid_index]
+            .chip_channel_cells[_chip][_channel]._raw_blocks;
 
         auto p = &_edit;
 
@@ -176,12 +177,12 @@ std::variant<GridBlockBeat, EmptyBlock> get_current_block(
     doc::ChannelIndex channel,
     timing::GridAndBeat now
 ) {
-    auto const& cell = document.chip_channel_timelines[chip][channel][now.grid];
+    auto cell_ref = doc::TimelineChannelRef(document.timeline, chip, channel)[now.grid];
+    doc::TimelineCell const& cell = cell_ref.cell;
 
-    auto pattern_or_end =
-        timeline_iter::pattern_or_end(document.grid_cells[now.grid], cell, now.beat);
+    doc::PatternRef pattern_or_end = timeline_iter::pattern_or_end(cell_ref, now.beat);
     if (pattern_or_end.block < cell.size()) {
-        auto pattern = pattern_or_end;
+        doc::PatternRef pattern = pattern_or_end;
         // block_or_end() is required to return a block where block.end_time > beat.
         release_assert(now.beat < pattern.end_time);
 
@@ -263,7 +264,7 @@ EditBox delete_cell(
 
     // Copy pattern.
     doc::Pattern pattern =
-        document.chip_channel_timelines[chip][channel][time.grid]
+        document.timeline[time.grid].chip_channel_cells[chip][channel]
         ._raw_blocks[time.block].pattern;
 
     // Erase certain event fields, based on where the cursor was positioned.
@@ -330,7 +331,7 @@ EditBox insert_note(
 
         // Copy pattern.
         edit = edit::EditPattern{doc::Pattern(
-            document.chip_channel_timelines[chip][channel][time.grid]
+            document.timeline[time.grid].chip_channel_cells[chip][channel]
                 ._raw_blocks[time.block].pattern
         )};
         events = &std::get<edit::EditPattern>(edit).pattern.events;
@@ -395,7 +396,7 @@ std::tuple<uint8_t, EditBox> add_digit(
 
         // Copy pattern.
         edit = edit::EditPattern{doc::Pattern(
-            document.chip_channel_timelines[chip][channel][time.grid]
+            document.timeline[time.grid].chip_channel_cells[chip][channel]
                 ._raw_blocks[time.block].pattern
         )};
         events = &std::get<edit::EditPattern>(edit).pattern.events;

@@ -233,8 +233,8 @@ add_executable(exotracker-tests
     tests/run_tests.cpp
     tests/test_blip_buffer.cpp
     tests/test_document.cpp
-    tests/test_math.cpp
     tests/test_edit_history.cpp
+    tests/test_math.cpp
     tests/audio/test_event_queue.cpp
     tests/audio/test_sequencer.cpp
     tests/audio/test_synth.cpp

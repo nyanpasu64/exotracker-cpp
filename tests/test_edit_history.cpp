@@ -21,8 +21,8 @@ using edit::EditBox;
 using timing::GridAndBeat;
 
 [[nodiscard]] doc::TimelineCell const& get_cell(doc::Document const& d) {
-    // chip 0, channel 0, grid 0
-    return d.chip_channel_timelines[0][0][0];
+    // grid 0, chip 0, channel 0
+    return d.timeline[0].chip_channel_cells[0][0];
 }
 
 using GetEdit = edit::EditBox (*)(doc::Document const&);

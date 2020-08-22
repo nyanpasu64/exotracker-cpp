@@ -172,15 +172,15 @@ My goal in exploring alternative approaches is not file-size efficiency (deletin
 
 The frame/order editor is replaced with a timeline editor, and its functionality is changed significantly.
 
-The pattern grid structure from existing trackers is carried over (under the name of grid cells). Each grid cell has its own length which can vary between cells (like OpenMPT, unlike FamiTracker). However, grid cells are not patterns, and events are not placed directly in grid cells.
+The pattern grid structure from existing trackers is carried over (under the name of timeline rows and grid cells). Each timeline row has its own length which can vary between rows (like OpenMPT, unlike FamiTracker). Each timeline row holds one timeline cell (or grid cell) per channel. However, unlike patterns, timeline cells do not contain events directly, but through several layers of indirection.
 
-Events are placed in a separate nested structure. Each channel has its own timeline, or an array of one timeline cell per global grid cell. The length of a timeline cell is determined by the corresponding grid cell. A timeline cell can hold zero or more blocks, which carry a start and end time (in integer beats) and a pattern. These blocks have nonzero length, do not overlap in time, occur in increasing time order, and lie between 0 and the timeline cell's length (the last block's end time can take on a special value corresponding to "end of cell")[1].
+A timeline cell can hold zero or more blocks, which carry a start and end time (in integer beats) and a pattern. These blocks have nonzero length, do not overlap in time, occur in increasing time order, and lie between 0 and the timeline cell's length (the last block's end time can take on a special value corresponding to "end of cell")[1].
 
 Each block contains a single pattern, consisting of a list of events and an optional loop duration (in integer beats). The pattern starts playing when absolute time reaches the block's start time, and stops playing when absolute time reaches the block's end time. If the loop duration is set, whenever relative time (within the pattern) reaches the loop duration, playback jumps back to the pattern's begin. A block can cut off a pattern's events early when time reaches the block's end time (either the pattern's initial play or during a loop). However a block cannot start playback partway into a pattern (no plans to add support yet).
 
 Eventually, patterns can be reused in multiple blocks at different times (and possibly different channels).
 
-[1] I'm not sure what to do if a user shrinks a grid cell, which causes an absolute-end block to end past the cell, or an "end of cell" block to have a size ≤ 0, etc.
+[1] I'm not sure what to do if a user shrinks a timeline row, which causes an numeric-end block to end past the cell, or an "end of cell" block to have a size ≤ 0, etc.
 
 ### Motivation
 
@@ -190,7 +190,15 @@ It is also intended to have a similar degree of flexibility as a DAW like Reaper
 
 ### Implementation
 
-I added classes `TimelineCellIter` and `TimelineCellIterRef` to loop each block's patterns for as long as it's playing. These classes (which act like coroutines/generators) are constructed with a `TimelineCell` and its duration, and yield `PatternRef` objects until exhausted.
+The timeline code is implemented in `doc/timeline.h`. I added several helper classes.
+
+`TimelineCellRef` and `TimelineCellRefMut` store a reference to a timeline cell, and the owning timeline row's length.
+
+`TimelineChannelRef` and `TimelineChannelRefMut` store a reference to a `Timeline` (all grid cells, all channels), and a chip and channel value. Timelines are currently stored as `[grid] [chip, channel] TimelineCell` to make adding/removing grid cells easy. But `TimelineChannelRef` can be indexed `[grid] TimelineCell`, to simplify code (like sequencers and cursor movement) that interacts with multiple grid/timeline cells, but only one channel.
+
+#### TimelineCellIter(Ref)
+
+I added classes `TimelineCellIter` and `TimelineCellIterRef` to step through a timeline cell's blocks, and loop each block's patterns for as long as it's playing. These classes (which act like coroutines/generators) are constructed with a `TimelineCell` and its duration, and yield `PatternRef` objects until exhausted.
 
 For each block in the cell, `TimelineCellIter(Ref)` will yield a `PatternRef` with the block's pattern either once (if the pattern doesn't loop), or once for each time the pattern loops within the block. The `PatternRef` stores the time the pattern plays within the grid cell, and a span (pointer, size) to the events that should be played (excluding all events past the block's end time, but currently not excluding events at the beginning).
 

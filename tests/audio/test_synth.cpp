@@ -18,6 +18,7 @@
 
 using audio::synth::nes_2a03_driver::Apu1Driver;
 using audio::synth::nes_2a03_driver::Apu1PulseDriver;
+using std::move;
 
 
 enum class TestChannelID {
@@ -29,31 +30,27 @@ enum class TestChannelID {
 static doc::Document one_note_document(TestChannelID which_channel, doc::Note pitch) {
     using namespace doc;
 
-    ChipList chips;
+    ChipList chips{ChipKind::Apu1};
 
-    auto const chip_kind = chip_kinds::ChipKind::Apu1;
-    using ChannelID = chip_kinds::Apu1ChannelID;
+    Timeline timeline;
 
-    chips.push_back(chip_kind);
+    timeline.push_back([&]() -> TimelineRow {
+        EventList one_note {{{0, 0}, {pitch}}};
+        EventList blank {};
 
-    EventList one_note {{{0, 0}, {pitch}}};
-    EventList blank {};
+        TimelineCell ch0{TimelineBlock::from_events(
+            which_channel == TestChannelID::Pulse1 ? one_note : blank
+        )};
 
-    // chip 0
-    Timeline pulse_1;
-    pulse_1.push_back({TimelineBlock{0, END_OF_GRID,
-        Pattern{which_channel == TestChannelID::Pulse1 ? one_note : blank}
-    }});
+        TimelineCell ch1{TimelineBlock::from_events(
+            which_channel == TestChannelID::Pulse2 ? one_note : blank
+        )};
 
-    Timeline pulse_2;
-    pulse_2.push_back({TimelineBlock{0, END_OF_GRID,
-        Pattern{which_channel == TestChannelID::Pulse2 ? one_note : blank}
-    }});
-
-    ChipChannelTo<Timeline> chip_channel_timelines =
-        {{std::move(pulse_1), std::move(pulse_2)}};
-
-    release_assert(chip_channel_timelines[0].size() == (int)ChannelID::COUNT);
+        return TimelineRow {
+            .nbeats = 4,
+            .chip_channel_cells = {{move(ch0), move(ch1)}},
+        };
+    }());
 
     return DocumentCopy {
         .sequencer_options = SequencerOptions{
@@ -63,8 +60,7 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = {},
         .chips = chips,
-        .grid_cells = {{.nbeats = 4}},
-        .chip_channel_timelines = std::move(chip_channel_timelines),
+        .timeline = move(timeline),
     };
 }
 

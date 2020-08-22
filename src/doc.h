@@ -80,15 +80,12 @@ struct DocumentCopy {
     ///
     /// Grid cells lie between gridlines.
     /// Each cell has a duration consisting of an integer(?) number of beats.
-    /// This variable stores cell durations, not block/pattern data.
+    /// This variable stores both cell durations and block/pattern data.
     /// ----
-    /// Timeline cell `i` has duration `grid_cells[i].nbeats`.
-    /// Valid gridlines are `0 .. grid_cells.size()` inclusive.
+    /// Timeline cell `i` has duration `timeline[i].nbeats`.
+    /// Valid gridlines are `0 .. timeline.size()` inclusive.
     /// However, the last grid cell is at size() - 1.
-    GridCells grid_cells;
-
-    /// This variable stores document pattern data.
-    ChipChannelTo<Timeline> chip_channel_timelines;
+    Timeline timeline;
 
     // Methods
     chip_common::ChannelIndex chip_index_to_nchan(chip_common::ChipIndex index) const {

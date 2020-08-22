@@ -79,10 +79,9 @@ static GridAndBeat pattern_to_abs_time(
 ) {
     auto [chip, channel] = gen_channel_list(document)[cursor.x.column];
 
-    doc::Timeline const& timeline =
-        document.chip_channel_timelines[chip][channel];
+    auto timeline = doc::TimelineChannelRef(document.timeline, chip, channel);
 
-    auto iter = ReverseBlockIterator::from_beat(document.grid_cells, timeline, cursor.y);
+    auto iter = ReverseBlockIterator::from_beat(timeline, cursor.y);
 
     bool first = true;
     while (true) {
@@ -131,10 +130,9 @@ static GridAndBeat pattern_to_abs_time(
 ) {
     auto [chip, channel] = gen_channel_list(document)[cursor.x.column];
 
-    doc::Timeline const& timeline =
-        document.chip_channel_timelines[chip][channel];
+    auto timeline = doc::TimelineChannelRef(document.timeline, chip, channel);
 
-    auto iter = ForwardBlockIterator::from_beat(document.grid_cells, timeline, cursor.y);
+    auto iter = ForwardBlockIterator::from_beat(timeline, cursor.y);
 
     bool first = true;
     while (true) {
@@ -219,11 +217,11 @@ using util::math::frac_next;
             }
             decrement_mod(
                 cursor_y.grid,
-                (GridIndex)document.grid_cells.size()
+                (GridIndex)document.timeline.size()
             );
         }
 
-        auto nbeats = document.grid_cells[cursor_y.grid].nbeats;
+        auto nbeats = document.timeline[cursor_y.grid].nbeats;
         prev_row = frac_prev(nbeats * rows_per_beat);
 
     } else {
@@ -246,7 +244,7 @@ using util::math::frac_next;
     FractionInt next_row;
     auto wrapped = Wrap::None;
 
-    auto nbeats = document.grid_cells[cursor_y.grid].nbeats;
+    auto nbeats = document.timeline[cursor_y.grid].nbeats;
     BeatFraction const num_rows = nbeats * rows_per_beat;
 
     if (raw_next < num_rows) {
@@ -256,7 +254,7 @@ using util::math::frac_next;
         if (move_cfg.wrap_across_frames) {
             increment_mod(
                 cursor_y.grid,
-                (GridIndex)document.grid_cells.size()
+                (GridIndex)document.timeline.size()
             );
             if (cursor_y.grid == GridIndex(0)) {
                 wrapped = Wrap::Plus;
@@ -399,11 +397,20 @@ static Document empty_doc(int n_seq_entry) {
     };
 
     Timeline timeline;
-    GridCells grid_cells;
 
     for (int seq_entry_idx = 0; seq_entry_idx < n_seq_entry; seq_entry_idx++) {
-        grid_cells.push_back(GridCell{.nbeats = 4});
-        timeline.push_back(TimelineCell{});
+        timeline.push_back(TimelineRow {
+            .nbeats = 4,
+            .chip_channel_cells = {
+                // chip 0
+                {
+                    // channel 0
+                    {},
+                    // channel 1
+                    {},
+                }
+            },
+        });
     }
 
     return DocumentCopy{
@@ -412,8 +419,7 @@ static Document empty_doc(int n_seq_entry) {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
-        .grid_cells = grid_cells,
-        .chip_channel_timelines = {{timeline}},
+        .timeline = timeline
     };
 }
 
@@ -425,14 +431,14 @@ using cursor::Cursor;
 /// Uses a single full-grid block to store events.
 static doc::Document simple_document() {
     auto document = empty_doc(4);
-    auto & timeline = document.chip_channel_timelines[0][0];
+    auto & cell = document.timeline[1].chip_channel_cells[0][0];
 
     auto block = doc::TimelineBlock{0, END_OF_GRID, Pattern{}};
 
     block.pattern.events.push_back({at(1), {1}});
     block.pattern.events.push_back({at(2), {2}});
 
-    timeline[1]._raw_blocks = {std::move(block)};
+    cell._raw_blocks = {std::move(block)};
 
     return document;
 }
@@ -440,7 +446,7 @@ static doc::Document simple_document() {
 /// Uses two mid-grid blocks to store events.
 static doc::Document blocked_document() {
     auto document = empty_doc(4);
-    auto & timeline = document.chip_channel_timelines[0][0];
+    auto & cell = document.timeline[1].chip_channel_cells[0][0];
 
     auto block1 = doc::TimelineBlock{1, 2, Pattern{
         .events = {{at(0), {1}}}
@@ -450,7 +456,7 @@ static doc::Document blocked_document() {
         .events = {{at(0), {2}}}
     }};
 
-    timeline[1]._raw_blocks = {std::move(block1), std::move(block2)};
+    cell._raw_blocks = {std::move(block1), std::move(block2)};
 
     return document;
 }
@@ -458,14 +464,14 @@ static doc::Document blocked_document() {
 /// Uses a looped pattern to play the same event multiple times.
 static doc::Document looped_document() {
     auto document = empty_doc(4);
-    auto & timeline = document.chip_channel_timelines[0][0];
+    auto & cell = document.timeline[1].chip_channel_cells[0][0];
 
     auto block = doc::TimelineBlock{1, 3, Pattern{
         .events = {{at(0), {1}}},
         .loop_length = 1,
     }};
 
-    timeline[1]._raw_blocks = {std::move(block)};
+    cell._raw_blocks = {std::move(block)};
 
     return document;
 }

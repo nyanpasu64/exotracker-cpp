@@ -17,6 +17,23 @@
 
 namespace doc::timeline {
 
+// # Constants
+
+/// Type doesn't really matter.
+///
+/// Not sure what MAX_SEQUENCE_LEN means.
+/// Maybe it needs to be split into grid cell limit, pattern usage limit,
+/// and pattern limit.
+constexpr int MAX_GRID_CELLS = 256;
+
+
+/// Not strictly enforced. But exceeding this could cause problems
+/// with the hardware driver, or skips in the audio.
+constexpr int MAX_BLOCKS_PER_CELL = 32;
+
+
+// # Utility types
+
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 
@@ -41,11 +58,13 @@ template<typename T>
 using MaybeNonZero = T;
 
 
+// # Sub-grid pattern types
+
 /// The length of a pattern is determined by its entry in the timeline (PatternUsage).
 /// However a Pattern may specify a loop length.
 /// If set, the first `loop_length` beats of the Pattern will loop
 /// for the duration of the PatternUsage.
-struct Pattern {
+struct [[nodiscard]] Pattern {
     event_list::EventList events;
 
     /// Loop length in beats. If length is zero, don't loop the pattern.
@@ -98,7 +117,7 @@ inline std::strong_ordering operator<=>(BeatOrEnd l, BeatFraction r) {
 /// It is legal to have gaps between `PatternUsage` in the timeline
 /// where no events are processed.
 /// It is illegal for `PatternUsage` to overlap in the timeline.
-struct TimelineBlock {
+struct [[nodiscard]] TimelineBlock {
     /// Invariant: begin_time < end_time
     /// (cannot be equal, since it becomes impossible to select the usage).
     ///
@@ -114,14 +133,23 @@ struct TimelineBlock {
     /// Or maybe a variant of these two.
     Pattern pattern;
 
+    static TimelineBlock from_events(
+        event_list::EventList events, MaybeNonZero<uint32_t> loop_length = {}
+    ) {
+        return TimelineBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}};
+    }
+
     #ifdef UNITTEST
     DEFAULT_EQUALABLE(TimelineBlock)
     #endif
 };
 
 
-/// One channel, one grid cell, can hold multiple blocks at non-overlapping times.
-struct TimelineCell {
+// # Timeline grid types
+
+/// One grid cell, one channel.
+/// Can hold multiple blocks at non-overlapping times.
+struct [[nodiscard]] TimelineCell {
     DenseMap<BlockIndex, TimelineBlock> _raw_blocks;
 
     // impl
@@ -137,28 +165,78 @@ struct TimelineCell {
     }
 };
 
-
-/// One channel, whole song.
-using Timeline = DenseMap<GridIndex, TimelineCell>;
-
-
-/// Type doesn't really matter.
-///
-/// Not sure what MAX_SEQUENCE_LEN means.
-/// Maybe it needs to be split into grid cell limit, pattern usage limit,
-/// and pattern limit.
-constexpr int MAX_GRID_CELLS = 256;
-
-
-/// Not strictly enforced. But exceeding this could cause problems
-/// with the hardware driver, or skips in the audio.
-constexpr int MAX_BLOCKS_PER_CELL = 32;
-
-struct GridCell {
-    BeatFraction nbeats;
+/// One grid cell, one channel.
+struct [[nodiscard]] TimelineCellRef {
+    BeatFraction const nbeats;
+    TimelineCell const& cell;
 };
 
-using GridCells = DenseMap<GridIndex, GridCell>;
+struct [[nodiscard]] TimelineCellRefMut {
+    BeatFraction const nbeats;
+    TimelineCell & cell;
+};
+
+
+/// One grid cell, all channels. Stores duration of grid cell.
+struct [[nodiscard]] TimelineRow {
+    BeatFraction nbeats;
+
+    ChipChannelTo<TimelineCell> chip_channel_cells;
+};
+
+
+/// All grid cells, all channels.
+using Timeline = DenseMap<GridIndex, TimelineRow>;
+using TimelineRef = gsl::span<TimelineRow const>;
+
+
+/// All grid cells, one channel.
+class [[nodiscard]] TimelineChannelRef {
+    TimelineRef _timeline;
+    ChipIndex _chip;
+    ChannelIndex _channel;
+
+    // impl
+public:
+    TimelineChannelRef(TimelineRef timeline, ChipIndex chip, ChannelIndex channel)
+        : _timeline(timeline)
+        , _chip(chip)
+        , _channel(channel)
+    {}
+
+    GridIndex size() const {
+        return (GridIndex) _timeline.size();
+    }
+
+    [[nodiscard]] TimelineCellRef operator[](GridIndex i) const {
+        auto & row = _timeline[(size_t) i];
+        return TimelineCellRef{row.nbeats, row.chip_channel_cells[_chip][_channel]};
+    }
+};
+
+/// All grid cells, one channel.
+class [[nodiscard]] TimelineChannelRefMut {
+    Timeline & _timeline;
+    ChipIndex _chip;
+    ChannelIndex _channel;
+
+    // impl
+public:
+    TimelineChannelRefMut(Timeline & timeline, ChipIndex chip, ChannelIndex channel)
+        : _timeline(timeline)
+        , _chip(chip)
+        , _channel(channel)
+    {}
+
+    GridIndex size() const {
+        return (GridIndex) _timeline.size();
+    }
+
+    [[nodiscard]] TimelineCellRefMut operator[](GridIndex i) {
+        auto & row = _timeline[(size_t) i];
+        return TimelineCellRefMut{row.nbeats, row.chip_channel_cells[_chip][_channel]};
+    }
+};
 
 
 // # Iterating over looped patterns within blocks in a timeline
@@ -194,9 +272,6 @@ using MaybePatternRef = std::optional<PatternRef>;
 class [[nodiscard]] TimelineCellIter {
     scrDefine;
 
-    /// Do not overwrite this field in any method (only via assignment).
-    BeatFraction _cell_nbeats;
-
     BeatIndex _loop_begin_time;
 
     BlockIndex _block;
@@ -205,20 +280,20 @@ class [[nodiscard]] TimelineCellIter {
     event_list::EventIndex _loop_ev_idx;
 
 public:
-    TimelineCellIter(GridCell nbeats);
+    TimelineCellIter() = default;
 
     /// You must pass in the same unmodified cell on each iteration,
     /// matching nbeats passed into the constructor.
-    [[nodiscard]] MaybePatternRef next(TimelineCell const& cell);
+    [[nodiscard]] MaybePatternRef next(TimelineCellRef cell_ref);
 };
 
 /// Version of TimelineCellIter that holds onto a reference to the cell.
 class [[nodiscard]] TimelineCellIterRef {
-    TimelineCell const& _cell;
+    TimelineCellRef _cell_ref;
     TimelineCellIter _iter;
 
 public:
-    TimelineCellIterRef(TimelineCell const& cell, GridCell nbeats);
+    TimelineCellIterRef(TimelineCellRef cell_ref);
 
     [[nodiscard]] MaybePatternRef next();
 };

@@ -5,7 +5,7 @@
 namespace edit::modified {
 
 enum ModifiedFlags : ModifiedInt {
-    GridCells = 0x1,
+    TimelineRows = 0x1,
     Patterns = 0x2,
     Tempo = 0x4,
 };

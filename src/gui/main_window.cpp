@@ -118,7 +118,7 @@ void RawSelection::select_all(
 
         _end.x = CursorX{right_col, col_to_nsubcol[right_col] - 1};
         _end.y = GridAndBeat{
-            bottom_seq, document.grid_cells[bottom_seq].nbeats - _bottom_padding
+            bottom_seq, document.timeline[bottom_seq].nbeats - _bottom_padding
         };
     };
 
@@ -867,7 +867,7 @@ public:
         auto & doc = get_document();
 
         {
-            auto nbeats = frac_floor(doc.grid_cells[_cursor->y.grid].nbeats);
+            auto nbeats = frac_floor(doc.timeline[_cursor->y.grid].nbeats);
             auto b = QSignalBlocker(_length_beats);
             _length_beats->setValue(nbeats);
         }
@@ -1005,7 +1005,7 @@ public:
 
     void add_timeline_row() {
         auto & document = get_document();
-        if (document.grid_cells.size() + 1 >= doc::MAX_GRID_CELLS) {
+        if (document.timeline.size() + 1 >= doc::MAX_GRID_CELLS) {
             return;
         }
 
@@ -1019,11 +1019,11 @@ public:
 
     void remove_timeline_row() {
         auto & document = get_document();
-        if (document.grid_cells.size() <= 1) {
+        if (document.timeline.size() <= 1) {
             return;
         }
 
-        push_edit(edit_doc::remove_timeline_row(document, _cursor->y.grid), {});
+        push_edit(edit_doc::remove_timeline_row(_cursor->y.grid), {});
     }
 
     /// Clears existing bindings and rebinds shortcuts.

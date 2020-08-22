@@ -21,30 +21,29 @@ namespace audio::synth::sequencer {
 using namespace doc;
 using chip_kinds::ChipKind;
 using namespace doc_util::shorthand;
+using std::move;
 
 static Document simple_doc() {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 10,
     };
 
-    GridCells grid_cells;
+    Timeline timeline;
 
-    grid_cells.push_back({2});
+    timeline.push_back([]() -> TimelineRow {
+        TimelineCell ch0{TimelineBlock::from_events({
+            // TimeInPattern, RowEvent
+            {at(0), {0}},
+            {at(1), {1}},
+        })};
 
-    Timeline channel_0;
-    Timeline channel_1;
+        TimelineCell ch1{};
 
-    // time 0
-    channel_0.push_back({
-        TimelineBlock{0, END_OF_GRID,
-            Pattern{EventList{
-                // TimeInPattern, RowEvent
-                {at(0), {0}},
-                {at(1), {1}},
-            }}
-        }
-    });
-    channel_1.push_back(TimelineCell{});
+        return TimelineRow{
+            .nbeats = 2,
+            .chip_channel_cells = {{move(ch0), move(ch1)}},
+        };
+    }());
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -52,8 +51,7 @@ static Document simple_doc() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
-        .grid_cells = grid_cells,
-        .chip_channel_timelines = {{channel_0, channel_1}},
+        .timeline = move(timeline),
     };
 }
 
@@ -272,49 +270,52 @@ static Document parametric_doc(
         .ticks_per_beat = 10,
     };
 
-    GridCells grid_cells {
-        {.nbeats = 4},
-        {.nbeats = 4},
-    };
-
-    Timeline channel_0;
-    Timeline channel_1;
+    Timeline timeline;
 
     // grid 0
-    channel_0.push_back({
-        TimelineBlock{0, END_OF_GRID, Pattern{
-            {
+    timeline.push_back([&]() -> TimelineRow {
+        TimelineCell ch0{
+            TimelineBlock::from_events({
                 // TimeInPattern, RowEvent
                 {at_delay(beat, delay), {0}},
                 {at_delay(beat + 2, -delay), {1}},
-            },
-            loop_length
-        }}
-    });
-    channel_1.push_back({});
+            }, loop_length)
+        };
+
+        return TimelineRow {
+            .nbeats = 4,
+            .chip_channel_cells = {{move(ch0), {}}},
+        };
+    }());
 
     // The second pattern is ✨different✨.
     delay = peak_delay - delay;
 
     // grid 1
-    channel_0.push_back({
-        // Add two blocks into one grid cell, as a test case.
-        TimelineBlock{(BeatIndex) beat, beat + 2, Pattern{
-            {
-                // TimeInPattern, RowEvent
-                {at_delay(0, delay), {2}},
-            },
-            loop_length
-        }},
-        TimelineBlock{(BeatIndex) beat + 2, END_OF_GRID, Pattern{
-            {
-                // TimeInPattern, RowEvent
-                {at_delay(0, -delay), {3}},
-            },
-            loop_length
-        }},
-    });
-    channel_1.push_back({});
+    timeline.push_back([&]() -> TimelineRow {
+        TimelineCell ch0{
+            // Add two blocks into one grid cell, as a test case.
+            TimelineBlock{(BeatIndex) beat, beat + 2, Pattern{
+                {
+                    // TimeInPattern, RowEvent
+                    {at_delay(0, delay), {2}},
+                },
+                loop_length
+            }},
+            TimelineBlock{(BeatIndex) beat + 2, END_OF_GRID, Pattern{
+                {
+                    // TimeInPattern, RowEvent
+                    {at_delay(0, -delay), {3}},
+                },
+                loop_length
+            }},
+        };
+
+        return TimelineRow {
+            .nbeats = 4,
+            .chip_channel_cells = {{move(ch0), {}}},
+        };
+    }());
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -322,8 +323,7 @@ static Document parametric_doc(
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
-        .grid_cells = grid_cells,
-        .chip_channel_timelines = {{channel_0, channel_1}},
+        .timeline = move(timeline),
     };
 }
 
@@ -339,24 +339,22 @@ static Document short_doc(
         .ticks_per_beat = 10,
     };
 
-    GridCells grid_cells {
-        {.nbeats = 4},
-    };
-
-    Timeline channel_0;
-    Timeline channel_1;
-
-    EventList events;
-    for (uint32_t beat = 0; beat < nbeat; beat++) {
-        events.push_back({at_delay(beat, delay), {beat}});
-    }
+    Timeline timeline;
 
     // grid 0
-    channel_0.push_back({
-        // Add two blocks into one grid cell, as a test case.
-        TimelineBlock{0, END_OF_GRID, Pattern{events, loop_length}}
-    });
-    channel_1.push_back({});
+    timeline.push_back([&]() -> TimelineRow {
+        EventList events;
+        for (uint32_t beat = 0; beat < nbeat; beat++) {
+            events.push_back({at_delay(beat, delay), {beat}});
+        }
+
+        TimelineCell ch0{TimelineBlock::from_events(move(events), loop_length)};
+
+        return TimelineRow {
+            .nbeats = 4,
+            .chip_channel_cells = {{move(ch0), {}}},
+        };
+    }());
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -364,8 +362,7 @@ static Document short_doc(
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
-        .grid_cells = grid_cells,
-        .chip_channel_timelines = {{channel_0, channel_1}},
+        .timeline = move(timeline),
     };
 }
 
@@ -377,14 +374,9 @@ static Document gap_doc(
         .ticks_per_beat = 10,
     };
 
-    GridCells grid_cells {
-        {.nbeats = 4},
-        {.nbeats = 4},
-        {.nbeats = 4},
-    };
+    Timeline timeline;
 
-    Timeline channel_0;
-    Timeline channel_1;
+
 
     EventList events;
     for (uint32_t beat = 0; beat < nbeat; beat++) {
@@ -392,18 +384,28 @@ static Document gap_doc(
     }
 
     // grid 0
-    channel_0.push_back({
-        TimelineBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}}
-    });
-    channel_1.push_back({});
+    timeline.push_back([&]() -> TimelineRow {
+        TimelineCell ch0{
+            TimelineBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}}
+        };
+
+        return TimelineRow {
+            .nbeats = 4,
+            .chip_channel_cells = {{move(ch0), {}}},
+        };
+    }());
 
     // grid 1
-    channel_0.push_back({});
-    channel_1.push_back({});
+    timeline.push_back(TimelineRow {
+        .nbeats = 4,
+        .chip_channel_cells = {{{}, {}}},
+    });
 
     // grid 2
-    channel_0.push_back({});
-    channel_1.push_back({});
+    timeline.push_back(TimelineRow {
+        .nbeats = 4,
+        .chip_channel_cells = {{{}, {}}},
+    });
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -411,8 +413,7 @@ static Document gap_doc(
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
-        .grid_cells = grid_cells,
-        .chip_channel_timelines = {{channel_0, channel_1}},
+        .timeline = move(timeline),
     };
 }
 
