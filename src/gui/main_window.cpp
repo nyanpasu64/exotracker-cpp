@@ -775,90 +775,6 @@ public:
         return _audio.get_document();
     }
 
-    void on_startup(config::Options const& options) {
-        // Upon application startup, pattern editor panel is focused.
-        _pattern_editor_panel->setFocus();
-
-        auto connect_spin = [&](QSpinBox * spin, auto target, auto func) {
-            connect(
-                spin,
-                qOverload<int>(&QSpinBox::valueChanged),
-                target,
-                func,
-                Qt::UniqueConnection
-            );
-        };
-
-        auto pattern_setter = [this] (auto method) {
-            return std::bind_front(method, _pattern_editor_panel);
-        };
-
-        #define BIND_SPIN(KEY) \
-            _##KEY->setValue(_pattern_editor_panel->KEY()); \
-            connect_spin( \
-                _##KEY, \
-                _pattern_editor_panel, \
-                pattern_setter(&PatternEditorPanel::set_##KEY) \
-            );
-
-        BIND_SPIN(rows_per_beat)
-
-        auto gui_bottom_octave = [] () {
-            return get_app().options().note_names.gui_bottom_octave;
-        };
-
-        // Visual octave: add offset.
-        _octave->setValue(_pattern_editor_panel->octave() + gui_bottom_octave());
-
-        // MIDI octave: subtract offset.
-        connect_spin(
-            _octave,
-            _pattern_editor_panel,
-            [this, gui_bottom_octave] (int octave) {
-                _pattern_editor_panel->set_octave(octave - gui_bottom_octave());
-            }
-        );
-
-        BIND_SPIN(step)
-
-        // _ticks_per_beat obtains its value through update_gui_from_doc().
-        connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
-            push_edit(edit_doc::set_ticks_per_beat(ticks_per_beat), {}, false);
-        });
-
-        // TODO connect _length_beats to edit_doc::set_timeline_row_length()
-        connect_spin(_length_beats, this, [this] (int grid_length_beats) {
-            push_edit(
-                edit_doc::set_grid_length(_cursor->y.grid, grid_length_beats), {}, false
-            );
-        });
-
-        set_widgets_from_doc();
-    }
-
-    // # Updating GUI from document
-
-    void set_widgets_from_doc() {
-        doc::Document const& document = get_document();
-
-        {
-            auto b = QSignalBlocker(_ticks_per_beat);
-            _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
-        }
-
-        set_widgets_from_cursor();
-    }
-
-    void set_widgets_from_cursor() {
-        auto & doc = get_document();
-
-        {
-            auto nbeats = frac_floor(doc.timeline[_cursor->y.grid].nbeats);
-            auto b = QSignalBlocker(_length_beats);
-            _length_beats->setValue(nbeats);
-        }
-    }
-
     AudioState audio_state() const override {
         return _audio.audio_state();
     }
@@ -943,11 +859,9 @@ public:
 
         _audio.setup_audio();
 
-        reload_shortcuts();
-        // TODO reload_shortcuts() when shortcut keybinds changed
-
         // Last thing.
         on_startup(get_app().options());
+        // TODO reload_shortcuts() when shortcut keybinds changed
     }
 
     void setup_screen() {
@@ -965,6 +879,155 @@ public:
     }
     // W_SLOT(setup_timer)
 
+    void on_startup(config::Options const& options) {
+        // Upon application startup, pattern editor panel is focused.
+        _pattern_editor_panel->setFocus();
+
+        auto connect_spin = [&](QSpinBox * spin, auto target, auto func) {
+            connect(
+                spin,
+                qOverload<int>(&QSpinBox::valueChanged),
+                target,
+                func,
+                Qt::UniqueConnection
+            );
+        };
+
+        auto pattern_setter = [this] (auto method) {
+            return std::bind_front(method, _pattern_editor_panel);
+        };
+
+        #define BIND_SPIN(KEY) \
+            _##KEY->setValue(_pattern_editor_panel->KEY()); \
+            connect_spin( \
+                _##KEY, \
+                _pattern_editor_panel, \
+                pattern_setter(&PatternEditorPanel::set_##KEY) \
+            );
+
+        BIND_SPIN(rows_per_beat)
+
+        auto gui_bottom_octave = [] () {
+            return get_app().options().note_names.gui_bottom_octave;
+        };
+
+        // Visual octave: add offset.
+        _octave->setValue(_pattern_editor_panel->octave() + gui_bottom_octave());
+
+        // MIDI octave: subtract offset.
+        connect_spin(
+            _octave,
+            _pattern_editor_panel,
+            [this, gui_bottom_octave] (int octave) {
+                _pattern_editor_panel->set_octave(octave - gui_bottom_octave());
+            }
+        );
+
+        BIND_SPIN(step)
+
+        // _ticks_per_beat obtains its value through update_gui_from_doc().
+        connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
+            push_edit(edit_doc::set_ticks_per_beat(ticks_per_beat), {}, false);
+        });
+
+        // TODO connect _length_beats to edit_doc::set_timeline_row_length()
+        connect_spin(_length_beats, this, [this] (int grid_length_beats) {
+            push_edit(
+                edit_doc::set_grid_length(_cursor->y.grid, grid_length_beats), {}, false
+            );
+        });
+
+        // Connect timeline editor toolbar.
+        auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
+            connect(&action, &QAction::triggered, this, func);
+        };
+        connect_action(*_timeline.add_row, &MainWindowImpl::add_timeline_row);
+        connect_action(*_timeline.remove_row, &MainWindowImpl::remove_timeline_row);
+        connect_action(*_timeline.move_up, &MainWindowImpl::move_grid_up);
+        connect_action(*_timeline.move_down, &MainWindowImpl::move_grid_down);
+
+        // Bind keyboard shortcuts, and (for the time being) connect to functions.
+        reload_shortcuts();
+
+        // Initialize GUI state.
+        set_widgets_from_doc();
+    }
+
+    /// Clears existing bindings and rebinds shortcuts.
+    /// Can be called multiple times.
+    void reload_shortcuts() {
+        auto & shortcuts = get_app().options().global_keys;
+
+        // This function is only for binding shortcut keys.
+        // Do not connect toolbar/menu actions here, but in on_startup() instead.
+        // For the time being, connecting shortcut actions is allowed,
+        // but most of these actions will have toolbar/menu entries in the future.
+
+        auto bind_editor_action = [this] (QAction & action) {
+            action.setShortcutContext(Qt::WidgetWithChildrenShortcut);
+
+            // "A QWidget should only have one of each action and adding an action
+            // it already has will not cause the same action to be in the widget twice."
+            _pattern_editor_panel->addAction(&action);
+        };
+
+        auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
+            connect(&action, &QAction::triggered, this, func, Qt::UniqueConnection);
+        };
+
+        _play_pause.setShortcut(QKeySequence{shortcuts.play_pause});
+        bind_editor_action(_play_pause);
+        connect_action(_play_pause, [this] () {
+            _audio.play_pause(*this);
+            repaint_children();
+        });
+
+        _play_from_row.setShortcut(QKeySequence{shortcuts.play_from_row});
+        bind_editor_action(_play_from_row);
+        connect_action(_play_from_row, [this] () {
+            _audio.play_from_row(*this);
+            repaint_children();
+        });
+
+        _undo.setShortcuts(QKeySequence::Undo);
+        bind_editor_action(_undo);
+        connect_action(_undo, &MainWindowImpl::undo);
+
+        _redo.setShortcuts(QKeySequence::Redo);
+        bind_editor_action(_redo);
+        connect_action(_redo, &MainWindowImpl::redo);
+
+        _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
+        _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
+        this->addAction(&_restart_audio);
+        connect_action(_restart_audio, [this] () {
+            _audio.restart_audio_thread();
+        });
+    }
+
+    // # Updating GUI from document
+
+    void set_widgets_from_doc() {
+        doc::Document const& document = get_document();
+
+        {
+            auto b = QSignalBlocker(_ticks_per_beat);
+            _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
+        }
+
+        set_widgets_from_cursor();
+    }
+
+    void set_widgets_from_cursor() {
+        auto & doc = get_document();
+
+        {
+            auto nbeats = frac_floor(doc.timeline[_cursor->y.grid].nbeats);
+            auto b = QSignalBlocker(_length_beats);
+            _length_beats->setValue(nbeats);
+        }
+    }
+
     /// Called after document/cursor mutated.
     void repaint_children() {
         _pattern_editor_panel->update();  // depends on _cursor and _history
@@ -974,6 +1037,8 @@ public:
 
         _timeline_editor->update_cursor();
     }
+
+    // # Mutation methods, called when QAction are triggered.
 
     void undo() {
         if (_audio.undo(*this)) {
@@ -1027,58 +1092,6 @@ public:
             down.y.grid++;
             push_edit(edit_doc::move_grid_down(_cursor->y.grid), down);
         }
-    }
-
-    /// Clears existing bindings and rebinds shortcuts.
-    /// Can be called multiple times.
-    void reload_shortcuts() {
-        auto & shortcuts = get_app().options().global_keys;
-
-        auto bind_editor_action = [this] (QAction & action) {
-            action.setShortcutContext(Qt::WidgetWithChildrenShortcut);
-
-            // "A QWidget should only have one of each action and adding an action
-            // it already has will not cause the same action to be in the widget twice."
-            _pattern_editor_panel->addAction(&action);
-        };
-
-        auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
-            connect(&action, &QAction::triggered, this, func, Qt::UniqueConnection);
-        };
-
-        _play_pause.setShortcut(QKeySequence{shortcuts.play_pause});
-        bind_editor_action(_play_pause);
-        connect_action(_play_pause, [this] () {
-            _audio.play_pause(*this);
-            repaint_children();
-        });
-
-        _play_from_row.setShortcut(QKeySequence{shortcuts.play_from_row});
-        bind_editor_action(_play_from_row);
-        connect_action(_play_from_row, [this] () {
-            _audio.play_from_row(*this);
-            repaint_children();
-        });
-
-        _undo.setShortcuts(QKeySequence::Undo);
-        bind_editor_action(_undo);
-        connect_action(_undo, &MainWindowImpl::undo);
-
-        _redo.setShortcuts(QKeySequence::Redo);
-        bind_editor_action(_redo);
-        connect_action(_redo, &MainWindowImpl::redo);
-
-        connect_action(*_timeline.add_row, &MainWindowImpl::add_timeline_row);
-        connect_action(*_timeline.remove_row, &MainWindowImpl::remove_timeline_row);
-        connect_action(*_timeline.move_up, &MainWindowImpl::move_grid_up);
-        connect_action(*_timeline.move_down, &MainWindowImpl::move_grid_down);
-
-        _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
-        _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
-        this->addAction(&_restart_audio);
-        connect_action(_restart_audio, [this] () {
-            _audio.restart_audio_thread();
-        });
     }
 };
 
