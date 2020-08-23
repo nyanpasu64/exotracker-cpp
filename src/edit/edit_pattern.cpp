@@ -6,7 +6,7 @@
 #include "util/release_assert.h"
 #include "util/typeid_cast.h"
 
-#include <algorithm>  // std::swap
+#include <utility>  // std::swap
 #include <cassert>
 #include <memory>  // make_unique. <memory> is already included for EditBox though.
 #include <stdexcept>

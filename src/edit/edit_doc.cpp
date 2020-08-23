@@ -6,6 +6,7 @@
 #include "util/release_assert.h"
 
 #include <variant>
+#include <utility>  // std::swap
 
 namespace edit::edit_doc {
 
@@ -119,6 +120,8 @@ struct EditRow : EditRowInner {
     EditRow(EditRow && other) : EditRow((EditRowInner &&) other) {}
 };
 
+// Exported via headers.
+
 EditBox add_timeline_row(
     doc::Document const& document, doc::GridIndex grid_pos, doc::BeatFraction nbeats
 ) {
@@ -143,6 +146,38 @@ EditBox add_timeline_row(
 
 EditBox remove_timeline_row(doc::GridIndex grid_pos) {
     return make_command<EditRow>(EditRowInner{grid_pos, {}});
+}
+
+// # Set grid length.
+
+struct SetGridLength {
+    doc::GridIndex _grid;
+    doc::BeatFraction _row_nbeats;
+
+    void apply_swap(doc::Document & document) {
+        std::swap(document.timeline[_grid].nbeats, _row_nbeats);
+    }
+
+    bool can_coalesce(BaseEditCommand & prev) const {
+        using ImplPatternEdit = edit_impl::ImplEditCommand<SetGridLength>;
+
+        // Is it really a good idea to coalesce spinbox changes?
+        // If you undo to after a spinbox edit, and spin it again,
+        // the previous undo state is destroyed!
+
+        if (auto p = typeid_cast<ImplPatternEdit *>(&prev)) {
+            SetGridLength & prev = *p;
+            return prev._grid == _grid;
+        }
+
+        return false;
+    }
+
+    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
+};
+
+EditBox set_grid_length(doc::GridIndex grid_pos, doc::BeatFraction nbeats) {
+    return make_command(SetGridLength{grid_pos, nbeats});
 }
 
 }

@@ -15,4 +15,7 @@ namespace edit::edit_doc {
 
 [[nodiscard]] EditBox remove_timeline_row(doc::GridIndex grid_pos);
 
+[[nodiscard]]
+EditBox set_grid_length(doc::GridIndex grid_pos, doc::BeatFraction nbeats);
+
 }

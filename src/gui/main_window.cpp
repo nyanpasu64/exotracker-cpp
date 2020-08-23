@@ -827,6 +827,11 @@ public:
         });
 
         // TODO connect _length_beats to edit_doc::set_timeline_row_length()
+        connect_spin(_length_beats, this, [this] (int grid_length_beats) {
+            push_edit(
+                edit_doc::set_grid_length(_cursor->y.grid, grid_length_beats), {}, false
+            );
+        });
 
         set_widgets_from_doc();
     }
