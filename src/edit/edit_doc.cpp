@@ -84,6 +84,7 @@ struct EditRow {
     EditRow(EditRow && other) : EditRow(other._grid, std::move(other._edit)) {}
 
     void apply_swap(doc::Document & document) {
+        assert(document.timeline.capacity() >= MAX_GRID_CELLS);
 
         auto validate_reserved = [] (TimelineRow & row) {
             for (auto & channel_cells : row.chip_channel_cells) {
