@@ -150,6 +150,12 @@ EditBox remove_timeline_row(doc::GridIndex grid_pos) {
     return make_command(EditRow(grid_pos, {}));
 }
 
+EditBox clone_timeline_row(doc::Document const& document, doc::GridIndex grid_pos) {
+    return make_command(EditRow(
+        grid_pos + 1, TimelineRow(document.timeline[grid_pos])
+    ));
+}
+
 // # Set grid length.
 
 struct SetGridLength {

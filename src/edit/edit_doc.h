@@ -22,4 +22,7 @@ EditBox set_grid_length(doc::GridIndex grid_pos, doc::BeatFraction nbeats);
 
 [[nodiscard]] EditBox move_grid_down(doc::GridIndex grid_pos);
 
+[[nodiscard]]
+EditBox clone_timeline_row(doc::Document const& document, doc::GridIndex grid_pos);
+
 }

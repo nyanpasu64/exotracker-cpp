@@ -945,6 +945,7 @@ public:
         connect_action(*_timeline.remove_row, &MainWindowImpl::remove_timeline_row);
         connect_action(*_timeline.move_up, &MainWindowImpl::move_grid_up);
         connect_action(*_timeline.move_down, &MainWindowImpl::move_grid_down);
+        connect_action(*_timeline.clone_row, &MainWindowImpl::clone_timeline_row);
 
         // Bind keyboard shortcuts, and (for the time being) connect to functions.
         reload_shortcuts();
@@ -1056,7 +1057,7 @@ public:
 
     void add_timeline_row() {
         auto & document = get_document();
-        if (document.timeline.size() + 1 >= doc::MAX_GRID_CELLS) {
+        if (document.timeline.size() >= doc::MAX_GRID_CELLS) {
             return;
         }
 
@@ -1092,6 +1093,15 @@ public:
             down.y.grid++;
             push_edit(edit_doc::move_grid_down(_cursor->y.grid), down);
         }
+    }
+
+    void clone_timeline_row() {
+        auto & document = get_document();
+        if (document.timeline.size() >= doc::MAX_GRID_CELLS) {
+            return;
+        }
+
+        push_edit(edit_doc::clone_timeline_row(document, _cursor->y.grid), {});
     }
 };
 
