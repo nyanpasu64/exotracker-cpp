@@ -59,9 +59,29 @@ EditBox set_ticks_per_beat(int ticks_per_beat) {
 
 using namespace doc;
 
-struct EditRowInner {
+struct EditRow {
     doc::GridIndex _grid;
     std::optional<TimelineRow> _edit;
+
+    /// If the command holds a row to be inserted, reserve memory for each cell.
+    /// Once a cell gets swapped into the document,
+    /// adding blocks must not allocate memory, to prevent blocking the audio thread.
+    EditRow(doc::GridIndex grid, std::optional<TimelineRow> edit)
+        : _grid(grid)
+        , _edit(std::move(edit))
+    {
+        if (_edit) {
+            for (auto & channel_cells : _edit->chip_channel_cells) {
+                for (auto & cell : channel_cells) {
+                    cell._raw_blocks.reserve(doc::MAX_BLOCKS_PER_CELL);
+                }
+            }
+        }
+    }
+
+    EditRow(EditRow const& other) : EditRow(other._grid, other._edit) {}
+
+    EditRow(EditRow && other) : EditRow(other._grid, std::move(other._edit)) {}
 
     void apply_swap(doc::Document & document) {
 
@@ -101,25 +121,6 @@ struct EditRowInner {
     constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
 };
 
-/// If the command holds a row to be inserted, reserve memory for each cell.
-/// Once a cell gets swapped into the document, adding blocks must not allocate memory,
-/// to prevent blocking the audio thread.
-struct EditRow : EditRowInner {
-    EditRow(EditRowInner cell) : EditRowInner(std::move(cell)) {
-        if (_edit) {
-            for (auto & channel_cells : _edit->chip_channel_cells) {
-                for (auto & cell : channel_cells) {
-                    cell._raw_blocks.reserve(doc::MAX_BLOCKS_PER_CELL);
-                }
-            }
-        }
-    }
-
-    EditRow(EditRow const& other) : EditRow((EditRowInner const&) other) {}
-
-    EditRow(EditRow && other) : EditRow((EditRowInner &&) other) {}
-};
-
 // Exported via headers.
 
 EditBox add_timeline_row(
@@ -138,14 +139,14 @@ EditBox add_timeline_row(
         chip_channel_cells.push_back(std::move(channel_cells));
     }
 
-    return make_command<EditRow>(EditRowInner{
+    return make_command(EditRow(
         grid_pos,
-        TimelineRow{nbeats, std::move(chip_channel_cells)},
-    });
+        TimelineRow{nbeats, std::move(chip_channel_cells)}
+    ));
 }
 
 EditBox remove_timeline_row(doc::GridIndex grid_pos) {
-    return make_command<EditRow>(EditRowInner{grid_pos, {}});
+    return make_command(EditRow(grid_pos, {}));
 }
 
 // # Set grid length.
