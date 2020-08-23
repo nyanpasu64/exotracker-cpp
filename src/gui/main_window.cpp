@@ -21,7 +21,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
-#include <QToolBar>
+#include "gui/lib/icon_toolbar.h"
 #include <QToolButton>
 // Layouts
 #include <QBoxLayout>
@@ -298,24 +298,15 @@ struct MainWindowUi : MainWindow {
 
     PatternEditorPanel * _pattern_editor_panel;
 
-    static QToolButton * toolbar_widget(QToolBar * tb, QAction * action) {
-        auto out = qobject_cast<QToolButton *>(tb->widgetForAction(action));
-        assert(out);
-        return out;
-    }
-
     /// Output: _pattern_editor_panel.
     void setup_widgets() {
 
-        // TODO move to main or GuiApp.
-        QIcon::setThemeSearchPaths(
-            QIcon::themeSearchPaths() << "C:/Users/nyanpasu/code/exotracker-icons/out"
-        );
-        QIcon::setThemeName("exotracker");
-
         auto main = this;
 
-        {main__tb(QToolBar);
+        // TODO move to main or GuiApp.
+        IconToolBar::setup_icon_theme();
+
+        {main__tb(IconToolBar(false));  // No button borders
             tb->setFloatable(false);
 
             // View options.
@@ -357,15 +348,6 @@ struct MainWindowUi : MainWindow {
         }
     }
 
-    void add_toolbar_action(
-        QToolBar * tb, QAction * & action, QString alt, QString icon
-    ) {
-        action = tb->addAction(alt);
-        action->setIcon(QIcon::fromTheme(icon));
-        // Disable flat mode.
-        toolbar_widget(tb, action)->setAutoRaise(false);
-    }
-
     void setup_panel(QBoxLayout * l) { {  // needed to allow shadowing
         l__c_l(QWidget, QHBoxLayout);
         c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -377,22 +359,21 @@ struct MainWindowUi : MainWindow {
                 _timeline_editor = w;
                 // w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
             }
-            {l__w(QToolBar)
-                w->setIconSize(w->iconSize() * 2 / 3);
-                add_toolbar_action(
-                    w, _timeline.add_row, tr("Add Timeline Row"), "document-new"
+            {l__w(IconToolBar(true))  // Show button borders.
+                _timeline.add_row = w->add_icon_action(
+                    tr("Add Timeline Row"), "document-new"
                 );
-                add_toolbar_action(
-                    w, _timeline.remove_row, tr("Delete Timeline Row"), "edit-delete"
+                _timeline.remove_row = w->add_icon_action(
+                    tr("Delete Timeline Row"), "edit-delete"
                 );
-                add_toolbar_action(
-                    w, _timeline.move_up, tr("Move Row Up"), "go-up"
+                _timeline.move_up = w->add_icon_action(
+                    tr("Move Row Up"), "go-up"
                 );
-                add_toolbar_action(
-                    w, _timeline.move_down, tr("Move Row Down"), "go-down"
+                _timeline.move_down = w->add_icon_action(
+                    tr("Move Row Down"), "go-down"
                 );
-                add_toolbar_action(
-                    w, _timeline.clone_row, tr("Clone Row"), "edit-copy"
+                _timeline.clone_row = w->add_icon_action(
+                    tr("Clone Row"), "edit-copy"
                 );
             }
         }
