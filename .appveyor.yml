@@ -37,15 +37,12 @@ clone_depth: 3 # clone entire repository history if not defined
 environment:
   APPVEYOR_YML_DISABLE_PS_LINUX: true
   matrix:
-    - APPVEYOR_JOB_NAME: Windows MSVC 64
+    - APPVEYOR_JOB_NAME: Windows Clang 64
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
 
-      # x86, x64, or /clean_env
-      VCVARS: x64
-
       # Used by CMake
-      CC: cl
-      CXX: cl
+      CC: clang
+      CXX: clang++
       Qt5_DIR: C:/Qt/5.15/msvc2019_64
 
 #---------------------------------#
@@ -61,7 +58,6 @@ configuration:
 
 # to run your custom scripts instead of automatic MSBuild
 build_script:
-  - cmd: '"C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Auxiliary/Build/vcvarsall.bat" %VCVARS%'
   - cmd: py -3 ci/build_appveyor.py build
 
 # to run your custom scripts instead of automatic tests

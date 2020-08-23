@@ -29,17 +29,17 @@ cmake .. -DCMAKE_BUILD_TYPE={Release, Debug, ...} -G Ninja
 ninja
 ```
 
-I use Qt Creator and CLion IDEs for this project. You can import it into Visual Studio 2019 as a CMake project, but profiling will be tricky-to-impossible to set up. Telling CMake to generate Visual Studio .sln projects will probably not work (switching build types in Visual Studio will not change flags).
+I use Qt Creator and CLion IDEs for this project. You can import it into Visual Studio 2019 as a CMake project, but profiling will be tricky-to-impossible to set up. Telling CMake to generate Visual Studio .sln projects will probably not work (switching build types in Visual Studio will not change flags, and I don't know how to use Clang with .vcxproj).
 
-exotracker-cpp requires a compiler with C++20 support.
+exotracker-cpp requires a compiler with C++20 support and GCC's "statement expressions" extension. MSVC is not supported, GCC and Clang is.
 
 - On Linux, I've had good results with GCC 10 and Clang 10 (not sure about older versions).
-- On Windows, I recommend using MSVC 2019 or Clang (not clang-cl); mingw-w64 produces larger binaries and requires either static libc or DLLs most people don't have.
-- On Mac, it compiles using XCode's Clang.
+- On Windows, I recommend using Clang (not clang-cl); mingw-w64 produces larger binaries and requires either static libc or DLLs most people don't have. MSVC is not supported and the code will not compile.
+- On Mac, it compiles using XCode's Clang. I haven't tried other compilers.
 
 ### Build Dependencies
 
-exotracker-cpp depends on Qt. All other libraries are bundled, compiled, and linked statically. On Linux, you need to install ALSA/PulseAudio/JACK headers to obtain each backend.
+exotracker-cpp depends on Qt. All other libraries are bundled, compiled, and linked statically. On Linux, to obtain audio, you need to install ALSA/PulseAudio/JACK headers (whichever one you want to use). Most Linux distributions use PulseAudio, but RtAudio's PulseAudio backend may be more stuttery (due to mutexes) than ALSA.
 
 ## Documentation
 
