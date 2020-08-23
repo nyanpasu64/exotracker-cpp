@@ -1012,6 +1012,23 @@ public:
         push_edit(edit_doc::remove_timeline_row(_cursor->y.grid), {});
     }
 
+    void move_grid_up() {
+        if (_cursor->y.grid.v > 0) {
+            auto up = *_cursor;
+            up.y.grid--;
+            push_edit(edit_doc::move_grid_up(_cursor->y.grid), up);
+        }
+    }
+
+    void move_grid_down() {
+        auto & document = get_document();
+        if (_cursor->y.grid + 1 < document.timeline.size()) {
+            auto down = *_cursor;
+            down.y.grid++;
+            push_edit(edit_doc::move_grid_down(_cursor->y.grid), down);
+        }
+    }
+
     /// Clears existing bindings and rebinds shortcuts.
     /// Can be called multiple times.
     void reload_shortcuts() {
@@ -1053,6 +1070,8 @@ public:
 
         connect_action(*_timeline.add_row, &MainWindowImpl::add_timeline_row);
         connect_action(*_timeline.remove_row, &MainWindowImpl::remove_timeline_row);
+        connect_action(*_timeline.move_up, &MainWindowImpl::move_grid_up);
+        connect_action(*_timeline.move_down, &MainWindowImpl::move_grid_down);
 
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);

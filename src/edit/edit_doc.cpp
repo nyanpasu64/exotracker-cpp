@@ -182,4 +182,28 @@ EditBox set_grid_length(doc::GridIndex grid_pos, doc::BeatFraction nbeats) {
     return make_command(SetGridLength{grid_pos, nbeats});
 }
 
+// # Move timeline rows.
+
+struct MoveGridDown {
+    doc::GridIndex _grid;
+
+    void apply_swap(doc::Document & document) {
+        std::swap(document.timeline[_grid], document.timeline[_grid + 1]);
+    }
+
+    bool can_coalesce(BaseEditCommand & prev) const {
+        return false;
+    }
+
+    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
+};
+
+EditBox move_grid_up(doc::GridIndex grid_pos) {
+    return make_command(MoveGridDown{grid_pos - 1});
+}
+
+EditBox move_grid_down(doc::GridIndex grid_pos) {
+    return make_command(MoveGridDown{grid_pos});
+}
+
 }
