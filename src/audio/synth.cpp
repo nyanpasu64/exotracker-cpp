@@ -164,7 +164,13 @@ void OverallSynth::synthesize_overall(
             chip->tempo_changed(_document);
         }
     }
-    if (total_modified & ModifiedFlags::Patterns) {
+
+    if (total_modified & ModifiedFlags::TimelineRows) {
+        for (auto & chip : _chip_instances) {
+            chip->timeline_modified(_document);
+        }
+        // Invalidates all sequencer state. We do not need to check the other flags.
+    } else if (total_modified & ModifiedFlags::Patterns) {
         for (auto & chip : _chip_instances) {
             chip->doc_edited(_document);
         }

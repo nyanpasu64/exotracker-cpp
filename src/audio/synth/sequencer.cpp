@@ -836,5 +836,44 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
     _ignore_ordering_errors = false;
 }
 
+void ChannelSequencer::timeline_modified(doc::Document const & document) {
+    // Clamp the grid cell within the document.
+    // This MUST be the first operation in this function!
+    // TODO supply an API so deleting previous grids moves the cursor backwards,
+    // and adding previous grids (or undoing deletion) moves the cursor forwards.
+    _now.grid = std::min(_now.grid, doc::GridIndex(document.timeline.size() - 1));
+
+    // Reset the next event to play, to the in-bounds grid cell.
+    _grid_runahead = {};
+    _next_event = {.grid = _now.grid};
+
+    // Clamp the cursor within the in-bounds grid cell's length.
+    BeatPlusTick const now_grid_len = ({
+        doc::SequencerOptions const options = document.sequencer_options;
+        TickT const ticks_per_beat = options.ticks_per_beat;
+        auto timeline =
+            doc::TimelineChannelRef(document.timeline, _chip_index, _chan_index);
+        frac_to_tick(ticks_per_beat, timeline[_now.grid].nbeats);
+    });
+
+    /*
+    doc_edited() treats adjacent grid cells as a continuum.
+    If _now.next_tick is at or past the end of one grid cell,
+    it acts as if _now is in the next cell (due to `now -= now_grid_len`)
+    and skips playing events within the overhang.
+
+    To fix this issue, clamp the tick to the current grid
+    (including the endpoint, because it's easier than subtracting 1 row or tick
+    or jumping to the next pattern).
+
+    doc_edited() will advance to the next grid's tick 0
+    and play the first event that isn't early.
+    */
+    _now.next_tick = std::min(_now.next_tick, now_grid_len);
+
+    // Recompute the next event to play.
+    doc_edited(document);
+}
+
 // end namespaces
 }

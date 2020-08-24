@@ -114,6 +114,10 @@ public:
         _chip_sequencer.doc_edited(document);
     }
 
+    void timeline_modified(doc::Document const & document) override {
+        _chip_sequencer.timeline_modified(document);
+    }
+
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
     SequencerTime sequencer_tick(doc::Document const & document) override {
         auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);

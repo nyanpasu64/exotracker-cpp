@@ -419,7 +419,7 @@ static Document gap_doc(
 
 std::random_device rd;
 
-TEST_CASE("Randomly switch between randomly generated documents") {
+TEST_CASE("Randomly switch between randomly generated documents of the same length") {
     // Keep two sequencers and tick both in lockstep.
     // Occasionally switch documents.
     // Upon each mutation, one sequencer is reset and advanced from scratch,
@@ -445,8 +445,6 @@ TEST_CASE("Randomly switch between randomly generated documents") {
         using rand_tick = std::uniform_int_distribution<TickT>;
         using rand_bool = std::bernoulli_distribution;
 
-        // TODO switch doc durations randomly
-        // TODO edit sequencer to add support for changing block lengths/counts
         auto const which_doc = rand_u32{0, 2}(rng);
 
         bool negative_ticks = false;
@@ -526,6 +524,108 @@ TEST_CASE("Randomly switch between randomly generated documents") {
             auto [dirty_time, dirty_ev] = dirty.next_tick(document);
             CHECK(pure_time == dirty_time);
             CHECK(pure_ev == dirty_ev);
+        }
+    }
+}
+
+TEST_CASE("Randomly switch between randomly generated documents of different lengths") {
+    // Occasionally switch documents, tell the sequencer,
+    // and make sure it doesn't crash.
+    // We don't compare to ground truth because behavior is ill-defined in some cases,
+    // like when switching from a long to a short cell.
+    // Behavior will be evaluated through manual testing.
+
+    using RNG = std::minstd_rand;
+    RNG rng{rd()};
+
+    for (int i = 0; i < 300; i++) {
+        // Capture state if test fails.
+        std::ostringstream ss;
+        ss << rng;
+        auto rng_state = ss.str();
+        CAPTURE(rng_state);
+
+        using rand_u32 = std::uniform_int_distribution<uint32_t>;
+        using rand_tick = std::uniform_int_distribution<TickT>;
+        using rand_bool = std::bernoulli_distribution;
+
+        uint32_t which_doc;
+        bool negative_ticks;
+
+        auto random_doc = [&which_doc, &negative_ticks] (RNG & rng) {
+            which_doc = rand_u32{0, 2}(rng);
+
+            switch (which_doc) {
+            case 0: {
+                // `beat + 2` can overflow the end of the pattern.
+                // Events are misordered, but doc_edited() pretends
+                // the new document was always there (and ignores misorderings).
+                auto begin_beat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{0, 9}(rng);
+                auto peak_delay = rand_bool{0.5}(rng) ? 10 : 0;
+                auto loop_length = rand_bool{0.5}(rng) ? begin_beat + 2 : 0;
+
+                negative_ticks = false;
+                return parametric_doc(begin_beat, delay, peak_delay, loop_length);
+
+            }
+            case 1: {
+                auto nbeat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{-4, 4}(rng);
+                auto loop_length = rand_u32{std::max(nbeat, 1u), 4}(rng);
+
+                negative_ticks = delay < 0;
+                return short_doc(nbeat, delay, loop_length);
+            }
+            case 2: {
+                auto nbeat = rand_u32{0, 2}(rng);
+                auto delay = rand_tick{-4, 4}(rng);
+                auto loop_length = rand_u32{std::max(nbeat, 1u), 4}(rng);
+
+                negative_ticks = delay < 0;
+                return gap_doc(nbeat, delay, loop_length);
+            }
+            }
+            throw std::logic_error("Unknown document type");
+        };
+
+        Document document = random_doc(rng);
+
+        auto seq = make_channel_sequencer(0, 0, document);
+
+        for (int tick = 0; tick < 100; tick++) {
+            CAPTURE(tick);
+            // Randomly decide whether to switch documents.
+            if (rand_bool{0.1}(rng)) {
+                /*
+                If you add negative delays at the beginning of a document,
+                then call doc_edited() before tick 0,
+                then only the edited sequencer will skip the negative-delay notes.
+
+                If you reduce the number of events but don't call doc_edited(),
+                then the sequencer could crash.
+
+                So don't add negative delays on tick 0.
+                (Desync doesn't happen if you edit a document
+                to remove negative delays.)
+                */
+
+                auto prev_which_doc = which_doc;
+                Document new_doc = random_doc(rng);
+                if (!(tick == 0 && negative_ticks)) {
+                    document = std::move(new_doc);
+
+                    if (which_doc != prev_which_doc) {
+                        seq.tempo_changed(document);
+                        seq.timeline_modified(document);
+                    } else {
+                        seq.doc_edited(document);
+                    }
+                }
+            }
+
+            // Make sure both sequencers agree.
+            seq.next_tick(document);
         }
     }
 }

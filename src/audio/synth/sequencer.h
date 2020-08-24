@@ -207,6 +207,10 @@ public:
     /// Recompute _next_event based on document and timestamp.
     /// Doesn't matter if document was edited or not.
     ///
+    /// Preconditions:
+    /// - None. This resets sequencer state, so the previous/current document
+    ///   don't need to be the same.
+    ///
     /// Postconditions:
     /// - playing (_curr_ticks_per_beat != 0)
     void seek(doc::Document const & document, GridAndBeat time);
@@ -219,17 +223,29 @@ public:
     void tempo_changed(doc::Document const & document);
 
     /// Recompute _next_event based on _now and edited document.
+    /// If tempo has changed, call tempo_changed() beforehand.
     ///
     /// Preconditions:
     /// - playing (_curr_ticks_per_beat != 0)
-    /// - ticks_per_beat unchanged from previous call to seek/tempo_changed/next_tick.
+    /// - ticks_per_beat unchanged from previous call to seek/tempo_changed.
+    /// - number and duration of timeline cells unmodified.
     void doc_edited(doc::Document const & document);
+
+    /// Called when number or duration of timeline cells are changed.
+    /// Force the cursor in-bounds (grid, then beat+tick), then recompute _next_event.
+    /// If tempo has changed, call tempo_changed() beforehand.
+    ///
+    /// Preconditions:
+    /// - playing (_curr_ticks_per_beat != 0)
+    /// - ticks_per_beat unchanged from previous call to seek/tempo_changed.
+    void timeline_modified(doc::Document const & document);
 
     // next_tick() is declared last in the header, but implemented first in the .cpp.
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
     ///
     /// Preconditions:
     /// - playing (_curr_ticks_per_beat != 0)
+    /// - Document is unchanged, or else appropriate methods have been called.
     ///
     /// Return: SequencerTime is current tick (just occurred), not next tick.
     std::tuple<SequencerTime, EventsRef> next_tick(doc::Document const & document);
@@ -270,6 +286,12 @@ public:
     void doc_edited(doc::Document const & document) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             _channel_sequencers[chan].doc_edited(document);
+        }
+    }
+
+    void timeline_modified(doc::Document const & document) {
+        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
+            _channel_sequencers[chan].timeline_modified(document);
         }
     }
 
