@@ -211,13 +211,6 @@ public:
     /// - playing (_curr_ticks_per_beat != 0)
     void seek(doc::Document const & document, GridAndBeat time);
 
-    /// Recompute _next_event based on _now and edited document.
-    ///
-    /// Preconditions:
-    /// - playing (_curr_ticks_per_beat != 0)
-    /// - ticks_per_beat unchanged from previous call to seek/tempo_changed/next_tick.
-    void doc_edited(doc::Document const & document);
-
     /// Recompute _now based on timestamp and document tempo. Ignores events entirely.
     /// Can be called before doc_edited() if both tempo and events edited.
     ///
@@ -225,6 +218,14 @@ public:
     /// - playing (_curr_ticks_per_beat != 0)
     void tempo_changed(doc::Document const & document);
 
+    /// Recompute _next_event based on _now and edited document.
+    ///
+    /// Preconditions:
+    /// - playing (_curr_ticks_per_beat != 0)
+    /// - ticks_per_beat unchanged from previous call to seek/tempo_changed/next_tick.
+    void doc_edited(doc::Document const & document);
+
+    // next_tick() is declared last in the header, but implemented first in the .cpp.
     /// Owning a vector, but returning a span, avoids the double-indirection of vector&.
     ///
     /// Preconditions:
@@ -260,15 +261,15 @@ public:
         }
     }
 
-    void doc_edited(doc::Document const & document) {
-        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
-            _channel_sequencers[chan].doc_edited(document);
-        }
-    }
-
     void tempo_changed(doc::Document const & document) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
             _channel_sequencers[chan].tempo_changed(document);
+        }
+    }
+
+    void doc_edited(doc::Document const & document) {
+        for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
+            _channel_sequencers[chan].doc_edited(document);
         }
     }
 

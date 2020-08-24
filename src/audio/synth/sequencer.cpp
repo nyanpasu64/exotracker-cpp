@@ -588,15 +588,71 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
 }
 
 /*
-We need separate APIs for "pattern contents changed" and "document speed changed".
-Right now, we recompute event index based on _now
+We provide separate APIs for "pattern contents changed" and "document speed changed".
+doc_edited() recomputes event index based on _now
 (which is correct if pattern contents change).
-If document speed changes, we should instead recompute _now and not event index.
+tempo_changed() recomputes _now and not event index.
 
 To recompute _now, we can convert _now to a beat fraction (= dtick / ticks per beat),
 then round down when converting back to a tick
 (to avoid putting events in the past as much as possible).
 */
+
+void ChannelSequencer::tempo_changed(doc::Document const & document) {
+    #ifdef SEQUENCER_DEBUG
+    print_chip_channel(*this);
+    fmt::print(stderr, "tempo_changed {}\n", document.sequencer_options.ticks_per_beat);
+    #endif
+
+    // beat must be based on the current value of _now,
+    // not the previously returned "start of beat".
+    // Or else, reassigning _now could erase gridline crossings
+    // and break _grid_runahead invariants.
+
+    // Assert that seek() was called earlier.
+    release_assert(_curr_ticks_per_beat != 0);
+
+    doc::BeatFraction beat{
+        _now.next_tick.beat + doc::BeatFraction{
+            _now.next_tick.dtick, _curr_ticks_per_beat
+        }
+    };
+    TickT const ticks_per_beat = document.sequencer_options.ticks_per_beat;
+
+    // Set real time.
+    // Both numerator (_now.next_tick) and denominator (_curr_ticks_per_beat)
+    // need to be changed at the same time.
+    _now.next_tick = frac_to_tick<util::math::frac_floor>(ticks_per_beat, beat);
+    _curr_ticks_per_beat = ticks_per_beat;
+
+    /*
+    Sometimes it's impossible to avoid putting events in the past.
+    Suppose you start with _now = 0 and ticks/beat = 1.
+
+    When next_tick() is called at ticks/beat = 1:
+    - _next_event (ceil-rounded) will advance until it's greater than _now
+      (1/4 rounds up to 1 > _now=0)
+    - _now will advance by 1 tick (_now := 1)
+
+    When tempo_changed() is called at ticks/beat = 11:
+    - _now stays at 1
+
+    When next_tick() is called at ticks/beat = 11:
+    - _next_event is at 1/4, which rounds to 3.
+    - _now rounds to 11.
+    - The event is in the past.
+
+    How would we fix this?
+    Setting frac_to_tick to frac_floor() (towards the past)
+    seems to resolve time paradoxes in the absence of delayed/early notes.
+    Switching between custom user grooves can cause semi-random time paradoxes.
+    Delayed/early notes can cause unavoidable time paradoxes
+    (not just due to rounding/quantization).
+
+    So set a flag saying "ignore past event errors".
+    */
+    _ignore_ordering_errors = true;
+}
 
 void ChannelSequencer::doc_edited(doc::Document const & document) {
     #ifdef SEQUENCER_DEBUG
@@ -778,62 +834,6 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
     }
     end_loop:
     _ignore_ordering_errors = false;
-}
-
-void ChannelSequencer::tempo_changed(doc::Document const & document) {
-    #ifdef SEQUENCER_DEBUG
-    print_chip_channel(*this);
-    fmt::print(stderr, "tempo_changed {}\n", document.sequencer_options.ticks_per_beat);
-    #endif
-
-    // beat must be based on the current value of _now,
-    // not the previously returned "start of beat".
-    // Or else, reassigning _now could erase gridline crossings
-    // and break _grid_runahead invariants.
-
-    // Assert that seek() was called earlier.
-    release_assert(_curr_ticks_per_beat != 0);
-
-    doc::BeatFraction beat{
-        _now.next_tick.beat + doc::BeatFraction{
-            _now.next_tick.dtick, _curr_ticks_per_beat
-        }
-    };
-    TickT const ticks_per_beat = document.sequencer_options.ticks_per_beat;
-
-    // Set real time.
-    // Both numerator (_now.next_tick) and denominator (_curr_ticks_per_beat)
-    // need to be changed at the same time.
-    _now.next_tick = frac_to_tick<util::math::frac_floor>(ticks_per_beat, beat);
-    _curr_ticks_per_beat = ticks_per_beat;
-
-    /*
-    Sometimes it's impossible to avoid putting events in the past.
-    Suppose you start with _now = 0 and ticks/beat = 1.
-
-    When next_tick() is called at ticks/beat = 1:
-    - _next_event (ceil-rounded) will advance until it's greater than _now
-      (1/4 rounds up to 1 > _now=0)
-    - _now will advance by 1 tick (_now := 1)
-
-    When tempo_changed() is called at ticks/beat = 11:
-    - _now stays at 1
-
-    When next_tick() is called at ticks/beat = 11:
-    - _next_event is at 1/4, which rounds to 3.
-    - _now rounds to 11.
-    - The event is in the past.
-
-    How would we fix this?
-    Setting frac_to_tick to frac_floor() (towards the past)
-    seems to resolve time paradoxes in the absence of delayed/early notes.
-    Switching between custom user grooves can cause semi-random time paradoxes.
-    Delayed/early notes can cause unavoidable time paradoxes
-    (not just due to rounding/quantization).
-
-    So set a flag saying "ignore past event errors".
-    */
-    _ignore_ordering_errors = true;
 }
 
 // end namespaces

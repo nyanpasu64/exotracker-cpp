@@ -106,12 +106,12 @@ public:
         _driver.stop_playback(_register_writes);
     }
 
-    void doc_edited(doc::Document const & document) override {
-        _chip_sequencer.doc_edited(document);
-    }
-
     void tempo_changed(doc::Document const & document) override {
         _chip_sequencer.tempo_changed(document);
+    }
+
+    void doc_edited(doc::Document const & document) override {
+        _chip_sequencer.doc_edited(document);
     }
 
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().

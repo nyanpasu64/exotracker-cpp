@@ -75,14 +75,14 @@ public:
     /// or notes may not necessarily stop.
     virtual void stop_playback() = 0;
 
-    /// Assumes tempo is unchanged, but events are changed.
-    /// Keeps real time in ticks, recomputes position in event list.
-    virtual void doc_edited(doc::Document const & document) = 0;
-
     /// Similar to seek(), but ignores events entirely (only looks at tempo/rounding).
     /// Keeps position in event list, recomputes real time in ticks.
     /// Can be called before doc_edited() if both tempo and events edited.
     virtual void tempo_changed(doc::Document const & document) = 0;
+
+    /// Assumes tempo is unchanged, but events are changed.
+    /// Keeps real time in ticks, recomputes position in event list.
+    virtual void doc_edited(doc::Document const & document) = 0;
 
     /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
     /// Sequencer's time passes.
