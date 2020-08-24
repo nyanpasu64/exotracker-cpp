@@ -211,7 +211,7 @@ TEST_CASE("Ensure sequencer behaves the same with and without reloading position
     }
 }
 
-TEST_CASE("Ensure sequencer behaves the same with and without reloading tempo") {
+TEST_CASE("Reload tempo on every tick, and ensure it doesn't affect behavior") {
     char const * doc_names[] {"dream-fragments", "world-revolution"};
     for (auto doc_name : doc_names) {
         CAPTURE(doc_name);
@@ -553,11 +553,58 @@ TEST_CASE("Deterministically switch between tempos") {
     }
 }
 
+TEST_CASE("Switch tempos twice on every tick, and ensure it doesn't affect behavior") {
+    // Keep two sequencers and tick both in lockstep.
+    // Occasionally, double "ticks per beat" and set it back in a single tick.
+
+    // If ChannelSequencer::tempo_changed() is implemented improperly,
+    // this changes the time of the sequencer.
+    // Unfortunately, the current fix causes each call to tempo_changed()
+    // to round off _now.next_tick, and the next call to use the rounded value.
+    // This is considered acceptable, so doubling "ticks per beat"
+    // (instead of a fractional multiplier)
+    // prevents rounding errors from failing the test.
+
+    // Can this bug occur in real life? Yes.
+    // OverallSynth's current design coalesces all tempo changes on the same callback,
+    // but multiple callbacks can occur without an intervening tick.
+
+    char const * doc_names[] {"dream-fragments", "world-revolution"};
+    for (auto doc_name : doc_names) {
+        CAPTURE(doc_name);
+        Document const& doc = sample_docs::DOCUMENTS.at(doc_name);
+
+        Document slow_doc = doc.clone();
+        slow_doc.sequencer_options.ticks_per_beat *= 2;
+
+        auto pure = make_channel_sequencer(0, 0, doc);
+        auto dirty = make_channel_sequencer(0, 0, doc);
+
+        for (int tick = 0; tick < 100; tick++) {
+            CAPTURE(tick);
+            // Randomly decide whether to switch documents.
+
+            dirty.tempo_changed(slow_doc);
+            dirty.tempo_changed(doc);
+
+            // Make sure both sequencers agree.
+            auto [pure_time, pure_ev] = pure.next_tick(doc);
+            auto [dirty_time, dirty_ev] = dirty.next_tick(doc);
+            REQUIRE(pure_time == dirty_time);
+            CHECK(pure_ev == dirty_ev);
+        }
+    }
+}
+
+
 TEST_CASE("Randomly switch between random tempos") {
     // Maybe my random test architecture from last time wasn't wasted.
 
     using RNG = std::minstd_rand;
     RNG rng{rd()};
+
+    bool reload_doc;
+    PICK(should_reload_doc(reload_doc));
 
     for (int i = 0; i < 300; i++) {
         // Capture state if test fails.
@@ -606,7 +653,9 @@ TEST_CASE("Randomly switch between random tempos") {
 
         for (int tick = 0; tick < 500; tick++) {
             CAPTURE(tick);
-            // Randomly decide whether to switch documents.
+            // Randomly decide how many times to switch documents.
+            // Switching multiple times on the same tick is allowed,
+            // and could expose bugs (I don't know of any yet).
             if (rand_bool{0.4}(rng)) {
                 if (rand_bool{0.25}(rng)) {
                     // This frequently causes `release_assert(dbeat <= 1)` to fail.
@@ -618,6 +667,11 @@ TEST_CASE("Randomly switch between random tempos") {
                     seq.tempo_changed(document);
                 }
             }
+
+            // There was a bug where changing the tempo
+            // and editing the doc on the same tick causes the sequencer to crash.
+            // Exercise this edge case too.
+            if (reload_doc) seq.doc_edited(document);
 
             // TODO add way for sequencers to report misordered events to caller.
             seq.next_tick(document);

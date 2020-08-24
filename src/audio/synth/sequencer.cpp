@@ -802,7 +802,10 @@ void ChannelSequencer::tempo_changed(doc::Document const & document) {
     TickT const ticks_per_beat = document.sequencer_options.ticks_per_beat;
 
     // Set real time.
+    // Both numerator (_now.next_tick) and denominator (_curr_ticks_per_beat)
+    // need to be changed at the same time.
     _now.next_tick = frac_to_tick<util::math::frac_floor>(ticks_per_beat, beat);
+    _curr_ticks_per_beat = ticks_per_beat;
 
     /*
     Sometimes it's impossible to avoid putting events in the past.
