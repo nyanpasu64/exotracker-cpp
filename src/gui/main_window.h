@@ -1,6 +1,4 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
-
+#pragma once
 // Do *not* include any other widgets in this header and create an include cycle.
 // Other widgets include main_window.h, since they rely on MainWindow for data/signals.
 #include "history.h"
@@ -120,7 +118,12 @@ public:
     Cursor const& operator*() const;
     Cursor const* operator->() const;
 
+    /// When emitted, a message is sent to the GUI to redraw widgets.
+    /// The widgets are only redrawn when the code returns to the event loop.
     void cursor_moved() W_SIGNAL(cursor_moved)
+
+    /// Only called by AudioComponent.
+    void set_internal(Cursor cursor);
 
     /// Moving the cursor always updates the selection endpoint.
     void set(Cursor cursor);
@@ -188,5 +191,3 @@ public:
 
 
 }
-
-#endif // MAINWINDOW_H

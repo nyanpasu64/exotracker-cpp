@@ -160,11 +160,15 @@ cursor::Cursor const* CursorAndSelection::operator->() const {
     return &_cursor;
 }
 
-void CursorAndSelection::set(Cursor cursor) {
+void CursorAndSelection::set_internal(Cursor cursor) {
     _cursor = cursor;
     if (_select) {
         _select->set_end(_cursor);
     }
+}
+
+void CursorAndSelection::set(Cursor cursor) {
+    set_internal(cursor);
     reset_digit();
     emit cursor_moved();
 }
@@ -193,13 +197,18 @@ int CursorAndSelection::digit_index() const {
 
 int CursorAndSelection::advance_digit() {
     ++_digit;
-    emit cursor_moved();
+    // Technically we should emit cursor_moved(),
+    // but advance_digit() is only called after/by another function which also emits it,
+    // and we want to avoid unnecessary double redraws.
+
     return _digit;
 }
 
 void CursorAndSelection::reset_digit() {
     _digit = 0;
-    emit cursor_moved();
+    // Technically we should emit cursor_moved(),
+    // but reset_digit() is only called after/by another function which also emits it,
+    // and we want to avoid unnecessary double redraws.
 }
 
 std::optional<RawSelection> CursorAndSelection::raw_select() const {
@@ -207,12 +216,10 @@ std::optional<RawSelection> CursorAndSelection::raw_select() const {
 }
 
 std::optional<RawSelection> & CursorAndSelection::raw_select_mut() {
-    // don't emit cursor_moved(), because we don't know when it'll get altered.
-    // Hopefully this shouldn't be a problem,
-    // since we only use raw_select_mut() for toggling selection bottom
-    // (which has minimal effect on GUI updates).
-    // and RawSelection has no way to emit the signal.
-    // and the caller? nah
+    // We emit the signal before _select is mutated.
+    // But the listener is connected via a Qt::QueuedConnection,
+    // so it only gets invoked once the mutating function exits to the event loop.
+    emit cursor_moved();
     return _select;
 }
 
@@ -231,9 +238,11 @@ void CursorAndSelection::enable_select(int rows_per_beat) {
 }
 
 void CursorAndSelection::clear_select() {
-    _select = {};
+    if (_select) {
+        _select = {};
+        emit cursor_moved();
+    }
     // TODO reset digit?
-    emit cursor_moved();
 }
 
 
@@ -699,18 +708,17 @@ public:
     ) {
         send_edit(*this, command->box_clone());
 
-        edit::MaybeCursor before_cursor{};
-        edit::MaybeCursor after_cursor{};
-
         if (maybe_cursor) {
-            before_cursor = *state._cursor;
-            state._cursor.set(*maybe_cursor);
-            after_cursor = *state._cursor;
+            _history.push(edit::CursorEdit{
+                std::move(command), *state._cursor, *maybe_cursor
+            });
+
+            // Does not emit cursor_moved()!
+            state._cursor.set_internal(*maybe_cursor);
+        } else {
+            _history.push(edit::CursorEdit{std::move(command), {}, {}});
         }
 
-        _history.push(
-            edit::CursorEdit{std::move(command), before_cursor, after_cursor}
-        );
         if (advance_digit) {
             state._cursor.advance_digit();
         } else {
@@ -784,11 +792,12 @@ public:
         std::optional<Cursor> maybe_cursor,
         bool advance_digit = false
     ) override {
+        // Never emits cursor_moved().
         _audio.push_edit(*this, std::move(command), maybe_cursor, advance_digit);
 
-        // Somehow, this call is not necessary to redraw the pattern editor
-        // when you press the "add row" button.
-        repaint_children();
+        // So run this instead, which is equivalent
+        // (except immediate instead of queued).
+        update_widgets();
     }
 
     // private methods
@@ -841,16 +850,16 @@ public:
             }
         );
 
-        // Redraw all editors when cursor moved.
+        // When the cursor moves, redraw all editors.
+        // Qt::QueuedConnection has "transactional" semantics;
+        // the callback will only run once the mutating function returns
+        // to the event loop, preventing intermediate states.
         connect(
             &_cursor,
             &CursorAndSelection::cursor_moved,
             this,
-            [this] () {
-                set_widgets_from_cursor();
-                _pattern_editor_panel->update();
-                _timeline_editor->update_cursor();
-            }
+            &MainWindowImpl::update_widgets,
+            Qt::QueuedConnection
         );
 
         setup_screen();
@@ -951,7 +960,7 @@ public:
         reload_shortcuts();
 
         // Initialize GUI state.
-        set_widgets_from_doc();
+        update_widgets();
     }
 
     /// Clears existing bindings and rebinds shortcuts.
@@ -980,14 +989,14 @@ public:
         bind_editor_action(_play_pause);
         connect_action(_play_pause, [this] () {
             _audio.play_pause(*this);
-            repaint_children();
+            update_widgets();
         });
 
         _play_from_row.setShortcut(QKeySequence{shortcuts.play_from_row});
         bind_editor_action(_play_from_row);
         connect_action(_play_from_row, [this] () {
             _audio.play_from_row(*this);
-            repaint_children();
+            update_widgets();
         });
 
         _undo.setShortcuts(QKeySequence::Undo);
@@ -1008,50 +1017,40 @@ public:
 
     // # Updating GUI from document
 
-    void set_widgets_from_doc() {
-        doc::Document const& document = get_document();
-
-        {
-            auto b = QSignalBlocker(_ticks_per_beat);
-            _ticks_per_beat->setValue(document.sequencer_options.ticks_per_beat);
-        }
-
-        set_widgets_from_cursor();
-    }
-
-    void set_widgets_from_cursor() {
-        auto & doc = get_document();
-
-        {
-            auto nbeats = frac_floor(doc.timeline[_cursor->y.grid].nbeats);
-            auto b = QSignalBlocker(_length_beats);
-            _length_beats->setValue(nbeats);
-        }
-    }
-
-    /// Called after document/cursor mutated.
-    void repaint_children() {
+    /// To avoid tricky stale-GUI bugs,
+    /// update the whole UI on any change to cursor or document.
+    ///
+    /// (how does reactivity work lol, and how do i get it)
+    void update_widgets() {
         _pattern_editor_panel->update();  // depends on _cursor and _history
 
         // TODO find a less hacky way to update item count
         _timeline_editor->set_history(_audio.history());
-
         _timeline_editor->update_cursor();
+
+        doc::Document const& doc = get_document();
+
+        {auto b = QSignalBlocker(_ticks_per_beat);
+            _ticks_per_beat->setValue(doc.sequencer_options.ticks_per_beat);
+        }
+
+        {auto b = QSignalBlocker(_length_beats);
+            auto nbeats = frac_floor(doc.timeline[_cursor->y.grid].nbeats);
+            _length_beats->setValue(nbeats);
+        }
     }
 
     // # Mutation methods, called when QAction are triggered.
 
     void undo() {
         if (_audio.undo(*this)) {
-            set_widgets_from_doc();
-            repaint_children();
+            update_widgets();
         }
     }
 
     void redo() {
         if (_audio.redo(*this)) {
-            set_widgets_from_doc();
-            repaint_children();
+            update_widgets();
         }
     }
 

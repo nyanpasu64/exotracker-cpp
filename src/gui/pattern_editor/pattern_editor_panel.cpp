@@ -161,6 +161,12 @@ static void setup_shortcuts(PatternEditorPanel & self) {
         }
         // Move cursor.
         std::invoke(method, self);
+
+        // This call is almost unnecessary.
+        // Document edits and cursor motions already trigger redraws.
+        // The only operation that doesn't is toggling edit mode, so keep this call.
+        // Maybe edit mode will eventually be stored in the main window,
+        // so you can toggle it from the toolbar.
         self.update();
     };
 

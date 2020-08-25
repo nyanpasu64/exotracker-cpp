@@ -79,6 +79,12 @@ I plan to add an option to open multiple windows linked to a single process, sha
 
 Multi-tab support is not planned at the moment, since the primary purpose of multiple instances is to copy-paste data between modules. If I want to later hack in tabs, each tab could have its own MainWindow instance, but acting as a sub-widget in an actual container window.
 
+## How are repaints triggered?
+
+It's complicated, and exotracker used to perform a lot of duplicated repaints (though this is not a major issue because ["calling update() several times normally results in just one paintEvent() call."](https://doc.qt.io/qt-5/qwidget.html#update)). In simplifying the code, I reduced and consolidated repaints, but now update the GUI spinboxes even when not strictly necessary (the updates are ignored).
+
+I traced out how cursor movements, pattern or document edits, and undo/redo trigger repainting at https://docs.google.com/document/d/1KYM8WJCIQc-U-7vUBlLcLzZOnvNdjpgpVQ1CDqz9QxA . This document is quite messy though.
+
 ## GUI drawing
 
 QPainter has a highly imperative/stateful drawing API (`setPen()` and `setBrush()`).
