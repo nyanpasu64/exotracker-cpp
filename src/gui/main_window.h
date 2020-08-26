@@ -122,7 +122,10 @@ public:
     /// The widgets are only redrawn when the code returns to the event loop.
     void cursor_moved() W_SIGNAL(cursor_moved)
 
-    /// Only called by AudioComponent.
+    /// Only called by PatternEditorImpl during edit/undo/redo.
+    Cursor & get_internal();
+
+    /// Only called by AudioComponent during edits.
     void set_internal(Cursor cursor);
 
     /// Moving the cursor always updates the selection endpoint.

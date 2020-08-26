@@ -160,6 +160,10 @@ cursor::Cursor const* CursorAndSelection::operator->() const {
     return &_cursor;
 }
 
+Cursor & CursorAndSelection::get_internal() {
+    return _cursor;
+}
+
 void CursorAndSelection::set_internal(Cursor cursor) {
     _cursor = cursor;
     if (_select) {
@@ -787,6 +791,32 @@ public:
         return _audio.audio_state();
     }
 
+    /// Called after edit/undo/redo, which are capable of deleting the timeline row
+    /// we're currently in.
+    ///
+    /// You should call update_widgets() afterwards.
+    void clamp_cursor() {
+        doc::Document const& document = get_document();
+
+        auto cursor_y = _cursor->y;
+        cursor_y.grid =
+            std::min(cursor_y.grid, doc::GridIndex(document.timeline.size() - 1));
+
+        BeatFraction nbeats = document.timeline[cursor_y.grid].nbeats;
+
+        // If cursor is out of bounds, move to last row in pattern.
+        if (cursor_y.beat >= nbeats) {
+            auto rows_per_beat = _pattern_editor_panel->rows_per_beat();
+
+            BeatFraction rows = nbeats * rows_per_beat;
+            int prev_row = util::math::frac_prev(rows);
+            cursor_y.beat = BeatFraction{prev_row, rows_per_beat};
+        }
+
+        // Does NOT emit cursor_moved().
+        _cursor.get_internal().y = cursor_y;
+    }
+
     void push_edit(
         edit::EditBox command,
         std::optional<Cursor> maybe_cursor,
@@ -794,6 +824,7 @@ public:
     ) override {
         // Never emits cursor_moved().
         _audio.push_edit(*this, std::move(command), maybe_cursor, advance_digit);
+        clamp_cursor();
 
         // So run this instead, which is equivalent
         // (except immediate instead of queued).
@@ -1044,12 +1075,14 @@ public:
 
     void undo() {
         if (_audio.undo(*this)) {
+            clamp_cursor();
             update_widgets();
         }
     }
 
     void redo() {
         if (_audio.redo(*this)) {
+            clamp_cursor();
             update_widgets();
         }
     }

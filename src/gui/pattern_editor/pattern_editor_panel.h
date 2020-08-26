@@ -175,7 +175,7 @@ public:
     }
 
     #define PROPERTY(TYPE, NAME) \
-        TYPE NAME() const { \
+        [[nodiscard]] TYPE NAME() const { \
             return _##NAME; \
         } \
         void set_##NAME(TYPE v) { \
