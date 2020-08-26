@@ -88,6 +88,7 @@ public:
         {
             l__w(QListView);
             _widget = w;
+            w->setDisabled(true);
         }
 
         _widget->setModel(&_model);
