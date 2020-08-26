@@ -691,7 +691,7 @@ static void draw_header(
         painter.drawText(
             header::TEXT_X,
             header::TEXT_Y,
-            QString("%1, %2 asdfasdfasdf").arg(chip).arg(channel)
+            QString("chip %1 chan %2").arg(chip).arg(channel)
         );
 
         draw_header_border(channel_rect);
