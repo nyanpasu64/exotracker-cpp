@@ -20,7 +20,7 @@ MaybePatternRef TimelineCellIter::next(TimelineCellRef cell_ref) {
 
         #define BLOCK  (cell_ref.cell._raw_blocks[_block])  // type: TimelineBlock
 
-        #define BLOCK_END_TIME  (BLOCK.end_time.value_or(cell_ref.nbeats))  // type: BeatFraction
+        _block_end_time = BLOCK.end_time.value_or(cell_ref.nbeats);
         #define LOOP_LENGTH  (int(BLOCK.pattern.loop_length))  // type: MaybeNonZero<uint32_t>
 
         if (LOOP_LENGTH) {
@@ -29,22 +29,22 @@ MaybePatternRef TimelineCellIter::next(TimelineCellRef cell_ref) {
             // Blocks where END_TIME <= begin_time are invalid, but skip them anyway.
             for (
                 _loop_begin_time = BLOCK.begin_time;
-                _loop_begin_time < BLOCK_END_TIME;
+                _loop_begin_time < _block_end_time;
                 _loop_begin_time += LOOP_LENGTH
             ) {
                 scrBeginScope;
 
                 auto loop_end_time = std::min(
-                    BeatFraction(_loop_begin_time + LOOP_LENGTH), BLOCK_END_TIME
+                    BeatFraction(_loop_begin_time + LOOP_LENGTH), _block_end_time
                 );
 
                 bool is_block_begin = _loop_begin_time == BLOCK.begin_time;
-                bool is_block_end = loop_end_time == BLOCK_END_TIME;
+                bool is_block_end = loop_end_time == _block_end_time;
 
                 // The final loop may or may not be truncated.
                 // Unconditionally recompute the end event for simplicity.
                 EventIndex end_ev_idx = is_block_end
-                    ? calc_end_ev(BLOCK.pattern.events, BLOCK_END_TIME - _loop_begin_time)
+                    ? calc_end_ev(BLOCK.pattern.events, _block_end_time - _loop_begin_time)
                     : _loop_ev_idx;
 
                 scrReturnEndScope((PatternRef{
@@ -59,11 +59,11 @@ MaybePatternRef TimelineCellIter::next(TimelineCellRef cell_ref) {
         } else {
             scrBeginScope;
             EventIndex end_ev_idx =
-                calc_end_ev(BLOCK.pattern.events, BLOCK_END_TIME - BLOCK.begin_time);
+                calc_end_ev(BLOCK.pattern.events, _block_end_time - BLOCK.begin_time);
             scrReturnEndScope((PatternRef{
                 .block = _block,
                 .begin_time = BLOCK.begin_time,
-                .end_time = BLOCK_END_TIME,
+                .end_time = _block_end_time,
                 .is_block_begin = true,
                 .is_block_end = true,
                 .events = TimedEventsRef(BLOCK.pattern.events).subspan(0, end_ev_idx)

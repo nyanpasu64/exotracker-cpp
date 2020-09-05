@@ -272,9 +272,10 @@ using MaybePatternRef = std::optional<PatternRef>;
 class [[nodiscard]] TimelineCellIter {
     scrDefine;
 
-    BeatIndex _loop_begin_time;
-
     BlockIndex _block;
+
+    BeatIndex _loop_begin_time;
+    BeatFraction _block_end_time;
 
     /// Where to truncate the event when looping.
     event_list::EventIndex _loop_ev_idx;
