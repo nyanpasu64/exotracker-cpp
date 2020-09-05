@@ -1442,6 +1442,13 @@ static void draw_pattern_foreground(
     ) {
         PainterScope scope{painter};
 
+        painter.setClipRect(
+            GridRect(
+                QPoint(column.left_px, pos.top), QPoint(column.right_px, pos.bottom)
+            ),
+            Qt::IntersectClip
+        );
+
         // Right now, only draw_pattern_foreground() and not draw_pattern_background()
         // calls translate(pos.top).
         // This should be made consistent so it's easier to copy code between them.
