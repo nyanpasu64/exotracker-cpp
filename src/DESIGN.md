@@ -186,7 +186,7 @@ Each block contains a single pattern, consisting of a list of events and an opti
 
 Eventually, patterns can be reused in multiple blocks at different times (and possibly different channels).
 
-[1] I'm not sure what to do if a user shrinks a timeline row, which causes an numeric-end block to end past the cell, or an "end of cell" block to have a size ≤ 0, etc.
+[1] If a user shrinks a timeline entry, it may cause an timed-end block to end past the cell, or an "end of cell" block to have a size ≤ 0. To prevent this from breaking the GUI or sequencer, `TimelineCellIter` clamps block end times to the end of the cell, and skips blocks beginning at or past the end of the cell. However, out-of-bounds events and blocks are still stored in the document. I have not decided how to indicate these to the user.
 
 ### Motivation
 

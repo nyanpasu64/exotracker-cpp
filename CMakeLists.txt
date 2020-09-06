@@ -232,14 +232,15 @@ endif()
 ## Unit tests
 add_executable(exotracker-tests
     tests/run_tests.cpp
+    tests/test_utils/parameterize.cpp
+
+    tests/test_document.cpp  # Required to prevent linking errors with EventSearch
     tests/test_blip_buffer.cpp
-    tests/test_document.cpp
     tests/test_edit_history.cpp
     tests/test_math.cpp
     tests/audio/test_event_queue.cpp
     tests/audio/test_sequencer.cpp
     tests/audio/test_synth.cpp
-    tests/test_utils/parameterize.cpp
     tests/test_utils/test_parameterize.cpp
 
     # for #ifdef UNITTEST
@@ -248,6 +249,7 @@ add_executable(exotracker-tests
     src/audio/synth/envelope.cpp
     src/audio/synth/nes_2a03_driver.cpp
     src/audio/synth/volume_calc_common.cpp
+    src/doc/timeline.cpp
 )
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
