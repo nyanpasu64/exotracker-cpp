@@ -99,8 +99,8 @@ public:
     }
 
     void set_history(History const& history) override {
-        _model.set_history(history);
         update_cursor();
+        _model.set_history(history);
     }
 
     void update_cursor() override {
