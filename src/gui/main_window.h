@@ -17,6 +17,7 @@
 #include <functional>  // std::function
 #include <memory>
 #include <optional>
+#include <variant>
 
 namespace gui::main_window {
 
@@ -151,6 +152,29 @@ public:
     void clear_select();
 };
 
+using CursorOrHere = std::optional<Cursor>;
+
+namespace MoveCursor_ {
+    struct NotPatternEdit {};
+    struct AdvanceDigit {};
+    struct MoveFrom {
+        CursorOrHere before_or_here;
+        CursorOrHere after_or_here;
+    };
+
+    using MoveCursor = std::variant<NotPatternEdit, AdvanceDigit, MoveFrom>;
+}
+
+using MoveCursor_::MoveCursor;
+
+inline MoveCursor move_to(Cursor cursor) {
+    return MoveCursor_::MoveFrom{{}, cursor};
+}
+
+inline MoveCursor keep_cursor() {
+    return MoveCursor_::MoveFrom{{}, {}};
+}
+
 struct StateComponent {
     // If we don't use QListView, we really don't need a "cursor_moved" signal.
     // Each method updates the cursor location, then the screen is redrawn at 60fps.
@@ -185,11 +209,7 @@ public:
     ///
     /// If advance_digit is true, calls _cursor.advance_digit(),
     /// otherwise reset_digit().
-    virtual void push_edit(
-        edit::EditBox command,
-        std::optional<Cursor> maybe_cursor,
-        bool advance_digit = false
-    ) = 0;
+    virtual void push_edit(edit::EditBox command, MoveCursor cursor_move) = 0;
 };
 
 

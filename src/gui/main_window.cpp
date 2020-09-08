@@ -705,25 +705,38 @@ private:
 
 public:
     void push_edit(
-        StateComponent & state,
-        edit::EditBox command,
-        std::optional<Cursor> maybe_cursor,
-        bool advance_digit
+        StateComponent & state, edit::EditBox command, MoveCursor cursor_move
     ) {
         send_edit(*this, command->box_clone());
 
-        if (maybe_cursor) {
-            _history.push(edit::CursorEdit{
-                std::move(command), *state._cursor, *maybe_cursor
-            });
+        edit::MaybeCursor before_cursor;
+        edit::MaybeCursor after_cursor;
+        edit::Cursor const here = *state._cursor;
 
-            // Does not emit cursor_moved()!
-            state._cursor.set_internal(*maybe_cursor);
-        } else {
-            _history.push(edit::CursorEdit{std::move(command), {}, {}});
+        auto p = &cursor_move;
+        if (std::get_if<MoveCursor_::NotPatternEdit>(p)) {
+            before_cursor = {};
+            after_cursor = {};
+        } else
+        if (std::get_if<MoveCursor_::AdvanceDigit>(p)) {
+            before_cursor = here;
+            after_cursor = here;
+        } else
+        if (auto move_from = std::get_if<MoveCursor_::MoveFrom>(p)) {
+            before_cursor = move_from->before_or_here.value_or(here);
+            after_cursor = move_from->after_or_here.value_or(here);
         }
 
-        if (advance_digit) {
+        _history.push(edit::CursorEdit{
+            std::move(command), before_cursor, after_cursor
+        });
+
+        if (after_cursor) {
+            // Does not emit cursor_moved()!
+            state._cursor.set_internal(*after_cursor);
+        }
+
+        if (std::get_if<MoveCursor_::AdvanceDigit>(p)) {
             state._cursor.advance_digit();
         } else {
             state._cursor.reset_digit();
@@ -817,13 +830,9 @@ public:
         _cursor.get_internal().y = cursor_y;
     }
 
-    void push_edit(
-        edit::EditBox command,
-        std::optional<Cursor> maybe_cursor,
-        bool advance_digit = false
-    ) override {
+    void push_edit(edit::EditBox command, MoveCursor cursor_move) override {
         // Never emits cursor_moved().
-        _audio.push_edit(*this, std::move(command), maybe_cursor, advance_digit);
+        _audio.push_edit(*this, std::move(command), cursor_move);
         clamp_cursor();
 
         // So run this instead, which is equivalent
@@ -967,13 +976,17 @@ public:
 
         // _ticks_per_beat obtains its value through update_gui_from_doc().
         connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
-            push_edit(edit_doc::set_ticks_per_beat(ticks_per_beat), {}, false);
+            push_edit(
+                edit_doc::set_ticks_per_beat(ticks_per_beat),
+                MoveCursor_::NotPatternEdit{}
+            );
         });
 
         // TODO connect _length_beats to edit_doc::set_timeline_row_length()
         connect_spin(_length_beats, this, [this] (int grid_length_beats) {
             push_edit(
-                edit_doc::set_grid_length(_cursor->y.grid, grid_length_beats), {}, false
+                edit_doc::set_grid_length(_cursor->y.grid, grid_length_beats),
+                MoveCursor_::NotPatternEdit{}
             );
         });
 
@@ -1093,28 +1106,48 @@ public:
             return;
         }
 
+        // Don't use this for undo.
+        // If you do, "add, undo, add" will differ from "add".
+        Cursor new_cursor = {
+            .x = _cursor->x,
+            .y = {
+                .grid = _cursor->y.grid + 1,
+                .beat = 0,
+            },
+        };
+
         push_edit(
             edit_doc::add_timeline_row(
                 document, _cursor->y.grid + 1, _length_beats->value()
             ),
-            {}
+            move_to(new_cursor)
         );
     }
 
     void remove_timeline_row() {
+        // The resulting cursor is invalid if you delete the last row.
+        // clamp_cursor() will fix it.
+        Cursor new_cursor = {
+            .x = _cursor->x,
+            .y = {
+                .grid = _cursor->y.grid,
+                .beat = 0,
+            },
+        };
+
         auto & document = get_document();
         if (document.timeline.size() <= 1) {
             return;
         }
 
-        push_edit(edit_doc::remove_timeline_row(_cursor->y.grid), {});
+        push_edit(edit_doc::remove_timeline_row(_cursor->y.grid), move_to(new_cursor));
     }
 
     void move_grid_up() {
         if (_cursor->y.grid.v > 0) {
             auto up = *_cursor;
             up.y.grid--;
-            push_edit(edit_doc::move_grid_up(_cursor->y.grid), up);
+            push_edit(edit_doc::move_grid_up(_cursor->y.grid), move_to(up));
         }
     }
 
@@ -1123,7 +1156,7 @@ public:
         if (_cursor->y.grid + 1 < document.timeline.size()) {
             auto down = *_cursor;
             down.y.grid++;
-            push_edit(edit_doc::move_grid_down(_cursor->y.grid), down);
+            push_edit(edit_doc::move_grid_down(_cursor->y.grid), move_to(down));
         }
     }
 
@@ -1133,7 +1166,12 @@ public:
             return;
         }
 
-        push_edit(edit_doc::clone_timeline_row(document, _cursor->y.grid), {});
+        // Right now the clone button keeps the cursor position.
+        // Should it move the cursor down by 1 pattern, into the clone?
+        // Or down to the beat 0 of the clone?
+        push_edit(
+            edit_doc::clone_timeline_row(document, _cursor->y.grid), keep_cursor()
+        );
     }
 };
 

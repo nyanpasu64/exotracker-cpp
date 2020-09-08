@@ -2030,10 +2030,6 @@ void PatternEditorPanel::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;
 }
 
-static cursor::Cursor keep_cursor(PatternEditorPanel const& self) {
-    return self._win._cursor.get();
-}
-
 static cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
     doc::Document const & document = self.get_document();
     auto cursor = self._win._cursor.get();
@@ -2081,7 +2077,7 @@ void PatternEditorPanel::delete_key_pressed() {
     auto [chip, channel, subcolumn] = calc_cursor_x(*this);
     _win.push_edit(
         ed::delete_cell(document, chip, channel, subcolumn, abs_time),
-        step_cursor_down(*this)
+        main_window::move_to(step_cursor_down(*this))
     );
 }
 
@@ -2102,7 +2098,7 @@ void note_pressed(
         ed::insert_note(
             self.get_document(), chip, channel, abs_time, note, instrument
         ),
-        step_cursor_down(self)
+        main_window::move_to(step_cursor_down(self))
     );
 }
 
@@ -2162,12 +2158,14 @@ static void add_digit(
 
     if (digit_index == 0) {
         // Erase field and enter first digit.
-        self._win.push_edit(std::move(box), keep_cursor(self), true);
+        self._win.push_edit(std::move(box), main_window::MoveCursor_::AdvanceDigit{});
 
     } else {
         // Move current digit to the left, append second digit,
         // and move cursor down.
-        self._win.push_edit(std::move(box), step_cursor_down(self));
+        self._win.push_edit(
+            std::move(box), main_window::move_to(step_cursor_down(self))
+        );
     }
     // Update saved instrument number.
     if (std::holds_alternative<subcolumns::Instrument>(field)) {
