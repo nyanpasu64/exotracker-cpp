@@ -812,8 +812,14 @@ public:
         doc::Document const& document = get_document();
 
         auto cursor_y = _cursor->y;
-        cursor_y.grid =
-            std::min(cursor_y.grid, doc::GridIndex(document.timeline.size() - 1));
+        auto ngrid = doc::GridIndex(document.timeline.size());
+
+        if (cursor_y.grid >= ngrid) {
+            cursor_y.grid = ngrid - 1;
+
+            BeatFraction nbeats = document.timeline[cursor_y.grid].nbeats;
+            cursor_y.beat = nbeats;
+        }
 
         BeatFraction nbeats = document.timeline[cursor_y.grid].nbeats;
 
