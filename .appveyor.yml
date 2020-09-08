@@ -78,4 +78,3 @@ after_test:
 artifacts:
   # pushing a single file
   - path: 'exotracker-*.7z'
-  - path: 'exotracker-*.pdb'

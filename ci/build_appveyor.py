@@ -38,6 +38,10 @@ def sanitize_path(filename: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_\-.]", r"_", filename)
 
 
+def quote_str(path: Path) -> str:
+    return shlex.quote(str(path))
+
+
 def run(*strings: T.List[str], **kwargs):
     # fmt: off
     args = [arg
@@ -83,7 +87,7 @@ BUILD_DIR = sanitize_path(f"build-{APPVEYOR_JOB_NAME}-{CONFIGURATION}")
 def build():
     resolve_compilers()
 
-    os.mkdir(BUILD_DIR)
+    os.makedirs(BUILD_DIR, exist_ok=True)
     os.chdir(BUILD_DIR)
 
     run(f"cmake .. -DCMAKE_BUILD_TYPE={CONFIGURATION} -G Ninja")
@@ -131,8 +135,13 @@ def archive():
         # Create archive (CI artifact).
         run("7z a -mx=3", shlex.quote(archive_name + ".7z"), ".")
 
-    # Move .pdb file to project root instead of archive root.
-    (build_dir / f"{EXE_NAME}.pdb").rename(archive_name + ".pdb")
+    # Visual Studio will not load .pdb files which have been renamed.
+    # So give the archive a different name, but preserve the name of the .pdb.
+    run(
+        "7z a -mx=3",
+        shlex.quote(archive_name + ".pdb.7z"),
+        quote_str(build_dir / f"{EXE_NAME}.pdb"),
+    )
 
 
 class DefaultHelpParser(argparse.ArgumentParser):
