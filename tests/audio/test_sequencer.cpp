@@ -538,6 +538,8 @@ TEST_CASE("Randomly switch between randomly generated documents of different len
     using RNG = std::minstd_rand;
     RNG rng{rd()};
 
+    // 300 iterations is not enough to expose rare bugs.
+    // However, increasing the number of iterations slows down the test.
     for (int i = 0; i < 300; i++) {
         // Capture state if test fails.
         std::ostringstream ss;
@@ -549,11 +551,16 @@ TEST_CASE("Randomly switch between randomly generated documents of different len
         using rand_tick = std::uniform_int_distribution<TickT>;
         using rand_bool = std::bernoulli_distribution;
 
-        uint32_t which_doc;
-        bool negative_ticks;
+        struct WhichDoc {
+            Document document;
+            uint32_t which_doc;
+            bool negative_ticks;
+        };
 
-        auto random_doc = [&which_doc, &negative_ticks] (RNG & rng) {
-            which_doc = rand_u32{0, 2}(rng);
+        auto random_doc = [] (RNG & rng) -> WhichDoc {
+            Document document{{}};
+            uint32_t const which_doc = rand_u32{0, 2}(rng);
+            bool negative_ticks;
 
             switch (which_doc) {
             case 0: {
@@ -566,8 +573,8 @@ TEST_CASE("Randomly switch between randomly generated documents of different len
                 auto loop_length = rand_bool{0.5}(rng) ? begin_beat + 2 : 0;
 
                 negative_ticks = false;
-                return parametric_doc(begin_beat, delay, peak_delay, loop_length);
-
+                document = parametric_doc(begin_beat, delay, peak_delay, loop_length);
+                break;
             }
             case 1: {
                 auto nbeat = rand_u32{0, 2}(rng);
@@ -575,7 +582,8 @@ TEST_CASE("Randomly switch between randomly generated documents of different len
                 auto loop_length = rand_u32{std::max(nbeat, 1u), 4}(rng);
 
                 negative_ticks = delay < 0;
-                return short_doc(nbeat, delay, loop_length);
+                document = short_doc(nbeat, delay, loop_length);
+                break;
             }
             case 2: {
                 auto nbeat = rand_u32{0, 2}(rng);
@@ -583,15 +591,19 @@ TEST_CASE("Randomly switch between randomly generated documents of different len
                 auto loop_length = rand_u32{std::max(nbeat, 1u), 4}(rng);
 
                 negative_ticks = delay < 0;
-                return gap_doc(nbeat, delay, loop_length);
+                document = gap_doc(nbeat, delay, loop_length);
+                break;
             }
+            default:
+                throw std::logic_error("Unknown document type");
             }
-            throw std::logic_error("Unknown document type");
+
+            return WhichDoc{move(document), which_doc, negative_ticks};
         };
 
-        Document document = random_doc(rng);
+        auto curr = random_doc(rng);
 
-        auto seq = make_channel_sequencer(0, 0, document);
+        auto seq = make_channel_sequencer(0, 0, curr.document);
 
         for (int tick = 0; tick < 100; tick++) {
             CAPTURE(tick);
@@ -610,22 +622,26 @@ TEST_CASE("Randomly switch between randomly generated documents of different len
                 to remove negative delays.)
                 */
 
-                auto prev_which_doc = which_doc;
-                Document new_doc = random_doc(rng);
-                if (!(tick == 0 && negative_ticks)) {
-                    document = std::move(new_doc);
+                // mutable state is hard to reason about.
+                // We decide whether to switch documents or not,
+                // based on the new value of random_doc().
+                // And if we choose to not switch documents, we must not alter curr.
+                auto prev_which_doc = curr.which_doc;
+                auto next = random_doc(rng);
+                if (!(tick == 0 && next.negative_ticks)) {
+                    curr = move(next);
 
-                    if (which_doc != prev_which_doc) {
-                        seq.tempo_changed(document);
-                        seq.timeline_modified(document);
+                    if (curr.which_doc != prev_which_doc) {
+                        seq.tempo_changed(curr.document);
+                        seq.timeline_modified(curr.document);
                     } else {
-                        seq.doc_edited(document);
+                        seq.doc_edited(curr.document);
                     }
                 }
             }
 
             // Make sure both sequencers agree.
-            seq.next_tick(document);
+            seq.next_tick(curr.document);
         }
     }
 }
