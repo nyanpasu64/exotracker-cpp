@@ -234,7 +234,7 @@ add_executable(exotracker-tests
     tests/run_tests.cpp
     tests/test_utils/parameterize.cpp
 
-    tests/test_document.cpp  # Required to prevent linking errors with EventSearch
+    tests/test_document.cpp
     tests/test_blip_buffer.cpp
     tests/test_edit_history.cpp
     tests/test_math.cpp

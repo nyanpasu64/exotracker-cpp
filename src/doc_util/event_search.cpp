@@ -37,16 +37,13 @@ public:
     } \
 
 using Const = EventSearch;
-using MutBase = EventSearchMutBase;
-using MutImpl = EventSearchMut;
+using Mut = EventSearchMut;
 
 
 #define IMPL(FUNC_NAME, BOUND, KEY_T, KEY_FUNC) \
-    template<> \
     IMPL_IMPL(Const, FUNC_NAME, BOUND, KEY_T, const, ConstIterator, KEY_FUNC) \
-    template<> \
-    IMPL_IMPL(MutBase, FUNC_NAME, BOUND, KEY_T, const, ConstIterator, KEY_FUNC) \
-    IMPL_IMPL(MutImpl, FUNC_NAME, BOUND, KEY_T, , Iterator, KEY_FUNC) \
+    IMPL_IMPL(Mut, FUNC_NAME, BOUND, KEY_T, const, ConstIterator, KEY_FUNC) \
+    IMPL_IMPL(Mut, FUNC_NAME, BOUND, KEY_T, , Iterator, KEY_FUNC) \
 
 IMPL(greater_equal, std::lower_bound, TimeInPattern, time_and_offset)
 IMPL(greater, std::upper_bound, TimeInPattern, time_and_offset)
