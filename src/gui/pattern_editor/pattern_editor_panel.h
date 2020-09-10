@@ -174,18 +174,18 @@ public:
         _history = _dummy_history;
     }
 
-    #define PROPERTY(TYPE, NAME) \
-        [[nodiscard]] TYPE NAME() const { \
-            return _##NAME; \
+    #define PROPERTY(TYPE, FIELD, METHOD) \
+        [[nodiscard]] TYPE METHOD() const { \
+            return FIELD; \
         } \
-        void set_##NAME(TYPE v) { \
-            _##NAME = v; \
+        void set_##METHOD(TYPE v) { \
+            FIELD = v; \
             update(); \
         }
 
-    PROPERTY(int, rows_per_beat)
-    PROPERTY(int, octave)
-    PROPERTY(int, step)
+    PROPERTY(int, _rows_per_beat, rows_per_beat)
+    PROPERTY(int, _octave, octave)
+    PROPERTY(int, _step, step)
 
 protected:
 

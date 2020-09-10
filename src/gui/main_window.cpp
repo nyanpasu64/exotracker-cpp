@@ -952,15 +952,19 @@ public:
             return std::bind_front(method, _pattern_editor_panel);
         };
 
-        #define BIND_SPIN(KEY) \
-            _##KEY->setValue(_pattern_editor_panel->KEY()); \
+        // Previously, BIND_SPIN(name) would use _##NAME to synthesize the field _name.
+        // However, this means searching for _name won't find the usage,
+        // making it hard to navigate the code.
+        // So supply the name twice, once like a _field and once like a method.
+        #define BIND_SPIN(FIELD, METHOD) \
+            FIELD->setValue(_pattern_editor_panel->METHOD()); \
             connect_spin( \
-                _##KEY, \
+                FIELD, \
                 _pattern_editor_panel, \
-                pattern_setter(&PatternEditorPanel::set_##KEY) \
+                pattern_setter(&PatternEditorPanel::set_##METHOD) \
             );
 
-        BIND_SPIN(rows_per_beat)
+        BIND_SPIN(_rows_per_beat, rows_per_beat)
 
         auto gui_bottom_octave = [] () {
             return get_app().options().note_names.gui_bottom_octave;
@@ -978,7 +982,7 @@ public:
             }
         );
 
-        BIND_SPIN(step)
+        BIND_SPIN(_step, step)
 
         // _ticks_per_beat obtains its value through update_gui_from_doc().
         connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
