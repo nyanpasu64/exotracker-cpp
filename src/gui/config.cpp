@@ -32,7 +32,7 @@ inline namespace visual {
             // # Pattern colors.
 
             /// Background gridline color.
-            /// TODO disambiguate pattern grid and beat grid
+            // TODO add _gridline_measure
             ._gridline_beat = gray(128),
             ._gridline_non_beat = gray(80),
 

@@ -1319,22 +1319,22 @@ static void draw_pattern_background(
             cursor_x.subcolumn = 0;
         }
 
-        // Draw cursor row and cell background.
+        // Draw background for cursor row and cell.
         if (auto & col = columns.cols[cursor_x.column]) {
             // If cursor is on-screen, draw left/cursor/right.
             auto subcol = col->subcolumns[cursor_x.subcolumn];
 
-            // Draw left background.
+            // Draw gradient (space to the left of the cursor cell).
             auto left_rect = cursor_row_rect;
             left_rect.set_right(subcol.left_px);
             painter.fillRect(left_rect, bg_grad);
 
-            // Draw right background.
+            // Draw gradient (space to the right of the cursor cell).
             auto right_rect = cursor_row_rect;
             right_rect.set_left(subcol.right_px);
             painter.fillRect(right_rect, bg_grad);
 
-            // Draw cursor cell background.
+            // Draw gradient (cursor cell only).
             GridRect cursor_rect{
                 QPoint{subcol.left_px, cursor_top},
                 QPoint{subcol.right_px, cursor_bottom}
@@ -1350,7 +1350,7 @@ static void draw_pattern_background(
                 )
             );
         } else {
-            // Otherwise just draw background.
+            // Otherwise draw a single gradient.
             painter.fillRect(cursor_row_rect, bg_grad);
         }
     }
