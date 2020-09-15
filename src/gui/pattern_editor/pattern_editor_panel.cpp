@@ -718,6 +718,7 @@ struct GridCellPosition {
     // top and bottom lie on gridlines like GridRect, not pixels like QRect.
     PxInt top;
     PxInt bottom;
+    bool focused;
 };
 
 struct PatternPosition {
@@ -725,6 +726,7 @@ struct PatternPosition {
     // top and bottom lie on gridlines like GridRect, not pixels like QRect.
     PxInt top;
     PxInt bottom;
+    bool focused;
 };
 
 enum class Direction {
@@ -744,6 +746,8 @@ struct GridCellIteratorState {
     // Initialized from _scroll_position.
     GridIndex _curr_grid_index;
     PxInt _curr_grid_pos;  // Represents top if Forward, bottom if Reverse.
+
+    bool _focused;
 
     static PxInt centered_cursor_pos(PxInt screen_height) {
         return screen_height / 2;
@@ -786,6 +790,10 @@ public:
             screen_height,
             scroll_position.grid,
             pattern_top_from_screen_top,
+            // This WILL break if _free_scroll_position exists
+            // and lies in a different grid than the cursor
+            // (which 0CC-FT deliberately prevents from happening).
+            true,
         };
         return {out, cursor_from_screen_top};
     }
@@ -800,6 +808,7 @@ public:
     {
         if constexpr (direction == Direction::Reverse) {
             _curr_grid_index--;
+            _focused = false;
         }
     }
 
@@ -839,6 +848,7 @@ private:
             .grid = _curr_grid_index,
             .top = curr_grid_top(),
             .bottom = curr_grid_bottom(),
+            .focused = _focused,
         };
     }
 
@@ -852,6 +862,7 @@ public:
             GridCellPosition out = peek();
             _curr_grid_pos += curr_grid_height();
             _curr_grid_index++;
+            _focused = false;
             return out;
 
         } else {
@@ -862,6 +873,7 @@ public:
             GridCellPosition out = peek();
             _curr_grid_pos -= curr_grid_height();
             _curr_grid_index--;  // May overflow to UINT32_MAX. Not UB.
+            _focused = false;
             return out;
         }
     }
@@ -876,7 +888,7 @@ public:
     ForeachGrid(GridCellIteratorState const& state) : _state{state} {}
 
     template<typename Visitor>
-    void operator()(Visitor visit_grid_cell) {
+    void operator()(Visitor visit_grid_cell) const {
         {
             auto forward = GridCellIterator<Direction::Forward>{_state};
             while (std::optional<GridCellPosition> pos = forward.next()) {
@@ -921,6 +933,11 @@ using cursor::SubColumnIndex;
 
 using CellIter = doc::TimelineCellIterRef;
 
+/// Computing colors may require blending with the background color.
+/// So cache the color for each timeline entry being drawn.
+#define CACHE_COLOR(COLOR) \
+    QColor COLOR = visual.COLOR(pos.focused);
+
 /// Draw the background lying behind notes/etc.
 static void draw_pattern_background(
     PatternEditorPanel & self,
@@ -930,14 +947,6 @@ static void draw_pattern_background(
     QSize const inner_size
 ) {
     auto & visual = get_app().options().visual;
-
-    #define COMPUTE_DIVIDER_COLOR(OUT, BG, FG) \
-        QColor OUT##_divider = lerp_colors(BG, FG, visual.subcolumn_divider_blend);
-
-    COMPUTE_DIVIDER_COLOR(note, visual.note_bg, visual.note_line_beat)
-    COMPUTE_DIVIDER_COLOR(instrument, visual.instrument_bg, visual.instrument)
-    COMPUTE_DIVIDER_COLOR(volume, visual.volume_bg, visual.volume)
-    COMPUTE_DIVIDER_COLOR(effect, visual.effect_bg, visual.effect)
 
     int row_right_px = columns.ruler.right_px;
     for (auto & c : reverse(columns.cols)) {
@@ -953,6 +962,18 @@ static void draw_pattern_background(
 
     auto draw_pattern_bg = [&] (GridCellPosition const & pos) {
         doc::TimelineRow const & grid_cell = document.timeline[pos.grid];
+
+        #define CACHE_SUBCOLUMN_COLOR(OUT) \
+            QColor OUT##_divider = visual.OUT##_divider(pos.focused); \
+            QColor OUT##_bg = visual.OUT##_bg(pos.focused);
+
+        CACHE_SUBCOLUMN_COLOR(note);
+        CACHE_SUBCOLUMN_COLOR(instrument);
+        CACHE_SUBCOLUMN_COLOR(volume);
+        CACHE_SUBCOLUMN_COLOR(effect);
+
+        CACHE_COLOR(gridline_beat);
+        CACHE_COLOR(gridline_non_beat);
 
         // Draw background columns.
         for (MaybeColumnPx const & maybe_column : columns.cols) {
@@ -983,11 +1004,11 @@ static void draw_pattern_background(
 
                 // Don't draw the note column's divider line,
                 // since it lies right next to the previous channel's channel divider.
-                CASE(sc::Note, visual.note_bg, note_divider)
-                CASE(sc::Instrument, visual.instrument_bg, instrument_divider)
-                CASE(sc::Volume, visual.volume_bg, volume_divider)
-                CASE(sc::EffectName, visual.effect_bg, effect_divider)
-                CASE_NO_FG(sc::EffectValue, visual.effect_bg)
+                CASE(sc::Note, note_bg, note_divider)
+                CASE(sc::Instrument, instrument_bg, instrument_divider)
+                CASE(sc::Volume, volume_bg, volume_divider)
+                CASE(sc::EffectName, effect_bg, effect_divider)
+                CASE_NO_FG(sc::EffectValue, effect_bg)
 
                 #undef CASE
                 #undef CASE_NO_FG
@@ -1018,9 +1039,9 @@ static void draw_pattern_background(
 
             // Draw gridline along top of row.
             if (curr_beats.denominator() == 1) {
-                painter.setPen(visual.gridline_beat);
+                painter.setPen(gridline_beat);
             } else {
-                painter.setPen(visual.gridline_non_beat);
+                painter.setPen(gridline_non_beat);
             }
             draw_top_border(painter, QPoint{0, ytop}, QPoint{row_right_px, ytop});
         }
@@ -1062,14 +1083,9 @@ static void draw_pattern_background(
 
         // Draw background.
         using gui::lib::color::lerp_colors;
-        using config::gray;
 
-        auto border_blend = visual.block_handle.value() >= visual.overall_bg.value()
-            ? gray(255)
-            : gray(0);
-
-        auto base = visual.block_handle;
-        auto border = lerp_colors(base, border_blend, 0.4);
+        auto base = visual.block_handle(pos.focused);
+        auto border = visual.block_handle_border(pos.focused);
 
         painter.fillRect(sub_rect, base);
 
@@ -1141,6 +1157,7 @@ static void draw_pattern_background(
                     .grid = pos.grid,
                     .top = top,
                     .bottom = bottom,
+                    .focused = pos.focused,
                 };
 
                 pattern_draw_blocks(col, pattern_pos, *p);
@@ -1249,9 +1266,10 @@ static void draw_pattern_background(
                 select_left, select_top, select_right, select_bottom
             );
 
-            painter.fillRect(select_rect, visual.select_bg);
+            // TODO use different color for selections in focused and unfocused grids.
+            painter.fillRect(select_rect, visual.select_bg(true));
 
-            painter.setPen(visual.select_border);
+            painter.setPen(visual.select_border(true));
             draw_left_border(painter, select_rect);
             draw_right_border(painter, select_rect);
             draw_top_border(painter, select_rect);
@@ -1264,12 +1282,12 @@ static void draw_pattern_background(
             );
 
             auto select_grad = make_gradient(
-                select_top, select_grad_bottom, visual.select_bg, 255, 0
+                select_top, select_grad_bottom, visual.select_bg(true), 255, 0
             );
             painter.fillRect(select_rect, select_grad);
 
             auto border_grad = make_gradient(
-                select_top, select_grad_bottom, visual.select_border, 255, 0
+                select_top, select_grad_bottom, visual.select_border(true), 255, 0
             );
             painter.fillRect(top_border(painter, select_rect), border_grad);
             painter.fillRect(left_border(painter, select_rect), border_grad);
@@ -1339,6 +1357,7 @@ static void draw_pattern_background(
 
     auto draw_row_numbers = [&] (GridCellPosition const & pos) {
         auto const & grid_cell = document.timeline[pos.grid];
+        CACHE_COLOR(note_line_beat);
 
         // Draw rows.
         // Begin loop(row)
@@ -1357,7 +1376,7 @@ static void draw_pattern_background(
                 QString s = format_hex_2((uint8_t) curr_beats.numerator());
 
                 painter.setFont(visual.pattern_font);
-                painter.setPen(visual.note_line_beat);
+                painter.setPen(note_line_beat);
 
                 DrawText draw_text{visual.pattern_font};
                 draw_text.draw_text(
@@ -1440,6 +1459,13 @@ static void draw_pattern_foreground(
     auto pattern_draw_notes = [&] (
         ColumnPx const & column, PatternPosition const & pos, doc::PatternRef pattern
     ) {
+        CACHE_COLOR(note_line_beat);
+        CACHE_COLOR(note_line_non_beat);
+        CACHE_COLOR(note_line_fractional);
+        CACHE_COLOR(instrument);
+        CACHE_COLOR(volume);
+        // CACHE_COLOR(effect); (not needed yet)
+
         PainterScope scope{painter};
 
         painter.setClipRect(
@@ -1474,13 +1500,13 @@ static void draw_pattern_foreground(
 
             if (beat.denominator() == 1) {
                 // Highlighted notes
-                note_color = visual.note_line_beat;
+                note_color = note_line_beat;
             } else if (row.denominator() == 1) {
                 // Non-highlighted notes
-                note_color = visual.note_line_non_beat;
+                note_color = note_line_non_beat;
             } else {
                 // Off-grid misaligned notes (not possible in traditional trackers)
-                note_color = visual.note_line_fractional;
+                note_color = note_line_fractional;
             }
 
             auto draw_top_line = [&painter, &note_color] (
@@ -1547,7 +1573,7 @@ static void draw_pattern_foreground(
                 }
                 CASE(sc::Instrument) {
                     if (row_event.instr) {
-                        painter.setPen(visual.instrument);
+                        painter.setPen(instrument);
                         auto s = format_hex_2(uint8_t(*row_event.instr));
                         draw_text(s);
 
@@ -1557,7 +1583,7 @@ static void draw_pattern_foreground(
 
                 CASE(sc::Volume) {
                     if (row_event.volume) {
-                        painter.setPen(visual.volume);
+                        painter.setPen(volume);
                         auto s = format_hex_2(uint8_t(*row_event.volume));
                         draw_text(s);
 
@@ -1594,6 +1620,7 @@ static void draw_pattern_foreground(
                     .grid = pos.grid,
                     .top = top,
                     .bottom = bottom,
+                    .focused = pos.focused,
                 };
 
                 pattern_draw_notes(col, pattern_pos, *p);

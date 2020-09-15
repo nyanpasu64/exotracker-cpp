@@ -12,6 +12,9 @@
 #include <array>
 
 namespace gui::config {
+#ifndef gui_config_INTERNAL
+#define gui_config_INTERNAL private
+#endif
 
 using doc::accidental::AccidentalMode;
 
@@ -79,10 +82,7 @@ inline namespace keys {
 }
 
 inline namespace visual {
-    using gui::lib::color::lerp_colors;
-
     constexpr QColor BLACK{0, 0, 0};
-    constexpr qreal BG_COLORIZE = 0.05;
 
     static constexpr QColor gray(int value) {
         return QColor{value, value, value};
@@ -93,69 +93,135 @@ inline namespace visual {
     }
 
     struct FontTweaks {
-        int width_adjust = 0;
+        int width_adjust;
 
-        // To move text down, increase pixels_above_text and decrease pixels_below_text.
-        int pixels_above_text = 1;
-        int pixels_below_text = -1;
+        /// To move text down, increase pixels_above_text and decrease pixels_below_text.
+        int pixels_above_text;
+        int pixels_below_text;
     };
 
-    struct PatternAppearance {
-        QColor overall_bg = gray(38);
+    /// Overall colors (not different in focused/unfocused patterns).
+    /// Stored in PatternAppearance fields.
+    #define OVERALL_COLORS(X) \
+        X(overall_bg) \
+        X(base_subcolumn_bg) \
+        X(channel_divider) \
+        X(cursor_row) \
+        X(cursor_row_edit) \
+        X(cell)
 
-        /// Vertical line to the right of each channel.
-        QColor channel_divider = gray(160);
+    /// Colors which are dimmed in inactive patterns.
+    /// Stored in PatternAppearance fields.
+    #define PATTERN_COLORS(X) \
+        X(gridline_beat) \
+        X(gridline_non_beat) \
+        X(select_bg) \
+        X(select_border) \
+        X(block_handle) \
+        X(note_line_beat) \
+        X(note_line_non_beat) \
+        X(note_line_fractional) \
+        X(instrument) \
+        X(volume) \
+        X(effect) \
 
-        /// Background gridline color.
-        /// TODO disambiguate pattern grid and beat grid
-        QColor gridline_beat = gray(128);
-        QColor gridline_non_beat = gray(80);
+    /// Subcolumn types used to parameterize background/divider methods.
+    /// Not stored directly in PatternAppearance, but computed from other fields.
+    /// Dimmed in inactive patterns.
+    #define SUBCOLUMNS(X) \
+        X(note) \
+        X(instrument) \
+        X(volume) \
+        X(effect)
 
-        /// Cursor color.
-        QColor cursor_row = gray(240);
-        QColor cursor_row_edit{255, 160, 160};
-        int cursor_top_alpha = 64;
-        int cursor_bottom_alpha = 0;
 
-        QColor cell{255, 255, 96};
-        int cell_top_alpha = 96;
-        int cell_bottom_alpha = 96;
+    /// Only used internally in PatternAppearance.
+    enum class PatternColor {
+        #define X(COLOR)  COLOR,
+        PATTERN_COLORS(X)
+        #undef X
+    };
 
-        /// Selection color.
-        QColor select_bg{134, 125, 242, 192};
-        QColor select_border{150, 146, 211};
+    /// Only used internally in PatternAppearance.
+    enum class SubColumn {
+        #define X(SUBCOLUMN)  SUBCOLUMN,
+        SUBCOLUMNS(X)
+        #undef X
+    };
 
-        /// Block handle to the left of each channel.
-        QColor block_handle = gray(114);
 
-        /// Foreground line color, also used as note text color.
-        QColor note_line_beat{255, 255, 96};
-        QColor note_line_non_beat{0, 255, 0};
-        QColor note_line_fractional{0, 224, 255};
-        QColor note_bg = lerp_colors(BLACK, note_line_beat, BG_COLORIZE);
+    class PatternAppearance {
+    public:
+        #define X(COLOR)  QColor COLOR;
+        OVERALL_COLORS(X)
+        #undef X
 
-        /// Instrument text color.
-        QColor instrument{128, 255, 128};
-        QColor instrument_bg = lerp_colors(BLACK, instrument, BG_COLORIZE);
+    gui_config_INTERNAL:
+        #define X(COLOR)  QColor _##COLOR;
+        PATTERN_COLORS(X)
+        #undef X
 
-        // Volume text color.
-        QColor volume{0, 255, 255};
-        QColor volume_bg = lerp_colors(BLACK, volume, BG_COLORIZE);
+        // All blending is conducted in approximate linear light (assuming gamma=2).
+        // This differs from gamma/RGB blending!
 
-        // Effect name color.
-        QColor effect{255, 128, 128};
-        QColor effect_bg = lerp_colors(BLACK, effect, BG_COLORIZE);
+        /// How opaquely to draw cells at a different grid index (time).
+        /// At 0, unfocused patterns have the same color as the background.
+        /// At 1, unfocused patterns have the same color as focused grid cells.
+        qreal _unfocused_brightness;
+        // TODO early-exit when drawing inactive patterns, if _unfocused_brightness = 0.
+        // But foreach_grid(find_selection) cannot do this.
+
+        /// How much to blend subcolumn colors into subcolumn backgrounds.
+        /// At 0, subcolumn backgrounds have color "base_subcolumn_bg".
+        /// At 1, subcolumn backgrounds have the same color as foreground text.
+        qreal _subcolumn_bg_colorize;
 
         /// How bright to make subcolumn dividers.
-        /// At 0, dividers are the same color as the background.
-        /// At 1, dividers are the same color as foreground text.
-        qreal subcolumn_divider_blend = 0.15;
+        /// At 0, dividers have the same color as the subcolumn background.
+        /// At 1, dividers have the same color as foreground text.
+        qreal _subcolumn_divider_colorize;
+
+    public:
+        /// Cursor row color gradient.
+        int cursor_top_alpha;
+        int cursor_bottom_alpha;
+
+        /// Cursor cell color gradient.
+        int cell_top_alpha;
+        int cell_bottom_alpha;
+
 
         /// Fonts to use.
         /// Initialized in default_appearance().
         QFont pattern_font;
 
         FontTweaks font_tweaks;
+
+        // impl
+    private:
+        QColor get_color(PatternColor color_type, bool focused) const;
+        QColor get_subcolumn_bg(SubColumn subcolumn, bool focused) const;
+        QColor get_subcolumn_divider(SubColumn subcolumn, bool focused) const;
+
+    public:
+        #define X(COLOR) \
+            inline QColor COLOR(bool focused) const { \
+                return get_color(PatternColor::COLOR, focused); \
+            }
+        PATTERN_COLORS(X)
+        #undef X
+
+        QColor block_handle_border(bool focused) const;
+
+        #define X(SUBCOLUMN) \
+            inline QColor SUBCOLUMN##_bg(bool focused) const { \
+                return get_subcolumn_bg(SubColumn::SUBCOLUMN, focused); \
+            } \
+            inline QColor SUBCOLUMN##_divider(bool focused) const { \
+                return get_subcolumn_divider(SubColumn::SUBCOLUMN, focused); \
+            }
+        SUBCOLUMNS(X)
+        #undef X
     };
 
     PatternAppearance default_appearance();
