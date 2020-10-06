@@ -749,6 +749,7 @@ struct GridCellIteratorState {
 
     bool _focused;
 
+    // impl
     static PxInt centered_cursor_pos(PxInt screen_height) {
         return screen_height / 2;
     }
@@ -802,6 +803,7 @@ public:
 /// Iterates up or down through patterns, and yields their locations on-screen.
 template<Direction direction>
 class GridCellIterator : private GridCellIteratorState {
+    // impl
 public:
     explicit GridCellIterator(GridCellIteratorState state) :
         GridCellIteratorState{state}

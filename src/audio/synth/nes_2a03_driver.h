@@ -29,6 +29,7 @@ constexpr static int BITS_PER_BYTE = 8;
 class Apu1PulseDriver {
     using PulseNum = Range<0, 2, uint16_t>;
 
+    // fields
     PulseNum /*const*/ _pulse_num;
     Address /*const*/ _base_address;
     TuningRef _tuning_table;
@@ -115,6 +116,7 @@ class Apu1Driver {
 
     using ChannelID = Apu1ChannelID;
 
+    // fields
 TEST_PUBLIC:
     ClockT const _clocks_per_sec;
     TuningOwned _tuning_table;

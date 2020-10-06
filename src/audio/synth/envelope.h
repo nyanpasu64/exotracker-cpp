@@ -12,10 +12,13 @@ namespace audio::synth::envelope {
 /// EnvelopeT = doc::instr::Envelope<some IntT>.
 template<typename EnvelopeT>
 class EnvelopeIterator {
+    // types
     using IntT = typename EnvelopeT::IntT;
 
     /// which envelope to track (volume, pitch, arpeggio...)
     using EnvelopePtr = EnvelopeT doc::Instrument::*;
+
+    // fields
     EnvelopePtr /*const*/ _field;
 
     // Treat "no instrument loaded" as "instrument loaded, all envelopes empty".
@@ -36,6 +39,7 @@ class EnvelopeIterator {
     /// Time index into envelope.
     std::optional<uint32_t> _next_position;
 
+    // impl
 public:
     EnvelopeIterator(EnvelopePtr field, IntT default_value) noexcept :
         _field(field),

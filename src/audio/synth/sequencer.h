@@ -117,6 +117,7 @@ struct EventIterator {
 class GridRunahead {
     int _event_minus_now = 0;
 
+    // impl
 public:
     using Success = bool;
 

@@ -29,13 +29,13 @@ struct RegisterWrite {
 
 /// Maybe just inline the methods, don't move to .cpp?
 class RegisterWriteQueue {
-
 public:
     struct RelativeRegisterWrite {
         RegisterWrite write;
         ClockT time_before;
     };
 
+    // fields
 private:
     std::vector<RelativeRegisterWrite> vec;
 
@@ -54,8 +54,8 @@ private:
         }
     } output;
 
-public:
     // impl
+public:
     DISABLE_COPY_MOVE(RegisterWriteQueue)
 
     RegisterWriteQueue() : input{}, output{} {
