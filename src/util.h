@@ -1,7 +1,5 @@
 #pragma once
 
-#include "util/macros.h"
-
 namespace util {
 
 template<typename T>
