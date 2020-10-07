@@ -14,7 +14,6 @@ namespace event_queue {
 // So call it "clock" instead.
 using ClockT = uint32_t;
 static ClockT constexpr NEVER = std::numeric_limits<ClockT>::max();
-}
 
 /**
 Allocation-free min priority queue which schedules a finite set of events.
@@ -48,25 +47,24 @@ An attempt for me to do the same thing as FamiTracker, but in an understandable 
 */
 template<typename EventID>
 class EventQueue {
+// types
 public:
-    // Types
     using EventInt = size_t;
     using ClockT = event_queue::ClockT;
 
     static ClockT constexpr NEVER = event_queue::NEVER;
 
-    // private:
-    // Fields
-    EnumMap<EventID, ClockT> time_until;   // fill with NEVER
+// fields
+private:
+    EnumMap<EventID, ClockT> _time_until;   // fill with NEVER
 
+// impl
 public:
     EventQueue() {
-        for (auto & time : time_until) {
+        for (auto & time : _time_until) {
             time = NEVER;
         }
     }
-
-    // Methods
 
     /**
     Schedules an event to happen now (t=0) or in the future.
@@ -76,14 +74,14 @@ public:
     the previous event schedule will be dropped.
     */
     void set_timeout(EventID event_id, ClockT in_how_long) {
-        time_until[event_id] = in_how_long;
+        _time_until[event_id] = in_how_long;
     }
 
     // TODO rename set_timeout to queue_event?
     // TODO add unqueue_event()? remove_event?
 
     ClockT get_time_until(EventID event_id) {
-        return time_until[event_id];
+        return _time_until[event_id];
     }
 
     struct RelativeEvent {
@@ -110,16 +108,16 @@ public:
         AbsoluteEvent out;
         {
             EventInt event_id = 0;
-            out = {event_id, time_until[event_id]};
+            out = {event_id, _time_until[event_id]};
         }
 
         for (EventInt event_id = 1; event_id < enum_count<EventID>; event_id++) {
-            if (time_until[event_id] < out.time) {
-                out = {event_id, time_until[event_id]};
+            if (_time_until[event_id] < out.time) {
+                out = {event_id, _time_until[event_id]};
             }
         }
 
-        time_until[out.event_id] = NEVER;
+        _time_until[out.event_id] = NEVER;
 
         advance_time(out.time);
 
@@ -128,7 +126,7 @@ public:
 
 private:
     inline void advance_time(ClockT dtime) {
-        for (auto & time_clk : time_until) {
+        for (auto & time_clk : _time_until) {
             if (time_clk != NEVER) {
                 time_clk -= dtime;
             }
@@ -136,5 +134,9 @@ private:
     }
 };
 
-// end namespace
+// namespace event_queue
+}
+using event_queue::EventQueue;
+
+// namespace audio
 }
