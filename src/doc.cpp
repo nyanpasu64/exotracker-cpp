@@ -1,4 +1,6 @@
 #include "doc.h"
+#include "chip_kinds.h"
+#include "util/enum_map.h"
 #include "util/release_assert.h"
 
 #include <cmath>  // pow
@@ -23,6 +25,27 @@ inline namespace tuning {
         }
         return out;
     }
+}
+
+chip_common::ChannelIndex DocumentCopy::chip_index_to_nchan(
+    chip_common::ChipIndex chip
+) const {
+    release_assert(chip < chips.size());
+    auto chip_kind = (size_t) chips[chip];
+
+    release_assert(chip_kind < (size_t) ChipKind::COUNT);
+    return chip_common::CHIP_TO_NCHAN[chip_kind];
+}
+
+uint8_t DocumentCopy::get_volume_digits(
+    chip_common::ChipIndex chip, chip_common::ChannelIndex channel
+) const {
+    release_assert(chip < chips.size());
+    auto chip_kind = (size_t) chips[chip];
+
+    release_assert(chip_kind < (size_t) ChipKind::COUNT);
+    release_assert(channel < chip_common::CHIP_TO_NCHAN[chip_kind]);
+    return chip_common::CHIP_CHANNEL_TO_VOLUME_DIGITS[chip_kind][channel];
 }
 
 Document Document::clone() const {

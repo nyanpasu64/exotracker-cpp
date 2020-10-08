@@ -13,6 +13,8 @@
 #include "chip_common.h"
 #include "util/copy_move.h"
 
+#include <gsl/span>
+
 #include <vector>
 
 namespace doc {
@@ -87,10 +89,14 @@ struct DocumentCopy {
     /// However, the last grid cell is at size() - 1.
     Timeline timeline;
 
-    // Methods
-    chip_common::ChannelIndex chip_index_to_nchan(chip_common::ChipIndex index) const {
-        return chip_common::CHIP_TO_NCHAN[(size_t)chips[index]];
-    }
+// impl
+    [[nodiscard]] chip_common::ChannelIndex chip_index_to_nchan(
+        chip_common::ChipIndex chip
+    ) const;
+
+    [[nodiscard]] uint8_t get_volume_digits(
+        chip_common::ChipIndex chip, chip_common::ChannelIndex channel
+    ) const;
 };
 
 /// Non-copyable version of Document. You must call clone() explicitly.

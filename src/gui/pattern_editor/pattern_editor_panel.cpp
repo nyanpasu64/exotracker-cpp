@@ -466,7 +466,6 @@ struct ColumnLayout {
             end_sub(block_handle);
 
             SubColumnLayout subcolumns;
-            // TODO change doc to list how many effect colums there are
 
             auto append_subcolumn = [&subcolumns, begin_sub, center_sub, end_sub] (
                 SubColumn type,
@@ -490,10 +489,13 @@ struct ColumnLayout {
             // Instruments are 2 characters wide.
             append_subcolumn(subcolumns::Instrument{}, 2);
 
-            // TODO Document::get_volume_width(chip_index, chan_index)
-            // Volumes are 2 characters wide.
-            append_subcolumn(subcolumns::Volume{}, 2);
+            // Volume width depends on the current chip and channel.
+            {
+                auto volume_width = document.get_volume_digits(chip_index, channel_index);
+                append_subcolumn(subcolumns::Volume{}, volume_width);
+            }
 
+            // TODO change doc to list how many effect columns there are
             for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
                 // Effect names are 2 characters wide and only have left padding.
                 append_subcolumn(
@@ -552,19 +554,15 @@ using ColumnList = std::vector<Column>;
             channel_index++
         ) {
             SubColumnList subcolumns;
-            // TODO change doc to list how many effect colums there are
 
-            // Notes are 3 characters wide.
             subcolumns.push_back(subcolumns::Note{});
 
             // TODO configurable column hiding (one checkbox per column type?)
-            // Instruments are 2 characters wide.
             subcolumns.push_back(subcolumns::Instrument{});
 
-            // TODO Document::get_volume_width(chip_index, chan_index)
-            // Volumes are 2 characters wide.
             subcolumns.push_back(subcolumns::Volume{});
 
+            // TODO change doc to list how many effect colums there are
             for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
                 subcolumns.push_back(subcolumns::EffectName{effect_col});
                 subcolumns.push_back(subcolumns::EffectValue{effect_col});
@@ -1580,7 +1578,12 @@ static void draw_pattern_foreground(
                 CASE(sc::Volume) {
                     if (row_event.volume) {
                         painter.setPen(volume);
-                        auto s = format_hex_2(uint8_t(*row_event.volume));
+
+                        auto digits =
+                            document.get_volume_digits(column.chip, column.channel);
+                        auto s = digits == 2
+                            ? format_hex_2(uint8_t(*row_event.volume))
+                            : format_hex_1(uint8_t(*row_event.volume));
                         draw_text(s);
 
                         draw_top_line(subcolumn);
@@ -2159,22 +2162,36 @@ static void add_digit(
     auto const& document = self.get_document();
     auto abs_time = self._win._cursor->y;
 
-    int digit_index = self._win._cursor.digit_index();
-    auto [number, box] = ed::add_digit(
-        document, chip, channel, abs_time, field, digit_index, nybble
-    );
+    // The volume field can have 1 or 2 digits. The effect fields always have 2.
+    int num_digits = std::holds_alternative<subcolumns::Volume>(field)
+        ? document.get_volume_digits(chip, channel)
+        : 2;
 
-    if (digit_index == 0) {
+    using edit::edit_pattern::DigitAction;
+    using main_window::MoveCursor;
+
+    // This logic will be rewritten (and split between volumes and effect names/values)
+    // once once each nybble is editable independently.
+
+    auto digit_index = self._win._cursor.digit_index();
+    auto digit_action = digit_index == 0
         // Erase field and enter first digit.
-        self._win.push_edit(std::move(box), main_window::MoveCursor_::AdvanceDigit{});
+        ? DigitAction::Replace
+        // Move current digit to the left and append second digit.
+        : DigitAction::ShiftLeft;
 
-    } else {
-        // Move current digit to the left, append second digit,
-        // and move cursor down.
-        self._win.push_edit(
-            std::move(box), main_window::move_to(step_cursor_down(self))
-        );
-    }
+    MoveCursor move_cursor = digit_index + 1 < num_digits
+        // Move cursor to second digit.
+        ? main_window::MoveCursor_::AdvanceDigit{}
+        // Move cursor down.
+        : main_window::move_to(step_cursor_down(self));
+
+
+    auto [number, box] = ed::add_digit(
+        document, chip, channel, abs_time, field, digit_action, nybble
+    );
+    self._win.push_edit(std::move(box), move_cursor);
+
     // Update saved instrument number.
     if (std::holds_alternative<subcolumns::Instrument>(field)) {
         self._win._instrument = number;

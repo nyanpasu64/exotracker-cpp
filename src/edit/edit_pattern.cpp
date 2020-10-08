@@ -20,7 +20,7 @@ using edit_impl::make_command;
 
 struct MultiDigitEdit {
     MultiDigitField field;
-    int digit_index;
+    DigitAction digit_action;
 };
 
 /// assert() only takes effect on debug builds.
@@ -110,7 +110,7 @@ struct PatternEdit {
         and may violate the invariant.
         */
 
-        if (_multi_digit && _multi_digit->digit_index == 1) {
+        if (_multi_digit && _multi_digit->digit_action == DigitAction::ShiftLeft) {
             using ImplPatternEdit = edit_impl::ImplEditCommand<PatternEdit>;
 
             // Coalesce first/second edits of the same two-digit field.
@@ -120,7 +120,7 @@ struct PatternEdit {
 
             assert_or_false(prev._multi_digit);
             assert_or_false(prev._multi_digit->field == _multi_digit->field);
-            assert_or_false(prev._multi_digit->digit_index == 0);
+            assert_or_false(prev._multi_digit->digit_action == DigitAction::Replace);
             assert_or_false(prev._chip == _chip);
             assert_or_false(prev._channel == _channel);
             assert_or_false(prev._grid_index == _grid_index);
@@ -381,9 +381,9 @@ std::tuple<uint8_t, EditBox> add_digit(
     ChannelIndex channel,
     GridAndBeat abs_time,
     MultiDigitField subcolumn,
-    int digit_index,
-    uint8_t nybble
-) {
+    DigitAction digit_action,
+    uint8_t nybble)
+{
     auto maybe_block = get_current_block(document, chip, channel, abs_time);
     auto p = &maybe_block;
 
@@ -431,7 +431,7 @@ std::tuple<uint8_t, EditBox> add_digit(
         throw std::invalid_argument("Invalid subcolumn");
     }();
 
-    if (digit_index == 0) {
+    if (digit_action == DigitAction::Replace) {
         field = nybble;
     } else {
         // TODO non-fatal popup if assertion failed.
@@ -451,7 +451,7 @@ std::tuple<uint8_t, EditBox> add_digit(
             time.grid,
             time.block,
             std::move(edit),
-            MultiDigitEdit{subcolumn, digit_index},
+            MultiDigitEdit{subcolumn, digit_action},
         })
     };
 }

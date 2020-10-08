@@ -71,40 +71,42 @@ namespace sc = edit::edit_pattern::subcolumns;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 
+using DA = ep::DigitAction;
+
 inline EditBox add_digit_simple(
     doc::Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
     GridAndBeat time,
-    edit::edit_pattern::MultiDigitField subcolumn,
-    int digit_index,
+    ep::MultiDigitField subcolumn,
+    ep::DigitAction digit_action,
     uint8_t nybble
 ) {
     auto [_value, box] = ep::add_digit(
-        document, chip, channel, time, subcolumn, digit_index, nybble
+        document, chip, channel, time, subcolumn, digit_action, nybble
     );
     return std::move(box);
 }
 
 
 EditBox volume_0(doc::Document const& d) {
-    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, 0, 0x1);
+    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, DA::Replace, 0x1);
 }
 
 EditBox volume_0_alt(doc::Document const& d) {
-    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, 0, 0x3);
+    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, DA::Replace, 0x3);
 }
 
 EditBox volume_1(doc::Document const& d) {
-    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, 1, 0x2);
+    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, DA::ShiftLeft, 0x2);
 }
 
 EditBox instr_0(doc::Document const& d) {
-    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Instrument{}, 0, 0x1);
+    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Instrument{}, DA::Replace, 0x1);
 }
 
 EditBox instr_1(doc::Document const& d) {
-    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Instrument{}, 1, 0x2);
+    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Instrument{}, DA::ShiftLeft, 0x2);
 }
 
 PARAMETERIZE(should_start_with_block, bool, start_with_block,

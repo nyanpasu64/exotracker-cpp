@@ -90,6 +90,17 @@ using chip_common::ChannelIndex;
 
 using MultiDigitField = std::variant<subcolumns::Instrument, subcolumns::Volume>;
 
+/// How to edit a byte field when the user enters a nybble.
+/// This enum will be changed once each nybble is editable independently.
+enum class DigitAction {
+    /// Given nybble a, replace byte xy with 0a.
+    Replace,
+
+    /// The byte is assumed to have upper nybble 0.
+    /// Given nybble b, replace byte 0a with ab.
+    ShiftLeft,
+};
+
 /// Called when the user enters notes into a two-digit hex field.
 ///
 /// On first keypress, digit_index is 0, and this function erases the field
@@ -106,8 +117,7 @@ using MultiDigitField = std::variant<subcolumns::Instrument, subcolumns::Volume>
     ChannelIndex channel,
     GridAndBeat abs_time,
     MultiDigitField subcolumn,
-    int digit_index,
-    uint8_t nybble
-);
+    DigitAction digit_action,
+    uint8_t nybble);
 
 }
