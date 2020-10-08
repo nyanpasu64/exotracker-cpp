@@ -497,9 +497,12 @@ struct ColumnLayout {
 
             // TODO change doc to list how many effect columns there are
             for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
-                // Effect names are 2 characters wide and only have left padding.
+                // Effect names are 1 or 2 characters wide and only have left padding.
                 append_subcolumn(
-                    subcolumns::EffectName{effect_col}, 2, true, false
+                    subcolumns::EffectName{effect_col},
+                    document.effect_name_chars,
+                    true,
+                    false
                 );
                 // Effect values are 2 characters wide and only have right padding.
                 append_subcolumn(
