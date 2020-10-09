@@ -3,7 +3,7 @@
 #include "audio/event_queue.h"
 #include "chip_kinds.h"
 #include "timing_common.h"
-#include "util.h"
+#include "util/distance.h"
 #include "util/release_assert.h"
 
 #include <nsfplay/xgm/devices/CPU/nes_cpu.h>
