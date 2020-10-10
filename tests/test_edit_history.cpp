@@ -67,7 +67,7 @@ void test_pattern_edits(
     }
 }
 
-namespace sc = edit::edit_pattern::subcolumns;
+namespace sc = edit::edit_pattern::SubColumn_;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 

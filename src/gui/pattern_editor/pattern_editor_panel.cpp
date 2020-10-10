@@ -320,7 +320,7 @@ struct ChannelDraw {
     int xright;
 };
 
-namespace subcolumns = edit::edit_pattern::subcolumns;
+namespace SubColumn_ = edit::edit_pattern::SubColumn_;
 using edit::edit_pattern::SubColumn;
 
 // # Visual layout.
@@ -438,7 +438,7 @@ struct ColumnLayout {
     };
 
     // SubColumn doesn't matter.
-    SubColumnPx ruler{subcolumns::Note{}};
+    SubColumnPx ruler{SubColumn_::Note{}};
 
     begin_sub(ruler);
     center_sub(ruler, columns::RULER_WIDTH_CHARS);
@@ -459,7 +459,7 @@ struct ColumnLayout {
             int const orig_left_px = x_px;
 
             // SubColumn doesn't matter.
-            SubColumnPx block_handle{subcolumns::Note{}};
+            SubColumnPx block_handle{SubColumn_::Note{}};
 
             begin_sub(block_handle);
             center_sub(block_handle, 1, 2);
@@ -483,30 +483,30 @@ struct ColumnLayout {
             };
 
             // Notes are 3 characters wide.
-            append_subcolumn(subcolumns::Note{}, 3);
+            append_subcolumn(SubColumn_::Note{}, 3);
 
             // TODO configurable column hiding (one checkbox per column type?)
             // Instruments are 2 characters wide.
-            append_subcolumn(subcolumns::Instrument{}, 2);
+            append_subcolumn(SubColumn_::Instrument{}, 2);
 
             // Volume width depends on the current chip and channel.
             {
                 auto volume_width = document.get_volume_digits(chip_index, channel_index);
-                append_subcolumn(subcolumns::Volume{}, volume_width);
+                append_subcolumn(SubColumn_::Volume{}, volume_width);
             }
 
             // TODO change doc to list how many effect columns there are
             for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
                 // Effect names are 1 or 2 characters wide and only have left padding.
                 append_subcolumn(
-                    subcolumns::EffectName{effect_col},
+                    SubColumn_::EffectName{effect_col},
                     document.effect_name_chars,
                     true,
                     false
                 );
                 // Effect values are 2 characters wide and only have right padding.
                 append_subcolumn(
-                    subcolumns::EffectValue{effect_col}, 2, false, true
+                    SubColumn_::EffectValue{effect_col}, 2, false, true
                 );
             }
 
@@ -558,17 +558,17 @@ using ColumnList = std::vector<Column>;
         ) {
             SubColumnList subcolumns;
 
-            subcolumns.push_back(subcolumns::Note{});
+            subcolumns.push_back(SubColumn_::Note{});
 
             // TODO configurable column hiding (one checkbox per column type?)
-            subcolumns.push_back(subcolumns::Instrument{});
+            subcolumns.push_back(SubColumn_::Instrument{});
 
-            subcolumns.push_back(subcolumns::Volume{});
+            subcolumns.push_back(SubColumn_::Volume{});
 
             // TODO change doc to list how many effect colums there are
             for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
-                subcolumns.push_back(subcolumns::EffectName{effect_col});
-                subcolumns.push_back(subcolumns::EffectValue{effect_col});
+                subcolumns.push_back(SubColumn_::EffectName{effect_col});
+                subcolumns.push_back(SubColumn_::EffectValue{effect_col});
             }
 
             column_list.push_back(Column{
@@ -997,7 +997,7 @@ static void draw_pattern_background(
                         bg = BG; \
                     }
 
-                namespace sc = subcolumns;
+                namespace sc = SubColumn_;
 
                 // Don't draw the note column's divider line,
                 // since it lies right next to the previous channel's channel divider.
@@ -1519,7 +1519,7 @@ static void draw_pattern_foreground(
 
             // Draw text.
             for (auto const & subcolumn : column.subcolumns) {
-                namespace sc = subcolumns;
+                namespace sc = SubColumn_;
 
                 auto draw_text = [&](QString & text) {
                     // Clear background using unmodified copy free of rendered text.
@@ -2124,7 +2124,7 @@ void PatternEditorPanel::note_cut_pressed() {
     auto [chip, channel, subcolumn] = calc_cursor_x(*this);
     auto subp = &subcolumn;
 
-    if (std::get_if<subcolumns::Note>(subp)) {
+    if (std::get_if<SubColumn_::Note>(subp)) {
         note_pressed(*this, chip, channel, doc::NOTE_CUT);
     }
 }
@@ -2166,7 +2166,7 @@ static void add_digit(
     auto abs_time = self._win._cursor->y;
 
     // The volume field can have 1 or 2 digits. The effect fields always have 2.
-    int num_digits = std::holds_alternative<subcolumns::Volume>(field)
+    int num_digits = std::holds_alternative<SubColumn_::Volume>(field)
         ? document.get_volume_digits(chip, channel)
         : 2;
 
@@ -2196,7 +2196,7 @@ static void add_digit(
     self._win.push_edit(std::move(box), move_cursor);
 
     // Update saved instrument number.
-    if (std::holds_alternative<subcolumns::Instrument>(field)) {
+    if (std::holds_alternative<SubColumn_::Instrument>(field)) {
         self._win._instrument = number;
     }
 
@@ -2209,7 +2209,7 @@ static void add_instrument_digit(
     doc::ChannelIndex channel,
     uint8_t nybble
 ) {
-    add_digit(self, chip, channel, nybble, subcolumns::Instrument{});
+    add_digit(self, chip, channel, nybble, SubColumn_::Instrument{});
 }
 
 static void add_volume_digit(
@@ -2219,7 +2219,7 @@ static void add_volume_digit(
     uint8_t nybble
 ) {
     // TODO add support for single-digit volume?
-    add_digit(self, chip, channel, nybble, subcolumns::Volume{});
+    add_digit(self, chip, channel, nybble, SubColumn_::Volume{});
 }
 
 /// Handles events based on physical layout rather than shortcuts.
@@ -2243,7 +2243,7 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
 
     auto subp = &subcolumn;
 
-    if (std::get_if<subcolumns::Note>(subp)) {
+    if (std::get_if<SubColumn_::Note>(subp)) {
         // Pick the octave based on whether the user pressed the lower or upper key row.
         // If the user is holding shift, give the user an extra 2 octaves of range
         // (transpose the lower row down 1 octave, and the upper row up 1).
@@ -2273,13 +2273,13 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
         }
 
     } else
-    if (std::get_if<subcolumns::Instrument>(subp)) {
+    if (std::get_if<SubColumn_::Instrument>(subp)) {
         if (auto digit = format::hex_from_key(*event)) {
             add_instrument_digit(*this, chip, channel, *digit);
             update();
         }
     } else
-    if (std::get_if<subcolumns::Volume>(subp)) {
+    if (std::get_if<SubColumn_::Volume>(subp)) {
         if (auto digit = format::hex_from_key(*event)) {
             add_volume_digit(*this, chip, channel, *digit);
             update();

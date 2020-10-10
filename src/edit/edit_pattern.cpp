@@ -278,22 +278,22 @@ EditBox delete_cell(
         for (auto it = ev_begin; it != ev_end; it++) {
             auto & event = it->v;
 
-            if (std::get_if<subcolumns::Note>(p)) {
+            if (std::get_if<SubColumn_::Note>(p)) {
                 event.note = {};
                 event.instr = {};
                 event.volume = {};
             } else
-            if (std::get_if<subcolumns::Instrument>(p)) {
+            if (std::get_if<SubColumn_::Instrument>(p)) {
                 event.instr = {};
             } else
-            if (std::get_if<subcolumns::Volume>(p)) {
+            if (std::get_if<SubColumn_::Volume>(p)) {
                 event.volume = {};
             } else
-            if (auto eff = std::get_if<subcolumns::EffectName>(p)) {
+            if (auto eff = std::get_if<SubColumn_::EffectName>(p)) {
                 // TODO v.effects[eff->effect_col]
                 (void) eff;
             } else
-            if (auto eff = std::get_if<subcolumns::EffectValue>(p)) {
+            if (auto eff = std::get_if<SubColumn_::EffectValue>(p)) {
                 // TODO v.effects[eff->effect_col]
                 (void) eff;
             }
@@ -422,10 +422,10 @@ std::tuple<uint8_t, EditBox> add_digit(
         EventSearchMut kv{*events};
         auto & ev = kv.get_or_insert(time.beat);
 
-        if (std::holds_alternative<subcolumns::Instrument>(subcolumn)) {
+        if (std::holds_alternative<SubColumn_::Instrument>(subcolumn)) {
             return ev.v.instr;
         }
-        if (std::holds_alternative<subcolumns::Volume>(subcolumn)) {
+        if (std::holds_alternative<SubColumn_::Volume>(subcolumn)) {
             return ev.v.volume;
         }
         throw std::invalid_argument("Invalid subcolumn");

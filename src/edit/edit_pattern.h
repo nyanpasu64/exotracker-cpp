@@ -12,7 +12,7 @@
 
 namespace edit::edit_pattern {
 
-namespace subcolumns {
+namespace SubColumn_ {
     struct Note {
         DEFAULT_EQUALABLE(Note)
     };
@@ -38,7 +38,7 @@ namespace subcolumns {
     >;
 }
 
-using subcolumns::SubColumn;
+using SubColumn_::SubColumn;
 
 using doc::Document;
 using timing::GridAndBeat;
@@ -88,7 +88,7 @@ using chip_common::ChannelIndex;
     std::optional<doc::InstrumentIndex> instrument
 );
 
-using MultiDigitField = std::variant<subcolumns::Instrument, subcolumns::Volume>;
+using MultiDigitField = std::variant<SubColumn_::Instrument, SubColumn_::Volume>;
 
 /// How to edit a byte field when the user enters a nybble.
 /// This enum will be changed once each nybble is editable independently.
