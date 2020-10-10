@@ -6,6 +6,8 @@
 #include "util/release_assert.h"
 #include "util/typeid_cast.h"
 
+#include <cpp11-on-multicore/bitfield.h>
+
 #include <utility>  // std::swap
 #include <cassert>
 #include <memory>  // make_unique. <memory> is already included for EditBox though.
@@ -17,11 +19,6 @@ namespace edit::edit_pattern {
 using namespace doc;
 using timing::GridBlockBeat;
 using edit_impl::make_command;
-
-struct MultiDigitEdit {
-    MultiDigitField field;
-    DigitAction digit_action;
-};
 
 /// assert() only takes effect on debug builds.
 /// On release builds, skip coalescing instead.
@@ -53,7 +50,6 @@ struct PatternEdit {
 
     Edit _edit;
 
-    std::optional<MultiDigitEdit> _multi_digit{};
     ModifiedFlags _modified = ModifiedFlags::Patterns;
 
     void apply_swap(doc::Document & document) {
@@ -91,58 +87,6 @@ struct PatternEdit {
     }
 
     bool can_coalesce(BaseEditCommand & prev) const {
-        /*
-        Invariant: the GUI pushes "second digit" edit commands
-        only after matching "first digit" commands.
-
-        What stops you from inserting a "second digit" in the wrong channel/field/time?
-        All cursor movement (CursorAndSelection::set()) resets digit to 0.
-
-        What stops you from inserting a "second digit" after a non-first-digit?
-        All edits (MainWindow::push_edit()) reset digit to 0,
-        except for entering the first digit.
-
-        Right now, all undo/redo operations set the cursor position
-        (which resets digit to 0).
-        If non-cursor-moving undo/redo operations are added,
-        and if they don't explicitly reset the cursor digit to 0,
-        the resulting effects will be difficult to understand
-        and may violate the invariant.
-        */
-
-        if (_multi_digit && _multi_digit->digit_action == DigitAction::ShiftLeft) {
-            using ImplPatternEdit = edit_impl::ImplEditCommand<PatternEdit>;
-
-            // Coalesce first/second edits of the same two-digit field.
-            auto prev_pattern_edit_maybe = typeid_cast<ImplPatternEdit *>(&prev);
-            assert_or_false(prev_pattern_edit_maybe);
-            PatternEdit & prev = *prev_pattern_edit_maybe;
-
-            assert_or_false(prev._multi_digit);
-            assert_or_false(prev._multi_digit->field == _multi_digit->field);
-            assert_or_false(prev._multi_digit->digit_action == DigitAction::Replace);
-            assert_or_false(prev._chip == _chip);
-            assert_or_false(prev._channel == _channel);
-            assert_or_false(prev._grid_index == _grid_index);
-            assert_or_false(prev._block_index == _block_index);
-
-            // If we're entering the second digit, the previous operation must be
-            // "enter first digit", which is AddBlock or EditPattern.
-            // When AddBlock is applied to a document, it turns into RemoveBlock.
-            // When EditPattern is applied to a document, it remains as-is.
-            assert_or_false(
-                std::holds_alternative<edit::RemoveBlock>(prev._edit) ||
-                std::holds_alternative<edit::EditPattern>(prev._edit)
-            );
-
-            // The current operation must be "enter second digit", which is EditPattern.
-            // And History calls can_coalesce() *after* apply_swap().
-            // But it remains as-is.
-            assert_or_false(std::holds_alternative<edit::EditPattern>(_edit));
-
-            return true;
-        }
-
         return false;
     }
 };
@@ -289,11 +233,7 @@ EditBox delete_cell(
             if (std::get_if<SubColumn_::Volume>(p)) {
                 event.volume = {};
             } else
-            if (auto eff = std::get_if<SubColumn_::EffectName>(p)) {
-                // TODO v.effects[eff->effect_col]
-                (void) eff;
-            } else
-            if (auto eff = std::get_if<SubColumn_::EffectValue>(p)) {
+            if (auto eff = std::get_if<SubColumn_::Effect>(p)) {
                 // TODO v.effects[eff->effect_col]
                 (void) eff;
             }
@@ -374,6 +314,12 @@ EditBox insert_note(
     });
 }
 
+BEGIN_BITFIELD_TYPE(HexByte, uint8_t)
+//  ADD_BITFIELD_MEMBER(memberName, offset, bits)
+    ADD_BITFIELD_MEMBER(lower,      0,      4)
+    ADD_BITFIELD_MEMBER(upper,      4,      4)
+END_BITFIELD_TYPE()
+
 // TODO add similar function for effect name (two ASCII characters, not nybbles).
 std::tuple<uint8_t, EditBox> add_digit(
     Document const & document,
@@ -389,7 +335,7 @@ std::tuple<uint8_t, EditBox> add_digit(
 
     GridBlockBeat time;
     Edit edit;
-    doc::EventList * events;
+    doc::EventList * events;  // events: 'edit
 
     if (auto exists = std::get_if<GridBlockBeat>(p)) {
         time = *exists;
@@ -414,10 +360,11 @@ std::tuple<uint8_t, EditBox> add_digit(
         events = &std::get<edit::AddBlock>(edit).block.pattern.events;
 
     } else
-        throw std::logic_error("insert_note() get_current_block() returned nothing");
+        throw std::logic_error("add_digit() get_current_block() returned nothing");
 
     // Insert instrument.
 
+    // field: ('events = 'edit)
     std::optional<uint8_t> & field = [&] () -> auto& {
         EventSearchMut kv{*events};
         auto & ev = kv.get_or_insert(time.beat);
@@ -431,28 +378,38 @@ std::tuple<uint8_t, EditBox> add_digit(
         throw std::invalid_argument("Invalid subcolumn");
     }();
 
-    if (digit_action == DigitAction::Replace) {
-        field = nybble;
-    } else {
-        // TODO non-fatal popup if assertion failed.
-        assert(field.has_value());
-        assert(field.value() < 0x10);
+    HexByte value = field.value_or(0);
 
-        // field is optional<u8> but make this a u32 to avoid promotion to signed int.
-        uint32_t old_nybble = field.value_or(0);
-        field = (old_nybble << 4u) | nybble;
+    switch (digit_action) {
+    case DigitAction::Replace:
+        value = nybble;
+        break;
+
+    case DigitAction::ShiftLeft:
+        value.upper = value.lower;
+        value.lower = nybble;
+        break;
+
+    case DigitAction::UpperNybble:
+        value.upper = nybble;
+        break;
+
+    case DigitAction::LowerNybble:
+        value.lower = nybble;
+        break;
+
+    default:
+        throw std::logic_error("invalid DigitAction when calling add_digit()");
     }
 
+    // Mutates `edit`.
+    field = value;
+
     return {
-        *field,
-        make_command(PatternEdit{
-            chip,
-            channel,
-            time.grid,
-            time.block,
-            std::move(edit),
-            MultiDigitEdit{subcolumn, digit_action},
-        })
+        // Tell GUI the newly selected volume/instrument number.
+        value,
+        // Return edit to be applied to GUI/audio documents.
+        make_command(PatternEdit{chip, channel, time.grid, time.block, std::move(edit)}),
     };
 }
 

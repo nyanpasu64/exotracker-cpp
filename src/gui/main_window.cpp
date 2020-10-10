@@ -175,7 +175,6 @@ void CursorAndSelection::set_internal(Cursor cursor) {
 
 void CursorAndSelection::set(Cursor cursor) {
     set_internal(cursor);
-    reset_digit();
     emit cursor_moved();
 }
 
@@ -184,7 +183,6 @@ void CursorAndSelection::set_x(CursorX x) {
     if (_select) {
         _select->set_end(_cursor);
     }
-    reset_digit();
     emit cursor_moved();
 }
 
@@ -193,28 +191,7 @@ void CursorAndSelection::set_y(GridAndBeat y) {
     if (_select) {
         _select->set_end(_cursor);
     }
-    reset_digit();
     emit cursor_moved();
-}
-
-int CursorAndSelection::digit_index() const {
-    return _digit;
-}
-
-int CursorAndSelection::advance_digit() {
-    ++_digit;
-    // Technically we should emit cursor_moved(),
-    // but advance_digit() is only called after/by another function which also emits it,
-    // and we want to avoid unnecessary double redraws.
-
-    return _digit;
-}
-
-void CursorAndSelection::reset_digit() {
-    _digit = 0;
-    // Technically we should emit cursor_moved(),
-    // but reset_digit() is only called after/by another function which also emits it,
-    // and we want to avoid unnecessary double redraws.
 }
 
 std::optional<RawSelection> CursorAndSelection::raw_select() const {
@@ -248,7 +225,6 @@ void CursorAndSelection::clear_select() {
         _select = {};
         emit cursor_moved();
     }
-    // TODO reset digit?
 }
 
 
@@ -725,10 +701,6 @@ public:
             before_cursor = {};
             after_cursor = {};
         } else
-        if (std::get_if<MoveCursor_::AdvanceDigit>(p)) {
-            before_cursor = here;
-            after_cursor = here;
-        } else
         if (auto move_from = std::get_if<MoveCursor_::MoveFrom>(p)) {
             before_cursor = move_from->before_or_here.value_or(here);
             after_cursor = move_from->after_or_here.value_or(here);
@@ -741,12 +713,6 @@ public:
         if (after_cursor) {
             // Does not emit cursor_moved()!
             state._cursor.set_internal(*after_cursor);
-        }
-
-        if (std::get_if<MoveCursor_::AdvanceDigit>(p)) {
-            state._cursor.advance_digit();
-        } else {
-            state._cursor.reset_digit();
         }
     }
 

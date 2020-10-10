@@ -73,7 +73,7 @@ struct DocumentCopy {
     /// Whether effect names are 1 or 2 characters wide.
     /// When set to 1, the first digit is hidden if it's 0,
     /// and typing character c will write effect 0c immediately.
-    int effect_name_chars = 1;
+    uint32_t effect_name_chars = 1;
 
     Instruments instruments;
 

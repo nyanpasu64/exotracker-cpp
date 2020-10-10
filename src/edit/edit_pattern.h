@@ -22,20 +22,12 @@ namespace SubColumn_ {
     struct Volume {
         DEFAULT_EQUALABLE(Volume)
     };
-    struct EffectName {
+    struct Effect {
         uint8_t effect_col;
-
-        DEFAULT_EQUALABLE(EffectName)
-    };
-    struct EffectValue {
-        uint8_t effect_col;
-
-        DEFAULT_EQUALABLE(EffectValue)
+        DEFAULT_EQUALABLE(Effect)
     };
 
-    using SubColumn = std::variant<
-        Note, Instrument, Volume, EffectName, EffectValue
-    >;
+    using SubColumn = std::variant<Note, Instrument, Volume, Effect>;
 }
 
 using SubColumn_::SubColumn;
@@ -93,24 +85,27 @@ using MultiDigitField = std::variant<SubColumn_::Instrument, SubColumn_::Volume>
 /// How to edit a byte field when the user enters a nybble.
 /// This enum will be changed once each nybble is editable independently.
 enum class DigitAction {
-    /// Given nybble a, replace byte xy with 0a.
+    /// Given nybble x, replace byte ab with 0x.
     Replace,
 
-    /// The byte is assumed to have upper nybble 0.
-    /// Given nybble b, replace byte 0a with ab.
+    /// Given nybble x, replace byte ab with bx.
+    /// Currently unused until I figure out how to encode two-digit hex values
+    /// where the cursor occupies both digits.
     ShiftLeft,
+
+    /// Given nybble x, replace byte ab with xb.
+    UpperNybble,
+
+    /// Given nybble x, replace byte ab with ax.
+    LowerNybble,
 };
 
-/// Called when the user enters notes into a two-digit hex field.
+/// Called when the user enters hex digits into a 1 or 2 digit hex field.
+/// digit_action determines how the existing byte is incorporated.
 ///
-/// On first keypress, digit_index is 0, and this function erases the field
-/// and replaces it with the nybble entered by the user.
-///
-/// If the user presses another key immediately afterwards (without moving the cursor),
-/// add_digit() is called with digit_index = 1.
-/// It moves the existing nybble to the left, and adds the nybble entered by the user.
-/// When the second keypress is sent to History, key0.can_coalesce(key1) returns true,
-/// and the two inputs are merged in the undo history.
+/// Returns:
+/// - uint8_t = new value of hex field.
+/// - EditBox describes the edit to the document.
 [[nodiscard]] std::tuple<uint8_t, EditBox> add_digit(
     Document const & document,
     ChipIndex chip,

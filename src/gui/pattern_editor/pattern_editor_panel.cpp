@@ -8,6 +8,7 @@
 #include "gui_common.h"
 #include "chip_kinds.h"
 #include "edit/edit_pattern.h"
+#include "util/distance.h"
 #include "util/enumerate.h"
 #include "util/math.h"
 #include "util/release_assert.h"
@@ -325,18 +326,65 @@ using edit::edit_pattern::SubColumn;
 
 // # Visual layout.
 
-/// One column that the cursor can move into.
+using cursor::CursorX;
+using cursor::ColumnIndex;
+using cursor::SubColumnIndex;
+using cursor::DigitIndex;
+using util::distance;
+
+// Effects have up to 2 characters, and 2 digits.
+constexpr DigitIndex MAX_DIGITS = 4;
+
+/// One column used for selections. May have multiple cursor columns.
 struct SubColumnPx {
     SubColumn type;
 
-    // Determines the boundaries for click/selection handling.
-    int left_px = 0;
-    int right_px = 0;
+    /// Number of items the cursor can move into. Must be nonzero.
+    DigitIndex ndigit;
 
-    // Center for text rendering.
-    qreal center_px = 0.0;
+    /// Subcolumn boundaries used for background/selection drawing and click handling.
+    int _bounds_left;
+    int _bounds_right;
 
+    /// Boundaries of each digit, used for cursor drawing.
+    /// Because there is added padding between subcolumns,
+    /// there is a gap between _bounds_left and digit_left_px[0],
+    /// and between digit_left_px[ndigit] and _bounds_right.
+    ///
+    /// Valid range: [0..ndigit] inclusive.
+    std::array<int, MAX_DIGITS + 1> digit_left_px;
+
+    /// Center for rendering each digit.
+    ///
+    /// Valid range: [0..ndigit).
+    std::array<qreal, MAX_DIGITS> digit_center_px;
+
+// impl
     SubColumnPx(SubColumn type) : type{type} {}
+
+    /// Returns the left boundary of the subcolumn (background).
+    /// It's slightly wider than the space used to draw text.
+    [[nodiscard]] inline int left_px() const {
+        return _bounds_left;
+    }
+
+    /// Returns the right boundary of the subcolumn (background).
+    /// It's slightly wider than the space used to draw text.
+    [[nodiscard]] inline int right_px() const {
+        return _bounds_right;
+    }
+
+    /// Returns the pixel to draw a digit.
+    [[nodiscard]] inline qreal center_px() const {
+        assert(ndigit == 1);
+        return digit_center_px[0];
+    }
+
+    /// Returns the horizontal boundaries of a digit, used for drawing the cursor.
+    [[nodiscard]] std::tuple<int, int> digit_left_right(DigitIndex digit) {
+        release_assert(digit < ndigit);
+        return {digit_left_px[digit], digit_left_px[digit + 1]};
+    }
 };
 
 using SubColumnLayout = std::vector<SubColumnPx>;
@@ -407,42 +455,63 @@ struct ColumnLayout {
     doc::Document const & document
 ) {
     int const width_per_char = self._pattern_font_metrics.width;
-    int const extra_width = width_per_char / columns::EXTRA_WIDTH_DIVISOR;
+    int const pad_width = width_per_char / columns::EXTRA_WIDTH_DIVISOR;
 
     int x_px = 0;
 
-    auto add_padding = [&x_px, extra_width] () {
-        x_px += extra_width;
+    // Add one extra pixel to the left of every subcolumn,
+    // since it's taken up by a column/subcolumn border.
+    constexpr int DIVIDER_WIDTH = 1;
+
+    auto wide_subcol = [&x_px, pad_width, width_per_char] (
+        SubColumn type, boost::rational<int32_t> nchar
+    ) -> SubColumnPx {
+        int const chars_width = width_per_char * nchar.numerator() / nchar.denominator();
+
+        auto sub = SubColumnPx(type);
+        sub.ndigit = 1;
+
+        sub._bounds_left = x_px;
+        x_px += pad_width + DIVIDER_WIDTH;
+        sub.digit_left_px[0] = x_px;
+
+        sub.digit_center_px[0] = x_px + chars_width / qreal(2.0);
+        x_px += chars_width;
+
+        sub.digit_left_px[sub.ndigit] = x_px;
+        x_px += pad_width;
+        sub._bounds_right = x_px;
+
+        return sub;
     };
 
-    auto begin_sub = [&x_px, add_padding] (SubColumnPx & sub, bool pad = true) {
-        sub.left_px = x_px;
-        if (pad) {
-            add_padding();
+    auto digits_subcol = [&x_px, pad_width, width_per_char] (
+        SubColumn type, DigitIndex ndigit
+    ) -> SubColumnPx {
+        release_assert(ndigit > 0);
+        release_assert(ndigit <= MAX_DIGITS);
+
+        auto sub = SubColumnPx(type);
+        sub.ndigit = ndigit;
+
+        sub._bounds_left = x_px;
+        x_px += pad_width + DIVIDER_WIDTH;
+
+        for (uint32_t digit = 0; digit < ndigit; digit++) {
+            sub.digit_left_px[digit] = x_px;
+            sub.digit_center_px[digit] = x_px + width_per_char / qreal(2.0);
+            x_px += width_per_char;
         }
-    };
 
-    auto center_sub = [&x_px, width_per_char] (
-        SubColumnPx & sub, int nchar_num, int nchar_den = 1
-    ) {
-        int dwidth = int(width_per_char * nchar_num / nchar_den);
-        sub.center_px = x_px + dwidth / qreal(2.0);
-        x_px += dwidth;
-    };
+        sub.digit_left_px[sub.ndigit] = x_px;
+        x_px += pad_width;
+        sub._bounds_right = x_px;
 
-    auto end_sub = [&x_px, add_padding] (SubColumnPx & sub, bool pad = true) {
-        if (pad) {
-            add_padding();
-        }
-        sub.right_px = x_px;
+        return sub;
     };
 
     // SubColumn doesn't matter.
-    SubColumnPx ruler{SubColumn_::Note{}};
-
-    begin_sub(ruler);
-    center_sub(ruler, columns::RULER_WIDTH_CHARS);
-    end_sub(ruler);
+    SubColumnPx ruler = wide_subcol(SubColumn_::Note{}, columns::RULER_WIDTH_CHARS);
 
     ColumnLayout column_layout{.ruler = ruler, .cols = {}};
 
@@ -459,55 +528,30 @@ struct ColumnLayout {
             int const orig_left_px = x_px;
 
             // SubColumn doesn't matter.
-            SubColumnPx block_handle{SubColumn_::Note{}};
-
-            begin_sub(block_handle);
-            center_sub(block_handle, 1, 2);
-            end_sub(block_handle);
+            SubColumnPx block_handle = wide_subcol(SubColumn_::Note{}, {1, 2});
 
             SubColumnLayout subcolumns;
 
-            auto append_subcolumn = [&subcolumns, begin_sub, center_sub, end_sub] (
-                SubColumn type,
-                int nchar,
-                bool pad_left = true,
-                bool pad_right = true
-            ) {
-                SubColumnPx sub{type};
-
-                begin_sub(sub, pad_left);
-                center_sub(sub, nchar);
-                end_sub(sub, pad_right);
-
-                subcolumns.push_back(sub);
-            };
-
-            // Notes are 3 characters wide.
-            append_subcolumn(SubColumn_::Note{}, 3);
+            // Notes are 3 characters wide, but the cursor only has 1 position.
+            subcolumns.push_back(wide_subcol(SubColumn_::Note{}, 3));
 
             // TODO configurable column hiding (one checkbox per column type?)
-            // Instruments are 2 characters wide.
-            append_subcolumn(SubColumn_::Instrument{}, 2);
+            // Instruments hold 2 characters.
+            subcolumns.push_back(digits_subcol(SubColumn_::Instrument{}, 2));
 
             // Volume width depends on the current chip and channel.
             {
                 auto volume_width = document.get_volume_digits(chip_index, channel_index);
-                append_subcolumn(SubColumn_::Volume{}, volume_width);
+                subcolumns.push_back(digits_subcol(SubColumn_::Volume{}, volume_width));
             }
 
             // TODO change doc to list how many effect columns there are
             for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
-                // Effect names are 1 or 2 characters wide and only have left padding.
-                append_subcolumn(
-                    SubColumn_::EffectName{effect_col},
-                    document.effect_name_chars,
-                    true,
-                    false
-                );
-                // Effect values are 2 characters wide and only have right padding.
-                append_subcolumn(
-                    SubColumn_::EffectValue{effect_col}, 2, false, true
-                );
+                // Effect names hold 1 or 2 characters.
+                // Effect values hold 2 characters.
+                subcolumns.push_back(digits_subcol(
+                    SubColumn_::Effect{effect_col}, document.effect_name_chars + 2
+                ));
             }
 
             // TODO replace off-screen columns with nullopt.
@@ -526,7 +570,14 @@ struct ColumnLayout {
 
 // # Cursor positioning
 
-using SubColumnList = std::vector<SubColumn>;
+struct SubColumnDigits {
+    SubColumn type;
+
+    // Number of items the cursor can move into.
+    DigitIndex ndigit;
+};
+
+using SubColumnList = std::vector<SubColumnDigits>;
 
 struct Column {
     chip_common::ChipIndex chip;
@@ -558,17 +609,21 @@ using ColumnList = std::vector<Column>;
         ) {
             SubColumnList subcolumns;
 
-            subcolumns.push_back(SubColumn_::Note{});
+            subcolumns.push_back({SubColumn_::Note{}, 1});
 
             // TODO configurable column hiding (one checkbox per column type?)
-            subcolumns.push_back(SubColumn_::Instrument{});
+            subcolumns.push_back({SubColumn_::Instrument{}, 2});
 
-            subcolumns.push_back(SubColumn_::Volume{});
+            {
+                auto volume_width = document.get_volume_digits(chip_index, channel_index);
+                subcolumns.push_back({SubColumn_::Volume{}, volume_width});
+            }
 
             // TODO change doc to list how many effect colums there are
             for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
-                subcolumns.push_back(SubColumn_::EffectName{effect_col});
-                subcolumns.push_back(SubColumn_::EffectValue{effect_col});
+                subcolumns.push_back({
+                    SubColumn_::Effect{effect_col}, document.effect_name_chars + 2
+                });
             }
 
             column_list.push_back(Column{
@@ -643,8 +698,8 @@ static void draw_header(
     // Draw the ruler's header outline.
     {
         GridRect channel_rect{inner_rect};
-        channel_rect.set_left(columns.ruler.left_px);
-        channel_rect.set_right(columns.ruler.right_px);
+        channel_rect.set_left(columns.ruler.left_px());
+        channel_rect.set_right(columns.ruler.right_px());
 
         // Unlike other channels, the ruler has no black border to its left.
         // So draw it manually.
@@ -924,10 +979,6 @@ QLinearGradient make_gradient(
     return grad;
 }
 
-using cursor::CursorX;
-using cursor::ColumnIndex;
-using cursor::SubColumnIndex;
-
 using CellIter = doc::TimelineCellIterRef;
 
 /// Computing colors may require blending with the background color.
@@ -945,7 +996,7 @@ static void draw_pattern_background(
 ) {
     auto & visual = get_app().options().visual;
 
-    int row_right_px = columns.ruler.right_px;
+    int row_right_px = columns.ruler.right_px();
     for (auto & c : reverse(columns.cols)) {
         if (c.has_value()) {
             row_right_px = c->right_px;
@@ -979,7 +1030,7 @@ static void draw_pattern_background(
             }
             for (SubColumnPx const & sub : maybe_column->subcolumns) {
                 GridRect sub_rect{
-                    QPoint{sub.left_px, pos.top}, QPoint{sub.right_px, pos.bottom}
+                    QPoint{sub.left_px(), pos.top}, QPoint{sub.right_px(), pos.bottom}
                 };
 
                 // Unrecognized columns are red to indicate an error.
@@ -1004,8 +1055,7 @@ static void draw_pattern_background(
                 CASE(sc::Note, note_bg, note_divider)
                 CASE(sc::Instrument, instrument_bg, instrument_divider)
                 CASE(sc::Volume, volume_bg, volume_divider)
-                CASE(sc::EffectName, effect_bg, effect_divider)
-                CASE_NO_FG(sc::EffectValue, effect_bg)
+                CASE(sc::Effect, effect_bg, effect_divider)
 
                 #undef CASE
                 #undef CASE_NO_FG
@@ -1058,7 +1108,7 @@ static void draw_pattern_background(
 
     painter.setPen(visual.channel_divider);
 
-    draw_divider(columns.ruler.right_px);
+    draw_divider(columns.ruler.right_px());
     for (auto & column : columns.cols) {
         if (column) {
             draw_divider(column->right_px);
@@ -1074,8 +1124,8 @@ static void draw_pattern_background(
         // Draw block handle.
         auto sub = column.block_handle;
         GridRect sub_rect{
-            QPoint{sub.left_px, 0},
-            QPoint{sub.right_px + painter.pen().width(), pos.bottom - pos.top}
+            QPoint{sub.left_px(), 0},
+            QPoint{sub.right_px() + painter.pen().width(), pos.bottom - pos.top}
         };
 
         // Draw background.
@@ -1096,8 +1146,8 @@ static void draw_pattern_background(
         } else {
             // Draw loop indicator triangles.
 
-            qreal x0 = sub.left_px + 1;
-            qreal x1 = sub.right_px;
+            qreal x0 = sub.left_px() + painter.pen().width();
+            qreal x1 = sub.right_px();
             qreal y0 = painter.pen().widthF() * 0.5;
 
             auto width = x1 - x0;
@@ -1169,7 +1219,7 @@ static void draw_pattern_background(
         // Limit selections to patterns, not ruler.
         PainterScope scope{painter};
         painter.setClipRect(GridRect::from_corners(
-            columns.ruler.right_px, 0, inner_size.width(), inner_size.height()
+            columns.ruler.right_px(), 0, inner_size.width(), inner_size.height()
         ));
 
         int off_screen = std::max(inner_size.width(), inner_size.height()) + 100;
@@ -1242,7 +1292,11 @@ static void draw_pattern_background(
             auto const& c = columns.cols[x.column];
             if (c.has_value()) {
                 SubColumnPx sc = c->subcolumns[x.subcolumn];
-                return right_border ? sc.right_px : sc.left_px;
+
+                // In FamiTracker, subcolumn boundaries determine selection borders.
+                // They are slightly larger than the character drawing regions
+                // (which determine cursor borders).
+                return right_border ? sc.right_px() : sc.left_px();
             }
             if (c.left_of_screen()) {
                 return -off_screen;
@@ -1320,21 +1374,22 @@ static void draw_pattern_background(
         if (auto & col = columns.cols[cursor_x.column]) {
             // If cursor is on-screen, draw left/cursor/right.
             auto subcol = col->subcolumns[cursor_x.subcolumn];
+            auto [digit_left, digit_right] = subcol.digit_left_right(cursor_x.digit);
 
             // Draw gradient (space to the left of the cursor cell).
             auto left_rect = cursor_row_rect;
-            left_rect.set_right(subcol.left_px);
+            left_rect.set_right(digit_left);
             painter.fillRect(left_rect, bg_grad);
 
             // Draw gradient (space to the right of the cursor cell).
             auto right_rect = cursor_row_rect;
-            right_rect.set_left(subcol.right_px);
+            right_rect.set_left(digit_right);
             painter.fillRect(right_rect, bg_grad);
 
             // Draw gradient (cursor cell only).
             GridRect cursor_rect{
-                QPoint{subcol.left_px, cursor_top},
-                QPoint{subcol.right_px, cursor_bottom}
+                QPoint{digit_left, cursor_top},
+                QPoint{digit_right, cursor_bottom}
             };
             painter.fillRect(
                 cursor_rect,
@@ -1378,7 +1433,7 @@ static void draw_pattern_background(
                 DrawText draw_text{visual.pattern_font};
                 draw_text.draw_text(
                     painter,
-                    columns.ruler.center_px,
+                    columns.ruler.center_px(),
                     ytop + visual.font_tweaks.pixels_above_text,
                     Qt::AlignTop | Qt::AlignHCenter,
                     s
@@ -1423,7 +1478,7 @@ static void draw_pattern_foreground(
     auto draw_note_cut = [&self, &painter, rect_height, rect_width] (
         SubColumnPx const & subcolumn, QColor color
     ) {
-        qreal x1f = subcolumn.center_px - rect_width / 2;
+        qreal x1f = subcolumn.center_px() - rect_width / 2;
         qreal x2f = x1f + rect_width;
         x1f = round(x1f);
         x2f = round(x2f);
@@ -1438,7 +1493,7 @@ static void draw_pattern_foreground(
     auto draw_release = [&self, &painter, rect_height, rect_width] (
         SubColumnPx const & subcolumn, QColor color
     ) {
-        qreal x1f = subcolumn.center_px - rect_width / 2;
+        qreal x1f = subcolumn.center_px() - rect_width / 2;
         qreal x2f = x1f + rect_width;
         int x1 = qRound(x1f);
         int x2 = qRound(x2f);
@@ -1507,10 +1562,10 @@ static void draw_pattern_foreground(
             }
 
             auto draw_top_line = [&painter, &note_color] (
-                SubColumnPx sub, int left_offset = 0
+                SubColumnPx const& sub, int left_offset = 0
             ) {
-                QPoint left_top{sub.left_px + left_offset, 0};
-                QPoint right_top{sub.right_px, 0};
+                QPoint left_top{sub.left_px() + left_offset, 0};
+                QPoint right_top{sub.right_px(), 0};
 
                 // Draw top border. Do it after each note clears the background.
                 painter.setPen(note_color);
@@ -1529,21 +1584,33 @@ static void draw_pattern_foreground(
                     auto clear_height = self._pixels_per_row;
 
                     GridRect target_rect{
-                        QPoint{subcolumn.left_px, 0},
-                        QPoint{subcolumn.right_px, clear_height},
+                        QPoint{subcolumn.left_px(), 0},
+                        QPoint{subcolumn.right_px(), clear_height},
                     };
                     auto sample_rect = painter.combinedTransform().mapRect(target_rect);
                     painter.drawImage(target_rect, self._temp_image.copy(sample_rect));
 
                     // Text is being drawn relative to top-left of current row (not cell).
-                    // subcolumn.center_px is relative to screen left (not cell).
-                    text_painter.draw_text(
-                        painter,
-                        subcolumn.center_px,
-                        visual.font_tweaks.pixels_above_text,
-                        Qt::AlignTop | Qt::AlignHCenter,
-                        text
-                    );
+                    // subcolumn.center_px() is relative to screen left (not cell).
+                    release_assert(size_t(text.size()) >= size_t(subcolumn.ndigit));
+                    if (subcolumn.ndigit <= 1) {
+                        text_painter.draw_text(
+                            painter,
+                            subcolumn.center_px(),
+                            visual.font_tweaks.pixels_above_text,
+                            Qt::AlignTop | Qt::AlignHCenter,
+                            text
+                        );
+                    } else for (DigitIndex digit = 0; digit < subcolumn.ndigit; digit++) {
+                        text_painter.draw_text(
+                            painter,
+                            subcolumn.digit_center_px[digit],
+                            visual.font_tweaks.pixels_above_text,
+                            Qt::AlignTop | Qt::AlignHCenter,
+                            QString(text[digit])
+                        );
+                    }
+
                 };
 
                 #define CASE(VARIANT) \
@@ -1581,10 +1648,7 @@ static void draw_pattern_foreground(
                 CASE(sc::Volume) {
                     if (row_event.volume) {
                         painter.setPen(volume);
-
-                        auto digits =
-                            document.get_volume_digits(column.chip, column.channel);
-                        auto s = digits == 2
+                        auto s = subcolumn.ndigit == 2
                             ? format_hex_2(uint8_t(*row_event.volume))
                             : format_hex_1(uint8_t(*row_event.volume));
                         draw_text(s);
@@ -1635,7 +1699,7 @@ static void draw_pattern_foreground(
     {
         int cursor_bottom = cursor_top + self._pixels_per_row;
 
-        int row_right_px = columns.ruler.right_px;
+        int row_right_px = columns.ruler.right_px();
         for (auto & c : reverse(columns.cols)) {
             if (c.has_value()) {
                 row_right_px = c->right_px;
@@ -1655,9 +1719,11 @@ static void draw_pattern_foreground(
         // If cursor is on-screen, draw cell outline.
         if (auto & col = columns.cols[cursor_x.column]) {
             auto subcol = col->subcolumns[cursor_x.subcolumn];
+            auto [digit_left, digit_right] = subcol.digit_left_right(cursor_x.digit);
+
             GridRect cursor_rect{
-                QPoint{subcol.left_px, cursor_top},
-                QPoint{subcol.right_px, cursor_bottom}
+                QPoint{digit_left, cursor_top},
+                QPoint{digit_right, cursor_bottom}
             };
 
             // Draw top line.
@@ -1930,19 +1996,14 @@ void PatternEditorPanel::next_pattern_pressed() {
 }
 
 ColumnIndex ncol(ColumnList const& cols) {
-    return ColumnIndex(cols.size());
+    return (ColumnIndex) cols.size();
 }
 
-SubColumnIndex nsubcol(ColumnList const& cols, size_t column_idx) {
-    return SubColumnIndex(cols[column_idx].subcolumns.size());
+SubColumnIndex nsubcol(ColumnList const& cols, CursorX const& cursor_x) {
+    return (SubColumnIndex) cols[cursor_x.column].subcolumns.size();
 }
-
-/// Transforms a "past the end" cursor to point to the beginning instead.
-/// Call this before moving the cursor towards the right.
-void wrap_cursor(ColumnList const& cols, CursorX & cursor_x) {
-    if (cursor_x.column >= ncol(cols)) {
-        cursor_x.column = 0;
-    }
+DigitIndex ndigit(ColumnList const& cols, CursorX const& cursor_x) {
+    return cols[cursor_x.column].subcolumns[cursor_x.subcolumn].ndigit;
 }
 
 /*
@@ -1962,15 +2023,20 @@ void PatternEditorPanel::left_pressed() {
     // an elegant abstraction i'm missing
     auto cursor_x = _win._cursor.get().x;
 
-    if (cursor_x.subcolumn > 0) {
-        cursor_x.subcolumn--;
+    if (cursor_x.digit > 0) {
+        cursor_x.digit--;
     } else {
-        if (cursor_x.column > 0) {
-            cursor_x.column--;
+        if (cursor_x.subcolumn > 0) {
+            cursor_x.subcolumn--;
         } else {
-            cursor_x.column = ncol(cols) - 1;
+            if (cursor_x.column > 0) {
+                cursor_x.column--;
+            } else {
+                cursor_x.column = ncol(cols) - 1;
+            }
+            cursor_x.subcolumn = nsubcol(cols, cursor_x) - 1;
         }
-        cursor_x.subcolumn = nsubcol(cols, cursor_x.column) - 1;
+        cursor_x.digit = ndigit(cols, cursor_x) - 1;
     }
 
     _win._cursor.set_x(cursor_x);
@@ -1982,15 +2048,20 @@ void PatternEditorPanel::right_pressed() {
 
     // Is it worth extracting cursor movement logic to a class?
     auto cursor_x = _win._cursor.get().x;
-    wrap_cursor(cols, cursor_x);
-    cursor_x.subcolumn++;
 
-    if (cursor_x.subcolumn >= nsubcol(cols, cursor_x.column)) {
-        cursor_x.subcolumn = 0;
-        cursor_x.column++;
+    cursor_x.digit++;
 
-        if (cursor_x.column >= ncol(cols)) {
-            cursor_x.column = 0;
+    if (cursor_x.digit >= ndigit(cols, cursor_x)) {
+        cursor_x.digit = 0;
+        cursor_x.subcolumn++;
+
+        if (cursor_x.subcolumn >= nsubcol(cols, cursor_x)) {
+            cursor_x.subcolumn = 0;
+            cursor_x.column++;
+
+            if (cursor_x.column >= ncol(cols)) {
+                cursor_x.column = 0;
+            }
         }
     }
 
@@ -2003,19 +2074,40 @@ void PatternEditorPanel::right_pressed() {
 // TODO disable wrapping if move_cfg.wrap_cursor is false.
 // X coordinate (nchan, 0) may/not be legal, idk yet.
 
+[[nodiscard]] static
+CursorX cursor_clamp_subcol(ColumnList const& cols, CursorX cursor_x) {
+    auto num_subcol = nsubcol(cols, cursor_x);
+
+    // All effect channels in a given document have the same number of characters.
+    // If not, this code would be wrong for effect columns,
+    // and we would have to edit `character` beyond merely clamping it.
+    // If you moved from [char1, char2, digit1, digit2] to [char, digit1, digit2],
+    // character=2 starts at digit1 and ends at digit2.
+
+    if (cursor_x.subcolumn >= num_subcol) {
+        cursor_x.subcolumn = num_subcol - 1;
+        cursor_x.digit = ndigit(cols, cursor_x) - 1;
+    } else {
+        cursor_x.digit = std::min(
+            cursor_x.digit, ndigit(cols, cursor_x) - 1
+        );
+    }
+
+    return cursor_x;
+}
+
 void PatternEditorPanel::scroll_left_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    auto cursor_x = _win._cursor.get().x;
+    CursorX cursor_x = _win._cursor.get().x;
     if (cursor_x.column > 0) {
         cursor_x.column--;
     } else {
         cursor_x.column = ncol(cols) - 1;
     }
 
-    cursor_x.subcolumn =
-        std::min(cursor_x.subcolumn, nsubcol(cols, cursor_x.column) - 1);
+    cursor_x = cursor_clamp_subcol(cols, cursor_x);
 
     _win._cursor.set_x(cursor_x);
 }
@@ -2024,11 +2116,14 @@ void PatternEditorPanel::scroll_right_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    auto cursor_x = _win._cursor.get().x;
+    CursorX cursor_x = _win._cursor.get().x;
+
     cursor_x.column++;
-    wrap_cursor(cols, cursor_x);
-    cursor_x.subcolumn =
-        std::min(cursor_x.subcolumn, nsubcol(cols, cursor_x.column) - 1);
+    if (cursor_x.column >= ncol(cols)) {
+        cursor_x.column = 0;
+    }
+
+    cursor_x = cursor_clamp_subcol(cols, cursor_x);
 
     _win._cursor.set_x(cursor_x);
 }
@@ -2061,15 +2156,15 @@ static cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
 namespace ed = edit::edit_pattern;
 
 auto calc_cursor_x(PatternEditorPanel const & self) ->
-    std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumn>
+    std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumnDigits, DigitIndex>
 {
     doc::Document const & document = self.get_document();
     auto cursor_x = self._win._cursor->x;
 
     Column column = gen_column_list(self, document)[cursor_x.column];
-    SubColumn subcolumn = column.subcolumns[cursor_x.subcolumn];
+    SubColumnDigits subcolumn = column.subcolumns[cursor_x.subcolumn];
 
-    return {column.chip, column.channel, subcolumn};
+    return {column.chip, column.channel, subcolumn, cursor_x.digit};
 }
 
 // TODO Is there a more reliable method for me to ensure that
@@ -2088,9 +2183,9 @@ void PatternEditorPanel::delete_key_pressed() {
     doc::Document const & document = get_document();
     auto abs_time = _win._cursor->y;
 
-    auto [chip, channel, subcolumn] = calc_cursor_x(*this);
+    auto [chip, channel, subcolumn, _digit] = calc_cursor_x(*this);
     _win.push_edit(
-        ed::delete_cell(document, chip, channel, subcolumn, abs_time),
+        ed::delete_cell(document, chip, channel, subcolumn.type, abs_time),
         main_window::move_to(step_cursor_down(*this))
     );
 }
@@ -2121,8 +2216,8 @@ void PatternEditorPanel::note_cut_pressed() {
         return;
     }
 
-    auto [chip, channel, subcolumn] = calc_cursor_x(*this);
-    auto subp = &subcolumn;
+    auto [chip, channel, subcolumn, _digit] = calc_cursor_x(*this);
+    auto subp = &subcolumn.type;
 
     if (std::get_if<SubColumn_::Note>(subp)) {
         note_pressed(*this, chip, channel, doc::NOTE_CUT);
@@ -2155,71 +2250,57 @@ void PatternEditorPanel::selection_padding_pressed() {
     }
 }
 
+using edit::edit_pattern::MultiDigitField;
+
+struct FieldAndDigit {
+    /// Subset of SubColumn fields, only those with numeric values.
+    MultiDigitField type;
+
+    /// Number of numeric digits (excluding effect name).
+    DigitIndex ndigit;
+};
+
 static void add_digit(
     PatternEditorPanel & self,
     doc::ChipIndex chip,
     doc::ChannelIndex channel,
-    uint8_t nybble,
-    ed::MultiDigitField field
+    FieldAndDigit field,
+    DigitIndex digit_index,
+    uint8_t nybble
 ) {
-    auto const& document = self.get_document();
-    auto abs_time = self._win._cursor->y;
-
-    // The volume field can have 1 or 2 digits. The effect fields always have 2.
-    int num_digits = std::holds_alternative<SubColumn_::Volume>(field)
-        ? document.get_volume_digits(chip, channel)
-        : 2;
-
     using edit::edit_pattern::DigitAction;
     using main_window::MoveCursor;
 
-    // This logic will be rewritten (and split between volumes and effect names/values)
-    // once once each nybble is editable independently.
+    auto const& document = self.get_document();
+    auto abs_time = self._win._cursor->y;
 
-    auto digit_index = self._win._cursor.digit_index();
-    auto digit_action = digit_index == 0
-        // Erase field and enter first digit.
+    // TODO add support for DigitAction::ShiftLeft?
+    // We'd have to track "cursor items" and "digits per item" separately,
+    // and use ShiftLeft upon 1 item with 2 digits.
+
+    DigitAction digit_action = field.ndigit <= 1
+        // Single-digit subcolumns can be overwritten directly.
         ? DigitAction::Replace
-        // Move current digit to the left and append second digit.
-        : DigitAction::ShiftLeft;
+        : digit_index == 0
+            // Left digit is the 0xf0 nybble.
+            ? DigitAction::UpperNybble
+            // Right digit is the 0x0f nybble.
+            : DigitAction::LowerNybble;
 
-    MoveCursor move_cursor = digit_index + 1 < num_digits
-        // Move cursor to second digit.
-        ? main_window::MoveCursor_::AdvanceDigit{}
-        // Move cursor down.
-        : main_window::move_to(step_cursor_down(self));
-
+    // TODO add cursor movement modes
+    MoveCursor move_cursor =  main_window::move_to(step_cursor_down(self));
 
     auto [number, box] = ed::add_digit(
-        document, chip, channel, abs_time, field, digit_action, nybble
+        document, chip, channel, abs_time, field.type, digit_action, nybble
     );
     self._win.push_edit(std::move(box), move_cursor);
 
     // Update saved instrument number.
-    if (std::holds_alternative<SubColumn_::Instrument>(field)) {
+    if (std::holds_alternative<SubColumn_::Instrument>(field.type)) {
         self._win._instrument = number;
     }
 
     // TODO update saved volume number? (is it useful?)
-}
-
-static void add_instrument_digit(
-    PatternEditorPanel & self,
-    doc::ChipIndex chip,
-    doc::ChannelIndex channel,
-    uint8_t nybble
-) {
-    add_digit(self, chip, channel, nybble, SubColumn_::Instrument{});
-}
-
-static void add_volume_digit(
-    PatternEditorPanel & self,
-    doc::ChipIndex chip,
-    doc::ChannelIndex channel,
-    uint8_t nybble
-) {
-    // TODO add support for single-digit volume?
-    add_digit(self, chip, channel, nybble, SubColumn_::Volume{});
 }
 
 /// Handles events based on physical layout rather than shortcuts.
@@ -2234,14 +2315,14 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
         event->isAutoRepeat()
     );
 
-    auto [chip, channel, subcolumn] = calc_cursor_x(*this);
+    auto [chip, channel, subcolumn, digit] = calc_cursor_x(*this);
 
     if (!_edit_mode) {
         // TODO preview note
         return;
     }
 
-    auto subp = &subcolumn;
+    auto subp = &subcolumn.type;
 
     if (std::get_if<SubColumn_::Note>(subp)) {
         // Pick the octave based on whether the user pressed the lower or upper key row.
@@ -2273,18 +2354,21 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
         }
 
     } else
-    if (std::get_if<SubColumn_::Instrument>(subp)) {
-        if (auto digit = format::hex_from_key(*event)) {
-            add_instrument_digit(*this, chip, channel, *digit);
+    if (auto p = std::get_if<SubColumn_::Instrument>(subp)) {
+        FieldAndDigit field{*p, subcolumn.ndigit};
+        if (auto nybble = format::hex_from_key(*event)) {
+            add_digit(*this, chip, channel, field, digit, *nybble);
             update();
         }
     } else
-    if (std::get_if<SubColumn_::Volume>(subp)) {
-        if (auto digit = format::hex_from_key(*event)) {
-            add_volume_digit(*this, chip, channel, *digit);
+    if (auto p = std::get_if<SubColumn_::Volume>(subp)) {
+        FieldAndDigit field{*p, subcolumn.ndigit};
+        if (auto nybble = format::hex_from_key(*event)) {
+            add_digit(*this, chip, channel, field, digit, *nybble);
             update();
         }
-    }
+    } else
+    {}
 }
 
 void PatternEditorPanel::keyReleaseEvent(QKeyEvent * event) {

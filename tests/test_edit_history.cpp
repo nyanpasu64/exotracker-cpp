@@ -28,11 +28,13 @@ using timing::GridAndBeat;
 using GetEdit = edit::EditBox (*)(doc::Document const&);
 namespace ep = edit::edit_pattern;
 
-/// Running each of a and b on a document (which may/not have an existing block),
-/// assert coalescing occurs or not.
-void test_pattern_edits(
-    bool start_with_block, GetEdit a, GetEdit b, bool should_coalesce
-) {
+/// When we switched to per-digit cursors (and an unused OpenMPT-style digit mode),
+/// we eliminated coalescing two adjacent edits to the same subcolumn.
+/// This allowed removing a significant amount of code.
+///
+/// Applying edits a and b on a document (which may/not have an existing block),
+/// assert that coalescing does not occur.
+void test_pattern_edits(bool start_with_block, GetEdit a, GetEdit b) {
     auto h = History(sample_docs::DOCUMENTS.at("empty").clone());
 
     if (start_with_block) {
@@ -53,18 +55,13 @@ void test_pattern_edits(
     h.push(CursorEdit{b(h.get_document()), Cursor{}, Cursor{}});
     auto after_b = get_cell(h.get_document().clone());
     CHECK_UNARY(after_b != begin_doc);
-    CHECK_UNARY(after_b != after_a);
+    // after_b may/not equal after_a.
 
     // Undo and check if both edits were reverted.
     h.undo();
     auto undo = get_cell(h.get_document().clone());
-    if (should_coalesce) {
-        CHECK_UNARY(undo == begin_doc);
-        CHECK_UNARY(undo != after_a);
-    } else {
-        CHECK_UNARY(undo == after_a);
-        CHECK_UNARY(undo != begin_doc);
-    }
+    CHECK_UNARY(undo == after_a);
+    CHECK_UNARY(undo != begin_doc);
 }
 
 namespace sc = edit::edit_pattern::SubColumn_;
@@ -89,23 +86,23 @@ inline EditBox add_digit_simple(
 }
 
 
-EditBox volume_0(doc::Document const& d) {
+EditBox volume_write_1(doc::Document const& d) {
     return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, DA::Replace, 0x1);
 }
 
-EditBox volume_0_alt(doc::Document const& d) {
-    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, DA::Replace, 0x3);
+EditBox volume_write_2(doc::Document const& d) {
+    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, DA::Replace, 0x11);
 }
 
-EditBox volume_1(doc::Document const& d) {
+EditBox volume_shift(doc::Document const& d) {
     return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Volume{}, DA::ShiftLeft, 0x2);
 }
 
-EditBox instr_0(doc::Document const& d) {
-    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Instrument{}, DA::Replace, 0x1);
+EditBox instr_write(doc::Document const& d) {
+    return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Instrument{}, DA::Replace, 0x11);
 }
 
-EditBox instr_1(doc::Document const& d) {
+EditBox instr_shift(doc::Document const& d) {
     return add_digit_simple(d, 0, 0, GridAndBeat{0, 0}, sc::Instrument{}, DA::ShiftLeft, 0x2);
 }
 
@@ -115,38 +112,27 @@ PARAMETERIZE(should_start_with_block, bool, start_with_block,
 )
 
 
-TEST_CASE("Check that volume editing operations are coalesced") {
+TEST_CASE("Check that volume editing operations are not coalesced") {
     bool start_with_block;
     PICK(should_start_with_block(start_with_block));
-    test_pattern_edits(start_with_block, volume_0, volume_1, true);
+    test_pattern_edits(start_with_block, volume_write_1, volume_write_2);
+    test_pattern_edits(start_with_block, volume_write_1, volume_shift);
+    test_pattern_edits(start_with_block, volume_write_2, volume_shift);
+    test_pattern_edits(start_with_block, volume_shift, volume_shift);
 }
-
-TEST_CASE("Check that 'first digit' volume edits are not coalesced") {
-    bool start_with_block;
-    PICK(should_start_with_block(start_with_block));
-    test_pattern_edits(start_with_block, volume_0, volume_0_alt, false);
-}
-
-// The GUI is intended to make it impossible to enter a "volume digit 1"
-// except for right after "volume digit 0", without moving the cursor.
-// So it's not worth unit-testing volume 1 and 0 located at different spots.
 
 TEST_CASE("Check that mixing volume/instrument edits are not coalesced") {
     bool start_with_block;
     PICK(should_start_with_block(start_with_block));
-    test_pattern_edits(start_with_block, volume_0, instr_0, false);
+    test_pattern_edits(start_with_block, volume_write_1, instr_write);
 }
 
-TEST_CASE("Check that instrument edits are coalesced") {
+TEST_CASE("Check that instrument edits are not coalesced") {
     bool start_with_block;
     PICK(should_start_with_block(start_with_block));
-    test_pattern_edits(start_with_block, instr_0, instr_1, true);
-}
-
-TEST_CASE("Check that 'first digit' instrument edits are coalesced") {
-    bool start_with_block;
-    PICK(should_start_with_block(start_with_block));
-    test_pattern_edits(start_with_block, instr_0, instr_1, true);
+    test_pattern_edits(start_with_block, instr_write, instr_write);
+    test_pattern_edits(start_with_block, instr_write, instr_shift);
+    test_pattern_edits(start_with_block, instr_shift, instr_shift);
 }
 
 }

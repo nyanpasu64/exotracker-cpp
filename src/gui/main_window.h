@@ -98,10 +98,6 @@ public:
 /// Stores cursor, selection,
 /// and how many beats to select below the bottom endpoint.
 ///
-/// Some pattern cells (like instruments, volumes, and effects)
-/// have multiple characters entered in order.
-/// digit_index() stores the typing progress within those cells.
-///
 /// Selections are a hard problem. Requirements which led to this API design at
 /// https://docs.google.com/document/d/1HBrF1W_5vKFMwHbaN6ONvtnmGAgawlJYsdZTbTUClmA/edit#heading=h.q2iq7gfnt5i8
 class CursorAndSelection : public QObject {
@@ -109,7 +105,6 @@ class CursorAndSelection : public QObject {
 
 private:
     Cursor _cursor{};
-    int _digit = 0;
     std::optional<RawSelection> _select{};
 
     // impl
@@ -134,11 +129,6 @@ public:
     void set_x(CursorX x);
     void set_y(GridAndBeat y);
 
-    // # Digits within a cell
-    [[nodiscard]] int digit_index() const;
-    int advance_digit();
-    void reset_digit();
-
     // # Selection
     [[nodiscard]] std::optional<RawSelection> raw_select() const;
     [[nodiscard]] std::optional<RawSelection> & raw_select_mut();
@@ -156,13 +146,12 @@ using CursorOrHere = std::optional<Cursor>;
 
 namespace MoveCursor_ {
     struct NotPatternEdit {};
-    struct AdvanceDigit {};
     struct MoveFrom {
         CursorOrHere before_or_here;
         CursorOrHere after_or_here;
     };
 
-    using MoveCursor = std::variant<NotPatternEdit, AdvanceDigit, MoveFrom>;
+    using MoveCursor = std::variant<NotPatternEdit, MoveFrom>;
 }
 
 using MoveCursor_::MoveCursor;
