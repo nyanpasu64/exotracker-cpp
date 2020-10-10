@@ -296,6 +296,7 @@ GridAndBeat move_up(
     MovementConfig const& move_cfg
 ) {
     // See doc comment in header for more docs.
+    // TODO is it really necessary to call prev_row_impl() `step` times?
 
     // If option enabled and step > 1, move cursor by multiple rows.
     if (move_cfg.arrow_follows_step && args.step > 1) {

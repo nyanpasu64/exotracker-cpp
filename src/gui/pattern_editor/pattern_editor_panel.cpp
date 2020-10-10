@@ -1944,30 +1944,12 @@ void wrap_cursor(ColumnList const& cols, CursorX & cursor_x) {
 }
 
 /*
-There are two cursor models I could use: Inclusive cursors (item indexing),
-or exclusive cursors (gridline indexing).
+I implemented inclusive horizontal cursor movement because it's more familiar to users,
+and to eliminate the "past-the-end" edge case in code.
 
-With inclusive cursors, selecting an integer number of columns is janky.
-With exclusive cursors, you can get zero-width selections.
-And there must be a way to move the cursor "past the end"
-to create a selection including the rightmost subcolumn.
-If you type in that state, they'll get inserted in the leftmost channel's
-note column instead.
-
-Cursor affinity is fun.
-
-I'll either switch to inclusive horizontal cursor movement,
-or allow the user to pick in the settings.
-
-Vertical cursor movement is a less severe issue,
-since "end of pattern" and "beginning of next" are indistinguishable
-except for pressing End a second time, or when inserting notes.
-
-The biggest vertical cursor issue arises if you have a single looping pattern.
-If you hold shift+down until the cursor reaches the end of the document,
-the cursor should extend to the end of the document, not the beginning.
-Similarly, if you hold down until the cursor reaches the end of the document,
-then press shift+up, the cursor should extend from the end of the document.
+Vertical cursor movement acts like inclusive indexing,
+but allows the user to switch to exclusive indexing
+which is useful when snapping the cursor to a non-grid-aligned event.
 */
 
 void PatternEditorPanel::left_pressed() {
@@ -2049,8 +2031,6 @@ void PatternEditorPanel::scroll_right_pressed() {
     _win._cursor.set_x(cursor_x);
 }
 
-// Begin document mutation
-
 void PatternEditorPanel::escape_pressed() {
     _win._cursor.clear_select();
 }
@@ -2058,6 +2038,8 @@ void PatternEditorPanel::escape_pressed() {
 void PatternEditorPanel::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;
 }
+
+// Begin document mutation
 
 static cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
     doc::Document const & document = self.get_document();

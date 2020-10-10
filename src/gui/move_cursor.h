@@ -92,7 +92,4 @@ struct MoveCursorYArgs {
     MovementConfig const& move_cfg
 );
 
-
-// TODO is it really necessary to call next_row() `step` times?
-
 }
