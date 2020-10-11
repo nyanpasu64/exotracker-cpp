@@ -54,6 +54,7 @@ using config::cursor::MovementConfig;
 struct MoveCursorYArgs {
     int rows_per_beat;
     int step;
+    bool step_to_event;
 };
 
 /// - If step > 1 and we follow step, move to nearest row above `step` times.
@@ -81,6 +82,7 @@ struct MoveCursorYArgs {
 );
 
 
+/// - If "step to event" enabled, move to the next event.
 /// - If step = 1, sub-row movement is enabled,
 ///   and next_event() doesn't wrap and is closer than the nearest row below,
 ///   jump down to next_event().time.

@@ -359,6 +359,10 @@ GridAndBeat cursor_step(
 ) {
     // See doc comment in header for more docs.
 
+    if (args.step_to_event) {
+        return next_event_impl(document, cursor).time;
+    }
+
     if (move_cfg.snap_to_events && args.step == 1) {
         MoveCursorResult grid_row =
             next_row_impl(document, cursor.y, args.rows_per_beat, move_cfg);

@@ -1741,6 +1741,7 @@ void PatternEditorPanel::up_pressed() {
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = _zoom_level,
         .step = _step,
+        .step_to_event = _step_to_event,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
@@ -1753,6 +1754,7 @@ void PatternEditorPanel::down_pressed() {
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = _zoom_level,
         .step = _step,
+        .step_to_event = _step_to_event,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
@@ -2047,6 +2049,7 @@ static cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = self._zoom_level,
         .step = self._step,
+        .step_to_event = self._step_to_event,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 

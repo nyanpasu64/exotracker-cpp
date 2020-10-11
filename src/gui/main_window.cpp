@@ -308,6 +308,7 @@ struct MainWindowUi : MainWindow {
     // Global state (editing)
     QSpinBox * _octave;
     QSpinBox * _step;
+    QCheckBox * _step_to_event;
     QCheckBox * _overflow_paste;
     QCheckBox * _key_repeat;
 
@@ -476,6 +477,10 @@ struct MainWindowUi : MainWindow {
             {form__label_w(tr("Step"), QSpinBox);
                 _step = w;
                 w->setRange(0, 256);
+            }
+
+            {form__w(QCheckBox(tr("Step to event")));
+                _step_to_event = w;
             }
 
             {form__w(QCheckBox(tr("Overflow paste")));
@@ -950,7 +955,11 @@ public:
         // Upon application startup, pattern editor panel is focused.
         _pattern_editor_panel->setFocus();
 
-        auto connect_spin = [&](QSpinBox * spin, auto target, auto func) {
+        auto pattern_setter = [this] (auto method) {
+            return std::bind_front(method, _pattern_editor_panel);
+        };
+
+        auto connect_spin = [](QSpinBox * spin, auto target, auto func) {
             connect(
                 spin,
                 qOverload<int>(&QSpinBox::valueChanged),
@@ -960,8 +969,16 @@ public:
             );
         };
 
-        auto pattern_setter = [this] (auto method) {
-            return std::bind_front(method, _pattern_editor_panel);
+        auto connect_check = [](QCheckBox * check, auto target, auto func) {
+            // QCheckBox::clicked is not emitted when state is programmatically changed.
+            // idk which is better.
+            connect(
+                check,
+                &QCheckBox::toggled,
+                target,
+                func,
+                Qt::UniqueConnection
+            );
         };
 
         // Previously, BIND_SPIN(name) would use _##NAME to synthesize the field _name.
@@ -971,6 +988,14 @@ public:
         #define BIND_SPIN(FIELD, METHOD) \
             FIELD->setValue(_pattern_editor_panel->METHOD()); \
             connect_spin( \
+                FIELD, \
+                _pattern_editor_panel, \
+                pattern_setter(&PatternEditorPanel::set_##METHOD) \
+            );
+
+        #define BIND_CHECK(FIELD, METHOD) \
+            FIELD->setChecked(_pattern_editor_panel->METHOD()); \
+            connect_check( \
                 FIELD, \
                 _pattern_editor_panel, \
                 pattern_setter(&PatternEditorPanel::set_##METHOD) \
@@ -995,6 +1020,7 @@ public:
         );
 
         BIND_SPIN(_step, step)
+        BIND_CHECK(_step_to_event, step_to_event);
 
         // _ticks_per_beat obtains its value through update_gui_from_doc().
         connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {

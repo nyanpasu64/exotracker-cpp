@@ -157,7 +157,8 @@ PatternEditorPanel_INTERNAL:
     int _zoom_level = 4;
     int _octave = 5;
     int _step = 1;  // can't remember if it will be saved on close, or defaulted via settings dialog
-    bool _is_zoomed = false;
+    bool _step_to_event = false;
+    // TODO add speed-1 zoom
 
     // Non-empty if free scrolling is enabled.
     std::optional<GridAndBeat> _free_scroll_position;
@@ -186,6 +187,7 @@ public:
     PROPERTY(int, _zoom_level, zoom_level)
     PROPERTY(int, _octave, octave)
     PROPERTY(int, _step, step)
+    PROPERTY(bool, _step_to_event, step_to_event)
 
 protected:
 
