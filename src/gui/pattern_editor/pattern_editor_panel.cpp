@@ -332,6 +332,23 @@ using cursor::SubColumnIndex;
 using cursor::DigitIndex;
 using util::distance;
 
+struct RulerOrHandlePx {
+    int _left_px;
+    int _right_px;
+
+    qreal _center_px;
+
+    [[nodiscard]] int left_px() const {
+        return _left_px;
+    }
+    [[nodiscard]] int right_px() const {
+        return _right_px;
+    }
+    [[nodiscard]] qreal center_px() const {
+        return _center_px;
+    }
+};
+
 // Effects have up to 2 characters, and 2 digits.
 constexpr DigitIndex MAX_DIGITS = 4;
 
@@ -397,7 +414,7 @@ struct ColumnPx {
     chip_common::ChannelIndex channel;
     int left_px;
     int right_px;
-    SubColumnPx block_handle;
+    RulerOrHandlePx block_handle;
     SubColumnLayout subcolumns;  // all endpoints lie within [left_px, left_px + width]
 };
 
@@ -445,7 +462,7 @@ struct MaybeColumnPx {
 /// Has the same number of items as ColumnList. Does *not* exclude off-screen columns.
 /// To skip drawing off-screen columns, fill their slot with nullopt.
 struct ColumnLayout {
-    SubColumnPx ruler;
+    RulerOrHandlePx ruler;
     std::vector<MaybeColumnPx> cols;
 };
 
@@ -463,10 +480,33 @@ struct ColumnLayout {
     // since it's taken up by a column/subcolumn border.
     constexpr int DIVIDER_WIDTH = 1;
 
-    auto wide_subcol = [&x_px, pad_width, width_per_char] (
-        SubColumn type, boost::rational<int32_t> nchar
-    ) -> SubColumnPx {
+    auto ruler_or_handle = [&x_px, pad_width, width_per_char] (
+        boost::rational<int32_t> nchar, bool padding
+    ) -> RulerOrHandlePx {
         int const chars_width = width_per_char * nchar.numerator() / nchar.denominator();
+
+        RulerOrHandlePx col;
+
+        col._left_px = x_px;
+        if (padding) {
+            x_px += pad_width;
+        }
+
+        col._center_px = x_px + chars_width / qreal(2.0);
+        x_px += chars_width;
+
+        if (padding) {
+            x_px += pad_width;
+        }
+        col._right_px = x_px;
+
+        return col;
+    };
+
+    auto wide_subcol = [&x_px, pad_width, width_per_char] (
+        SubColumn type, int nchar
+    ) -> SubColumnPx {
+        int const chars_width = width_per_char * nchar;
 
         auto sub = SubColumnPx(type);
         sub.ndigit = 1;
@@ -511,7 +551,7 @@ struct ColumnLayout {
     };
 
     // SubColumn doesn't matter.
-    SubColumnPx ruler = wide_subcol(SubColumn_::Note{}, columns::RULER_WIDTH_CHARS);
+    RulerOrHandlePx ruler = ruler_or_handle(columns::RULER_WIDTH_CHARS, true);
 
     ColumnLayout column_layout{.ruler = ruler, .cols = {}};
 
@@ -528,7 +568,7 @@ struct ColumnLayout {
             int const orig_left_px = x_px;
 
             // SubColumn doesn't matter.
-            SubColumnPx block_handle = wide_subcol(SubColumn_::Note{}, {1, 2});
+            RulerOrHandlePx block_handle = ruler_or_handle({7, 6}, false);
 
             SubColumnLayout subcolumns;
 
