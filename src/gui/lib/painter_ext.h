@@ -179,7 +179,7 @@ static inline GridRect bottom_border(QPainter & painter, GridRect rect) {
 }
 
 #define DEF_DRAW_BORDER(DIRECTION) \
-    static inline void draw_##DIRECTION##_border(QPainter & painter, GridRect rect) { \
+    inline void draw_##DIRECTION##_border(QPainter & painter, GridRect rect) { \
         painter.fillRect(DIRECTION##_border(painter, rect), painter.pen().color()); \
     }
 DEF_DRAW_BORDER(left)
@@ -189,7 +189,7 @@ DEF_DRAW_BORDER(bottom)
 #undef DEF_DRAW_BORDER
 
 #define BORDER_OVERLOAD(METHOD_NAME) \
-    static inline auto METHOD_NAME(QPainter & painter, QPoint a, QPoint b) { \
+    inline auto METHOD_NAME(QPainter & painter, QPoint a, QPoint b) { \
         return METHOD_NAME(painter, GridRect{a, b}); \
     }
 BORDER_OVERLOAD(left_border)
