@@ -83,7 +83,7 @@ public:
         auto l = new QVBoxLayout(c);
         setLayout(l);
 
-        l->setMargin(0);
+        l->setContentsMargins(0, 0, 0, 0);
 
         {
             l__w(QListView);

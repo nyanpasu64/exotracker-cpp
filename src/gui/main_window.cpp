@@ -345,7 +345,7 @@ struct MainWindowUi : MainWindow {
         }
 
         {main__central_c_l(QWidget, QVBoxLayout);
-            l->setMargin(0);
+            l->setContentsMargins(0, 0, 0, 0);
 
             // Top panel.
             setup_panel(l);
@@ -355,7 +355,7 @@ struct MainWindowUi : MainWindow {
                 c->setFrameStyle(int(QFrame::StyledPanel) | QFrame::Sunken);
 
                 c->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
-                l->setMargin(0);
+                l->setContentsMargins(0, 0, 0, 0);
                 {l__w(PatternEditorPanel(this));
                     w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
                     _pattern_editor_panel = w;
