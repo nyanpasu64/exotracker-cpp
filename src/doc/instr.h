@@ -29,10 +29,10 @@ using ShortEnvelope = Envelope<int16_t>;
 
 struct Instrument {
     // TODO implement envelope reuse.
-    ByteEnvelope volume;
-    ShortEnvelope pitch;
-    ByteEnvelope arpeggio;
-    ByteEnvelope wave_index;
+    ByteEnvelope volume{};
+    ShortEnvelope pitch{};
+    ByteEnvelope arpeggio{};
+    ByteEnvelope wave_index{};
 };
 
 constexpr size_t MAX_INSTRUMENTS = 128;
