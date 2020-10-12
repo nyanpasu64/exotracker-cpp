@@ -92,7 +92,7 @@ TODO:
 */
 
 namespace columns {
-    constexpr int EXTRA_WIDTH_DIVISOR = 3;
+    constexpr int EXTRA_WIDTH_DIVISOR = 5;
 
     // TODO switch to 3-digit ruler/space in decimal mode?
     // If I label fractional beats, this needs to increase to 3 or more.
@@ -363,6 +363,11 @@ struct SubColumnPx {
     int _bounds_left;
     int _bounds_right;
 
+    /// Number of padding pixels from either side of digits to subcolumn boundary.
+    /// May not equal digit_left_px[0] - _bounds_left,
+    /// because that includes the left DIVIDER_WIDTH and _pad_width does not.
+    int _pad_width;
+
     /// Boundaries of each digit, used for cursor drawing.
     /// Because there is added padding between subcolumns,
     /// there is a gap between _bounds_left and digit_left_px[0],
@@ -400,7 +405,9 @@ struct SubColumnPx {
     /// Returns the horizontal boundaries of a digit, used for drawing the cursor.
     [[nodiscard]] std::tuple<int, int> digit_left_right(DigitIndex digit) {
         release_assert(digit < ndigit);
-        return {digit_left_px[digit], digit_left_px[digit + 1]};
+        return {
+            digit_left_px[digit] - _pad_width, digit_left_px[digit + 1] + _pad_width
+        };
     }
 };
 
@@ -510,6 +517,7 @@ struct ColumnLayout {
 
         auto sub = SubColumnPx(type);
         sub.ndigit = 1;
+        sub._pad_width = pad_width;
 
         sub._bounds_left = x_px;
         x_px += pad_width + DIVIDER_WIDTH;
@@ -533,6 +541,7 @@ struct ColumnLayout {
 
         auto sub = SubColumnPx(type);
         sub.ndigit = ndigit;
+        sub._pad_width = pad_width;
 
         sub._bounds_left = x_px;
         x_px += pad_width + DIVIDER_WIDTH;
