@@ -3,12 +3,12 @@
 // based off Q_DISABLE_COPY and the like.
 
 #define DISABLE_COPY(Class) \
-    Class(const Class &) = delete;\
-    Class &operator=(const Class &) = delete;
+    Class(Class const&) = delete;\
+    Class & operator=(Class const&) = delete;
 
 #define DISABLE_MOVE(Class) \
     Class(Class &&) = delete; \
-    Class &operator=(Class &&) = delete;
+    Class & operator=(Class &&) = delete;
 
 #define DISABLE_COPY_MOVE(Class) \
     DISABLE_COPY(Class) \
@@ -16,13 +16,13 @@
 
 
 #define DEFAULT_COPY(Class) \
-    Class(const Class &) = default;\
-    Class &operator=(const Class &) = default;
+    Class(Class const&) = default;\
+    Class & operator=(Class const&) = default;
 
 #define CONSTEXPR_COPY(Class) \
-    constexpr Class(const Class &) = default;\
-    constexpr Class &operator=(const Class &) = default;
+    constexpr Class(Class const&) = default;\
+    constexpr Class & operator=(Class const&) = default;
 
 #define DEFAULT_MOVE(Class) \
     Class(Class &&) = default; \
-    Class &operator=(Class &&) = default;
+    Class & operator=(Class &&) = default;
