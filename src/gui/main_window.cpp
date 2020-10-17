@@ -379,10 +379,10 @@ struct MainWindowUi : MainWindow {
             }
             {l__w(IconToolBar(true))  // Show button borders.
                 _timeline.add_row = w->add_icon_action(
-                    tr("Add Timeline Row"), "document-new"
+                    tr("Add Timeline Entry"), "document-new"
                 );
                 _timeline.remove_row = w->add_icon_action(
-                    tr("Delete Timeline Row"), "edit-delete"
+                    tr("Delete Timeline Entry"), "edit-delete"
                 );
                 _timeline.move_up = w->add_icon_action(
                     tr("Move Row Up"), "go-up"
@@ -445,7 +445,7 @@ struct MainWindowUi : MainWindow {
 
             // TODO rework settings GUI
             {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("Timeline row"));
+                c->setTitle(tr("Timeline entry"));
 
                 form->addRow(
                     new QLabel(tr("Length (beats)")),
