@@ -1284,59 +1284,65 @@ static void draw_pattern_background(
         using MaybePxInt = std::optional<PxInt>;
 
         /// Overwritten with the estimated top/bottom of the selection on-screen.
-        /// Set to INT_MIN/MAX if selection endpoint is above or below screen.
-        /// Only uset if 0 patterns were visited.
+        /// Set to ±off_screen if selection endpoint is above or below screen.
+        ///
+        /// These values are initialized to nullopt,
+        /// and overwritten with a non-null value on the first call to calc_select_pos().
         MaybePxInt maybe_select_top{};
         MaybePxInt maybe_select_bottom{};
 
-        /// Every time we compare an endpoint against a pattern,
-        /// we can identify if it's within, above, or below.
+        /// Every time we compare a selection endpoint against a timeline entry / grid cell,
+        /// we can identify if it's within, above, or below it.
         ///
-        /// If within, overwrite position unconditionally.
-        /// If above/below, overwrite position if not present.
+        /// If within, overwrite `select_px` unconditionally.
+        /// If above/below, overwrite `select_px` if it's nullopt.
         ///
-        /// If the endpoint is within *any* pattern, we write the exact position.
-        /// Otherwise we identify whether it's above or below the screen.
-        auto find_selection = [&] (GridCellPosition const & pos) {
+        /// Once all on-screen grid cells have been checked, `select_px` holds
+        /// either a pixel value (if it's located in an on-screen grid cell),
+        /// or ±off_screen (if it's located in an off-screen grid cell).
+        auto calc_select_pos = [&self, off_screen] (
+            GridAndBeat select_time,
+            GridCellPosition const& grid_px,
+            MaybePxInt &/*mut*/ select_px
+        ) {
             using Frac = BeatFraction;
 
-            auto calc_row = [&] (GridAndBeat y, std::optional<PxInt> & select_pos) {
-                // If row is in pattern, return exact position.
-                if (y.grid == pos.grid) {
-                    Frac row = y.beat * self._zoom_level;
-                    PxInt yPx = doc::round_to_int(self._pixels_per_row * row);
+            // If time is in current grid cell, set exact position.
+            // This overwrites ±off_screen, and will not be replaced with ±off_screen.
+            if (select_time.grid == grid_px.grid) {
+                Frac select_row = select_time.beat * self._zoom_level;
+                PxInt select_y = doc::round_to_int(self._pixels_per_row * select_row);
 
-                    select_pos = pos.top + yPx;
-                    return;
-                }
+                select_px = grid_px.top + select_y;
+                return;
+            }
 
-                // If row is at end of pattern, return exact position.
-                // Because if cursor is "past end of document",
-                // it isn't owned by any pattern, but needs to be positioned correctly.
-                if (y.grid.v == pos.grid + 1 && y.beat == 0) {
-                    select_pos = pos.bottom;
-                    return;
-                }
+            // If time is above current grid cell,
+            // set to -off_screen (if no value present).
+            if (select_time.grid < grid_px.grid) {
+                select_px = select_px.value_or(-off_screen);
+                return;
+            }
 
-                // If row is above screen, set to top of universe (if no value present).
-                if (y.grid < pos.grid) {
-                    select_pos = select_pos.value_or(-off_screen);
-                    return;
-                }
-
-                // If row is below screen, set to bottom of universe (if no value present).
-                release_assert(y.grid > pos.grid);
-                select_pos = select_pos.value_or(+off_screen);
-            };
-
-            calc_row(select.top, maybe_select_top);
-            calc_row(select.bottom, maybe_select_bottom);
+            // If time is below current grid cell,
+            // set to +off_screen (if no value present).
+            release_assert(select_time.grid > grid_px.grid);
+            select_px = select_px.value_or(+off_screen);
         };
 
-        foreach_grid(find_selection);
+        foreach_grid([
+            &select, &calc_select_pos,
+            &/*mut*/ maybe_select_top, &/*mut*/ maybe_select_bottom
+        ] (GridCellPosition const& grid_px) {
+            calc_select_pos(select.top, grid_px, maybe_select_top);
+            calc_select_pos(select.bottom, grid_px, maybe_select_bottom);
+        });
 
-        // It should be impossible to position the cursor such that 0 patterns are drawn.
-        if (!(maybe_select_top && maybe_select_bottom)) {
+        // calc_select_pos() is called once for every on-screen timeline entry.
+        // These variables are overwritten on the first call to calc_select_pos().
+        // It should be impossible to scroll the screen (or move the cursor)
+        // such that 0 timeline entries are drawn.
+        if (!maybe_select_top || !maybe_select_bottom) {
             throw std::logic_error("Trying to draw selection with 0 patterns");
         }
 
@@ -1345,7 +1351,7 @@ static void draw_pattern_background(
 
         release_assert(select_top <= select_bottom);
 
-        auto get_select_x = [&] (CursorX x, bool right_border) {
+        auto calc_select_x = [&] (CursorX x, bool right_border) {
             auto const& c = columns.cols[x.column];
             if (c.has_value()) {
                 SubColumnPx sc = c->subcolumns[x.subcolumn];
@@ -1366,8 +1372,8 @@ static void draw_pattern_background(
             );
         };
 
-        PxInt select_left = get_select_x(select.left, false);
-        PxInt select_right = get_select_x(select.right, true);
+        PxInt select_left = calc_select_x(select.left, false);
+        PxInt select_right = calc_select_x(select.right, true);
 
         if (select_top != select_bottom) {
             auto select_rect = GridRect::from_corners(
