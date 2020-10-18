@@ -204,11 +204,8 @@ public:
 
     virtual AudioState audio_state() const = 0;
 
-    /// If maybe_cursor is present, assigns it to _cursor and saves old/new cursor.
-    /// Otherwise, cursor is not saved in undo history.
-    ///
-    /// If advance_digit is true, calls _cursor.advance_digit(),
-    /// otherwise reset_digit().
+    /// MoveCursor determines whether to save and move the cursor (for pattern edits)
+    /// or not (for non-pattern edits).
     virtual void push_edit(edit::EditBox command, MoveCursor cursor_move) = 0;
 };
 
