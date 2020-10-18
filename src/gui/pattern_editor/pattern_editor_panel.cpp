@@ -15,6 +15,7 @@
 #include "util/reverse.h"
 
 #include <fmt/core.h>
+#include <gsl/span>
 #include <verdigris/wobjectimpl.h>
 #include <qkeycode/qkeycode.h>
 
@@ -400,6 +401,11 @@ struct SubColumnPx {
     [[nodiscard]] inline qreal center_px() const {
         assert(ndigit == 1);
         return digit_center_px[0];
+    }
+
+    [[nodiscard]] inline gsl::span<qreal const> center_pxs() const {
+        assert(ndigit <= MAX_DIGITS);
+        return {digit_center_px.data(), ndigit};
     }
 
     /// Returns the horizontal boundaries of a digit, used for drawing the cursor.
@@ -1625,11 +1631,18 @@ static void draw_pattern_foreground(
             for (auto const & subcolumn : column.subcolumns) {
                 namespace sc = SubColumn_;
 
-                auto draw_text = [&](QString & text) {
+                auto clear_subcolumn = [&self, &painter, &subcolumn] () {
                     // Clear background using unmodified copy free of rendered text.
                     // Unlike alpha transparency, this doesn't break ClearType
                     // and may be faster as well.
-                    // Multiply by 1.5 or 2-ish if character tails are not being cleared.
+
+                    // One concern is that with some fonts and `pixels_below_text` settings,
+                    // long Q tails may not be cleared fully.
+                    // If this happens, multiply clear_height by 1.5 or 2-ish,
+                    // or change calc_single_font_metrics and calc_font_metrics
+                    // to save the actual descent height
+                    // (based on visual.font_tweaks.pixels_below_text).
+
                     auto clear_height = self._pixels_per_row;
 
                     GridRect target_rect{
@@ -1638,28 +1651,60 @@ static void draw_pattern_foreground(
                     };
                     auto sample_rect = painter.combinedTransform().mapRect(target_rect);
                     painter.drawImage(target_rect, self._temp_image.copy(sample_rect));
+                };
 
+                /// Draw a single character centered at a specific X-coordinate.
+                auto draw_char = [
+                    &visual, &text_painter, &painter
+                ] (QChar single_char, qreal char_center_x) {
                     // Text is being drawn relative to top-left of current row (not cell).
-                    // subcolumn.center_px() is relative to screen left (not cell).
-                    release_assert(size_t(text.size()) >= size_t(subcolumn.ndigit));
-                    if (subcolumn.ndigit <= 1) {
-                        text_painter.draw_text(
-                            painter,
-                            subcolumn.center_px(),
-                            visual.font_tweaks.pixels_above_text,
-                            Qt::AlignTop | Qt::AlignHCenter,
-                            text
-                        );
-                    } else for (DigitIndex digit = 0; digit < subcolumn.ndigit; digit++) {
-                        text_painter.draw_text(
-                            painter,
-                            subcolumn.digit_center_px[digit],
-                            visual.font_tweaks.pixels_above_text,
-                            Qt::AlignTop | Qt::AlignHCenter,
-                            QString(text[digit])
-                        );
-                    }
+                    // subcolumn.digit_center_px[] is relative to screen left (not cell).
+                    text_painter.draw_text(
+                        painter,
+                        char_center_x,
+                        visual.font_tweaks.pixels_above_text,
+                        Qt::AlignTop | Qt::AlignHCenter,
+                        QString(single_char)
+                    );
+                };
 
+                /// Draw a string of characters,
+                /// each centered at a specific X-coordinate.
+                /// Used for fixed-length (strings, positions).
+                auto draw_text_fixed = [&draw_char](
+                    QString const& text, gsl::span<qreal const> center_xs
+                ) {
+                    int nchar = text.size();
+                    release_assert((size_t) nchar == center_xs.size());
+
+                    for (int i = 0; i < nchar; i++) {
+                        draw_char(text[i], center_xs[(size_t) i]);
+                    }
+                };
+
+                /// Draw an string of characters,
+                /// overall centered at a specific X-coordinate.
+                /// All characters are spaced out at equal intervals,
+                /// regardless if the font is monospace.
+                auto draw_text = [
+                    &draw_char, width_per_char = self._pattern_font_metrics.width
+                ] (QString const& text, qreal center_x) {
+                    int nchar = text.size();
+                    if (!(nchar >= 1)) return;
+
+                    // Compute the center x of the leftmost character.
+                    qreal char_center_x = center_x - (nchar - 1) * width_per_char / qreal(2);
+
+                    // One would think you could draw a character using a QPainter
+                    // without performing a heap allocation...
+                    // but QPainter::drawText() doesn't seem to allow it.
+                    for (
+                        int i = 0;
+                        i < nchar;
+                        i++, char_center_x += width_per_char
+                    ) {
+                        draw_char(text[i], char_center_x);
+                    }
                 };
 
                 #define CASE(VARIANT) \
@@ -1668,6 +1713,7 @@ static void draw_pattern_foreground(
                 CASE(sc::Note) {
                     if (row_event.note) {
                         auto note = *row_event.note;
+                        clear_subcolumn();
 
                         if (note.is_cut()) {
                             draw_note_cut(subcolumn, note_color);
@@ -1678,7 +1724,7 @@ static void draw_pattern_foreground(
                             QString s = format::midi_to_note_name(
                                 note_cfg, document.accidental_mode, note
                             );
-                            draw_text(s);
+                            draw_text(s, subcolumn.center_px());
                         }
 
                         draw_top_line(subcolumn, painter.pen().width());
@@ -1686,9 +1732,11 @@ static void draw_pattern_foreground(
                 }
                 CASE(sc::Instrument) {
                     if (row_event.instr) {
+                        clear_subcolumn();
+
                         painter.setPen(instrument);
                         auto s = format_hex_2(uint8_t(*row_event.instr));
-                        draw_text(s);
+                        draw_text_fixed(s, subcolumn.center_pxs());
 
                         draw_top_line(subcolumn);
                     }
@@ -1696,11 +1744,13 @@ static void draw_pattern_foreground(
 
                 CASE(sc::Volume) {
                     if (row_event.volume) {
+                        clear_subcolumn();
+
                         painter.setPen(volume);
                         auto s = subcolumn.ndigit == 2
                             ? format_hex_2(uint8_t(*row_event.volume))
                             : format_hex_1(uint8_t(*row_event.volume));
-                        draw_text(s);
+                        draw_text_fixed(s, subcolumn.center_pxs());
 
                         draw_top_line(subcolumn);
                     }
