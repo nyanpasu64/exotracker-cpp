@@ -8,7 +8,7 @@
 #include <gsl/span>
 
 #include <array>
-#include <cstdint>  // int16_t
+#include <cstdint>
 #include <optional>
 
 namespace doc::events {
@@ -54,17 +54,57 @@ inline namespace note_ {
     }
 }
 
+using InstrumentIndex = uint8_t;
+
 /// SNES supports negative volumes.
 /// But keep it unsigned for type-consistency with other fields, and hex display.
 /// This way I can write an "edit" function operating on optional<uint8_t>
 /// regardless of the field being changed.
 using Volume = uint8_t;
 
+using EffColIndex = uint32_t;
+
+inline namespace effects_ {
+    constexpr EffColIndex MAX_EFFECTS_PER_EVENT = 8;
+    constexpr char EFFECT_NAME_PLACEHOLDER = '0';
+
+    /// An effect name is two ASCII characters (probably limited to alphanumeric).
+    ///
+    /// TODO for multi-byte effects, use ".." or nullopt as a name.
+    using EffectName = std::array<char, 2>;
+
+    /// An effect value is a byte.
+    using EffectValue = uint8_t;
+
+    struct Effect {
+        EffectName name;
+        EffectValue value;
+
+        Effect()
+            : name{EFFECT_NAME_PLACEHOLDER, EFFECT_NAME_PLACEHOLDER}
+            , value{0}
+        {}
+
+        Effect(EffectName name, EffectValue value) : name(name), value(value) {}
+
+        Effect(char const* name, EffectValue value)
+            : name{name[0], name[1]}
+            , value{value}
+        {}
+
+        DEFAULT_EQUALABLE(Effect)
+    };
+
+    using MaybeEffect = std::optional<Effect>;
+
+    using EffectList = std::array<MaybeEffect, MAX_EFFECTS_PER_EVENT>;
+}
+
 struct RowEvent {
     std::optional<Note> note;
     std::optional<InstrumentIndex> instr = {};
     std::optional<Volume> volume = {};
-    // TODO []effects
+    EffectList effects = {};
 
     DEFAULT_EQUALABLE(RowEvent)
 };
@@ -93,6 +133,7 @@ namespace doc::events {
         }  else {
             os << "{}";
         }
+        // TODO instr/volume/effects
         os << "}";
         return os;
     }

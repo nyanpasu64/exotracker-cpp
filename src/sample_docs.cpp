@@ -12,6 +12,7 @@ namespace sample_docs {
 using namespace doc;
 using namespace doc_util::shorthand;
 using std::move;
+using std::nullopt;
 
 static Instrument music_box() {
     auto volume = [] {
@@ -202,6 +203,12 @@ static Document world_revolution() {
         }
 
         out[0].v.instr = BASS;
+
+        out[0].v.effects[0] = Effect("AA", 0);
+        out[1].v.effects[0] = Effect("II", 0);
+        out[2].v.effects[0] = Effect("AI", 0);
+        out[3].v.effects[0] = Effect("IA", 0);
+
         return out;
     };
 
@@ -212,8 +219,11 @@ static Document world_revolution() {
                 Pattern{EventList{
                     // TimeInPattern, RowEvent
                     // 0
-                    {at(0), {pitch(6, 0), TRUMPET}},
-                    {at(0, 4, 8), {pitch(6, -1)}},
+                    {at(0), {pitch(6, 0), TRUMPET, 0xf, {Effect("0A", 0)}}},
+                    {
+                        at(0, 4, 8),
+                        {pitch(6, -1), nullopt, nullopt, {Effect("0Q", 0)}}
+                    },
                     {at(0, 6, 8), {pitch(6, 0)}},
                     {at(0, 7, 8), {pitch(6, -1)}},
                     {at(1), {pitch(5, 9)}},
@@ -232,7 +242,7 @@ static Document world_revolution() {
             TimelineBlock{8, BeatOrEnd(16),
                 Pattern{EventList{
                     // 0
-                    {at(0), {pitch(6, 0)}},
+                    {at(0), {pitch(6, 0), nullopt, 0xf}},
                     {at(0, 4, 8), {pitch(6, -1)}},
                     {at(0, 6, 8), {pitch(6, 0)}},
                     {at(0, 7, 8), {pitch(6, -1)}},

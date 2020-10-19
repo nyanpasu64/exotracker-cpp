@@ -13,6 +13,4 @@ namespace doc {
 template<typename K, typename V>
 using DenseMap = std::vector<V>;
 
-using InstrumentIndex = uint8_t;
-
 }
