@@ -5,41 +5,35 @@
 #include "gui/lib/painter_ext.h"
 #include "gui/cursor.h"
 #include "gui/move_cursor.h"
-#include "gui/main_window.h"
 #include "gui_common.h"
 #include "chip_kinds.h"
 #include "edit/edit_pattern.h"
-#include "util/compare.h"
-#include "util/release_assert.h"
 #include "util/enumerate.h"
-#include "util/loop.h"
 #include "util/math.h"
+#include "util/release_assert.h"
 #include "util/reverse.h"
 
 #include <fmt/core.h>
 #include <verdigris/wobjectimpl.h>
 #include <qkeycode/qkeycode.h>
 
-#include <QApplication>
 #include <QColor>
-#include <QDebug>  // unused
+// #include <QDebug>
 #include <QFont>
 #include <QFontMetrics>
 #include <QGradient>
 #include <QKeyEvent>
 #include <QKeySequence>
-#include <QMessageBox>
+// #include <QMessageBox>
 #include <QPainter>
 #include <QPoint>
 #include <QRect>
 
 #include <algorithm>  // std::max, std::clamp
 #include <cmath>  // round
-#include <climits>  // INT_MIN, INT_MAX
 #include <functional>  // std::invoke
 #include <optional>
 #include <tuple>
-#include <type_traits>  // is_same_v
 #include <variant>
 #include <vector>
 
