@@ -13,12 +13,12 @@ using ColumnIndex = uint32_t;
 // Both of these will never overflow u16,
 // but then integer literals and integer promotion cause difficulties.
 using SubColumnIndex = uint32_t;
-using DigitIndex = uint32_t;
+using CellIndex = uint32_t;
 
 struct CursorX {
     ColumnIndex column = 0;
     SubColumnIndex subcolumn = 0;
-    DigitIndex digit = 0;
+    CellIndex cell = 0;
 
     DEFAULT_COMPARE(CursorX)
 };
