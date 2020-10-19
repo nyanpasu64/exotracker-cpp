@@ -1639,6 +1639,19 @@ static void draw_pattern_foreground(
             for (auto const & subcolumn : column.subcolumns) {
                 namespace sc = SubColumn_;
 
+                PainterScope scope{painter};
+
+                // Prevent text drawing from drawing into adjacent subcolumns.
+                painter.setClipRect(
+                    GridRect{
+                        QPoint{subcolumn.left_px(), 0},
+                        // Double the height so descenders can still draw into the next row.
+                        // Is this a good idea? IDK.
+                        QPoint{subcolumn.right_px(), 2 * self._pixels_per_row},
+                    },
+                    Qt::IntersectClip
+                );
+
                 auto clear_subcolumn = [&self, &painter, &subcolumn] () {
                     // Clear background using unmodified copy free of rendered text.
                     // Unlike alpha transparency, this doesn't break ClearType
