@@ -2,18 +2,25 @@
 
 namespace gui::lib::painter_ext {
 
-void DrawText::draw_text(QPainter & painter, const qreal x, const qreal y, Qt::Alignment align, const QString & text, QRectF * boundingRect) {
-    qreal const down = 32767.0;
-    qreal const right = down;
+void DrawText::draw_text(
+    QPainter & painter,
+    const qreal x,
+    const qreal y,
+    int align,
+    const QString & text,
+    QRectF * boundingRect)
+{
+    qreal const dy_down = 32767.0;
+    qreal const dx_right = dy_down;
 
-    qreal left = x;
-    qreal top = y;
+    qreal x_left = x;
+    qreal y_top = y;
 
     if (align & Qt::AlignHCenter) {
-        left -= right/2.0;
+        x_left -= dx_right/2.0;
     }
     else if (align & Qt::AlignRight) {
-        left -= right;
+        x_left -= dx_right;
     }
 
     // Qt::AlignTop properly adds space above lowercase characters.
@@ -22,10 +29,10 @@ void DrawText::draw_text(QPainter & painter, const qreal x, const qreal y, Qt::A
         // do nothing
     }
     else if (align & Qt::AlignVCenter) {
-        top -= down/2.0;
+        y_top -= dy_down/2.0;
     }
     else if (align & Qt::AlignBottom) {
-        top -= down;
+        y_top -= dy_down;
     }
     else {
         // Emulate baseline alignment (AKA calling drawText() with a point).
@@ -42,11 +49,11 @@ void DrawText::draw_text(QPainter & painter, const qreal x, const qreal y, Qt::A
         int down_descent = _descent;
 
         align |= Qt::AlignBottom;
-        top -= down;
-        top += down_descent;
+        y_top -= dy_down;
+        y_top += down_descent;
     }
 
-    QRectF rect{left, top, right, down};
+    QRectF rect{x_left, y_top, dx_right, dy_down};
     painter.drawText(rect, int(align), text, boundingRect);
 }
 

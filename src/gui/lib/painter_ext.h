@@ -222,18 +222,17 @@ public:
         QPainter & painter,
         qreal const x,
         qreal const y,
-        Qt::Alignment align,
+        int align,
         QString const & text,
-        QRectF * boundingRect = nullptr
-    );
+        QRectF * boundingRect = nullptr);
 
     void draw_text(
         QPainter & painter,
         QPointF const point,
-        Qt::Alignment align,
+        int align,
         QString const & text,
-        QRectF * boundingRect = nullptr
-    ) {
+        QRectF * boundingRect = nullptr)
+    {
        draw_text(painter, point.x(), point.y(), align, text, boundingRect);
     }
 };

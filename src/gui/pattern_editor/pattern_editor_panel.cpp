@@ -1715,6 +1715,56 @@ static void draw_pattern_foreground(
                     }
                 };
 
+                /// Like draw_text(), except the text is drawn at its natural width
+                /// (instead of monospace), and compressed horizontally and vertically
+                /// to approximately fit in max_width_char.
+                auto draw_text_squash = [
+                    &painter,
+                    &text_painter,
+                    &visual,
+                    pixels_per_row = self._pixels_per_row,
+                    orig_width_per_char = self._pattern_font_metrics.width]
+                (
+                    QString const& text,
+                    qreal center_x,
+                    qreal y_scale,
+                    qreal max_width_char)
+                {
+                    PainterScope scope{painter};
+
+                    // We use draw_text() and specify the top pixel of the resulting text.
+                    // When we shrink the text vertically,
+                    // we need to move the top pixel downwards to keep the text centered.
+                    qreal y_shrink = pixels_per_row * (1 - y_scale);
+                    painter.translate(center_x, y_shrink / 2);
+
+                    // Compress the text so it fits within `max_width_char`.
+                    QRectF bounding_rect;
+                    text_painter.draw_text(
+                        painter,
+                        0,
+                        visual.font_tweaks.pixels_above_text,
+                        Qt::AlignTop | Qt::AlignHCenter | Qt::TextDontPrint,
+                        text,
+                        &/*out*/ bounding_rect
+                    );
+                    qreal text_w = bounding_rect.width();
+                    qreal max_w = orig_width_per_char * max_width_char;
+                    qreal x_scale = qMin(y_scale, max_w / text_w);
+
+                    // Shrink the text horizontally and vertically.
+                    painter.scale(x_scale, y_scale);
+
+                    text_painter.draw_text(
+                        painter,
+                        0,
+                        visual.font_tweaks.pixels_above_text,
+                        Qt::AlignTop | Qt::AlignHCenter,
+                        text
+                    );
+                };
+
+
                 #define CASE(VARIANT) \
                     if (std::holds_alternative<VARIANT>(subcolumn.type))
 
@@ -1798,9 +1848,15 @@ static void draw_pattern_foreground(
                                 draw_char(name[1], center_pxs[0]);
                             } else {
                                 // The effect name is XY, so show both characters.
-                                // Stuffing 2 characters into a 1-character cell is ugly,
-                                // but whatever.
-                                draw_text(name, center_pxs[0]);
+                                // Reduce character width to minimize overflowing
+                                // from its cell.
+                                draw_text_squash(
+                                    name,
+                                    // HACK: fonts look better-aligned when drawn further to the left.
+                                    center_pxs[0] - 1,
+                                    0.9,  // y_scale
+                                    1.2  // max_width_char
+                                );
                             }
 
                             painter.setPen(note_color);
