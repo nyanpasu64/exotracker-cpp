@@ -232,9 +232,19 @@ static PatternFontMetrics calc_single_font_metrics(QFont const & font) {
     int width = metrics.width(width_char);
 #endif
 
+    width = width + visual.font_tweaks.width_adjust;
+
+    // Round up to multiple of 2.
+    // This ensures that cell centers (used to draw text) are integers.
+    // On Windows, drawing text centered at fractional coordinates can lead to
+    // characters being off-center by up to a full pixel on each side.
+    // This is probably because QPainter draws text using GDI or similar,
+    // and GDI doesn't perform subpixel text positioning.
+    width = (width + 1) & ~1;
+
     // Only width used so far. Instead of ascent/descent, we look at _pixels_per_row.
     return PatternFontMetrics{
-        .width=width + visual.font_tweaks.width_adjust,
+        .width=width,
         .ascent=metrics.ascent(),
         .descent=metrics.descent()
     };
