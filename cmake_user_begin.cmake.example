@@ -13,3 +13,7 @@ endif()
 # https://github.com/onqtam/doctest/issues/255
 # https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo
 # -fsanitize=memory spits out spurious errors unless you compile libc with it enabled
+
+
+# Example: Disable PCH.
+set(USE_PCH FALSE)

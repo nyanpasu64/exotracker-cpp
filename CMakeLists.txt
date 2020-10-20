@@ -13,6 +13,11 @@ set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Build (rtaudio, fmt, ...?) as shared lib
 # Turn it off to avoid weirdness.
 set(RTAUDIO_STATIC_MSVCRT FALSE)
 
+set(USE_PCH FALSE)
+if(COMMAND target_precompile_headers)
+    set(USE_PCH TRUE)
+endif()
+
 include(cmake_user_begin.cmake OPTIONAL)
 #End initialize environment
 
@@ -139,7 +144,7 @@ target_compile_options(exotracker-core PRIVATE "${options}")
 target_link_libraries(exotracker-core PRIVATE lib-3rdparty rtaudio)
 target_link_libraries(exotracker-core PUBLIC fmt::fmt)
 
-if(COMMAND target_precompile_headers)
+if(USE_PCH)
     target_precompile_headers(exotracker-core PRIVATE
         precompiled_headers/exotracker_lib.h
     )
@@ -167,7 +172,7 @@ target_link_libraries(exotracker-headless
     PRIVATE rtaudio
     PUBLIC exotracker-core
 )
-if(COMMAND target_precompile_headers)
+if(USE_PCH)
     target_precompile_headers(exotracker-headless PRIVATE
         precompiled_headers/exotracker_lib.h
     )
@@ -192,7 +197,7 @@ add_executable(exotracker-qt
 target_compile_options(exotracker-qt PRIVATE "${options}")
 target_link_libraries(exotracker-qt PRIVATE exotracker-headless rtaudio Qt5::Widgets qkeycode)
 
-if(COMMAND target_precompile_headers)
+if(USE_PCH)
     target_precompile_headers(exotracker-qt PRIVATE
         precompiled_headers/exotracker_lib.h
         precompiled_headers/exotracker_bin.h
@@ -256,7 +261,7 @@ target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests PRIVATE exotracker-headless)
 target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
 
-if(COMMAND target_precompile_headers)
+if(USE_PCH)
     target_precompile_headers(exotracker-tests PRIVATE
         precompiled_headers/exotracker_lib.h
     )
