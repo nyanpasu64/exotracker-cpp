@@ -468,9 +468,7 @@ struct MainWindowUi : MainWindow {
 
                 int gui_bottom_octave =
                     get_app().options().note_names.gui_bottom_octave;
-                int peak_octave = ceildiv(
-                    doc::CHROMATIC_COUNT - 1, doc::NOTES_PER_OCTAVE
-                );
+                int peak_octave = (doc::CHROMATIC_COUNT - 1) / doc::NOTES_PER_OCTAVE;
                 w->setRange(gui_bottom_octave, gui_bottom_octave + peak_octave);
             }
 
