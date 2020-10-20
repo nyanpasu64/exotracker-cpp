@@ -117,4 +117,40 @@ enum class DigitAction {
     DigitAction digit_action,
     uint8_t nybble);
 
+
+namespace EffectAction_ {
+    /// Replace the effect name with the name passed in.
+    struct Replace {
+        doc::EffectName name;
+
+        Replace(char const* name) : name{name[0], name[1]} {}
+    };
+
+    /// Replace the left character of the effect name.
+    /// If there was no effect before, set the right character to '0'
+    /// (doc::EFFECT_NAME_PLACEHOLDER).
+    struct LeftChar {
+        char c;
+    };
+
+    /// Replace the right character of the effect name.
+    /// If there was no effect before, set the left character to '0'
+    /// (doc::EFFECT_NAME_PLACEHOLDER).
+    struct RightChar {
+        char c;
+    };
+
+    using EffectAction = std::variant<Replace, LeftChar, RightChar>;
+}
+
+using EffectAction_::EffectAction;
+
+[[nodiscard]] EditBox add_effect_char(
+    Document const& document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    GridAndBeat abs_time,
+    SubColumn_::Effect subcolumn,
+    EffectAction effect_action);
+
 }

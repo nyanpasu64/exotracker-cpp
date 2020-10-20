@@ -37,6 +37,8 @@ namespace detail {
 
 [[nodiscard]] std::optional<uint8_t> hex_from_key(QKeyEvent const & key);
 
+[[nodiscard]] std::optional<char> alphanum_from_key(QKeyEvent const& key);
+
 using doc::events::NOTES_PER_OCTAVE;
 
 [[nodiscard]] inline QString midi_to_note_name(

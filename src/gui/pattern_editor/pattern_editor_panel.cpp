@@ -2486,7 +2486,7 @@ void PatternEditorPanel::selection_padding_pressed() {
 
 using edit::edit_pattern::MultiDigitField;
 
-struct FieldAndDigit {
+struct DigitField {
     /// Subset of SubColumn fields, only those with numeric values.
     MultiDigitField type;
 
@@ -2498,11 +2498,11 @@ static void add_digit(
     PatternEditorPanel & self,
     doc::ChipIndex chip,
     doc::ChannelIndex channel,
-    FieldAndDigit field,
+    DigitField field,
     DigitIndex digit_index,
     uint8_t nybble
 ) {
-    using edit::edit_pattern::DigitAction;
+    using ed::DigitAction;
     using main_window::MoveCursor;
 
     auto const& document = self.get_document();
@@ -2535,6 +2535,55 @@ static void add_digit(
     }
 
     // TODO update saved volume number? (is it useful?)
+}
+
+struct EffectField {
+    SubColumn_::Effect type;
+    CellIndex nchar;
+};
+
+static void add_effect_char(
+    PatternEditorPanel & self,
+    doc::ChipIndex chip,
+    doc::ChannelIndex channel,
+    EffectField field,
+    CellIndex char_index,
+    char c)
+{
+    // TODO write a different function to insert an autocompleted effect atomically,
+    // including two-character effects.
+
+    using ed::EffectAction;
+    namespace EffectAction_ = ed::EffectAction_;
+    using main_window::MoveCursor;
+
+    auto const& document = self.get_document();
+    auto abs_time = self._win._cursor->y;
+
+    doc::EffectName dummy_name{doc::EFFECT_NAME_PLACEHOLDER, c};
+
+    auto effect_action = [&] () -> EffectAction {
+        if (field.nchar <= 1) {
+            assert(field.nchar == 1);
+            // Single-character effect names can be overwritten directly.
+            return EffectAction_::Replace(dummy_name.data());
+        }
+
+        assert(field.nchar == 2);
+        if (char_index == 0) {
+            return EffectAction_::LeftChar{c};
+        } else {
+            return EffectAction_::RightChar{c};
+        }
+    }();
+
+    // TODO add cursor movement modes
+    MoveCursor move_cursor =  main_window::move_to(step_cursor_down(self));
+
+    auto box = ed::add_effect_char(
+        document, chip, channel, abs_time, field.type, effect_action
+    );
+    self._win.push_edit(std::move(box), move_cursor);
 }
 
 /// Handles events based on physical layout rather than shortcuts.
@@ -2590,24 +2639,24 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
 
     } else
     if (auto p = std::get_if<SubColumn_::Instrument>(subp)) {
-        FieldAndDigit field{*p, (DigitIndex) subcolumn.ncell};
+        DigitField field{*p, (DigitIndex) subcolumn.ncell};
         if (auto nybble = format::hex_from_key(*event)) {
             add_digit(*this, chip, channel, field, (DigitIndex) cell, *nybble);
             update();
         }
     } else
     if (auto p = std::get_if<SubColumn_::Volume>(subp)) {
-        FieldAndDigit field{*p, (DigitIndex) subcolumn.ncell};
+        DigitField field{*p, (DigitIndex) subcolumn.ncell};
         if (auto nybble = format::hex_from_key(*event)) {
             add_digit(*this, chip, channel, field, (DigitIndex) cell, *nybble);
             update();
         }
     } else
     if (auto p = std::get_if<SubColumn_::Effect>(subp)) {
-        FieldAndDigit field{*p, 2};
 
         CellIndex digit_0_cell = document.effect_name_chars;
         if (cell >= digit_0_cell) {
+            DigitField field{*p, 2};
             DigitIndex digit = cell - digit_0_cell;
 
             if (auto nybble = format::hex_from_key(*event)) {
@@ -2615,7 +2664,10 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
                 update();
             }
         } else {
-            // TODO write effect character
+            EffectField field{*p, document.effect_name_chars};
+            if (auto c = format::alphanum_from_key(*event)) {
+                add_effect_char(*this, chip, channel, field, cell, *c);
+            }
         }
     } else
         throw std::logic_error("Invalid subcolumn passed to keyPressEvent()");

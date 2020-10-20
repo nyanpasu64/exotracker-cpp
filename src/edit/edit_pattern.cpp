@@ -442,4 +442,71 @@ std::tuple<uint8_t, EditBox> add_digit(
 
 // TODO write test to ensure subcolumn/selection deletion clears empty events.
 
+[[nodiscard]] EditBox add_effect_char(
+    Document const& document,
+    ChipIndex chip,
+    ChannelIndex channel,
+    GridAndBeat abs_time,
+    SubColumn_::Effect subcolumn,
+    EffectAction effect_action)
+{
+    auto maybe_block = get_current_block(document, chip, channel, abs_time);
+    auto p = &maybe_block;
+
+    GridBlockBeat time;
+    Edit edit;
+    doc::EventList * events;  // events: 'edit
+
+    if (auto exists = std::get_if<GridBlockBeat>(p)) {
+        time = *exists;
+
+        // Copy pattern.
+        edit = edit::EditPattern{doc::Pattern(
+            document.timeline[time.grid].chip_channel_cells[chip][channel]
+                ._raw_blocks[time.block].pattern
+        )};
+        events = &std::get<edit::EditPattern>(edit).pattern.events;
+
+    } else
+    if (auto empty = std::get_if<EmptyBlock>(p)) {
+        time = empty->time;
+
+        // Create new pattern.
+        edit = edit::AddBlock{doc::TimelineBlock{
+            .begin_time = empty->begin_time,
+            .end_time = empty->end_time,
+            .pattern = Pattern{.events = EventList{}, .loop_length = {}},
+        }};
+        events = &std::get<edit::AddBlock>(edit).block.pattern.events;
+
+    } else
+        throw std::logic_error("add_effect_char() get_current_block() returned nothing");
+
+    // field: ('events = 'edit).
+    auto & field = [&] () -> doc::Effect & {
+        EventSearchMut kv{*events};
+        auto & ev = kv.get_or_insert(time.beat);
+
+        doc::MaybeEffect & maybe_eff = ev.v.effects[subcolumn.effect_col];
+        maybe_eff = maybe_eff.value_or(Effect());
+        return *maybe_eff;
+    }();
+
+    auto ep = &effect_action;
+    if (auto p = std::get_if<EffectAction_::Replace>(ep)) {
+        field.name = p->name;
+    } else
+    if (auto p = std::get_if<EffectAction_::LeftChar>(ep)) {
+        field.name[0] = p->c;
+    } else
+    if (auto p = std::get_if<EffectAction_::RightChar>(ep)) {
+        field.name[1] = p->c;
+    } else
+        throw std::logic_error("invalid EffectAction when calling add_effect_char()");
+
+    return make_command(PatternEdit{
+        chip, channel, time.grid, time.block, std::move(edit)
+    });
+}
+
 }
