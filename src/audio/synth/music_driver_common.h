@@ -4,6 +4,9 @@
 #include "audio/event_queue.h"
 #include "util/copy_move.h"
 
+#include <cassert>
+#include <vector>
+
 namespace audio::synth::music_driver {
 
 using event_queue::ClockT;
