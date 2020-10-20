@@ -35,6 +35,7 @@
 #include <cmath>  // round
 #include <functional>  // std::invoke
 #include <optional>
+#include <stdexcept>
 #include <tuple>
 #include <variant>
 #include <vector>
@@ -2539,6 +2540,7 @@ static void add_digit(
 /// Handles events based on physical layout rather than shortcuts.
 /// Basically note and effect/hex input only.
 void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
+    auto const& document = get_document();
     auto keycode = qkeycode::toKeycode(event);
     DEBUG_PRINT(
         "KeyPress {}=\"{}\", modifier {}, repeat? {}\n",
@@ -2601,7 +2603,22 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
             update();
         }
     } else
-    {}
+    if (auto p = std::get_if<SubColumn_::Effect>(subp)) {
+        FieldAndDigit field{*p, 2};
+
+        CellIndex digit_0_cell = document.effect_name_chars;
+        if (cell >= digit_0_cell) {
+            DigitIndex digit = cell - digit_0_cell;
+
+            if (auto nybble = format::hex_from_key(*event)) {
+                add_digit(*this, chip, channel, field, digit, *nybble);
+                update();
+            }
+        } else {
+            // TODO write effect character
+        }
+    } else
+        throw std::logic_error("Invalid subcolumn passed to keyPressEvent()");
 }
 
 void PatternEditorPanel::keyReleaseEvent(QKeyEvent * event) {

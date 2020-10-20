@@ -234,9 +234,9 @@ EditBox delete_cell(
                 event.volume = {};
             } else
             if (auto eff = std::get_if<SubColumn_::Effect>(p)) {
-                // TODO v.effects[eff->effect_col]
-                (void) eff;
-            }
+                event.effects[eff->effect_col] = {};
+            } else
+                throw std::invalid_argument("Invalid subcolumn passed to delete_cell()");
         }
     }
 
@@ -362,23 +362,48 @@ std::tuple<uint8_t, EditBox> add_digit(
     } else
         throw std::logic_error("add_digit() get_current_block() returned nothing");
 
-    // Insert instrument.
+    // Insert instrument/volume, edit effect. No-op if no effect present.
 
-    // field: ('events = 'edit)
-    std::optional<uint8_t> & field = [&] () -> auto& {
+    auto make_some = [](std::optional<uint8_t> & maybe_field) -> uint8_t & {
+        maybe_field = maybe_field.value_or(0);
+        return *maybe_field;
+    };
+
+    // field: ('events = 'edit).
+    auto field = [&] () -> uint8_t * {
         EventSearchMut kv{*events};
-        auto & ev = kv.get_or_insert(time.beat);
+
 
         if (std::holds_alternative<SubColumn_::Instrument>(subcolumn)) {
-            return ev.v.instr;
+            auto & ev = kv.get_or_insert(time.beat);
+            return &make_some(ev.v.instr);
         }
         if (std::holds_alternative<SubColumn_::Volume>(subcolumn)) {
-            return ev.v.volume;
+            auto & ev = kv.get_or_insert(time.beat);
+            return &make_some(ev.v.volume);
         }
-        throw std::invalid_argument("Invalid subcolumn");
+        if (auto p = std::get_if<SubColumn_::Effect>(&subcolumn)) {
+            auto ev = kv.get_maybe(time.beat);
+            // If there's no event at the current time,
+            // discard the new value and don't modify the document.
+            if (!ev) {
+                return nullptr;
+            }
+
+            auto & eff = ev->v.effects[p->effect_col];
+            // If we're editing an empty effect slot,
+            // discard the new value and don't modify the document.
+            if (!eff) {
+                return nullptr;
+            }
+
+            // If we're editing an (effect, value) pair, return the value.
+            return &eff->value;
+        }
+        throw std::invalid_argument("Invalid subcolumn passed to add_digit()");
     }();
 
-    HexByte value = field.value_or(0);
+    HexByte value = field ? *field : 0;
 
     switch (digit_action) {
     case DigitAction::Replace:
@@ -402,8 +427,10 @@ std::tuple<uint8_t, EditBox> add_digit(
         throw std::logic_error("invalid DigitAction when calling add_digit()");
     }
 
-    // Mutates `edit`.
-    field = value;
+    if (field) {
+        // Mutates `edit`.
+        *field = value;
+    }
 
     return {
         // Tell GUI the newly selected volume/instrument number.

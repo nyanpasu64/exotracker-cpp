@@ -80,7 +80,9 @@ using chip_common::ChannelIndex;
     std::optional<doc::InstrumentIndex> instrument
 );
 
-using MultiDigitField = std::variant<SubColumn_::Instrument, SubColumn_::Volume>;
+using MultiDigitField = std::variant<
+    SubColumn_::Instrument, SubColumn_::Volume, SubColumn_::Effect
+>;
 
 /// How to edit a byte field when the user enters a nybble.
 /// This enum will be changed once each nybble is editable independently.
