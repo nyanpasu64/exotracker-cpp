@@ -62,7 +62,7 @@ using doc::events::NOTES_PER_OCTAVE;
         if (diatonic >= 0) {
             return detail::diatonic_names[diatonic]
                 + accidental
-                + QString::number(octave);
+                + (octave < 0 ? QStringLiteral("-") : format_hex_1(octave & 0xf));
         } else if (accidental_mode == AccidentalMode::Sharp) {
             return impl(impl, note - 1, cfg.sharp_char);
         } else {
