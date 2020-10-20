@@ -51,6 +51,17 @@ IMPL(greater, std::upper_bound, TimeInPattern, time_and_offset)
 IMPL(beat_begin, std::lower_bound, BeatFraction, time)
 IMPL(beat_end, std::upper_bound, BeatFraction, time)
 
+TimedRowEvent * EventSearchMut::get_maybe(BeatFraction beat) {
+    // Last event anchored to this beat fraction.
+    EventList::reverse_iterator it{beat_end(beat)};
+
+    if (it != _event_list.rend() && it->time.anchor_beat == beat) {
+        return &*it;
+    } else {
+        return nullptr;
+    }
+}
+
 TimedRowEvent & EventSearchMut::get_or_insert(BeatFraction beat) {
     // Last event anchored to this beat fraction.
     EventList::reverse_iterator it{beat_end(beat)};

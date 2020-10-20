@@ -2,9 +2,6 @@
 
 #include "doc/event_list.h"
 
-#include <optional>
-#include <type_traits>
-
 namespace doc_util::event_search {
 
 using namespace doc::timed_events;
@@ -64,6 +61,10 @@ public:
 
     [[nodiscard]] Iterator beat_begin(BeatFraction beat);
     [[nodiscard]] Iterator beat_end(BeatFraction beat);
+
+    /// Returns pointer to last event anchored to this beat fraction.
+    /// Returns nullptr if none exist at this time.
+    [[nodiscard]] TimedRowEvent * get_maybe(BeatFraction beat);
 
     /// Returns reference to last event anchored to this beat fraction.
     /// Inserts new event if none exist at this time.
