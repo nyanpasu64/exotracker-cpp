@@ -1579,7 +1579,7 @@ static void draw_pattern_foreground(
         CACHE_COLOR(note_line_fractional);
         CACHE_COLOR(instrument);
         CACHE_COLOR(volume);
-        // CACHE_COLOR(effect); (not needed yet)
+        CACHE_COLOR(effect);
 
         PainterScope scope{painter};
 
@@ -1759,6 +1759,53 @@ static void draw_pattern_foreground(
                             ? format_hex_2(uint8_t(*row_event.volume))
                             : format_hex_1(uint8_t(*row_event.volume));
                         draw_cells(s, subcolumn.cell_centers());
+
+                        draw_top_line(subcolumn);
+                    }
+                }
+
+                if (auto p = std::get_if<SubColumn_::Effect>(&subcolumn.type)) {
+                    release_assert(p->effect_col < doc::MAX_EFFECTS_PER_EVENT);
+                    auto const& eff = row_event.effects[p->effect_col];
+
+                    if (eff) {
+                        clear_subcolumn();
+
+                        auto const& name_arr = eff->name;
+                        QString name = QString(name_arr[0]) + QChar(name_arr[1]);
+                        QString value = format_hex_2(eff->value);
+
+                        auto center_pxs = subcolumn.cell_centers();
+
+                        if (center_pxs.size() == 4) {
+                            // Effect names are shown as 2 characters/cells wide.
+                            assert(document.effect_name_chars == 2);
+
+                            painter.setPen(effect);
+                            draw_cells(name, center_pxs.subspan(0, 2));
+
+                            painter.setPen(note_color);
+                            draw_cells(value, center_pxs.subspan(2));
+
+                        } else {
+                            // Effect names are shown as 1 character/cell wide.
+                            assert(center_pxs.size() == 3);
+                            assert(document.effect_name_chars == 1);
+
+                            painter.setPen(effect);
+                            if (name[0] == doc::EFFECT_NAME_PLACEHOLDER) {
+                                // The effect name is 0X, so only show X.
+                                draw_char(name[1], center_pxs[0]);
+                            } else {
+                                // The effect name is XY, so show both characters.
+                                // Stuffing 2 characters into a 1-character cell is ugly,
+                                // but whatever.
+                                draw_text(name, center_pxs[0]);
+                            }
+
+                            painter.setPen(note_color);
+                            draw_cells(value, center_pxs.subspan(1));
+                        }
 
                         draw_top_line(subcolumn);
                     }
