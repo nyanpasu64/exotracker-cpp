@@ -129,17 +129,17 @@ struct BitFieldArray
         Element& operator++() { return *this += 1; }
         Element operator++(int)                // postfix form
         {
-	    Element tmp(*this);
-	    operator++();
-	    return tmp;
-	}
+            Element tmp(*this);
+            operator++();
+            return tmp;
+        }
         Element& operator--() { return *this -= 1; }
         Element operator--(int)                // postfix form
-	{
-	    Element tmp(*this);
-	    operator--();
-	    return tmp;
-	}
+        {
+            Element tmp(*this);
+            operator--();
+            return tmp;
+        }
     };
 
     Element operator[](int i)
@@ -169,8 +169,8 @@ struct BitFieldArray
         Wrapper wrapper; \
         typeName(T v = 0) { wrapper.value = v; } \
         typeName& operator=(T v) { wrapper.value = v; return *this; } \
-        operator T&() { return wrapper.value; } \
-        operator T() const { return wrapper.value; } \
+        operator T &() { return wrapper.value; } \
+        operator T const&() const { return wrapper.value; } \
         typedef T StorageType;
 
 #define ADD_BITFIELD_MEMBER(memberName, offset, bits) \
