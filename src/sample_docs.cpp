@@ -91,7 +91,7 @@ static Document dream_fragments() {
 
     // We only have 1 chip.
     auto const chip_kind = chip_kinds::ChipKind::Apu1;
-    ChipList chips{chip_kind};
+    ChipList chips{chip_kind, chip_kind};
 
     Timeline timeline;
 
@@ -115,39 +115,43 @@ static Document dream_fragments() {
         })};
         return TimelineRow{
             .nbeats = 8,
-            .chip_channel_cells = {{move(ch0), move(ch1)}},
+            .chip_channel_cells = {{move(ch0), move(ch1)}, {{}, {}}},
         };
     }());
 
     timeline.push_back([] {
-        auto ch0 = TimelineCell{TimelineBlock::from_events({
+        TimelineCell ch0{TimelineBlock::from_events({
             // TimeInPattern, RowEvent
-            {{0, -5}, {pitch(6, 4)}},
-            {{0, -2}, {pitch(6, 7)}},
-            {{0, 1}, {pitch(7, -1)}},
+            {at_delay(0, -5), {.note=pitch(6, 4), .instr=0}},
             {at(1), {pitch(6, -1)}},
             {at(2), {pitch(6, 4)}},
             {at(3), {pitch(6, 7)}},
-            {{4, -5}, {pitch(6, 6)}},
-            {{4, -2}, {pitch(7, -2)}},
-            {{4, 1}, {pitch(7, 1)}},
+            {at_delay(4, -5), {pitch(6, 6)}},
             {at(5), {pitch(6, 1)}},
             {at(6), {pitch(6, -2)}},
             {at(7), {pitch(6, 1)}},
         })};
-        auto ch1 = TimelineCell{TimelineBlock::from_events({
-            {{0, 4}, {pitch(7, 4)}},
+        TimelineCell ch1{TimelineBlock::from_events({
+            {at_delay(0, -2), {.note=pitch(6, 7), .instr=0}},
             {at(1, 1, 2), {pitch(7, -1)}},
             {at(3), {pitch(7, 4)}},
-            {{4, 4}, {pitch(7, 6)}},
+            {at_delay(4, -2), {pitch(7, -2)}},
             {at(5, 2, 4), {pitch(7, 7)}},
             {at(5, 3, 4), {pitch(7, 6)}},
             {at(6), {pitch(7, 4)}},
         })};
+        TimelineCell ch2{TimelineBlock::from_events({
+            {at_delay(0, 1), {.note=pitch(7, -1), .instr=0}},
+            {at_delay(4, 1), {pitch(7, 1)}},
+        })};
+        TimelineCell ch3{TimelineBlock::from_events({
+            {at_delay(0, 4), {.note=pitch(7, 4), .instr=0}},
+            {at_delay(4, 4), {pitch(7, 6)}},
+        })};
         return TimelineRow{
             .nbeats = 8,
-            .chip_channel_cells = {{move(ch0), move(ch1)}},
-    };
+            .chip_channel_cells = {{move(ch0), move(ch1)}, {move(ch2), move(ch3)}},
+        };
     }());
 
     Instruments instruments;
