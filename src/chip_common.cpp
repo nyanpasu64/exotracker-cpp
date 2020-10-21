@@ -12,10 +12,9 @@ using namespace chip_kinds;
 
 using ChipToNchanSized = EnumMap<ChipKind, ChannelIndex>;
 
-static const ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
+static constinit ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
     /// EnumMap<ChipKind, ChannelIndex>
-    ChipToNchanSized chip_to_nchan;
-    chip_to_nchan.fill(0);
+    ChipToNchanSized chip_to_nchan{};
 
 #define INITIALIZE(chip)  chip_to_nchan[ChipKind::chip] = enum_count<chip##ChannelID>;
     INITIALIZE(Apu1)
@@ -32,7 +31,7 @@ static const ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
     return chip_to_nchan;
 }();
 
-const ChipToNchan CHIP_TO_NCHAN = &CHIP_TO_NCHAN_SIZED[0];
+constinit const ChipToNchan CHIP_TO_NCHAN = &CHIP_TO_NCHAN_SIZED[0];
 
 
 // # CHIP_CHANNEL_TO_VOLUME_DIGITS
@@ -46,10 +45,9 @@ static const EnumArray<Apu1ChannelID, uint8_t> Apu1_VOL_DIGITS{1, 2};
 
 using ChipChannelToVolumeDigitsSized = EnumMap<ChipKind, uint8_t const*>;
 
-static const ChipChannelToVolumeDigitsSized CHIP_CHANNEL_TO_VOLUME_DIGITS_SIZED = []() {
+static constinit ChipChannelToVolumeDigitsSized CHIP_CHANNEL_TO_VOLUME_DIGITS_SIZED = []() {
     // Compare to chip_common.cpp.
-    ChipChannelToVolumeDigitsSized out;
-    out.fill(nullptr);
+    ChipChannelToVolumeDigitsSized out{};
 
 #define INITIALIZE(chip)  out[ChipKind::chip] = chip##_VOL_DIGITS.data();
     INITIALIZE(Apu1)
@@ -66,7 +64,7 @@ static const ChipChannelToVolumeDigitsSized CHIP_CHANNEL_TO_VOLUME_DIGITS_SIZED 
     return out;
 }();
 
-const ChipChannelToVolumeDigits CHIP_CHANNEL_TO_VOLUME_DIGITS =
+constinit const ChipChannelToVolumeDigits CHIP_CHANNEL_TO_VOLUME_DIGITS =
     CHIP_CHANNEL_TO_VOLUME_DIGITS_SIZED.data();
 
 }

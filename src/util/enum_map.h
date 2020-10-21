@@ -20,17 +20,17 @@ class EnumMap : public std::array<ValueT, enum_count<EnumT>> {
 public:
     using super::super;
 
-    typename super::reference operator[] (typename super::size_type n) {
+    constexpr typename super::reference operator[] (typename super::size_type n) {
         return super::operator[](n);
     }
-    typename super::const_reference operator[] (typename super::size_type n) const {
+    constexpr typename super::const_reference operator[] (typename super::size_type n) const {
         return super::operator[](n);
     }
 
-    typename super::reference operator[] (EnumT n) {
+    constexpr typename super::reference operator[] (EnumT n) {
         return super::operator[]((typename super::size_type) n);
     }
-    typename super::const_reference operator[] (EnumT n) const {
+    constexpr typename super::const_reference operator[] (EnumT n) const {
         return super::operator[]((typename super::size_type) n);
     }
 };
