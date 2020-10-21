@@ -34,7 +34,7 @@ struct ImplEditCommand : BaseEditCommand, Body {
 };
 
 template<typename Body>
-static EditBox make_command(Body body) {
+inline EditBox make_command(Body body) {
     return std::make_unique<ImplEditCommand<Body>>(std::move(body));
 }
 

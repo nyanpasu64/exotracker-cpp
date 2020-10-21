@@ -77,7 +77,7 @@ struct RowEvent {
 #include <ostream>
 
 namespace doc::events {
-    static std::ostream& operator<< (std::ostream& os, RowEvent const & value) {
+    inline std::ostream& operator<< (std::ostream& os, RowEvent const & value) {
         os << "RowEvent{";
         if (value.note.has_value()) {
             Note note = *value.note;

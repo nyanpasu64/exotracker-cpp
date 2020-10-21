@@ -106,11 +106,11 @@ inline namespace keys {
 inline namespace visual {
     constexpr QColor BLACK{0, 0, 0};
 
-    static constexpr QColor gray(int value) {
+    inline constexpr QColor gray(int value) {
         return QColor{value, value, value};
     }
 
-    static constexpr QColor gray_alpha(int value, int alpha) {
+    inline constexpr QColor gray_alpha(int value, int alpha) {
         return QColor{value, value, value, alpha};
     }
 

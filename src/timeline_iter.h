@@ -125,7 +125,7 @@ using ForwardBlockIterator = detail::BlockIterator<detail::Direction::Forward>;
 
 #include <ostream>
 
-static std::ostream& operator<< (std::ostream& os, Wrap const & value) {
+inline std::ostream& operator<< (std::ostream& os, Wrap const & value) {
     os << "Wrap(" << (int) value << ")";
     return os;
 }

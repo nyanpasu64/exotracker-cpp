@@ -18,7 +18,7 @@ using StackedFunc = std::function<Return(SubcaseName)>;
 
 // public
 // impl StackedFunc<SubcaseName>
-static SubcaseName noop(SubcaseName leaf_stack) {
+inline SubcaseName noop(SubcaseName leaf_stack) {
     release_assert(!leaf_stack.empty());
     return leaf_stack;
 }

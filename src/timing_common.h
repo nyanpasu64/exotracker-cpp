@@ -147,7 +147,7 @@ static_assert(
 #include <ostream>
 
 namespace timing {
-    static std::ostream& operator<< (std::ostream& os, SequencerTime const & value) {
+    inline std::ostream& operator<< (std::ostream& os, SequencerTime const & value) {
         os << fmt::format("SequencerTime{{{}, {}, {}, {}}}",
             value.grid,
             value.curr_ticks_per_beat,
@@ -157,7 +157,7 @@ namespace timing {
         return os;
     }
 
-    static std::ostream& operator<< (std::ostream& os, GridAndBeat const & value) {
+    inline std::ostream& operator<< (std::ostream& os, GridAndBeat const & value) {
         os << fmt::format("GridAndBeat{{{}, {}}}",
             value.grid,
             format_frac(value.beat)
@@ -165,7 +165,7 @@ namespace timing {
         return os;
     }
 
-    static std::ostream& operator<< (std::ostream& os, GridBlockBeat const & value) {
+    inline std::ostream& operator<< (std::ostream& os, GridBlockBeat const & value) {
         os << fmt::format("GridBlockBeat{{{}, {}}}",
             value.block,
             format_frac(value.beat)

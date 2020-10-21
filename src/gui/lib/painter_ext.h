@@ -155,25 +155,25 @@ public:
 };
 
 /// Finds the left border of a GridRect to stroke.
-static inline GridRect left_border(QPainter & painter, GridRect rect) {
+inline GridRect left_border(QPainter & painter, GridRect rect) {
     rect.set_right(rect.left() + painter.pen().width());
     return rect;
 }
 
 /// Finds the right border of a GridRect to stroke.
-static inline GridRect right_border(QPainter & painter, GridRect rect) {
+inline GridRect right_border(QPainter & painter, GridRect rect) {
     rect.set_left(rect.right() - painter.pen().width());
     return rect;
 }
 
 /// Finds the top border of a GridRect to stroke.
-static inline GridRect top_border(QPainter & painter, GridRect rect) {
+inline GridRect top_border(QPainter & painter, GridRect rect) {
     rect.set_bottom(rect.top() + painter.pen().width());
     return rect;
 }
 
 /// Finds the bottom border of a GridRect to stroke.
-static inline GridRect bottom_border(QPainter & painter, GridRect rect) {
+inline GridRect bottom_border(QPainter & painter, GridRect rect) {
     rect.set_top(rect.bottom() - painter.pen().width());
     return rect;
 }

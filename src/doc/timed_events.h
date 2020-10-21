@@ -77,14 +77,14 @@ struct TimedRowEvent {
 #include <string>
 
 namespace boost {
-    static std::ostream& operator<< (std::ostream& os, doc::timed_events::BeatFraction const & frac) {
+    inline std::ostream& operator<< (std::ostream& os, doc::timed_events::BeatFraction const & frac) {
         os << format_frac(frac);
         return os;
     }
 }
 
 namespace doc::timed_events {
-    static std::ostream& operator<< (std::ostream& os, TimeInPattern const & value) {
+    inline std::ostream& operator<< (std::ostream& os, TimeInPattern const & value) {
         os << fmt::format(
             "TimeInPattern{{{} + {}}}",
             format_frac(value.anchor_beat),

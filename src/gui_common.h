@@ -5,11 +5,11 @@
 
 namespace gui {
 
-static inline app::GuiApp & get_app() {
+inline app::GuiApp & get_app() {
     return *(app::GuiApp *) QApplication::instance();
 }
 
-static inline main_window::MainWindow & win() {
+inline main_window::MainWindow & win() {
     return main_window::MainWindow::get_instance();
 }
 

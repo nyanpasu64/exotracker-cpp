@@ -26,12 +26,12 @@ namespace detail {
 }
 
 /// Converts a nybble into a single hex character.
-[[nodiscard]] static QString format_hex_1(uint8_t num) {
+[[nodiscard]] inline QString format_hex_1(uint8_t num) {
     return detail::hex_digits[num & 0x0F];
 }
 
 /// Converts a byte into 2 hex characters.
-[[nodiscard]] static QString format_hex_2(uint8_t num) {
+[[nodiscard]] inline QString format_hex_2(uint8_t num) {
     return detail::hex_digits[num >> 4] + detail::hex_digits[num & 0x0F];
 }
 
@@ -39,7 +39,7 @@ namespace detail {
 
 using doc::events::NOTES_PER_OCTAVE;
 
-[[nodiscard]] static QString midi_to_note_name(
+[[nodiscard]] inline QString midi_to_note_name(
     config::NoteNameConfig cfg, AccidentalMode accidental_mode, doc::events::Note note
 ) {
     if (note.is_cut()) {
