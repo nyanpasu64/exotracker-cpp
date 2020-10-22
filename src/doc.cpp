@@ -57,6 +57,13 @@ void post_init(Document & document) {
     document.instruments.v.resize(MAX_INSTRUMENTS);
     document.frequency_table.resize(CHROMATIC_COUNT);
 
+    release_assert_equal(document.chip_channel_settings.size(), document.chips.size());
+    for (ChipIndex chip = 0; chip < document.chips.size(); chip++) {
+        release_assert_equal(
+            document.chip_channel_settings[chip].size(),
+            document.chip_index_to_nchan(chip));
+    }
+
     // Reserve 256 elements to ensure that insert/delete is bounded-time.
     document.timeline.reserve(MAX_GRID_CELLS);
 

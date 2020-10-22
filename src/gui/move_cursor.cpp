@@ -424,6 +424,7 @@ static Document empty_doc(int n_seq_entry) {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
+        .chip_channel_settings = {{{}, {}}},
         .timeline = timeline
     };
 }

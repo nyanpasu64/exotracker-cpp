@@ -593,6 +593,9 @@ struct ColumnLayout {
             channel_index < document.chip_index_to_nchan(chip_index);
             channel_index++
         ) {
+            doc::EffColIndex n_effect_col =
+                document.chip_channel_settings[chip_index][channel_index].n_effect_col;
+
             int const orig_left_px = x_px;
 
             // SubColumn doesn't matter.
@@ -613,8 +616,7 @@ struct ColumnLayout {
                 subcolumns.push_back(many_cells(SubColumn_::Volume{}, volume_width));
             }
 
-            // TODO change doc to list how many effect columns there are
-            for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
+            for (uint8_t effect_col = 0; effect_col < n_effect_col; effect_col++) {
                 // Effect names hold 1 or 2 characters.
                 // Effect values hold 2 characters.
                 subcolumns.push_back(many_cells(
@@ -675,6 +677,8 @@ using ColumnList = std::vector<Column>;
             channel_index < document.chip_index_to_nchan(chip_index);
             channel_index++
         ) {
+            doc::EffColIndex n_effect_col =
+                document.chip_channel_settings[chip_index][channel_index].n_effect_col;
             SubColumnList subcolumns;
 
             subcolumns.push_back({SubColumn_::Note{}, 1});
@@ -687,8 +691,7 @@ using ColumnList = std::vector<Column>;
                 subcolumns.push_back({SubColumn_::Volume{}, volume_width});
             }
 
-            // TODO change doc to list how many effect colums there are
-            for (uint8_t effect_col = 0; effect_col < 1; effect_col++) {
+            for (uint8_t effect_col = 0; effect_col < n_effect_col; effect_col++) {
                 subcolumns.push_back({
                     SubColumn_::Effect{effect_col}, document.effect_name_chars + 2
                 });

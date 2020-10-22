@@ -60,6 +60,7 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = {},
         .chips = chips,
+        .chip_channel_settings = {{{}, {}}},
         .timeline = move(timeline),
     };
 }

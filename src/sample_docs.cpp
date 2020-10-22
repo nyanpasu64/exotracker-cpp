@@ -43,6 +43,11 @@ static Document empty() {
 
     ChipList chips{ChipKind::Apu1, ChipKind::Apu1};
 
+    ChipChannelSettings chip_channel_settings = {
+        {{}, {}},
+        {{}, {}},
+    };
+
     Timeline timeline;
 
     timeline.push_back([]() -> TimelineRow {
@@ -76,6 +81,7 @@ static Document empty() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = move(instruments),
         .chips = move(chips),
+        .chip_channel_settings = move(chip_channel_settings),
         .timeline = move(timeline),
     };
 }
@@ -92,6 +98,11 @@ static Document dream_fragments() {
     // We only have 1 chip.
     auto const chip_kind = chip_kinds::ChipKind::Apu1;
     ChipList chips{chip_kind, chip_kind};
+
+    ChipChannelSettings chip_channel_settings = {
+        {{}, {}},
+        {{}, {}},
+    };
 
     Timeline timeline;
 
@@ -163,6 +174,7 @@ static Document dream_fragments() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = move(instruments),
         .chips = move(chips),
+        .chip_channel_settings = chip_channel_settings,
         .timeline = move(timeline),
     };
 }
@@ -191,6 +203,7 @@ static Document world_revolution() {
     };
 
     ChipList chips{ChipKind::Apu1};
+    ChipChannelSettings chip_channel_settings{{{}, {}}};
 
     Timeline timeline;
 
@@ -311,6 +324,7 @@ static Document world_revolution() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = move(instruments),
         .chips = move(chips),
+        .chip_channel_settings = move(chip_channel_settings),
         .timeline = move(timeline),
     };
 }
@@ -331,6 +345,7 @@ static Document render_test() {
     }
 
     ChipList chips{ChipKind::Apu1};
+    ChipChannelSettings chip_channel_settings{{{}, {}}};
 
     Timeline timeline;
 
@@ -366,6 +381,7 @@ static Document render_test() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = move(instruments),
         .chips = move(chips),
+        .chip_channel_settings = move(chip_channel_settings),
         .timeline = move(timeline),
     };
 }
@@ -384,6 +400,7 @@ static Document audio_test() {
     };
 
     ChipList chips{ChipKind::Apu1, ChipKind::Apu1};
+    ChipChannelSettings chip_channel_settings{{{}, {}}, {{}, {}}};
 
     auto get_channel = [&] (Note note) {
         return TimelineCell{TimelineBlock::from_events({
@@ -427,6 +444,7 @@ static Document audio_test() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = move(instruments),
         .chips = move(chips),
+        .chip_channel_settings = move(chip_channel_settings),
         .timeline = move(timeline),
     };
 }
@@ -440,6 +458,7 @@ static Document block_test() {
     instruments[0] = music_box();
 
     ChipList chips{ChipKind::Apu1, ChipKind::Apu1};
+    ChipChannelSettings chip_channel_settings{{{}, {}}, {{}, {}}};
 
     TimelineBlock unlooped{0, END_OF_GRID, Pattern{{}}};
     TimelineBlock looped{0, END_OF_GRID, Pattern{{}, 1}};
@@ -472,6 +491,7 @@ static Document block_test() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = move(instruments),
         .chips = move(chips),
+        .chip_channel_settings = move(chip_channel_settings),
         .timeline = move(timeline),
     };
 }

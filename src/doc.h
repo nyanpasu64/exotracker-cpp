@@ -59,6 +59,12 @@ inline namespace tuning {
 using chip_kinds::ChipKind;
 using ChipList = std::vector<chip_kinds::ChipKind>;
 
+struct ChannelSettings {
+    events::EffColIndex n_effect_col = 1;
+};
+
+using ChipChannelSettings = ChipChannelTo<ChannelSettings>;
+
 /// Document struct.
 ///
 /// Usage:
@@ -80,6 +86,8 @@ struct DocumentCopy {
     /// vector<ChipIndex -> ChipKind>
     /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
     ChipList chips;
+
+    ChipChannelSettings chip_channel_settings;
 
     /// The order editor is replaced with a global timeline grid for placing patterns in.
     /// We don't store the absolute times of gridlines,

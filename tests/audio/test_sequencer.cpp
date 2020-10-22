@@ -51,6 +51,7 @@ static Document simple_doc() {
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
+        .chip_channel_settings = {{{}, {}}},
         .timeline = move(timeline),
     };
 }
@@ -323,6 +324,7 @@ static Document parametric_doc(
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
+        .chip_channel_settings = {{{}, {}}},
         .timeline = move(timeline),
     };
 }
@@ -362,6 +364,7 @@ static Document short_doc(
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
+        .chip_channel_settings = {{{}, {}}},
         .timeline = move(timeline),
     };
 }
@@ -413,6 +416,7 @@ static Document gap_doc(
         .accidental_mode = AccidentalMode::Sharp,
         .instruments = Instruments(),
         .chips = {ChipKind::Apu1},
+        .chip_channel_settings = {{{}, {}}},
         .timeline = move(timeline),
     };
 }
