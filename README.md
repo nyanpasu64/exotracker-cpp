@@ -41,6 +41,24 @@ exotracker-cpp requires a compiler with C++20 support and GCC's "statement expre
 
 exotracker-cpp depends on Qt. All other libraries are bundled, compiled, and linked statically. On Linux, to obtain audio, you need to install ALSA/PulseAudio/JACK headers (whichever one you want to use). Most Linux distributions use PulseAudio, but RtAudio's PulseAudio backend may be more stuttery (due to mutexes) than ALSA.
 
+## Usage
+
+- **Press Space to enable note entry, and Enter to play.** Unfortunately, note preview is not supported yet.
+	- Press `'` to play from the current row. (Recall Channel State is not supported yet.)
+- ExoTracker uses a FamiTracker-style piano layout. Keybinds mostly resemble FamiTracker, but changing patterns is mapped to Ctrl+PageUp/Down instead of Ctrl+Left/Right.
+	- Additionally, you can Ctrl+Up/Down to snap to the next beat, and Ctrl+Alt+Up/Down to snap to the next event.
+	- Mouse input is not implemented yet.
+- Try zooming with Ctrl-±. Unlike previous trackers, rows are merely used for editing, and the document stores an event stream with each event's timestamp as a beat fraction. This means you can use real triplets without hacking with delay effects, and more closely spaced notes when needed.
+- Try passing in names of sample documents as command-line arguments. Listed in order from most to least useful:
+	- Partial songs: `dream-fragments`, `world-revolution` (default song)
+	- `empty` (add your own notes)
+	- `audio-test` (dual APU1) (sounds bad, but useful for finding audio stuttering)
+	- `block-test` (dual APU1) (rendering test for block system, no notes or events)
+	- `render-test` (sounds bad, negative octave text is too wide for the screen)
+- Some sample documents have short and/or looped blocks (the gray rectangles to the left of each channel), intended as a DAW-inspired system of looping and reuse. But right now, users can only create full-grid blocks, and cannot delete blocks.
+	- The block system is powerful, but unfortunately not editable through the UI yet, so you can't try it out to see useful it is.
+	- Pattern reuse is not implemented.
+
 ## Documentation
 
 See [src/DESIGN.md](src/DESIGN.md) for high-level design docs. There is no end-user help manual yet.
