@@ -118,7 +118,7 @@ MaybePatternRef TimelineCellIterRef::next() {
 
 #ifdef UNITTEST
 
-#include "doc_util/shorthand.h"
+#include "doc_util/event_builder.h"
 #include "util/compare.h"
 #include "util/compare_impl.h"
 #include "util/enumerate.h"
@@ -128,7 +128,9 @@ MaybePatternRef TimelineCellIterRef::next() {
 namespace doc::timeline {
 TEST_SUITE_BEGIN("doc/timeline");
 
-using doc_util::shorthand::at;
+using namespace doc::events;
+using namespace doc::timed_events;
+using namespace doc::event_list;
 using std::move;
 
 /// Contains all fields of PatternRef except the event list.
@@ -179,7 +181,7 @@ static TimelineCell single_block(BeatOrEnd end_time) {
     EventList events;
     auto num_events = (int) end_time.value_or(1u);
     for (int i = 0; i < num_events; i++) {
-        events.push_back({at(i), {i}});
+        events.push_back({i, {i}});
     }
 
     return TimelineCell{TimelineBlock{0, end_time,
@@ -208,7 +210,7 @@ TEST_CASE("Check TimelineCellIter with a single block overflowing the grid cell"
 static TimelineCell single_block_loop(BeatOrEnd end_time, uint32_t loop_modulo) {
     EventList events;
     for (uint32_t i = 0; i < loop_modulo; i++) {
-        events.push_back({at(i), {i}});
+        events.push_back({i, {i}});
     }
 
     return TimelineCell{TimelineBlock{0, end_time,
@@ -273,12 +275,12 @@ static TimelineCell two_blocks() {
     return TimelineCell{
         TimelineBlock{0, 4,
             Pattern{EventList{
-                {at(0), {0}},
+                {0, {0}},
             }}
         },
         TimelineBlock{6, 8,
             Pattern{EventList{
-                {at(0), {1}},
+                {0, {1}},
             }}
         },
     };
@@ -308,12 +310,12 @@ static TimelineCell two_blocks_loop1() {
     return TimelineCell{
         TimelineBlock{0, 4,
             Pattern{EventList{
-                {at(0), {0}},
+                {0, {0}},
             }, 1}
         },
         TimelineBlock{6, 8,
             Pattern{EventList{
-                {at(0), {1}},
+                {0, {1}},
             }, 1}
         },
     };
@@ -334,12 +336,12 @@ static TimelineCell has_zero_length_block() {
     return TimelineCell{
         TimelineBlock{0, 4,
             Pattern{EventList{
-                {at(0), {0}},
+                {0, {0}},
             }}
         },
         TimelineBlock{4, 4,
             Pattern{EventList{
-                {at(0), {NOTE_CUT}},
+                {0, {NOTE_CUT}},
             }}
         },
     };

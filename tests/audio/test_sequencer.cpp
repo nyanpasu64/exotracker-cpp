@@ -2,7 +2,7 @@
 #include "chip_kinds.h"
 #include "timing_common.h"
 #include "sample_docs.h"
-#include "doc_util/shorthand.h"
+#include "doc_util/event_builder.h"
 #include "test_utils/parameterize.h"
 
 #include <fmt/core.h>
@@ -20,7 +20,8 @@ namespace audio::synth::sequencer {
 
 using namespace doc;
 using chip_kinds::ChipKind;
-using namespace doc_util::shorthand;
+using namespace doc_util::event_builder;
+using Ev = EventBuilder;
 using std::move;
 
 static Document simple_doc() {
@@ -33,8 +34,8 @@ static Document simple_doc() {
     timeline.push_back([]() -> TimelineRow {
         TimelineCell ch0{TimelineBlock::from_events({
             // TimeInPattern, RowEvent
-            {at(0), {0}},
-            {at(1), {1}},
+            {0, {0}},
+            {1, {1}},
         })};
 
         TimelineCell ch1{};
@@ -278,8 +279,8 @@ static Document parametric_doc(
         TimelineCell ch0{
             TimelineBlock::from_events({
                 // TimeInPattern, RowEvent
-                {at_delay(beat, delay), {0}},
-                {at_delay(beat + 2, -delay), {1}},
+                Ev(beat, {0}).delay(delay),
+                Ev(beat + 2, {1}).delay(-delay),
             }, loop_length)
         };
 
@@ -299,14 +300,14 @@ static Document parametric_doc(
             TimelineBlock{(BeatIndex) beat, beat + 2, Pattern{
                 {
                     // TimeInPattern, RowEvent
-                    {at_delay(0, delay), {2}},
+                    Ev(0, {2}).delay(delay),
                 },
                 loop_length
             }},
             TimelineBlock{(BeatIndex) beat + 2, END_OF_GRID, Pattern{
                 {
                     // TimeInPattern, RowEvent
-                    {at_delay(0, -delay), {3}},
+                    Ev(0, {3}).delay(-delay),
                 },
                 loop_length
             }},
@@ -347,7 +348,7 @@ static Document short_doc(
     timeline.push_back([&]() -> TimelineRow {
         EventList events;
         for (uint32_t beat = 0; beat < nbeat; beat++) {
-            events.push_back({at_delay(beat, delay), {beat}});
+            events.push_back(Ev(beat, {beat}).delay(delay));
         }
 
         TimelineCell ch0{TimelineBlock::from_events(move(events), loop_length)};
@@ -383,7 +384,7 @@ static Document gap_doc(
 
     EventList events;
     for (uint32_t beat = 0; beat < nbeat; beat++) {
-        events.push_back({at_delay(beat, delay), {beat}});
+        events.push_back(Ev(beat, {beat}).delay(delay));
     }
 
     // grid 0

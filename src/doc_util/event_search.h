@@ -23,9 +23,6 @@ private:
 public:
     EventSearch(EventsT event_list) : _event_list{event_list} {}
 
-    [[nodiscard]] ConstIterator greater_equal(TimeInPattern t) const;
-    [[nodiscard]] ConstIterator greater(TimeInPattern t) const;
-
     [[nodiscard]] ConstIterator beat_begin(BeatFraction beat) const;
     [[nodiscard]] ConstIterator beat_end(BeatFraction beat) const;
 };
@@ -49,16 +46,10 @@ public:
     EventSearchMut(EventsT event_list) : _event_list{event_list} {}
 
     // Const methods.
-    [[nodiscard]] ConstIterator greater_equal(TimeInPattern t) const;
-    [[nodiscard]] ConstIterator greater(TimeInPattern t) const;
-
     [[nodiscard]] ConstIterator beat_begin(BeatFraction beat) const;
     [[nodiscard]] ConstIterator beat_end(BeatFraction beat) const;
 
     // Mutating methods.
-    [[nodiscard]] Iterator greater_equal(TimeInPattern t);
-    [[nodiscard]] Iterator greater(TimeInPattern t);
-
     [[nodiscard]] Iterator beat_begin(BeatFraction beat);
     [[nodiscard]] Iterator beat_end(BeatFraction beat);
 

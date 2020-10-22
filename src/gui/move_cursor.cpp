@@ -71,7 +71,7 @@ COMPARABLE_IMPL(MoveCursorResult, (self.wrapped, self.time))
 static GridAndBeat pattern_to_abs_time(
     GridIndex grid, PatternRef pattern, doc::TimedRowEvent const& ev
 ) {
-    return GridAndBeat{grid, pattern.begin_time + ev.time.anchor_beat};
+    return GridAndBeat{grid, pattern.begin_time + ev.anchor_beat};
 }
 
 [[nodiscard]] static MoveCursorResult prev_event_impl(
@@ -388,13 +388,13 @@ GridAndBeat cursor_step(
 #include "timing_common.h"
 #include "doc.h"
 #include "chip_kinds.h"
-#include "doc_util/shorthand.h"
+#include "doc_util/event_builder.h"
 
 namespace gui::move_cursor {
 
 using namespace doc;
 using chip_kinds::ChipKind;
-using namespace doc_util::shorthand;
+using namespace doc_util::event_builder;
 
 static Document empty_doc(int n_seq_entry) {
     SequencerOptions sequencer_options{
@@ -441,8 +441,8 @@ static doc::Document simple_document() {
 
     auto block = doc::TimelineBlock{0, END_OF_GRID, Pattern{}};
 
-    block.pattern.events.push_back({at(1), {1}});
-    block.pattern.events.push_back({at(2), {2}});
+    block.pattern.events.push_back({1, {1}});
+    block.pattern.events.push_back({2, {2}});
 
     cell._raw_blocks = {std::move(block)};
 
@@ -455,11 +455,11 @@ static doc::Document blocked_document() {
     auto & cell = document.timeline[1].chip_channel_cells[0][0];
 
     auto block1 = doc::TimelineBlock{1, 2, Pattern{
-        .events = {{at(0), {1}}}
+        .events = {{0, {1}}}
     }};
 
     auto block2 = doc::TimelineBlock{2, 3, Pattern{
-        .events = {{at(0), {2}}}
+        .events = {{0, {2}}}
     }};
 
     cell._raw_blocks = {std::move(block1), std::move(block2)};
@@ -473,7 +473,7 @@ static doc::Document looped_document() {
     auto & cell = document.timeline[1].chip_channel_cells[0][0];
 
     auto block = doc::TimelineBlock{1, 3, Pattern{
-        .events = {{at(0), {1}}},
+        .events = {{0, {1}}},
         .loop_length = 1,
     }};
 

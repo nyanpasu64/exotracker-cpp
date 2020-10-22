@@ -1,6 +1,6 @@
 #include "doc.h"
 #include "doc_util/event_search.h"
-#include "doc_util/shorthand.h"
+#include "doc_util/event_builder.h"
 
 #include <fmt/core.h>
 
@@ -36,49 +36,21 @@ TEST_CASE("Test that TimeInPattern comparisons work properly.") {
 /// for simplicity.
 /// ListT=EventList copies the list unnecessarily, but it's not a big deal.
 template<typename SearchT, typename ListT>
-void check_beat_tick_search(ListT events) {
-    using namespace doc_util::shorthand;
-    using Rev = typename ListT::reverse_iterator;
-
-    SearchT kv{events};
-
-    // Ensure "no element found" works, and >= and > match.
-    CHECK(kv.greater_equal(at(-1))->time == at(0));
-    CHECK(kv.greater(at(-1))->time == at(0));
-
-    CHECK(kv.greater_equal(at({1, 2}))->time == at({2, 3}));
-    CHECK(kv.greater(at({1, 2}))->time == at({2, 3}));
-
-    // Ensure that in "element found", >= and > enclose one element.
-    CHECK(kv.greater_equal(at(0))->time == at(0));
-    CHECK(Rev{kv.greater(at(0))}->time == at(0));
-    CHECK(kv.greater(at(0))->time == at_delay(0, 1));
-
-    CHECK(kv.greater_equal(at(1))->time == at(1));
-    CHECK(Rev{kv.greater(at(1))}->time == at(1));
-    CHECK(kv.greater(at(1))->time == at(2));
-
-    // Test "past the end" search.
-    CHECK(kv.greater_equal(at(10)) == events.end());
-    CHECK(kv.greater(at(10)) == events.end());
-}
-
-template<typename SearchT, typename ListT>
 void check_beat_search(ListT events) {
-    using namespace doc_util::shorthand;
+    using namespace doc_util::event_builder;
     using Rev = typename ListT::reverse_iterator;
 
     SearchT kv{events};
 
     // Ensure "no element found" works, and >= and > match.
-    CHECK(kv.beat_begin(-1)->time == at(0));
-    CHECK(kv.beat_end(-1)->time == at(0));
+    CHECK(kv.beat_begin(-1)->anchor_beat == 0);
+    CHECK(kv.beat_end(-1)->anchor_beat == 0);
 
     // Ensure that in "elements found" mode,
     // >= and > enclose all elements anchored to the beat.
-    CHECK(kv.beat_begin(0)->time == at(0));
-    CHECK(Rev{kv.beat_end(0)}->time == at_delay(0, 1));
-    CHECK(kv.beat_end(0)->time == at({1, 3}));
+    CHECK(kv.beat_begin(0)->v.note == std::nullopt);
+    CHECK(Rev{kv.beat_end(0)}->v.note == 1);
+    CHECK(kv.beat_end(0)->anchor_beat == BeatFraction(1, 3));
 
     // Test "past the end" search.
     CHECK(kv.beat_begin(10) == events.end());
@@ -90,20 +62,15 @@ TEST_CASE ("Test that EventList and KV search is implemented properly.") {
     using namespace doc;
     using doc_util::event_search::EventSearch;
     using doc_util::event_search::EventSearchMut;
-    using namespace doc_util::shorthand;
+    using namespace doc_util::event_builder;
 
     EventList events;
-    events.push_back({at(0), {}});
-    events.push_back({at_delay(0, 1), {1}});
-    events.push_back({at({1, 3}), {3}});
-    events.push_back({at({2, 3}), {6}});
-    events.push_back({at(1), {10}});
-    events.push_back({at(2), {20}});
-
-    SUBCASE("Check (beat, tick) search.") {
-        check_beat_tick_search<EventSearch, TimedEventsRef>(events);
-        check_beat_tick_search<EventSearchMut, EventList>(std::move(events));
-    }
+    events.push_back({0, {}});
+    events.push_back({0, {1}});
+    events.push_back({{1, 3}, {3}});
+    events.push_back({{2, 3}, {6}});
+    events.push_back({1, {10}});
+    events.push_back({2, {20}});
 
     SUBCASE("Check (beat) search.") {
         check_beat_search<EventSearch, TimedEventsRef>(events);
@@ -115,16 +82,16 @@ TEST_CASE ("Test that EventList and KV search is implemented properly.") {
         auto n = events.size();
 
         // If one event is anchored here, make sure the right event is picked.
-        CHECK(kv.get_or_insert(1).time == at(1));
+        CHECK(kv.get_or_insert(1).anchor_beat == 1);
         CHECK(events.size() == n);
 
         // If multiple events are anchored here, make sure the last one is picked.
-        CHECK(kv.get_or_insert(0).time == at_delay(0, 1));
+        CHECK(kv.get_or_insert(0).v.note == 1);
         CHECK(events.size() == n);
 
         // Test inserting events at times not already present.
         auto & added = kv.get_or_insert(-1);
-        CHECK(added.time == at(-1));
+        CHECK(added.anchor_beat == -1);
         CHECK(events.size() == n + 1);
         CHECK(&added == &events[0]);
     }

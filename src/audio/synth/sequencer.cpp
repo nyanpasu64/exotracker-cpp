@@ -255,6 +255,8 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 
     auto timeline =
         doc::TimelineChannelRef(document.timeline, _chip_index, _chan_index);
+    auto n_effect_col =
+        document.chip_channel_settings[_chip_index][_chan_index].n_effect_col;
 
     BeatPlusTick const now_grid_len =
         frac_to_tick(ticks_per_beat, timeline[_now.grid].nbeats);
@@ -316,9 +318,9 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
         BeatPlusTick now = _now.next_tick;
 
         BeatPlusTick next_ev_time =
-            frac_to_tick(ticks_per_beat, next_ev.time.anchor_beat);
+            frac_to_tick(ticks_per_beat, next_ev.anchor_beat);
         next_ev_time.beat += pattern_start;
-        next_ev_time.dtick += next_ev.time.tick_offset;
+        next_ev_time.dtick += next_ev.tick_offset(n_effect_col);
 
         // Only scanning for events in the next grid cell(?)
         // reduces worst-case CPU usage in the 6502 driver.
@@ -362,7 +364,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
 
         // Past events are overdue and should never happen.
         if (!_ignore_ordering_errors && event_pos == EventPos::Past) {
-            auto time = next_ev.time;
+            auto time = next_ev.time(n_effect_col);
             fmt::print(
                 stderr,
                 "invalid document: event at grid {} pattern at {} time {} + {} is in the past!\n",
@@ -379,7 +381,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
             fmt::print(
                 stderr,
                 "\tplaying event beat {} -> time {}+{}\n",
-                format_frac(next_ev.time.anchor_beat),
+                format_frac(next_ev.anchor_beat),
                 next_ev_time.beat,
                 next_ev_time.dtick
             );
@@ -504,7 +506,7 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
 
     // Note that seeking is done in beat-fraction space (ignoring offsets),
     // so replace _now.next_tick with time.beat,
-    // and frac_to_tick(...next_ev.time.anchor_beat). with next_ev.time.anchor_beat.
+    // and frac_to_tick(...next_ev.anchor_beat). with next_ev.anchor_beat.
 
     TimedEventsRef events{};
     doc::BeatIndex pattern_start{};
@@ -566,7 +568,7 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
             doc::TimedRowEvent next_ev = events[_next_event.event_idx];
 
             BeatFraction now = time.beat;
-            BeatFraction next_ev_time = pattern_start + next_ev.time.anchor_beat;
+            BeatFraction next_ev_time = pattern_start + next_ev.anchor_beat;
 
             // Event is on current grid cell.
             // If event is now/future, queue it for playback.
@@ -718,6 +720,8 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
 
     auto timeline =
         doc::TimelineChannelRef(document.timeline, _chip_index, _chan_index);
+    auto n_effect_col =
+        document.chip_channel_settings[_chip_index][_chan_index].n_effect_col;
 
     BeatPlusTick const now_grid_len =
         frac_to_tick(ticks_per_beat, timeline[_now.grid].nbeats);
@@ -779,9 +783,9 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
         BeatPlusTick now = _now.next_tick;
 
         BeatPlusTick next_ev_time =
-            frac_to_tick(ticks_per_beat, next_ev.time.anchor_beat);
+            frac_to_tick(ticks_per_beat, next_ev.anchor_beat);
         next_ev_time.beat += pattern_start;
-        next_ev_time.dtick += next_ev.time.tick_offset;
+        next_ev_time.dtick += next_ev.tick_offset(n_effect_col);
 
         // On the first loop iteration, we move _next_event backwards in time
         // (prev_grid above) so _grid_runahead.event_grid_ahead() cannot happen.

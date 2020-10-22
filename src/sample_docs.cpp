@@ -2,7 +2,7 @@
 
 #include "doc.h"
 #include "chip_kinds.h"
-#include "doc_util/shorthand.h"
+#include "doc_util/event_builder.h"
 #include "util/release_assert.h"
 
 #include <cmath>
@@ -10,7 +10,8 @@
 namespace sample_docs {
 
 using namespace doc;
-using namespace doc_util::shorthand;
+using namespace doc_util::event_builder;
+using Ev = EventBuilder;
 using std::move;
 using std::nullopt;
 
@@ -101,28 +102,32 @@ static Document dream_fragments() {
 
     ChipChannelSettings chip_channel_settings = {
         {{}, {}},
-        {{}, {}},
+        {{}, ChannelSettings{.n_effect_col = 2}},
     };
 
     Timeline timeline;
 
     timeline.push_back([]() -> TimelineRow {
         TimelineCell ch0{TimelineBlock::from_events({
-            // TimeInPattern, RowEvent
-            {at(0), {.note=pitch(5, 7), .instr=0}},
-            {at(1), {pitch(6, 2)}},
-            {at(4+0), {pitch(5, 7+2)}},
-            {at(4+1), {pitch(6, 2+2)}},
+            // Since ch0 has only 1 effect column,
+            // the delay should neither be visible on-screen
+            // nor affect the sequencer.
+            // TODO write a unit test to make sure the sequencer only uses
+            // in-bounds delays.
+            Ev(0, pitch(5, 7)).instr(0).no_effect().delay(16),
+            Ev(1, pitch(6, 2)),
+            Ev(4+0, pitch(5, 7+2)),
+            Ev(4+1, pitch(6, 2+2)),
         })};
         TimelineCell ch1{TimelineBlock::from_events({
-            {at(0, 3, 4), {NOTE_CUT}},
-            {at(1, 1, 2), {.note=pitch(7, -3), .instr=0}},
-            {at(2, 0, 2), {pitch(7, 6)}},
-            {at(2, 1, 2), {pitch(7, 7)}},
-            {at(3, 1, 2), {pitch(7, 9)}},
-            {at(4, 1, 2), {pitch(7, 4)}},
-            {at(5, 1, 2), {pitch(7, 2)}},
-            {at(6, 1, 2), {pitch(7, 1)}},
+            Ev(at(0, 3, 4), NOTE_CUT),
+            Ev(at(1, 1, 2), pitch(7, -3)).instr(0),
+            Ev(at(2, 0, 2), pitch(7, 6)),
+            Ev(at(2, 1, 2), pitch(7, 7)),
+            Ev(at(3, 1, 2), pitch(7, 9)),
+            Ev(at(4, 1, 2), pitch(7, 4)),
+            Ev(at(5, 1, 2), pitch(7, 2)),
+            Ev(at(6, 1, 2), pitch(7, 1)),
         })};
         return TimelineRow{
             .nbeats = 8,
@@ -131,33 +136,32 @@ static Document dream_fragments() {
     }());
 
     timeline.push_back([] {
-        TimelineCell ch0{TimelineBlock::from_events({
-            // TimeInPattern, RowEvent
-            {at_delay(0, -5), {.note=pitch(6, 4), .instr=0}},
-            {at(1), {pitch(6, -1)}},
-            {at(2), {pitch(6, 4)}},
-            {at(3), {pitch(6, 7)}},
-            {at_delay(4, -5), {pitch(6, 6)}},
-            {at(5), {pitch(6, 1)}},
-            {at(6), {pitch(6, -2)}},
-            {at(7), {pitch(6, 1)}},
+        auto ch0 = TimelineCell{TimelineBlock::from_events({
+            Ev(0, pitch(6, 4)).instr(0).delay(-5),
+            Ev(1, pitch(6, -1)),
+            Ev(2, pitch(6, 4)),
+            Ev(3, pitch(6, 7)),
+            Ev(4, pitch(6, 6)).delay(-5),
+            Ev(5, pitch(6, 1)),
+            Ev(6, pitch(6, -2)),
+            Ev(7, pitch(6, 1)),
         })};
-        TimelineCell ch1{TimelineBlock::from_events({
-            {at_delay(0, -2), {.note=pitch(6, 7), .instr=0}},
-            {at(1, 1, 2), {pitch(7, -1)}},
-            {at(3), {pitch(7, 4)}},
-            {at_delay(4, -2), {pitch(7, -2)}},
-            {at(5, 2, 4), {pitch(7, 7)}},
-            {at(5, 3, 4), {pitch(7, 6)}},
-            {at(6), {pitch(7, 4)}},
+        auto ch1 = TimelineCell{TimelineBlock::from_events({
+            Ev(0, pitch(6, 7)).instr(0).delay(-2),
+            Ev(at(1, 1, 2), pitch(7, -1)),
+            Ev(3, pitch(7, 4)),
+            Ev(4, pitch(7, -2)).delay(-2),
+            Ev(at(5, 2, 4), pitch(7, 7)),
+            Ev(at(5, 3, 4), pitch(7, 6)),
+            Ev(6, pitch(7, 4)),
         })};
         TimelineCell ch2{TimelineBlock::from_events({
-            {at_delay(0, 1), {.note=pitch(7, -1), .instr=0}},
-            {at_delay(4, 1), {pitch(7, 1)}},
+            Ev(0, pitch(7, -1)).instr(0).delay(1),
+            Ev(4, pitch(7, 1)).delay(1),
         })};
         TimelineCell ch3{TimelineBlock::from_events({
-            {at_delay(0, 4), {.note=pitch(7, 4), .instr=0}},
-            {at_delay(4, 4), {pitch(7, 6)}},
+            Ev(0, pitch(7, 4)).instr(0).no_effect().delay(4),
+            Ev(4, pitch(7, 6)).no_effect().delay(4),
         })};
         return TimelineRow{
             .nbeats = 8,
@@ -213,10 +217,10 @@ static Document world_revolution() {
             int note = (beat / 4 % 2 == 0)
                 ? pitch(0, offset).value
                 : pitch(0, offset + 2).value;
-            out.push_back({at(beat), {pitch(3, note)}});
-            out.push_back({at(beat, 1, 4), {pitch(3, note + 7)}});
-            out.push_back({at(beat, 2, 4), {pitch(3, note + 12)}});
-            out.push_back({at(beat, 3, 4), {pitch(3, note + 7)}});
+            out.push_back(Ev(beat, pitch(3, note)));
+            out.push_back(Ev(at(beat, 1, 4), pitch(3, note + 7)));
+            out.push_back(Ev(at(beat, 2, 4), pitch(3, note + 12)));
+            out.push_back(Ev(at(beat, 3, 4), pitch(3, note + 7)));
         }
 
         out[0].v.instr = BASS;
@@ -234,46 +238,42 @@ static Document world_revolution() {
         auto ch0 = TimelineCell{
             TimelineBlock{0, BeatOrEnd(8),
                 Pattern{EventList{
-                    // TimeInPattern, RowEvent
                     // 0
-                    {at(0), {pitch(6, 0), TRUMPET, 0xf, {Effect("0A", 0)}}},
-                    {
-                        at(0, 4, 8),
-                        {pitch(6, -1), nullopt, nullopt, {Effect("0Q", 0)}}
-                    },
-                    {at(0, 6, 8), {pitch(6, 0)}},
-                    {at(0, 7, 8), {pitch(6, -1)}},
-                    {at(1), {pitch(5, 9)}},
-                    {at(1, 1, 2), {pitch(5, 7)}},
-                    {at(2), {pitch(5, 9)}},
-                    {at(2, 1, 2), {pitch(5, 2)}},
-                    {at(3), {pitch(5, 4)}},
-                    {at(3, 1, 2), {pitch(5, 7)}},
+                    Ev(0, pitch(6, 0)).instr(TRUMPET).volume(0xf).effect("0A", 0),
+                    Ev(at(0, 4, 8), pitch(6, -1)).effect("0Q", 0),
+                    Ev(at(0, 6, 8), pitch(6, 0)),
+                    Ev(at(0, 7, 8), pitch(6, -1)),
+                    Ev(1, pitch(5, 9)),
+                    Ev(at(1, 1, 2), pitch(5, 7)),
+                    Ev(2, pitch(5, 9)),
+                    Ev(at(2, 1, 2), pitch(5, 2)),
+                    Ev(3, pitch(5, 4)),
+                    Ev(at(3, 1, 2), pitch(5, 7)),
                     // 4
-                    {at(4), {pitch(5, 9)}},
-                    {at(6), {pitch(5, 7)}},
-                    {at(7), {pitch(5, 9)}},
-                    {at(7, 1, 2), {pitch(6, -1)}},
+                    Ev(4, pitch(5, 9)),
+                    Ev(6, pitch(5, 7)),
+                    Ev(7, pitch(5, 9)),
+                    Ev(at(7, 1, 2), pitch(6, -1)),
                 }}
             },
             TimelineBlock{8, BeatOrEnd(16),
                 Pattern{EventList{
                     // 0
-                    {at(0), {pitch(6, 0), nullopt, 0xf}},
-                    {at(0, 4, 8), {pitch(6, -1)}},
-                    {at(0, 6, 8), {pitch(6, 0)}},
-                    {at(0, 7, 8), {pitch(6, -1)}},
-                    {at(1), {pitch(5, 9)}},
-                    {at(1, 1, 2), {pitch(5, 7)}},
-                    {at(2), {pitch(5, 9)}},
-                    {at(2, 1, 2), {pitch(6, -1)}},
-                    {at(3), {pitch(6, 0)}},
-                    {at(3, 1, 2), {pitch(6, 2)}},
+                    Ev(0, pitch(6, 0)).volume(0xf),
+                    Ev(at(0, 4, 8), pitch(6, -1)),
+                    Ev(at(0, 6, 8), pitch(6, 0)),
+                    Ev(at(0, 7, 8), pitch(6, -1)),
+                    Ev(1, pitch(5, 9)),
+                    Ev(at(1, 1, 2), pitch(5, 7)),
+                    Ev(2, pitch(5, 9)),
+                    Ev(at(2, 1, 2), pitch(6, -1)),
+                    Ev(3, pitch(6, 0)),
+                    Ev(at(3, 1, 2), pitch(6, 2)),
                     // 4
-                    {at(4), {pitch(6, 4)}},
-                    {at(6), {pitch(6, 2)}},
-                    {at(7), {pitch(5, 9)}},
-                    {at(7, 1, 2), {pitch(6, -1)}},
+                    Ev(4, pitch(6, 4)),
+                    Ev(6, pitch(6, 2)),
+                    Ev(7, pitch(5, 9)),
+                    Ev(at(7, 1, 2), pitch(6, -1)),
                 }},
             },
         };
@@ -292,23 +292,22 @@ static Document world_revolution() {
     }());
     timeline.push_back([&]() -> TimelineRow {
         auto ch0 = TimelineCell{TimelineBlock::from_events({
-            // TimeInPattern, RowEvent
             // 0
-            {at(0), {pitch(6, 0), TRUMPET}},
-            {at(0, 4, 8), {pitch(6, -1)}},
-            {at(0, 6, 8), {pitch(6, 0)}},
-            {at(0, 7, 8), {pitch(6, -1)}},
-            {at(1), {pitch(5, 9)}},
-            {at(1, 1, 2), {pitch(5, 7)}},
-            {at(2), {pitch(5, 9)}},
-            {at(2, 1, 2), {pitch(5, 2)}},
-            {at(3), {pitch(5, 4)}},
-            {at(3, 1, 2), {pitch(5, 7)}},
+            Ev(0, pitch(6, 0)).instr(TRUMPET),
+            Ev(at(0, 4, 8), pitch(6, -1)),
+            Ev(at(0, 6, 8), pitch(6, 0)),
+            Ev(at(0, 7, 8), pitch(6, -1)),
+            Ev(1, pitch(5, 9)),
+            Ev(at(1, 1, 2), pitch(5, 7)),
+            Ev(2, pitch(5, 9)),
+            Ev(at(2, 1, 2), pitch(5, 2)),
+            Ev(3, pitch(5, 4)),
+            Ev(at(3, 1, 2), pitch(5, 7)),
             // 4
-            {at(4), {pitch(5, 9)}},
-            {at(5), {pitch(6, -1)}},
-            {at(6), {pitch(6, 0)}},
-            {at(7), {pitch(6, 2)}},
+            Ev(4, pitch(5, 9)),
+            Ev(5, pitch(6, -1)),
+            Ev(6, pitch(6, 0)),
+            Ev(7, pitch(6, 2)),
         })};
         auto ch1 = TimelineCell{TimelineBlock::from_events(generate_bass(8))};
 
@@ -354,19 +353,22 @@ static Document render_test() {
             EventList ev;
             for (int i = 0; i <= 10; i++) {
                 // Play MIDI pitches 0, 12... 120.
-                ev.push_back({at_delay(i, 0, 2, 4 * (i - 5)), {pitch(i, 0)}});
-                ev.push_back({
-                    at_delay(i, 1, 2, 4 * (i - 5)),
-                    {i % 2 == 0 ? NOTE_CUT : NOTE_RELEASE}
-                });
+                ev.push_back(
+                    Ev(at(i, 0, 2), pitch(i, 0))
+                        .delay(4 * (i - 5))
+                );
+                ev.push_back(
+                    Ev(at(i, 1, 2), {i % 2 == 0 ? NOTE_CUT : NOTE_RELEASE})
+                        .delay(4 * (i - 5))
+                );
             }
             ev[0].v.instr = 2;
             return ev;
         }())};
 
         TimelineCell ch1{TimelineBlock::from_events({
-            {at(2), {NOTE_CUT}},
-            {at(4), {NOTE_RELEASE}},
+            Ev(2, {NOTE_CUT}),
+            Ev(4, {NOTE_RELEASE}),
         })};
 
         return TimelineRow{
@@ -404,7 +406,7 @@ static Document audio_test() {
 
     auto get_channel = [&] (Note note) {
         return TimelineCell{TimelineBlock::from_events({
-            {at(0), RowEvent{note, 0}}
+            Ev(0, note).instr(0)
         })};
     };
 

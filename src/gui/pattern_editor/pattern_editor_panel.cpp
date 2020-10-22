@@ -1612,11 +1612,10 @@ static void draw_pattern_foreground(
         // https://bugs.llvm.org/show_bug.cgi?id=33236
         // the original C++17 spec broke const struct unpacking.
         for (doc::TimedRowEvent timed_event : pattern.events) {
-            doc::TimeInPattern time = timed_event.time;
+            Frac beat = timed_event.anchor_beat;
             doc::RowEvent row_event = timed_event.v;
 
             // Compute where to draw row.
-            Frac beat = time.anchor_beat;
             Frac row = beat * self._zoom_level;
             int yPx = doc::round_to_int(self._pixels_per_row * row);
 

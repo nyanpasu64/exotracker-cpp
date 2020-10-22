@@ -58,8 +58,16 @@ struct TimeInPattern {
 };
 
 struct TimedRowEvent {
-    TimeInPattern time;
+    BeatFraction anchor_beat;
+    // Tick offset is now specified through signed Gxx delay effects.
+
     events::RowEvent v;
+
+    TickT tick_offset(events::EffColIndex n_effect_col);
+
+    TimeInPattern time(events::EffColIndex n_effect_col) {
+        return {anchor_beat, tick_offset(n_effect_col)};
+    }
 
     DEFAULT_EQUALABLE(TimedRowEvent)
 };

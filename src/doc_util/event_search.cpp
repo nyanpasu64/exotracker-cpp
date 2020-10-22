@@ -5,12 +5,8 @@
 
 namespace doc_util::event_search {
 
-static TimeInPattern const & time_and_offset(const TimedRowEvent & a) {
-    return a.time;
-}
-
 static BeatFraction const & time(const TimedRowEvent & a) {
-    return a.time.anchor_beat;
+    return a.anchor_beat;
 }
 
 template<auto key_func>
@@ -45,9 +41,6 @@ using Mut = EventSearchMut;
     IMPL_IMPL(Mut, FUNC_NAME, BOUND, KEY_T, const, ConstIterator, KEY_FUNC) \
     IMPL_IMPL(Mut, FUNC_NAME, BOUND, KEY_T, , Iterator, KEY_FUNC) \
 
-IMPL(greater_equal, std::lower_bound, TimeInPattern, time_and_offset)
-IMPL(greater, std::upper_bound, TimeInPattern, time_and_offset)
-
 IMPL(beat_begin, std::lower_bound, BeatFraction, time)
 IMPL(beat_end, std::upper_bound, BeatFraction, time)
 
@@ -55,7 +48,7 @@ TimedRowEvent * EventSearchMut::get_maybe(BeatFraction beat) {
     // Last event anchored to this beat fraction.
     EventList::reverse_iterator it{beat_end(beat)};
 
-    if (it != _event_list.rend() && it->time.anchor_beat == beat) {
+    if (it != _event_list.rend() && it->anchor_beat == beat) {
         return &*it;
     } else {
         return nullptr;
@@ -66,11 +59,11 @@ TimedRowEvent & EventSearchMut::get_or_insert(BeatFraction beat) {
     // Last event anchored to this beat fraction.
     EventList::reverse_iterator it{beat_end(beat)};
 
-    if (it != _event_list.rend() && it->time.anchor_beat == beat) {
+    if (it != _event_list.rend() && it->anchor_beat == beat) {
         return *it;
     } else {
         TimedRowEvent ev {
-            .time = TimeInPattern{beat, 0},
+            .anchor_beat = beat,
             .v = RowEvent{},
         };
         return *_event_list.insert(it.base(), std::move(ev));

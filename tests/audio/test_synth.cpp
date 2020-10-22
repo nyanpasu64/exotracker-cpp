@@ -35,7 +35,7 @@ static doc::Document one_note_document(TestChannelID which_channel, doc::Note pi
     Timeline timeline;
 
     timeline.push_back([&]() -> TimelineRow {
-        EventList one_note {{{0, 0}, {pitch}}};
+        EventList one_note {{0, {pitch}}};
         EventList blank {};
 
         TimelineCell ch0{TimelineBlock::from_events(
