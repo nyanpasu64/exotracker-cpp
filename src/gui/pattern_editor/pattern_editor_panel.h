@@ -42,6 +42,14 @@ using RowIndex = uint32_t;
 using doc::BeatFraction;
 using timing::GridAndBeat;
 
+enum class StepDirection {
+    Down,
+    RightDigits,
+    RightEffect,
+    Right,
+    COUNT
+};
+
 struct ShortcutPair {
     // You can't use an array of 2 elements. Why?
     //
@@ -157,6 +165,7 @@ PatternEditorPanel_INTERNAL:
     int _zoom_level = 4;
     int _octave = 5;
     int _step = 1;  // can't remember if it will be saved on close, or defaulted via settings dialog
+    StepDirection _step_direction = StepDirection::Down;
     bool _step_to_event = false;
     // TODO add speed-1 zoom
 
@@ -187,6 +196,12 @@ public:
     PROPERTY(int, _zoom_level, zoom_level)
     PROPERTY(int, _octave, octave)
     PROPERTY(int, _step, step)
+    PROPERTY(StepDirection, _step_direction, step_direction)
+    void set_step_direction_int(int v) {
+        // QComboBox::currentIndexChanged is bound to this method,
+        // but passes in int (not enum).
+        set_step_direction(StepDirection(v));
+    }
     PROPERTY(bool, _step_to_event, step_to_event)
 
 protected:

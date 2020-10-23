@@ -47,6 +47,7 @@ using std::unique_ptr;
 using std::make_unique;
 
 using gui::pattern_editor::PatternEditorPanel;
+using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
 using doc::BeatFraction;
 using util::math::ceildiv;
@@ -282,10 +283,13 @@ struct MainWindowUi : MainWindow {
 
     // Global state (editing)
     QSpinBox * _octave;
-    QSpinBox * _step;
-    QCheckBox * _step_to_event;
     QCheckBox * _overflow_paste;
     QCheckBox * _key_repeat;
+
+    // Step
+    QSpinBox * _step;
+    QComboBox * _step_direction;
+    QCheckBox * _step_to_event;
 
     PatternEditorPanel * _pattern_editor_panel;
 
@@ -435,40 +439,58 @@ struct MainWindowUi : MainWindow {
         }
 
         // Pattern editing.
-        {l__c_form(QGroupBox, QFormLayout);
-            c->setTitle(tr("Note entry"));
+        {l__l(QVBoxLayout);
+            {l__c_form(QGroupBox, QFormLayout);
+                c->setTitle(tr("Note entry"));
 
-            {form__label_w(tr("Octave"), QSpinBox);
-                _octave = w;
+                {form__label_w(tr("Octave"), QSpinBox);
+                    _octave = w;
 
-                int gui_bottom_octave =
-                    get_app().options().note_names.gui_bottom_octave;
-                int peak_octave = (doc::CHROMATIC_COUNT - 1) / doc::NOTES_PER_OCTAVE;
-                w->setRange(gui_bottom_octave, gui_bottom_octave + peak_octave);
+                    int gui_bottom_octave =
+                        get_app().options().note_names.gui_bottom_octave;
+                    int peak_octave = (doc::CHROMATIC_COUNT - 1) / doc::NOTES_PER_OCTAVE;
+                    w->setRange(gui_bottom_octave, gui_bottom_octave + peak_octave);
+                }
+
+                {form__w(QCheckBox(tr("Overflow paste")));
+                    _overflow_paste = w;
+                    w->setEnabled(false);
+                }
+
+                {form__w(QCheckBox(tr("Key repetition")));
+                    _key_repeat = w;
+                    w->setEnabled(false);
+                }
+
+                {form__label_w(tr("Zoom"), QSpinBox);
+                    _zoom_level = w;
+                    w->setRange(1, MAX_ZOOM_LEVEL);
+                }
             }
+            {l__c_form(QGroupBox, QFormLayout);
+                c->setTitle(tr("Step"));
+                {form__label_w(tr("Rows"), QSpinBox);
+                    _step = w;
+                    w->setRange(0, 256);
+                }
 
-            {form__label_w(tr("Step"), QSpinBox);
-                _step = w;
-                w->setRange(0, 256);
-            }
+                {form__w(/*tr("Direction"), */QComboBox);
+                    _step_direction = w;
 
-            {form__w(QCheckBox(tr("Step to event")));
-                _step_to_event = w;
-            }
+                    auto push = [&w] (StepDirection step, QString item) {
+                        assert(w->count() == (int) step);
+                        w->addItem(item);
+                    };
+                    push(StepDirection::Down, tr("Down"));
+                    push(StepDirection::RightDigits, tr("Right (digits)"));
+                    push(StepDirection::RightEffect, tr("Right (effect)"));
+                    push(StepDirection::Right, tr("Right"));
+                    assert(w->count() == (int) StepDirection::COUNT);
+                }
 
-            {form__w(QCheckBox(tr("Overflow paste")));
-                _overflow_paste = w;
-                w->setEnabled(false);
-            }
-
-            {form__w(QCheckBox(tr("Key repetition")));
-                _key_repeat = w;
-                w->setEnabled(false);
-            }
-
-            {form__label_w(tr("Zoom"), QSpinBox);
-                _zoom_level = w;
-                w->setRange(1, MAX_ZOOM_LEVEL);
+                {form__w(QCheckBox(tr("Snap to event")));
+                    _step_to_event = w;
+                }
             }
         }
     } }
@@ -936,6 +958,14 @@ public:
             );
         };
 
+        auto connect_combo = [](QComboBox * combo, auto * target, auto func) {
+            connect(
+                combo, qOverload<int>(&QComboBox::currentIndexChanged),
+                target, func,
+                Qt::UniqueConnection
+            );
+        };
+
         // Previously, BIND_SPIN(name) would use _##NAME to synthesize the field _name.
         // However, this means searching for _name won't find the usage,
         // making it hard to navigate the code.
@@ -950,6 +980,12 @@ public:
             FIELD->setChecked(_pattern_editor_panel->METHOD()); \
             connect_check( \
                 FIELD, _pattern_editor_panel, &PatternEditorPanel::set_##METHOD \
+            );
+
+        #define BIND_COMBO(FIELD, METHOD) \
+            FIELD->setCurrentIndex((int) _pattern_editor_panel->METHOD()); \
+            connect_combo( \
+                FIELD, _pattern_editor_panel, &PatternEditorPanel::set_##METHOD##_int \
             );
 
         // _ticks_per_beat obtains its value through update_gui_from_doc().
@@ -989,6 +1025,7 @@ public:
         BIND_SPIN(_zoom_level, zoom_level)
 
         BIND_SPIN(_step, step)
+        BIND_COMBO(_step_direction, step_direction);
         BIND_CHECK(_step_to_event, step_to_event);
 
         // Connect timeline editor toolbar.
