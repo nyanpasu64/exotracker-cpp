@@ -338,6 +338,7 @@ using edit::edit_pattern::SubColumn;
 
 // # Visual layout.
 
+using cursor::Cursor;
 using cursor::CursorX;
 using cursor::ColumnIndex;
 using cursor::SubColumnIndex;
@@ -2382,9 +2383,8 @@ void PatternEditorPanel::toggle_edit_pressed() {
 
 // Begin document mutation
 
-static cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
+static Cursor step_down_only(PatternEditorPanel const& self, Cursor cursor) {
     doc::Document const & document = self.get_document();
-    auto cursor = self._win._cursor.get();
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = self._zoom_level,
         .step = self._step,
@@ -2395,6 +2395,73 @@ static cursor::Cursor step_cursor_down(PatternEditorPanel const& self) {
     cursor.y = move_cursor::cursor_step(document, cursor, args, move_cfg);
 
     return cursor;
+}
+
+static Cursor step_cursor(PatternEditorPanel const& self) {
+    doc::Document const & document = self.get_document();
+    auto cursor = self._win._cursor.get();
+
+    switch (self._step_direction) {
+    case StepDirection::Down:
+        return step_down_only(self, cursor);
+
+    case StepDirection::RightDigits: {
+        ColumnList const& cols = gen_column_list(self, document);
+        SubColumnCells const subcol =
+            cols[cursor.x.column].subcolumns[cursor.x.subcolumn];
+
+        CellIndex next_cell = cursor.x.cell + 1;
+
+        if (std::holds_alternative<SubColumn_::Effect>(subcol.type)) {
+            if (next_cell == document.effect_name_chars) {
+                cursor.x.cell = 0;
+                return step_down_only(self, cursor);
+
+            } else if (next_cell >= subcol.ncell) {
+                cursor.x.cell = document.effect_name_chars;
+                return step_down_only(self, cursor);
+
+            } else {
+                cursor.x.cell++;
+                return cursor;
+            }
+
+        } else {
+            if (next_cell >= subcol.ncell) {
+                cursor.x.cell = 0;
+                return step_down_only(self, cursor);
+            } else {
+                cursor.x.cell++;
+                return cursor;
+            }
+        }
+    }
+
+    case StepDirection::RightEffect: {
+        ColumnList const& cols = gen_column_list(self, document);
+        SubColumnCells const subcol =
+            cols[cursor.x.column].subcolumns[cursor.x.subcolumn];
+
+        CellIndex next_cell = cursor.x.cell + 1;
+        if (next_cell >= subcol.ncell) {
+            cursor.x.cell = 0;
+            return step_down_only(self, cursor);
+        } else {
+            cursor.x.cell++;
+            return cursor;
+        }
+    }
+
+    case StepDirection::Right:
+        cursor.x = move_right(self, cursor.x);
+        return cursor;
+
+    default:
+        throw std::invalid_argument(fmt::format(
+            "Invalid _step_direction {} when calling step_cursor()",
+            (int) self._step_direction
+        ));
+    }
 }
 
 namespace ed = edit::edit_pattern;
@@ -2430,7 +2497,7 @@ void PatternEditorPanel::delete_key_pressed() {
     auto [chip, channel, subcolumn, _cell] = calc_cursor_x(*this);
     _win.push_edit(
         ed::delete_cell(document, chip, channel, subcolumn.type, abs_time),
-        main_window::move_to(step_cursor_down(*this))
+        main_window::move_to(step_down_only(*this, _win._cursor.get()))
     );
 }
 
@@ -2451,7 +2518,7 @@ void note_pressed(
         ed::insert_note(
             self.get_document(), chip, channel, abs_time, note, instrument
         ),
-        main_window::move_to(step_cursor_down(self))
+        main_window::move_to(step_cursor(self))
     );
 }
 
@@ -2532,7 +2599,7 @@ static void add_digit(
             : DigitAction::LowerNybble;
 
     // TODO add cursor movement modes
-    MoveCursor move_cursor =  main_window::move_to(step_cursor_down(self));
+    MoveCursor move_cursor =  main_window::move_to(step_cursor(self));
 
     auto [number, box] = ed::add_digit(
         document, chip, channel, abs_time, field.type, digit_action, nybble
@@ -2588,7 +2655,7 @@ static void add_effect_char(
     }();
 
     // TODO add cursor movement modes
-    MoveCursor move_cursor =  main_window::move_to(step_cursor_down(self));
+    MoveCursor move_cursor =  main_window::move_to(step_cursor(self));
 
     auto box = ed::add_effect_char(
         document, chip, channel, abs_time, field.type, effect_action
