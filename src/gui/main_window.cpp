@@ -918,24 +918,20 @@ public:
         // Upon application startup, pattern editor panel is focused.
         _pattern_editor_panel->setFocus();
 
-        auto connect_spin = [](QSpinBox * spin, auto target, auto func) {
+        auto connect_spin = [](QSpinBox * spin, auto * target, auto func) {
             connect(
-                spin,
-                qOverload<int>(&QSpinBox::valueChanged),
-                target,
-                func,
+                spin, qOverload<int>(&QSpinBox::valueChanged),
+                target, func,
                 Qt::UniqueConnection
             );
         };
 
-        auto connect_check = [](QCheckBox * check, auto target, auto func) {
+        auto connect_check = [](QCheckBox * check, auto * target, auto func) {
             // QCheckBox::clicked is not emitted when state is programmatically changed.
             // idk which is better.
             connect(
-                check,
-                &QCheckBox::toggled,
-                target,
-                func,
+                check, &QCheckBox::toggled,
+                target, func,
                 Qt::UniqueConnection
             );
         };
@@ -956,27 +952,6 @@ public:
                 FIELD, _pattern_editor_panel, &PatternEditorPanel::set_##METHOD \
             );
 
-        BIND_SPIN(_zoom_level, zoom_level)
-
-        auto gui_bottom_octave = [] () {
-            return get_app().options().note_names.gui_bottom_octave;
-        };
-
-        // Visual octave: add offset.
-        _octave->setValue(_pattern_editor_panel->octave() + gui_bottom_octave());
-
-        // MIDI octave: subtract offset.
-        connect_spin(
-            _octave,
-            _pattern_editor_panel,
-            [this, gui_bottom_octave] (int octave) {
-                _pattern_editor_panel->set_octave(octave - gui_bottom_octave());
-            }
-        );
-
-        BIND_SPIN(_step, step)
-        BIND_CHECK(_step_to_event, step_to_event);
-
         // _ticks_per_beat obtains its value through update_gui_from_doc().
         connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
             push_edit(
@@ -985,13 +960,36 @@ public:
             );
         });
 
-        // TODO connect _length_beats to edit_doc::set_timeline_row_length()
         connect_spin(_length_beats, this, [this] (int grid_length_beats) {
             push_edit(
                 edit_doc::set_grid_length(_cursor->y.grid, grid_length_beats),
                 MoveCursor_::NotPatternEdit{}
             );
         });
+
+        // Bind octave field.
+        {
+            auto gui_bottom_octave = [] () {
+                return get_app().options().note_names.gui_bottom_octave;
+            };
+
+            // Visual octave: add offset.
+            _octave->setValue(_pattern_editor_panel->octave() + gui_bottom_octave());
+
+            // MIDI octave: subtract offset.
+            connect_spin(
+                _octave,
+                _pattern_editor_panel,
+                [this, gui_bottom_octave] (int octave) {
+                    _pattern_editor_panel->set_octave(octave - gui_bottom_octave());
+                }
+            );
+        }
+
+        BIND_SPIN(_zoom_level, zoom_level)
+
+        BIND_SPIN(_step, step)
+        BIND_CHECK(_step_to_event, step_to_event);
 
         // Connect timeline editor toolbar.
         auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
