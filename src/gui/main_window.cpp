@@ -37,7 +37,6 @@
 
 #include <algorithm>  // std::min/max, std::sort
 #include <chrono>
-#include <functional>  // reference_wrapper
 #include <iostream>
 #include <optional>
 #include <stdexcept>  // logic_error
@@ -919,10 +918,6 @@ public:
         // Upon application startup, pattern editor panel is focused.
         _pattern_editor_panel->setFocus();
 
-        auto pattern_setter = [this] (auto method) {
-            return std::bind_front(method, _pattern_editor_panel);
-        };
-
         auto connect_spin = [](QSpinBox * spin, auto target, auto func) {
             connect(
                 spin,
@@ -952,17 +947,13 @@ public:
         #define BIND_SPIN(FIELD, METHOD) \
             FIELD->setValue(_pattern_editor_panel->METHOD()); \
             connect_spin( \
-                FIELD, \
-                _pattern_editor_panel, \
-                pattern_setter(&PatternEditorPanel::set_##METHOD) \
+                FIELD, _pattern_editor_panel, &PatternEditorPanel::set_##METHOD \
             );
 
         #define BIND_CHECK(FIELD, METHOD) \
             FIELD->setChecked(_pattern_editor_panel->METHOD()); \
             connect_check( \
-                FIELD, \
-                _pattern_editor_panel, \
-                pattern_setter(&PatternEditorPanel::set_##METHOD) \
+                FIELD, _pattern_editor_panel, &PatternEditorPanel::set_##METHOD \
             );
 
         BIND_SPIN(_zoom_level, zoom_level)
