@@ -2251,13 +2251,12 @@ but allows the user to switch to exclusive indexing
 which is useful when snapping the cursor to a non-grid-aligned event.
 */
 
-void PatternEditorPanel::left_pressed() {
-    doc::Document const & document = get_document();
-    ColumnList cols = gen_column_list(*this, document);
+static CursorX move_left(PatternEditorPanel const& self, CursorX cursor_x) {
+    doc::Document const& document = self.get_document();
+    ColumnList cols = gen_column_list(self, document);
 
     // there's got to be a better way to write this code...
     // an elegant abstraction i'm missing
-    auto cursor_x = _win._cursor.get().x;
 
     if (cursor_x.cell > 0) {
         cursor_x.cell--;
@@ -2275,15 +2274,12 @@ void PatternEditorPanel::left_pressed() {
         cursor_x.cell = ncell(cols, cursor_x) - 1;
     }
 
-    _win._cursor.set_x(cursor_x);
+    return cursor_x;
 }
 
-void PatternEditorPanel::right_pressed() {
-    doc::Document const & document = get_document();
-    ColumnList cols = gen_column_list(*this, document);
-
-    // Is it worth extracting cursor movement logic to a class?
-    auto cursor_x = _win._cursor.get().x;
+static CursorX move_right(PatternEditorPanel const& self, CursorX cursor_x) {
+    doc::Document const& document = self.get_document();
+    ColumnList cols = gen_column_list(self, document);
 
     cursor_x.cell++;
 
@@ -2301,6 +2297,18 @@ void PatternEditorPanel::right_pressed() {
         }
     }
 
+    return cursor_x;
+}
+
+void PatternEditorPanel::left_pressed() {
+    auto cursor_x = _win._cursor.get().x;
+    cursor_x = move_left(*this, cursor_x);
+    _win._cursor.set_x(cursor_x);
+}
+
+void PatternEditorPanel::right_pressed() {
+    auto cursor_x = _win._cursor.get().x;
+    cursor_x = move_right(*this, cursor_x);
     _win._cursor.set_x(cursor_x);
 }
 

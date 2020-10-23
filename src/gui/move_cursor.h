@@ -1,5 +1,9 @@
 #pragma once
 
+/// Only vertical (in time) cursor movement is implemented here.
+/// Horizontal (columns/subcolumns/digits) movement is still in
+/// pattern_editor_panel.cpp.
+
 #include "cursor.h"
 #include "doc.h"
 #include "gui/config/cursor_config.h"
