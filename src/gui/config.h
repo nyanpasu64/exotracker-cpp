@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gui/config/cursor.h"
+#include "gui/config/cursor_config.h"
 #include "gui/lib/color.h"
 #include "doc/accidental_common.h"
 
@@ -100,7 +100,7 @@ inline namespace keys {
         std::array<KeyboardRow, 2> piano_keys{get_octave_0(), get_octave_1()};
     };
 
-    using cursor::MovementConfig;
+    using cursor_config::MovementConfig;
 }
 
 inline namespace visual {

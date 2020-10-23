@@ -2,7 +2,7 @@
 
 #include "cursor.h"
 #include "doc.h"
-#include "gui/config/cursor.h"
+#include "gui/config/cursor_config.h"
 #include "timing_common.h"
 #include "chip_common.h"
 
@@ -36,7 +36,7 @@ GridAndBeat next_event(doc::Document const& document, cursor::Cursor cursor);
 
 // # Moving cursor by beats
 
-using config::cursor::MovementConfig;
+using config::cursor_config::MovementConfig;
 
 [[nodiscard]] GridAndBeat prev_beat(
     doc::Document const& document,

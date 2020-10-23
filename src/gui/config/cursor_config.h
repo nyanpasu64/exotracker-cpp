@@ -2,7 +2,7 @@
 
 #include "doc/timed_events.h"
 
-namespace gui::config::cursor {
+namespace gui::config::cursor_config {
 
 using doc::timed_events::BeatFraction;
 
