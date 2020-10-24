@@ -13,6 +13,38 @@
 #define HIDE(var)  void * var = nullptr; Q_UNUSED(var)
 
 
+/// Add menubar to QMainWidget.
+#define main__m(...) \
+    auto * m = new QMenuBar(__VA_ARGS__); \
+    main->setMenuBar(m); \
+    HIDE(main) \
+    \
+    require_semicolon
+
+
+/// Add menu to QMenuBar or QMenu.
+#define m__m(...) \
+    auto * m2_ = m->addMenu(__VA_ARGS__); \
+    auto * m = m2_;
+    \
+    require_semicolon
+
+
+#define m__action(...) \
+    auto * a = m->addAction(__VA_ARGS__); \
+    HIDE(m); \
+    \
+    require_semicolon
+
+
+#define m__check(...) \
+    auto * a = m->addAction(__VA_ARGS__); \
+    a->setCheckable(true); \
+    HIDE(m); \
+    \
+    require_semicolon
+
+
 /// Add toolbar to QMainWidget.
 #define main__tb(qtoolbar) \
     auto * tb = new qtoolbar; \

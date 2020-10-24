@@ -21,6 +21,8 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
+#include <QMenuBar>
 #include <QSpinBox>
 #include "gui/lib/icon_toolbar.h"
 #include <QToolButton>
@@ -250,9 +252,20 @@ constexpr int MAX_BEATS_PER_PATTERN = 256;
 
 struct MainWindowUi : MainWindow {
     using MainWindow::MainWindow;
-
     // Use raw pointers since QObjects automatically destroy children.
 
+    // File menu
+    QAction * _exit;
+
+    // Edit menu
+    QAction * _overflow_paste;
+    QAction * _key_repeat;
+
+    // View menu
+    QAction * _follow_playback;
+    QAction * _compact_view;
+
+    // Widgets
     TimelineEditor * _timeline_editor;
 
     struct Timeline {
@@ -264,10 +277,6 @@ struct MainWindowUi : MainWindow {
 
         QAction * clone_row;
     } _timeline;
-
-    // Global state (view)
-    QCheckBox * _follow_playback;
-    QCheckBox * _compact_view;
 
     // Per-song ephemeral state
     QSpinBox * _zoom_level;
@@ -283,8 +292,6 @@ struct MainWindowUi : MainWindow {
 
     // Global state (editing)
     QSpinBox * _octave;
-    QCheckBox * _overflow_paste;
-    QCheckBox * _key_repeat;
 
     // Step
     QSpinBox * _step;
@@ -298,28 +305,49 @@ struct MainWindowUi : MainWindow {
 
         auto main = this;
 
+        {main__m();
+            {m__m(tr("&File"));
+                _exit = m->addAction(tr("E&xit"));
+            }
+
+            {m__m(tr("&Edit"));
+                {m__check(tr("&Overflow paste"));
+                    _overflow_paste = a;
+                    a->setChecked(true);
+                    a->setEnabled(false);
+                }
+                {m__check(tr("&Key repetition"));
+                    _key_repeat = a;
+                    a->setEnabled(false);
+                }
+            }
+
+            {m__m(tr("&View"));
+                {m__check(tr("&Follow playback"));
+                    _follow_playback = a;
+                    a->setChecked(true);
+                    /* TODO finish implementing:
+                    - if cursor != play, draw play position separately
+                    - if cursor != play, don't move cursor upon beginning playback
+                    - when setting cursor == play, snap to playback position instead of
+                      waiting for next row
+                    */
+                }
+                {m__check(tr("&Compact view"));
+                    _compact_view = a;
+                    a->setEnabled(false);
+                }
+            }
+        }
+
         // TODO move to main or GuiApp.
         IconToolBar::setup_icon_theme();
 
         {main__tb(IconToolBar(false));  // No button borders
             tb->setFloatable(false);
+            tb->setAllowedAreas(Qt::TopToolBarArea);
 
-            // View options.
-            tb->addWidget([this] {
-                auto w = _follow_playback = new QCheckBox;
-                w->setChecked(true);
-                w->setEnabled(false);
-                w->setText(tr("Follow playback"));
-                return w;
-            }());
-
-            tb->addWidget([this] {
-                auto w = _compact_view = new QCheckBox;
-                w->setEnabled(false);
-                w->setText(tr("Compact view"));
-                return w;
-            }());
-
+            // TODO toolbar?
             // TODO add zoom checkbox
         }
 
@@ -436,6 +464,7 @@ struct MainWindowUi : MainWindow {
                     }()
                 );
             }
+            l->addStretch();
         }
 
         // Pattern editing.
@@ -450,16 +479,6 @@ struct MainWindowUi : MainWindow {
                         get_app().options().note_names.gui_bottom_octave;
                     int peak_octave = (doc::CHROMATIC_COUNT - 1) / doc::NOTES_PER_OCTAVE;
                     w->setRange(gui_bottom_octave, gui_bottom_octave + peak_octave);
-                }
-
-                {form__w(QCheckBox(tr("Overflow paste")));
-                    _overflow_paste = w;
-                    w->setEnabled(false);
-                }
-
-                {form__w(QCheckBox(tr("Key repetition")));
-                    _key_repeat = w;
-                    w->setEnabled(false);
                 }
 
                 {form__label_w(tr("Zoom"), QSpinBox);
@@ -492,6 +511,7 @@ struct MainWindowUi : MainWindow {
                     _step_to_event = w;
                 }
             }
+            l->addStretch();
         }
     } }
 };
@@ -767,7 +787,8 @@ public:
 class MainWindowImpl : public MainWindowUi {
      W_OBJECT(MainWindowImpl)
 public:
-    // GUI widgets/etc.
+    // GUI widgets are defined in MainWindowUi.
+    // These are non-widget utilities.
     QScreen * _screen;
     QTimer _gui_refresh_timer;
 
@@ -939,6 +960,8 @@ public:
     void on_startup(config::Options const& options) {
         // Upon application startup, pattern editor panel is focused.
         _pattern_editor_panel->setFocus();
+
+        connect(_exit, &QAction::triggered, this, &QWidget::close);
 
         auto connect_spin = [](QSpinBox * spin, auto * target, auto func) {
             connect(
