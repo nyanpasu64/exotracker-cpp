@@ -150,8 +150,8 @@ std::optional<BlockIteratorRef> ForwardBlockIterator::next() {
                 DEBUG_PRINT(
                     "forward, grid {}, time {} to {}\n",
                     _grid,
-                    PATTERN.begin_time,
-                    format_frac(PATTERN.end_time)
+                    pattern.begin_time,
+                    format_frac(pattern.end_time)
                 );
                 scrReturnEndScope((
                     BlockIteratorRef{(Wrap) _wrap_count, _grid, pattern}
@@ -204,8 +204,8 @@ std::optional<BlockIteratorRef> ReverseBlockIterator::next() {
                 DEBUG_PRINT(
                     "reverse, grid {}, time {} to {}\n",
                     _grid,
-                    PATTERN.begin_time,
-                    format_frac(PATTERN.end_time)
+                    pattern.begin_time,
+                    format_frac(pattern.end_time)
                 );
                 scrReturnEndScope((
                     BlockIteratorRef{(Wrap) _wrap_count, _grid, pattern}
