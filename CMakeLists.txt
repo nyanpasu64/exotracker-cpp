@@ -193,6 +193,9 @@ add_executable(exotracker-qt
     src/gui/lib/painter_ext.cpp
     src/gui/pattern_editor/pattern_editor_panel.cpp
     src/gui/timeline_editor.cpp
+
+    # Resources
+    res/exotracker.qrc
 )
 target_compile_options(exotracker-qt PRIVATE "${options}")
 target_link_libraries(exotracker-qt PRIVATE exotracker-headless rtaudio Qt5::Widgets qkeycode)
