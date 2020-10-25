@@ -48,6 +48,7 @@ namespace gui::main_window {
 using std::unique_ptr;
 using std::make_unique;
 
+using gui::lib::IconToolBar;
 using gui::pattern_editor::PatternEditorPanel;
 using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
@@ -339,9 +340,6 @@ struct MainWindowUi : MainWindow {
                 }
             }
         }
-
-        // TODO move to main or GuiApp.
-        IconToolBar::setup_icon_theme();
 
         {main__tb(IconToolBar(false));  // No button borders
             tb->setFloatable(false);

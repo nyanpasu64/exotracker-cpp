@@ -186,6 +186,7 @@ add_executable(exotracker-qt
     src/gui/app.cpp
     src/gui/main_window.cpp
     src/gui/config.cpp
+    src/gui/lib/icons.cpp
     src/gui/lib/icon_toolbar.cpp
 
     src/gui/lib/color.cpp
