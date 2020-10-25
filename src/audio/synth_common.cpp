@@ -70,7 +70,7 @@ void ChipInstance::run_chip_for(
             }
 
             SampleT nsamp_from_call = synth_run_clocks(
-                nclock_elapsed, ev.clk_elapsed, buffer_tail
+                nclock_elapsed, ev.clk_elapsed, buffer_tail, nes_blip
             );
 
             nclock_elapsed += ev.clk_elapsed;

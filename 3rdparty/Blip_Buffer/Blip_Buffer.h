@@ -167,8 +167,7 @@ private:
 
     class Blip_Synth_Fast_ {
     public:
-        Blip_Buffer* buf;
-        int last_amp;
+        int last_amp = 0;
         int delta_factor;
 
         void volume_unit( double );
@@ -178,8 +177,7 @@ private:
 
     class Blip_Synth_ {
     public:
-        Blip_Buffer* buf;
-        int last_amp;
+        int last_amp = 0;
         int delta_factor;
 
         void volume_unit( double );
@@ -213,15 +211,13 @@ public:
     // Configure low-pass filter (see blip_buffer.txt)
     void treble_eq( blip_eq_t const& eq )       { impl.treble_eq( eq ); }
 
-    // Get/set Blip_Buffer used for output
-    Blip_Buffer* output() const                 { return impl.buf; }
-    void output( Blip_Buffer* b )               { impl.buf = b; impl.last_amp = 0; }
+    void clear() { impl.last_amp = 0; }
 
     // Update amplitude of waveform at given time. Using this requires a separate
     // Blip_Synth for each waveform.
     // The actual output value (assuming no DC removal) is around
     // (amplitude / range) * volume * 65536.
-    void update( blip_nclock_t time, int amplitude );
+    void update( blip_nclock_t time, int amplitude, Blip_Buffer* );
 
 // Low-level interface
 
@@ -229,7 +225,6 @@ public:
     // rather than the one set with output(). Delta can be positive or negative.
     // The actual change in amplitude is around (delta / range) * volume * 65536.
     void offset( blip_nclock_t, int delta, Blip_Buffer* ) const;
-    void offset( blip_nclock_t t, int delta ) const { offset( t, delta, impl.buf ); }
 
     // Works directly in terms of fractional output samples. Contact author for more info.
     void offset_resampled( blip_resampled_time_t, int delta, Blip_Buffer* ) const;
@@ -237,9 +232,6 @@ public:
     // Same as offset(), except code is inlined for higher performance
     void offset_inline( blip_nclock_t t, int delta, Blip_Buffer* buf ) const {
         offset_resampled( t * buf->factor_ + buf->offset_, delta, buf );
-    }
-    void offset_inline( blip_nclock_t t, int delta ) const {
-        offset_resampled( t * impl.buf->factor_ + impl.buf->offset_, delta, impl.buf );
     }
 
 private:
@@ -253,8 +245,7 @@ public:
     // When update(...Amplitude) is called,
     // the actual output value (assuming no DC removal) is around
     // (Amplitude / range) * volume * 65536.
-    Blip_Synth(Blip_Buffer & b, unsigned int range, double volume) : impl( impulses, quality ) {
-        output(&b);
+    Blip_Synth(unsigned int range, double volume) : impl( impulses, quality ) {
         this->volume(volume, range);
     }
     // Cannot be moved or copied because this struct is self-referencing:
@@ -486,7 +477,7 @@ template<int quality>
 #if BLIP_BUFFER_FAST
     inline
 #endif
-void Blip_Synth<quality>::update( blip_nclock_t t, int amp )
+void Blip_Synth<quality>::update( blip_nclock_t t, int amp, Blip_Buffer* blip_buf )
 {
     int delta = amp - impl.last_amp;
 
@@ -495,7 +486,7 @@ void Blip_Synth<quality>::update( blip_nclock_t t, int amp )
     // If so, skip the slow synthesis process.
     if (delta != 0) {
         impl.last_amp = amp;
-        offset_resampled( t * impl.buf->factor_ + impl.buf->offset_, delta, impl.buf );
+        offset_resampled( t * blip_buf->factor_ + blip_buf->offset_, delta, blip_buf);
     }
 }
 

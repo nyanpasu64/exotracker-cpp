@@ -44,7 +44,6 @@ OverallSynth::OverallSynth(
             case ChipKind::Apu1: {
                 auto apu1_unique = nes_2a03::make_Apu1Instance(
                     chip_index,
-                    _nes_blip,
                     CLOCKS_PER_S,
                     doc::FrequenciesRef{_document.frequency_table},
                     _clocks_per_sound_update

@@ -205,7 +205,6 @@ void Blip_Buffer::remove_samples( blip_nsamp_t count )
 
 Blip_Synth_Fast_::Blip_Synth_Fast_()
 {
-    buf = 0;
     last_amp = 0;
     delta_factor = 0;
 }
@@ -223,7 +222,6 @@ Blip_Synth_::Blip_Synth_( short* p, int w ) :
 {
     volume_unit_ = 0.0;
     kernel_unit = 0;
-    buf = 0;
     last_amp = 0;
     delta_factor = 0;
 }

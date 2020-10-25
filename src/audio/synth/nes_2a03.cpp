@@ -75,14 +75,13 @@ private:
 public:
     explicit Apu1Instance(
         chip_common::ChipIndex chip_index,
-        Blip_Buffer & blip,
         ClockT clocks_per_sec,
         doc::FrequenciesRef frequencies,
         ClockT clocks_per_sound_update
     )
         : _chip_sequencer{chip_index}
         , _driver{clocks_per_sec, frequencies}
-        , _apu1_synth{blip, APU1_RANGE, APU1_VOLUME}
+        , _apu1_synth{APU1_RANGE, APU1_VOLUME}
         , _clocks_per_smp{clocks_per_sound_update}
     {
         // Make sure these parameters aren't swapped.
@@ -150,7 +149,10 @@ public:
     /// It really doesn't matter, but I'm a perfectionist.
     /// This should be verified through unit testing.
     NsampWritten synth_run_clocks(
-        ClockT const clk_begin, ClockT const nclk, gsl::span<Amplitude> write_buffer
+        ClockT const clk_begin,
+        ClockT const nclk,
+        gsl::span<Amplitude> write_buffer,
+        Blip_Buffer & blip
     ) override {
 
         release_assert(_clocks_per_smp > 0);
@@ -176,7 +178,9 @@ public:
         /// Outputs audio from internal stereo [2]amplitude.
         auto take_sample = [&]() {
             _apu1.Render(&stereo_out[0]);
-            _apu1_synth.update((blip_nclock_t) (clk_begin + clock), stereo_out[0]);
+            _apu1_synth.update(
+                (blip_nclock_t) (clk_begin + clock), stereo_out[0], &blip
+            );
         };
 
         if (_clocks_per_smp <= 1) {
@@ -217,13 +221,12 @@ public:
 
 std::unique_ptr<BaseApu1Instance> make_Apu1Instance(
     chip_common::ChipIndex chip_index,
-    Blip_Buffer & blip,
     ClockT clocks_per_sec,
     doc::FrequenciesRef frequencies,
     ClockT clocks_per_sound_update
 ) {
     return std::make_unique<Apu1Instance<>>(
-        chip_index, blip, clocks_per_sec, frequencies, clocks_per_sound_update
+        chip_index, clocks_per_sec, frequencies, clocks_per_sound_update
     );
 }
 

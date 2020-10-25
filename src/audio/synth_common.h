@@ -126,7 +126,10 @@ private:
     /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
     /// The FDS will instead write lowpassed audio to write_buffer.
     virtual NsampWritten synth_run_clocks(
-        ClockT clk_begin, ClockT nclk, gsl::span<Amplitude> write_buffer
+        ClockT clk_begin,
+        ClockT nclk,
+        gsl::span<Amplitude> write_buffer,
+        Blip_Buffer & blip
     ) = 0;
 };
 
