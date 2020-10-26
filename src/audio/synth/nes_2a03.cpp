@@ -1,5 +1,6 @@
 #include "nes_2a03.h"
 #include "nes_2a03_driver.h"
+#include "sequencer.h"
 #include "audio/event_queue.h"
 #include "chip_kinds.h"
 #include "timing_common.h"
@@ -19,8 +20,6 @@ namespace nes_2a03 {
 using chip_kinds::Apu1ChannelID;
 using timing::SequencerTime;
 
-// Disable external linkage.
-namespace {
 
 // APU1 single pulse wave playing at volume F produces values 0 and 1223.
 constexpr int APU1_RANGE = 3000;
@@ -29,8 +28,6 @@ constexpr int APU1_RANGE = 3000;
 constexpr double APU1_VOLUME = 0.5;
 //constexpr double APU2_VOLUME = 0.0;
 
-// unnamed namespace
-}
 
 enum class SampleEvent {
     // EndOfCallback comes before Tick.
@@ -42,19 +39,19 @@ enum class SampleEvent {
 };
 
 /// APU1 (2 pulses)
-template<typename Synth = MyBlipSynth>
+template<typename BlipSynthT = MyBlipSynth>
 class Apu1Instance : public BaseApu1Instance {
 private:
     using ChannelID = Apu1ChannelID;
 
-    // fields
+// fields
     sequencer::ChipSequencer<ChannelID> _chip_sequencer;
     EnumMap<ChannelID, sequencer::EventsRef> _channel_events;
     nes_2a03_driver::Apu1Driver _driver;
 
     // NesApu2Synth::apu2 (xgm::NES_DMC) holds a reference to apu1 (xgm::NES_APU).
     xgm::NES_APU _apu1;
-    Synth _apu1_synth;
+    BlipSynthT _apu1_synth;
 
     /// Must be 1 or greater.
     /// Increasing it past 1 causes sound synths to only be sampled
@@ -72,6 +69,7 @@ private:
 
     // friend class NesApu2Synth;
 
+// impl
 public:
     explicit Apu1Instance(
         chip_common::ChipIndex chip_index,
@@ -93,7 +91,7 @@ public:
         _pq.set_timeout(SampleEvent::Sample, _clocks_per_smp);
     }
 
-    // impl ChipInstance
+// impl ChipInstance
     void seek(doc::Document const & document, timing::GridAndBeat time) override {
         _chip_sequencer.seek(document, time);
     }
@@ -151,7 +149,7 @@ public:
     NsampWritten synth_run_clocks(
         ClockT const clk_begin,
         ClockT const nclk,
-        gsl::span<Amplitude> write_buffer,
+        gsl::span<Amplitude>,
         Blip_Buffer & blip
     ) override {
 
