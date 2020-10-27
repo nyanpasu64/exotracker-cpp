@@ -28,8 +28,7 @@ using nes_2a03_driver::Apu1Driver;
 // APU1 single pulse wave playing at volume F produces values 0 and 1223.
 constexpr int APU1_RANGE = 3000;
 
-constexpr double APU1_VOLUME = 0.5;
-//constexpr double APU2_VOLUME = 0.0;
+constexpr double VOLUME = 0.5;
 
 
 enum class SampleEvent {
@@ -41,12 +40,19 @@ enum class SampleEvent {
     COUNT,
 };
 
-/// APU1 (2 pulses)
-class Apu1Synth {
-// fields
-    // NesApu2Synth::apu2 (xgm::NES_DMC) holds a reference to apu1 (xgm::NES_APU).
-    xgm::NES_APU _apu1;
-    MyBlipSynth _apu1_synth;
+/// Not a fan of NSFPlay.
+///
+/// NSFPlay chips have an odd stereo setup (we don't support stereo now).
+/// They can only be sampled (at user-determined times),
+/// and cannot be queried for the time of the next level transition
+/// (sampling interval is a speed-quality tradeoff).
+///
+/// This class samples a NSFPlay chip at a uniform interval,
+/// and forwards the values into a Blip_Synth.
+template<typename SoundChip, int RANGE>  // same interface as NSFPlay's ISoundChip
+class Synth {
+    SoundChip _chip;
+    MyBlipSynth _blip_synth;
 
     /// Must be 1 or greater.
     /// Increasing it past 1 causes sound synths to only be sampled
@@ -62,17 +68,15 @@ class Apu1Synth {
     ClockT const _clocks_per_smp;
     EventQueue<SampleEvent> _pq;
 
-    // friend class NesApu2Synth;
-
 // impl
 public:
-    Apu1Synth(ClockT clocks_per_sound_update)
-        : _apu1_synth{APU1_RANGE, APU1_VOLUME}
-        , _clocks_per_smp{clocks_per_sound_update}
+    Synth(ClockT clocks_per_sound_update)
+        : _blip_synth(RANGE, VOLUME)
+        , _clocks_per_smp(clocks_per_sound_update)
     {
         // Sanity check.
         release_assert(clocks_per_sound_update < 100);
-        _apu1.Reset();
+        _chip.Reset();
 
         // Do *not* sample at t=0.
         // You must run nsfplay synth to produce audio to sample.
@@ -80,12 +84,12 @@ public:
     }
 
     void write_memory(RegisterWrite write) {
-        _apu1.Write(write.address, write.value);
+        _chip.Write(write.address, write.value);
     }
 
     /// Intended guarantees:
-    /// - _apu1_synth's amplitude is only ever updated at multiples of _clock_increment.
-    /// - After this method returns, _apu1 has advanced exactly nclk cycles.
+    /// - _blip_synth's amplitude is only ever updated at multiples of _clock_increment.
+    /// - After this method returns, _chip has advanced exactly nclk cycles.
     ///
     /// This ensures:
     /// - Audio updates occur at exactly uniform intervals.
@@ -97,23 +101,23 @@ public:
         ClockT const clk_begin,
         ClockT const nclk,
         gsl::span<Amplitude>,
-        Blip_Buffer & blip
-    ) {
+        Blip_Buffer & blip)
+    {
         release_assert(_clocks_per_smp > 0);
 
         /*
-        _apu1.Tick(dclk) runs the chip,
+        _chip.Tick(dclk) runs the chip,
         then writes audio into an internal stereo [2]amplitude.
         This makes it impossible to identify the audio level at time 0,
         unless you do something questionable like Tick(0).
 
-        advance(dclk) calls _apu1.Tick(dclk).
-        take_sample() calls _apu1.Render(out array).
+        advance(dclk) calls _chip.Tick(dclk).
+        take_sample() calls _chip.Render(out array).
         */
 
         ClockT clock = 0;
         auto advance = [&](ClockT dclk) {
-            _apu1.Tick(dclk);
+            _chip.Tick(dclk);
             clock += dclk;
         };
 
@@ -121,14 +125,13 @@ public:
 
         /// Outputs audio from internal stereo [2]amplitude.
         auto take_sample = [&]() {
-            _apu1.Render(&stereo_out[0]);
-            _apu1_synth.update(
+            _chip.Render(&stereo_out[0]);
+            _blip_synth.update(
                 (blip_nclock_t) (clk_begin + clock), stereo_out[0], &blip
             );
         };
 
         if (_clocks_per_smp <= 1) {
-            // Will running apu1 and apu2 in separate loops improve locality of reference?
             while (clock < nclk) {
                 advance(1);
                 take_sample();
@@ -163,6 +166,7 @@ public:
     }
 };
 
+using Apu1Synth = Synth<xgm::NES_APU, APU1_RANGE>;
 using Apu1Instance = ImplChipInstance<Apu1Driver, Apu1Synth>;
 
 std::unique_ptr<ChipInstance> make_Apu1Instance(
