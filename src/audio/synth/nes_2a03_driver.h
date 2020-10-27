@@ -32,7 +32,6 @@ class Apu1PulseDriver {
     // fields
     PulseNum /*const*/ _pulse_num;
     Address /*const*/ _base_address;
-    TuningRef _tuning_table;
 
     bool _first_tick_occurred = false;
 
@@ -86,12 +85,11 @@ private:
     Apu1Reg _next_state = 0;
 
     // impl
-private:
-    explicit DEFAULT_COPY(Apu1PulseDriver)
-    DEFAULT_MOVE(Apu1PulseDriver)
-
 public:
-    Apu1PulseDriver(PulseNum pulse_num, TuningRef tuning_table) noexcept;
+    Apu1PulseDriver(PulseNum pulse_num) noexcept;
+
+    DISABLE_COPY(Apu1PulseDriver)
+    DEFAULT_MOVE(Apu1PulseDriver)
 
     void stop_playback(RegisterWriteQueue &/*mut*/ register_writes);
 
@@ -100,6 +98,7 @@ public:
     // Apu1Driver can toggle hardware envelopes.
     void tick(
         doc::Document const & document,
+        TuningRef tuning_table,
         sequencer::EventsRef events,
         RegisterWriteQueue &/*out*/ register_writes
     );
@@ -111,28 +110,26 @@ TuningOwned make_tuning_table(
 );
 
 class Apu1Driver {
-    // Apu1PulseDriver references _tuning_table, so disable moving this.
-    DISABLE_COPY_MOVE(Apu1Driver)
-
     using ChannelID = Apu1ChannelID;
 
     // fields
 TEST_PUBLIC:
-    ClockT const _clocks_per_sec;
+    ClockT _clocks_per_sec;
     TuningOwned _tuning_table;
 
     Apu1PulseDriver _pulse1_driver;
     Apu1PulseDriver _pulse2_driver;
 
 public:
-    // TODO Apu1PulseDriver doesn't hold reference to _tuning_table,
-    // but is passed one on each tick.
     Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
         : _clocks_per_sec(clocks_per_sec)
         , _tuning_table(make_tuning_table(frequencies, clocks_per_sec))
-        , _pulse1_driver{0, TuningRef{_tuning_table}}
-        , _pulse2_driver{1, TuningRef{_tuning_table}}
+        , _pulse1_driver{0}
+        , _pulse2_driver{1}
     {}
+
+    DISABLE_COPY(Apu1Driver)
+    DEFAULT_MOVE(Apu1Driver)
 
     void recompute_tuning(FrequenciesRef frequencies) {
         _tuning_table = make_tuning_table(frequencies, _clocks_per_sec);
@@ -149,11 +146,16 @@ public:
         RegisterWriteQueue &/*out*/ register_writes
     ) {
         _pulse1_driver.tick(
-            document, channel_events[ChannelID::Pulse1], /*mut*/ register_writes
-        );
+            document,
+            _tuning_table,
+            channel_events[ChannelID::Pulse1],
+            /*mut*/ register_writes);
+
         _pulse2_driver.tick(
-            document, channel_events[ChannelID::Pulse2], /*mut*/ register_writes
-        );
+            document,
+            _tuning_table,
+            channel_events[ChannelID::Pulse2],
+            /*mut*/ register_writes);
 
         // TODO write $4015 to register_writes, if I ever add envelope functionality.
     }

@@ -49,7 +49,7 @@ inline namespace tuning {
     using FrequenciesRef = Ref_<FreqDouble>;
 
     using TuningOwned = Owned_<RegisterInt>;
-    using TuningRef = Ref_<RegisterInt>;
+    using TuningRef = Ref_<RegisterInt const>;
 
     FrequenciesOwned equal_temperament(
         ChromaticInt root_chromatic = 69, FreqDouble root_frequency = 440.

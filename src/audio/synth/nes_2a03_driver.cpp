@@ -3,6 +3,7 @@
 
 #include <algorithm>  // std::clamp
 #include <cmath>  // lround
+#include <type_traits>  // std::is_move_constructible_v
 
 #ifdef UNITTEST
 #include <doctest.h>
@@ -52,11 +53,10 @@ TuningOwned make_tuning_table(
 
 
 Apu1PulseDriver::Apu1PulseDriver(
-    Apu1PulseDriver::PulseNum pulse_num, TuningRef tuning_table
+    Apu1PulseDriver::PulseNum pulse_num
 ) noexcept
     : _pulse_num(pulse_num)
     , _base_address(Address(0x4000 + 0x4 * pulse_num))
-    , _tuning_table(tuning_table)
     , _volume_iter(&doc::Instrument::volume, MAX_VOLUME)
     , _arpeggio_iter(&doc::Instrument::arpeggio, 0)
     , _wave_index_iter(&doc::Instrument::wave_index, 0)
@@ -96,18 +96,18 @@ void Apu1PulseDriver::stop_playback(
 
     // Backup parameters.
     auto pulse_num = _pulse_num;
-    auto tuning_table = _tuning_table;
     // Backup state.
     auto prev_state = _prev_state;
 
-    *this = Apu1PulseDriver{pulse_num, tuning_table};
+    *this = Apu1PulseDriver{pulse_num};
     // Initialize state so we know how to turn off sound.
     _prev_state = prev_state;
     // _next_state = silence.
 }
 
 void Apu1PulseDriver::tick(
-    doc::Document const & document,
+    doc::Document const& document,
+    TuningRef tuning_table,
     sequencer::EventsRef events,
     RegisterWriteQueue & register_writes
 ) {
@@ -155,7 +155,7 @@ void Apu1PulseDriver::tick(
         // I did not implement that method, so I get clicks.
         auto note = _prev_note.value + _arpeggio_iter.next(document);
         note = std::clamp(note, 0, doc::CHROMATIC_COUNT - 1);
-        return _tuning_table[(size_t) note];
+        return tuning_table[(size_t) note];
     }();
 
     /*
@@ -197,6 +197,8 @@ void Apu1PulseDriver::tick(
     _prev_state = _next_state;
     return;
 }
+
+static_assert(std::is_move_constructible_v<Apu1Driver>, "");
 
 
 #ifdef UNITTEST
