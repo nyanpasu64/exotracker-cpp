@@ -40,7 +40,7 @@ TEST_CASE("Ensure register_quantize() produces correct values.") {
 }
 #endif
 
-TuningOwned make_tuning_table(
+static TuningOwned make_tuning_table(
     FrequenciesRef const frequencies,  // cycle/s
     ClockT const clocks_per_second  // clock/s
 ) {
@@ -200,6 +200,12 @@ void Apu1PulseDriver::tick(
 }
 
 static_assert(std::is_move_constructible_v<Apu1Driver>, "");
+
+Apu1Driver::Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
+    : _tuning_table(make_tuning_table(frequencies, clocks_per_sec))
+    , _pulse1_driver{0}
+    , _pulse2_driver{1}
+{}
 
 
 #ifdef UNITTEST

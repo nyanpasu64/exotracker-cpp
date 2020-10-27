@@ -112,11 +112,6 @@ public:
     );
 };
 
-TuningOwned make_tuning_table(
-    FrequenciesRef const frequencies,  // cycle/s
-    ClockT const clocks_per_second  // clock/s
-);
-
 class Apu1Driver {
 // types
 public:
@@ -124,26 +119,16 @@ public:
 
 // fields
 TEST_PUBLIC:
-    ClockT _clocks_per_sec;
     TuningOwned _tuning_table;
 
     Apu1PulseDriver _pulse1_driver;
     Apu1PulseDriver _pulse2_driver;
 
 public:
-    Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
-        : _clocks_per_sec(clocks_per_sec)
-        , _tuning_table(make_tuning_table(frequencies, clocks_per_sec))
-        , _pulse1_driver{0}
-        , _pulse2_driver{1}
-    {}
+    Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies);
 
     DISABLE_COPY(Apu1Driver)
     DEFAULT_MOVE(Apu1Driver)
-
-    void recompute_tuning(FrequenciesRef frequencies) {
-        _tuning_table = make_tuning_table(frequencies, _clocks_per_sec);
-    }
 
     void stop_playback(RegisterWriteQueue &/*mut*/ register_writes) {
         _pulse1_driver.stop_playback(/*mut*/ register_writes);
