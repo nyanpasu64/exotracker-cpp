@@ -2,6 +2,7 @@
 
 #include "Blip_Buffer.h"
 
+#include <type_traits>
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
@@ -203,21 +204,7 @@ void Blip_Buffer::remove_samples( blip_nsamp_t count )
 
 // Blip_Synth_
 
-Blip_Synth_Fast_::Blip_Synth_Fast_()
-{
-    last_amp = 0;
-    delta_factor = 0;
-}
-
-void Blip_Synth_Fast_::volume_unit( double new_unit )
-{
-    delta_factor = int (new_unit * (1L << blip_sample_bits) + 0.5);
-}
-
-#if !BLIP_BUFFER_FAST
-
-Blip_Synth_::Blip_Synth_( short* p, int w ) :
-    impulses( p ),
+Blip_Synth_::Blip_Synth_( int w ) :
     width( w )
 {
     volume_unit_ = 0.0;
@@ -292,7 +279,7 @@ void blip_eq_t::generate( float* out, int count ) const
         out [i] *= 0.54f - 0.46f * (float) cos( i * to_fraction );
 }
 
-void Blip_Synth_::adjust_impulse()
+void Blip_Synth_::adjust_impulse( short* impulses )
 {
     // sum pairs for each phase and add error correction to end of first half
     int const size = impulses_size();
@@ -316,7 +303,7 @@ void Blip_Synth_::adjust_impulse()
     //      printf( "%5ld,", impulses [j * blip_res + i + 1] );
 }
 
-void Blip_Synth_::treble_eq( blip_eq_t const& eq )
+void Blip_Synth_::treble_eq( blip_eq_t const& eq, short* impulses )
 {
     float fimpulse [blip_res / 2 * (blip_widest_impulse_ - 1) + blip_res * 2];
 
@@ -354,24 +341,24 @@ void Blip_Synth_::treble_eq( blip_eq_t const& eq )
         sum += fimpulse [i];
         next += fimpulse [i + blip_res];
     }
-    adjust_impulse();
+    adjust_impulse( impulses );
 
     // volume might require rescaling
     double vol = volume_unit_;
     if ( vol != 0.0 )
     {
         volume_unit_ = 0.0;
-        volume_unit( vol );
+        volume_unit( vol, impulses );
     }
 }
 
-void Blip_Synth_::volume_unit( double new_unit )
+void Blip_Synth_::volume_unit( double new_unit, short* impulses )
 {
     if ( new_unit != volume_unit_ )
     {
         // use default eq if it hasn't been set yet
         if ( !kernel_unit )
-            treble_eq( -8.0 );
+            treble_eq( -8.0, impulses );
 
         volume_unit_ = new_unit;
         double factor = new_unit * (1L << blip_sample_bits) / kernel_unit;
@@ -398,14 +385,15 @@ void Blip_Synth_::volume_unit( double new_unit )
                 blip_long offset2 = 0x8000 >> shift;
                 for ( int i = impulses_size(); i--; )
                     impulses [i] = (short) (((impulses [i] + offset) >> shift) - offset2);
-                adjust_impulse();
+                adjust_impulse(impulses);
             }
         }
         delta_factor = (int) floor( factor + 0.5 );
         //printf( "delta_factor: %d, kernel_unit: %d\n", delta_factor, kernel_unit );
     }
 }
-#endif
+
+static_assert(std::is_move_constructible_v<Blip_Synth<blip_good_quality>>, "");
 
 blip_nsamp_t Blip_Buffer::read_samples( blip_amplitude_t* BLIP_RESTRICT out, blip_nsamp_t max_samples, int stereo )
 {

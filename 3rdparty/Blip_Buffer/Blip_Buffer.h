@@ -115,6 +115,7 @@ public:
     ~Blip_Buffer();
 
     Blip_Buffer(Blip_Buffer &&);
+    Blip_Buffer & operator=(Blip_Buffer &&) = delete;
 
     // Deprecated
     typedef blip_resampled_time_t resampled_time_t;
@@ -165,31 +166,20 @@ private:
     int const blip_res = 1 << BLIP_PHASE_BITS;
     class blip_eq_t;
 
-    class Blip_Synth_Fast_ {
-    public:
-        int last_amp = 0;
-        int delta_factor;
-
-        void volume_unit( double );
-        Blip_Synth_Fast_();
-        void treble_eq( blip_eq_t const& ) { }
-    };
-
     class Blip_Synth_ {
     public:
         int last_amp = 0;
         int delta_factor;
 
-        void volume_unit( double );
-        Blip_Synth_( short* impulses, int width );
-        void treble_eq( blip_eq_t const& );
+        void volume_unit( double, short* impulses );
+        Blip_Synth_( int width );
+        void treble_eq( blip_eq_t const&, short* impulses );
     private:
         double volume_unit_;
-        short* const impulses;
         int const width;
         blip_long kernel_unit;
         int impulses_size() const { return blip_res / 2 * width + 1; }
-        void adjust_impulse();
+        void adjust_impulse( short* impulses );
     };
 
 // Quality level. Start with blip_good_quality.
@@ -206,10 +196,10 @@ public:
     // Set overall volume of waveform
     // The actual output value (assuming no DC removal) is around
     // (amplitude / range) * volume * 65536.
-    void volume( double v, unsigned int range ) { impl.volume_unit( v / range ); }
+    void volume( double v, unsigned int range ) { impl.volume_unit( v / range, impulses ); }
 
     // Configure low-pass filter (see blip_buffer.txt)
-    void treble_eq( blip_eq_t const& eq )       { impl.treble_eq( eq ); }
+    void treble_eq( blip_eq_t const& eq )       { impl.treble_eq( eq, impulses ); }
 
     void clear() { impl.last_amp = 0; }
 
@@ -235,9 +225,6 @@ public:
     }
 
 private:
-#if BLIP_BUFFER_FAST
-    Blip_Synth_Fast_ impl;
-#else
     Blip_Synth_ impl;
     typedef short imp_t;
     imp_t impulses [blip_res * (quality / 2) + 1];
@@ -245,13 +232,9 @@ public:
     // When update(...Amplitude) is called,
     // the actual output value (assuming no DC removal) is around
     // (Amplitude / range) * volume * 65536.
-    Blip_Synth(unsigned int range, double volume) : impl( impulses, quality ) {
+    Blip_Synth(unsigned int range, double volume) : impl( quality ) {
         this->volume(volume, range);
     }
-    // Cannot be moved or copied because this struct is self-referencing:
-    // Blip_Synth.(Blip_Synth_ impl).impulses points to Blip_Synth.impulses.
-    BLIP_DISABLE_COPY_MOVE(Blip_Synth)
-#endif
 };
 
 // Low-pass equalization parameters
@@ -365,20 +348,6 @@ inline void Blip_Synth<quality>::offset_resampled( blip_resampled_time_t time,
     blip_long* BLIP_RESTRICT buf = blip_buf->buffer_ + (time >> BLIP_BUFFER_ACCURACY);
     int phase = (int) (time >> (BLIP_BUFFER_ACCURACY - BLIP_PHASE_BITS) & (blip_res - 1));
 
-#if BLIP_BUFFER_FAST
-    blip_long left = buf [0] + delta;
-
-    // Kind of crappy, but doing shift after multiply results in overflow.
-    // Alternate way of delaying multiply by delta_factor results in worse
-    // sub-sample resolution.
-    blip_long right = (delta >> BLIP_PHASE_BITS) * phase;
-    left  -= right;
-    right += buf [1];
-
-    buf [0] = left;
-    buf [1] = right;
-#else
-
     int const fwd = (blip_widest_impulse_ - quality) / 2;
     int const rev = fwd + quality - 2;
     int const mid = quality / 2 - 1;
@@ -457,8 +426,6 @@ inline void Blip_Synth<quality>::offset_resampled( blip_resampled_time_t time,
         buf [rev    ] = t0;
         buf [rev + 1] = t1;
     #endif
-
-#endif
 }
 
 #undef BLIP_FWD
