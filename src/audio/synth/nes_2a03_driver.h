@@ -110,9 +110,11 @@ TuningOwned make_tuning_table(
 );
 
 class Apu1Driver {
+// types
+public:
     using ChannelID = Apu1ChannelID;
 
-    // fields
+// fields
 TEST_PUBLIC:
     ClockT _clocks_per_sec;
     TuningOwned _tuning_table;

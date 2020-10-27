@@ -1,5 +1,6 @@
 #include "nes_2a03.h"
 #include "nes_2a03_driver.h"
+#include "nes_instance_common.h"
 #include "sequencer.h"
 #include "audio/event_queue.h"
 #include "chip_kinds.h"
@@ -19,6 +20,9 @@ namespace nes_2a03 {
 
 using chip_kinds::Apu1ChannelID;
 using timing::SequencerTime;
+using sequencer::ChipSequencer;
+using nes_instance::ImplChipInstance;
+using nes_2a03_driver::Apu1Driver;
 
 
 // APU1 single pulse wave playing at volume F produces values 0 and 1223.
@@ -39,15 +43,8 @@ enum class SampleEvent {
 
 /// APU1 (2 pulses)
 template<typename BlipSynthT = MyBlipSynth>
-class Apu1Instance : public BaseApu1Instance {
-private:
-    using ChannelID = Apu1ChannelID;
-
+class Apu1Synth {
 // fields
-    sequencer::ChipSequencer<ChannelID> _chip_sequencer;
-    EnumMap<ChannelID, sequencer::EventsRef> _channel_events;
-    nes_2a03_driver::Apu1Driver _driver;
-
     // NesApu2Synth::apu2 (xgm::NES_DMC) holds a reference to apu1 (xgm::NES_APU).
     xgm::NES_APU _apu1;
     BlipSynthT _apu1_synth;
@@ -70,19 +67,12 @@ private:
 
 // impl
 public:
-    explicit Apu1Instance(
-        chip_common::ChipIndex chip_index,
-        ClockT clocks_per_sec,
-        doc::FrequenciesRef frequencies,
-        ClockT clocks_per_sound_update
-    )
-        : _chip_sequencer{chip_index}
-        , _driver{clocks_per_sec, frequencies}
-        , _apu1_synth{APU1_RANGE, APU1_VOLUME}
+    Apu1Synth(ClockT clocks_per_sound_update)
+        : _apu1_synth{APU1_RANGE, APU1_VOLUME}
         , _clocks_per_smp{clocks_per_sound_update}
     {
-        // Make sure these parameters aren't swapped.
-        release_assert(clocks_per_sound_update < clocks_per_sec);
+        // Sanity check.
+        release_assert(clocks_per_sound_update < 100);
         _apu1.Reset();
 
         // Do *not* sample at t=0.
@@ -90,48 +80,7 @@ public:
         _pq.set_timeout(SampleEvent::Sample, _clocks_per_smp);
     }
 
-// impl ChipInstance
-    void seek(doc::Document const & document, timing::GridAndBeat time) override {
-        _chip_sequencer.seek(document, time);
-    }
-
-    void stop_playback() override {
-        _chip_sequencer.stop_playback();
-
-        // May append to _register_writes.
-        _driver.stop_playback(_register_writes);
-    }
-
-    void tempo_changed(doc::Document const & document) override {
-        _chip_sequencer.tempo_changed(document);
-    }
-
-    void doc_edited(doc::Document const & document) override {
-        _chip_sequencer.doc_edited(document);
-    }
-
-    void timeline_modified(doc::Document const & document) override {
-        _chip_sequencer.timeline_modified(document);
-    }
-
-    /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
-    SequencerTime sequencer_tick(doc::Document const & document) override {
-        auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);
-        _channel_events = channel_events;
-        return chip_time;
-    }
-
-    /// Can be called without calling sequencer_tick() first.
-    /// This will not play any notes.
-    void driver_tick(doc::Document const & document) override {
-        // Appends to _register_writes.
-        _driver.driver_tick(document, _channel_events, _register_writes);
-
-        // Replace all map values with empty slices.
-        _channel_events = {};
-    }
-
-    void synth_write_memory(RegisterWrite write) override {
+    void write_memory(RegisterWrite write) {
         _apu1.Write(write.address, write.value);
     }
 
@@ -145,13 +94,12 @@ public:
     ///
     /// It really doesn't matter, but I'm a perfectionist.
     /// This should be verified through unit testing.
-    NsampWritten synth_run_clocks(
+    ChipInstance::NsampWritten run_clocks(
         ClockT const clk_begin,
         ClockT const nclk,
         gsl::span<Amplitude>,
         Blip_Buffer & blip
-    ) override {
-
+    ) {
         release_assert(_clocks_per_smp > 0);
 
         /*
@@ -216,15 +164,18 @@ public:
     }
 };
 
-std::unique_ptr<BaseApu1Instance> make_Apu1Instance(
+using Apu1Instance = ImplChipInstance<Apu1Driver, Apu1Synth<>>;
+
+std::unique_ptr<ChipInstance> make_Apu1Instance(
     chip_common::ChipIndex chip_index,
     ClockT clocks_per_sec,
     doc::FrequenciesRef frequencies,
     ClockT clocks_per_sound_update
 ) {
-    return std::make_unique<Apu1Instance<>>(
-        chip_index, clocks_per_sec, frequencies, clocks_per_sound_update
-    );
+    return std::make_unique<Apu1Instance>(
+        chip_index,
+        Apu1Driver(clocks_per_sec, frequencies),
+        Apu1Synth(clocks_per_sound_update));
 }
 
 // End namespaces

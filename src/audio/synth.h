@@ -8,6 +8,7 @@
 #include "timing_common.h"
 #include "cmd_queue.h"
 #include "util/enum_map.h"
+#include "util/copy_move.h"
 
 #include <atomic>
 #include <cstdint>
@@ -35,7 +36,9 @@ using timing::MaybeSequencerTime;
 /// - Tick rate must be over 4 tick/second.
 ///   Otherwise blip_buffer count_clocks(nsamp) breaks.
 /// - samp/s / ticks/sec < 65536. Otherwise _temp_buffer overflows.
-class OverallSynth : boost::noncopyable, public callback::CallbackInterface {
+class OverallSynth : public callback::CallbackInterface {
+    DISABLE_COPY_MOVE(OverallSynth)
+
     // runtime constants
 public:
     uint32_t const _stereo_nchan;

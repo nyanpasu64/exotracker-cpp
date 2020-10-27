@@ -215,18 +215,10 @@ void OverallSynth::synthesize_overall(
                 for (ChipIndex chip_index = 0; chip_index < nchip; chip_index++) {
                     auto & chip = *_chip_instances[chip_index];
 
-                    RegisterWriteQueue & register_writes = chip._register_writes;
-                    release_assert(register_writes.num_unread() == 0);
-
-                    // Reset register write queue.
-                    register_writes.clear();
-
                     // chip's time passes.
                     /// Current tick (just occurred), not next tick.
                     if (_sequencer_running) {
-                        auto chip_time = chip.sequencer_tick(_document);
-
-                        chip.driver_tick(_document);
+                        auto chip_time = chip.sequencer_driver_tick(_document);
 
                         // Ensure all chip sequencers are running in sync.
                         if (chip_index > 0) {

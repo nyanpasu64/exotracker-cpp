@@ -11,7 +11,6 @@
 #include "util/copy_move.h"
 
 #include <gsl/span>
-#include <boost/core/noncopyable.hpp>
 
 #include <vector>
 
@@ -53,17 +52,19 @@ using SampleT = uint32_t;
 /// Base class, for a single NES chip's (software driver + sequencers
 /// + hardware emulator synth).
 /// Non-NES consoles may use a different base class (SNES) or maybe not (wavetable chips).
-class ChipInstance : boost::noncopyable {
-public:
-    // fields
+class ChipInstance {
+    // Some implementations are self-referential.
+    DISABLE_COPY_MOVE(ChipInstance)
+
+// fields
+protected:
+    /// One register write queue per chip.
     RegisterWriteQueue _register_writes;
 
-    // type-erased dependent values:
-    //  defined in subclasses, enforced via runtime release_assert.
-    //  This is OK because it's not checked in a hot inner loop.
-    // type ChannelID = Apu1ChannelID;
+// impl
+public:
+    explicit ChipInstance() = default;
 
-    // impl
     virtual ~ChipInstance() = default;
 
     /// Seek the sequencer to this time in the document
@@ -90,13 +91,12 @@ public:
     /// so invalidate both real time and events.
     virtual void timeline_modified(doc::Document const & document) = 0;
 
-    /// Ticks sequencer and buffers up events for a subsequent call to driver_tick().
-    /// Sequencer's time passes.
+    /// Ticks sequencer and runs driver.
     ///
     /// Return: SequencerTime is current tick (just occurred), not next tick.
-    virtual SequencerTime sequencer_tick(doc::Document const & document) = 0;
+    virtual SequencerTime sequencer_driver_tick(doc::Document const & document) = 0;
 
-    /// Mutates _register_writes.
+    /// Runs driver, ignoring sequencer. Called when the song is not playing.
     virtual void driver_tick(doc::Document const & document) = 0;
 
     /// Cannot cross tick boundaries. Can cross register-write boundaries.
@@ -112,7 +112,7 @@ private:
     /// Time does not pass.
     virtual void synth_write_memory(RegisterWrite write) = 0;
 
-protected:
+public:
     /// If the synth generates audio via Blip_Synth, nsamp_returned == 0.
     /// If the synth writes audio into `write_buffer`,
     /// nsamp_returned == how many samples were written.
