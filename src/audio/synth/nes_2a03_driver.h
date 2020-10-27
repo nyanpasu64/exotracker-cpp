@@ -21,40 +21,35 @@ using chip_kinds::Apu1ChannelID;
 
 // Pulse 1/2 driver
 
+#define ITER_TYPE(NAME) \
+    envelope::EnvelopeIterator<decltype(doc::Instrument::NAME)>
+
 /// Convert [byte][bit]Bit indexing to [bit]Bit.
 constexpr static int BITS_PER_BYTE = 8;
 #define BYTE_BIT(byte, bit) ((byte) * BITS_PER_BYTE + (bit))
 #define BYTE(byte) (BITS_PER_BYTE * (byte))
 
 class Apu1PulseDriver {
+// types
     using PulseNum = Range<0, 2, uint16_t>;
 
-    // fields
-    PulseNum /*const*/ _pulse_num;
-    Address /*const*/ _base_address;
+    struct Envelopes {
+        ITER_TYPE(volume) volume;
+        ITER_TYPE(arpeggio) arpeggio;
+        ITER_TYPE(wave_index) wave_index;
 
-    bool _first_tick_occurred = false;
+        Envelopes();
 
-#define Apu1PulseDriver_FOREACH_RAW(X, APPL) \
-    X(APPL(volume)); \
-    X(APPL(arpeggio)); \
-    X(APPL(wave_index));
+        /// F is a lambda [](auto){} whose operator() is a template
+        /// accepting multiple types.
+        template<typename Func>
+        void foreach(Func f) {
+            f(volume);
+            f(arpeggio);
+            f(wave_index);
+        }
+    };
 
-#define ITER_NAME(name)  _ ## name ## _iter
-#define ID(name)  name
-
-#define DEFINE_ITERATOR(name) \
-    envelope::EnvelopeIterator<decltype(doc::Instrument::name)> ITER_NAME(name)
-
-    Apu1PulseDriver_FOREACH_RAW(DEFINE_ITERATOR, ID)
-
-#define Apu1PulseDriver_FOREACH(X) \
-    Apu1PulseDriver_FOREACH_RAW(X, ITER_NAME)
-
-    doc::Note _prev_note;
-    int _prev_volume;
-
-public:
     // Reading a ADD_BITFIELD_MEMBER does not sign-extend it.
     // The read value can only be negative
     // if the ADD_BITFIELD_MEMBER has the same length as the storage type
@@ -76,15 +71,28 @@ public:
         ADD_BITFIELD_ARRAY(bytes, /*offset*/ 0, /*bits*/ 8, /*numItems*/ BYTES)
     END_BITFIELD_TYPE()
 
+// constants
+public:
     static constexpr int MAX_VOLUME = decltype(Apu1Reg::volume)::Maximum;
     static_assert (MAX_VOLUME == 15, "huh?");
     static constexpr int MAX_PERIOD = decltype(Apu1Reg::period_reg)::Maximum;
 
+// fields
 private:
+    PulseNum /*const*/ _pulse_num;
+    Address /*const*/ _base_address;
+
+    bool _first_tick_occurred = false;
+
+    Envelopes _envs{};
+
+    doc::Note _prev_note = 0;
+    int _prev_volume = MAX_VOLUME;
+
     Apu1Reg _prev_state = 0;
     Apu1Reg _next_state = 0;
 
-    // impl
+// impl
 public:
     Apu1PulseDriver(PulseNum pulse_num) noexcept;
 

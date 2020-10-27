@@ -11,6 +11,8 @@
 
 namespace audio::synth::nes_2a03_driver {
 
+using doc::Instrument;
+
 /// given: frequency
 /// find: period_reg clamped between [$0, $7FF]
 static RegisterInt register_quantize(
@@ -52,16 +54,17 @@ TuningOwned make_tuning_table(
 }
 
 
+Apu1PulseDriver::Envelopes::Envelopes()
+    : volume(&Instrument::volume, MAX_VOLUME)
+    , arpeggio(&Instrument::arpeggio, 0)
+    , wave_index(&Instrument::wave_index, 0)
+{}
+
 Apu1PulseDriver::Apu1PulseDriver(
     Apu1PulseDriver::PulseNum pulse_num
 ) noexcept
     : _pulse_num(pulse_num)
     , _base_address(Address(0x4000 + 0x4 * pulse_num))
-    , _volume_iter(&doc::Instrument::volume, MAX_VOLUME)
-    , _arpeggio_iter(&doc::Instrument::arpeggio, 0)
-    , _wave_index_iter(&doc::Instrument::wave_index, 0)
-    , _prev_note(0)
-    , _prev_volume(MAX_VOLUME)
 {}
 
 void Apu1PulseDriver::stop_playback(
@@ -105,6 +108,9 @@ void Apu1PulseDriver::stop_playback(
     // _next_state = silence.
 }
 
+#define ENV_FOREACH(ENV, ITER, ...) \
+    ENV.foreach([&] (auto & ITER) { __VA_ARGS__; });
+
 void Apu1PulseDriver::tick(
     doc::Document const& document,
     TuningRef tuning_table,
@@ -116,22 +122,17 @@ void Apu1PulseDriver::tick(
             doc::Note note = *event.note;
 
             if (note.is_valid_note()) {
-                #define NOTE_ON(iter)  iter.note_on(event.instr)
-                Apu1PulseDriver_FOREACH(NOTE_ON)
+                ENV_FOREACH(_envs, iter, iter.note_on(event.instr));
                 _prev_note = note;
 
             } else if (note.is_release()) {
-                #define RELEASE(iter)  iter.release(document)
-                Apu1PulseDriver_FOREACH(RELEASE)
-
+                ENV_FOREACH(_envs, iter, iter.release(document));
             } else if (note.is_cut()) {
-                #define NOTE_CUT(iter)  iter.note_cut()
-                Apu1PulseDriver_FOREACH(NOTE_CUT)
+                ENV_FOREACH(_envs, iter, iter.note_cut());
             }
         }
         if (event.instr.has_value()) {
-            #define SWITCH_INSTRUMENT(iter)  iter.switch_instrument(*event.instr);
-            Apu1PulseDriver_FOREACH(SWITCH_INSTRUMENT)
+            ENV_FOREACH(_envs, iter, iter.switch_instrument(*event.instr))
         }
         if (event.volume.has_value()) {
             _prev_volume = std::clamp(int(*event.volume), 0, MAX_VOLUME);
@@ -140,10 +141,10 @@ void Apu1PulseDriver::tick(
 
     // Set chip volume and increment volume envelope.
     _next_state.volume =
-        volume_calc::volume_mul_4x4_4(_prev_volume, _volume_iter.next(document));
+        volume_calc::volume_mul_4x4_4(_prev_volume, _envs.volume.next(document));
 
     // Set chip duty and increment duty envelope.
-    _next_state.duty = _wave_index_iter.next(document);
+    _next_state.duty = _envs.wave_index.next(document);
 
     // Set chip pitch and increment arpeggio envelope.
     _next_state.period_reg = [&] {
@@ -153,7 +154,7 @@ void Apu1PulseDriver::tick(
         // Changing pitch may write to $4003, which resets phase and creates a click.
         // There is a way to avoid this click: http://forums.nesdev.com/viewtopic.php?t=231
         // I did not implement that method, so I get clicks.
-        auto note = _prev_note.value + _arpeggio_iter.next(document);
+        auto note = _prev_note.value + _envs.arpeggio.next(document);
         note = std::clamp(note, 0, doc::CHROMATIC_COUNT - 1);
         return tuning_table[(size_t) note];
     }();
