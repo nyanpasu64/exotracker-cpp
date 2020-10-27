@@ -42,12 +42,11 @@ enum class SampleEvent {
 };
 
 /// APU1 (2 pulses)
-template<typename BlipSynthT = MyBlipSynth>
 class Apu1Synth {
 // fields
     // NesApu2Synth::apu2 (xgm::NES_DMC) holds a reference to apu1 (xgm::NES_APU).
     xgm::NES_APU _apu1;
-    BlipSynthT _apu1_synth;
+    MyBlipSynth _apu1_synth;
 
     /// Must be 1 or greater.
     /// Increasing it past 1 causes sound synths to only be sampled
@@ -164,7 +163,7 @@ public:
     }
 };
 
-using Apu1Instance = ImplChipInstance<Apu1Driver, Apu1Synth<>>;
+using Apu1Instance = ImplChipInstance<Apu1Driver, Apu1Synth>;
 
 std::unique_ptr<ChipInstance> make_Apu1Instance(
     chip_common::ChipIndex chip_index,
