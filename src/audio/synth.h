@@ -106,7 +106,6 @@ public:
     /// - get_document argument must outlive returned OverallSynth.
     /// - get_document's list of chips must not change between calls.
     ///   If it changes, discard returned OverallSynth and create a new one.
-    /// - In get_document's list of chips, any APU2 must be preceded directly with APU1.
     OverallSynth(
         uint32_t stereo_nchan,
         uint32_t smp_per_s,

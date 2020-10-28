@@ -67,7 +67,6 @@ public:
     /// - get_document argument must outlive returned OverallSynth.
     /// - get_document's list of chips must not change between calls.
     ///   If it changes, destroy returned OverallSynth and create a new one.
-    /// - In get_document's list of chips, any APU2 must be preceded directly with APU1.
     ///
     /// throws PaException or PaCppException or whatever else
     static std::optional<AudioThreadHandle> make(

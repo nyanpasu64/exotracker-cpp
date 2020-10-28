@@ -23,7 +23,6 @@ using timing::SequencerTime;
 
 // APU1 single pulse wave playing at volume F produces values 0 and 1223.
 constexpr int APU1_RANGE = 3000;
-//constexpr int APU2_RANGE = 100;
 
 constexpr double APU1_VOLUME = 0.5;
 //constexpr double APU2_VOLUME = 0.0;
@@ -227,65 +226,6 @@ std::unique_ptr<BaseApu1Instance> make_Apu1Instance(
         chip_index, clocks_per_sec, frequencies, clocks_per_sound_update
     );
 }
-
-///// APU2 (tri noise dpcm)
-/////
-///// Requirement: NesApu2Synth must be destroyed before NesApu1Synth.
-/////
-///// This is because NesApu2Synth.cpu (xgm::NES_CPU) holds a reference to xgm::NES_APU
-///// owned by NesApu1Synth.
-///// In C++, arrays are destroyed in reverse order, so this can be guaranteed
-///// if the array of unique_ptr<BaseNesSynth> stores NesApu2Synth after NesApu1Synth.
-//class NesApu2Synth : public BaseChipSynth {
-//    xgm::NES_DMC apu2;
-//    MyBlipSynth apu2_synth;
-
-//    // xgm::NES_DMC holds references to NES_CPU and NES_APU.
-//    // We own NES_CPU.
-//    // NesApu1Synth owns NES_APU, and our constructor takes a reference to one.
-//    xgm::NES_CPU cpu;
-
-//public:
-//    explicit NesApu2Synth(Blip_Buffer & blip, Apu1Instance & apu1) :
-//        apu2_synth{blip, APU2_RANGE, APU2_VOLUME}
-//    {
-//        apu2.Reset();
-
-//        apu2.SetCPU(&cpu);
-//        apu2.SetAPU(&(apu1.apu1));
-//    }
-
-//    // impl NesChipSynth
-//    void write_memory(RegisterWrite write) override {
-//        apu2.Write(write.address, write.value);
-//    }
-
-//    NsampWritten synthesize_chip_clocks(
-//        ClockT clk_offset, ClockT nclk, gsl::span<Amplitude> write_buffer
-//    ) override {
-//        std::array<xgm::INT32, 2> stereo_out;
-
-//        for (ClockT clock = 0; clock < nclk; clock++) {
-//            apu2.Tick(1);
-//            apu2.Render(&stereo_out[0]);
-//            apu2_synth.update((blip_nclock_t) (clk_offset + clock), stereo_out[0]);
-//        }
-
-//        return 0;
-//    }
-//};
-
-//std::unique_ptr<BaseChipSynth> make_NesApu2Synth(
-//    Blip_Buffer & blip, BaseNesApu1Synth & apu1
-//) {
-//    // honestly static_cast is good enough,
-//    // as there are no other subclasses of BaseNesApu1Synth
-//    // which override pure-virtual synthesize_chip_clocks().
-//    Apu1Instance * apu1_real = dynamic_cast<Apu1Instance *>(&apu1);
-//    assert(apu1_real != nullptr);
-
-//    return std::make_unique<NesApu2Synth>(blip, *apu1_real);
-//}
 
 // End namespaces
 }

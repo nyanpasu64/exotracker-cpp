@@ -5,7 +5,6 @@
 
 #include <cstddef>  // size_t
 #include <optional>
-#include <stdexcept>  // std::logic_error will be used once I add APU2.
 #include <utility>  // std::move
 
 namespace audio {
@@ -31,40 +30,24 @@ OverallSynth::OverallSynth(
 
     // Thread creation will act as a memory barrier, so we don't need a fence.
 
-    // Optional non-owning reference to the previous chip, which may/not be APU1.
-    // Passed to APU2.
-    // If an APU2 is not immediately preceded by an APU1 (if apu1_maybe == nullptr),
-    // this is a malformed document, so throw an exception.
-    nes_2a03::BaseApu1Instance * apu1_maybe = nullptr;
-
     for (ChipIndex chip_index = 0; chip_index < _document.chips.size(); chip_index++) {
         ChipKind chip_kind = _document.chips[chip_index];
 
         switch (chip_kind) {
             case ChipKind::Apu1: {
-                auto apu1_unique = nes_2a03::make_Apu1Instance(
-                    chip_index,
-                    CLOCKS_PER_S,
-                    doc::FrequenciesRef{_document.frequency_table},
-                    _clocks_per_sound_update
-                );
-                apu1_maybe = apu1_unique.get();
                 // Possibly more efficient than push_back,
                 // and silences false error in IDE.
-                _chip_instances.emplace_back(std::move(apu1_unique));
+                _chip_instances.emplace_back(nes_2a03::make_Apu1Instance(
+                    chip_index,
+                    CLOCKS_PER_S,
+                    _document.frequency_table,
+                    _clocks_per_sound_update));
                 break;
             }
 
             case ChipKind::COUNT: break;
         }
-
-        if (chip_kind != ChipKind::Apu1) {
-            apu1_maybe = nullptr;
-        }
     }
-
-    // TODO add APU2
-    (void) apu1_maybe;
 
     _events.set_timeout(SynthEvent::Tick, 0);
 }

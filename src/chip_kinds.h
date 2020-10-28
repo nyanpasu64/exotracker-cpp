@@ -9,7 +9,6 @@ namespace chip_kinds {
 /// List of sound chips supported.
 enum class ChipKind : uint32_t {
     Apu1,
-//    Apu2,
 
     COUNT,
 };
