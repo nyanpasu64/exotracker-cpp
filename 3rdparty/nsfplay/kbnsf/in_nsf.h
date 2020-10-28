@@ -2,21 +2,23 @@
 #define _IN_NSF_H_
 #include <windows.h>
 #include "xgm.h"
-#include "utils/nsf_tag.h"
+#include "nsf_tag.h"
 #include "debugout.h"
 #include "nsfplug_ui.h"
+#include "plugin/kbmedia/plugin.h"
+#include "nsfconfig_ini.h"
 
 
 class KMP_NSF : public xgm::KbMediaPluginMSP
 {
 public:
   xgm::NSFPlayer *pl;
-  xgm::NSFPlayerConfig *cf;
+  xgm::NSFPlayerConfigIni *cf;
   xgm::NSF *sdat;    
   NSF_TAG *ntag;
   bool not_write_yet;
 
-  KMP_NSF(xgm::NSFPlayer *p, xgm::NSFPlayerConfig *c, xgm::NSF *s) 
+  KMP_NSF(xgm::NSFPlayer *p, xgm::NSFPlayerConfigIni *c, xgm::NSF *s)
     : pl(p), cf(c), sdat(s), xgm::KbMediaPluginMSP(p,c,s)
   {
     ntag = new NSF_TAG(s);

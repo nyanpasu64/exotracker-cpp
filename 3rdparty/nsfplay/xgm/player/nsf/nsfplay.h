@@ -4,28 +4,28 @@
 #include "nsfconfig.h"
 #include "nsf.h"
 
-#include "../../devices/cpu/nes_cpu.h"
-#include "../../devices/memory/nes_bank.h"
-#include "../../devices/memory/nes_mem.h"
-#include "../../devices/memory/nsf2_vectors.h"
-#include "../../devices/sound/nes_apu.h"
-#include "../../devices/sound/nes_vrc7.h"
-#include "../../devices/sound/nes_fme7.h"
-#include "../../devices/sound/nes_vrc6.h"
-#include "../../devices/sound/nes_dmc.h"
-#include "../../devices/sound/nes_mmc5.h"
-#include "../../devices/sound/nes_n106.h"
-#include "../../devices/sound/nes_fds.h"
-#include "../../devices/audio/filter.h"
-#include "../../devices/audio/mixer.h"
-#include "../../devices/audio/fader.h"
-#include "../../devices/audio/amplifier.h"
-#include "../../devices/audio/rconv.h"
-#include "../../devices/audio/echo.h"
-#include "../../devices/audio/MedianFilter.h"
-#include "../../devices/misc/nsf2_irq.h"
-#include "../../devices/misc/nes_detect.h"
-#include "../../devices/misc/log_cpu.h"
+#include "../../devices/CPU/nes_cpu.h"
+#include "../../devices/Memory/nes_bank.h"
+#include "../../devices/Memory/nes_mem.h"
+#include "../../devices/Memory/nsf2_vectors.h"
+#include "../../devices/Sound/nes_apu.h"
+#include "../../devices/Sound/nes_vrc7.h"
+#include "../../devices/Sound/nes_fme7.h"
+#include "../../devices/Sound/nes_vrc6.h"
+#include "../../devices/Sound/nes_dmc.h"
+#include "../../devices/Sound/nes_mmc5.h"
+#include "../../devices/Sound/nes_n106.h"
+#include "../../devices/Sound/nes_fds.h"
+#include "../../devices/Audio/filter.h"
+#include "../../devices/Audio/mixer.h"
+#include "../../devices/Audio/fader.h"
+#include "../../devices/Audio/amplifier.h"
+#include "../../devices/Audio/rconv.h"
+#include "../../devices/Audio/echo.h"
+#include "../../devices/Audio/MedianFilter.h"
+#include "../../devices/Misc/nsf2_irq.h"
+#include "../../devices/Misc/nes_detect.h"
+#include "../../devices/Misc/log_cpu.h"
 
 namespace xgm
 {
@@ -35,9 +35,6 @@ namespace xgm
   protected:
     NSFPlayerConfig *config;
 
-    enum { PRE_CLICK, CLICKING, POST_CLICK };
-
-    int click_mode;
     double rate;
     int nch; // number of channels
     int song;
@@ -50,6 +47,7 @@ namespace xgm
 
     int time_in_ms;             // 演奏した時間(ms)
     bool playtime_detected;     // 演奏時間が検出されたらtrue
+    bool infinite;               // never fade out
 
     void Reload ();
     void DetectLoop ();
@@ -148,7 +146,7 @@ namespace xgm
     virtual UINT32 Skip (UINT32 length);
 
     /** 曲名を取得する */
-    virtual char *GetTitleString ();
+    virtual const char *GetTitleString ();
 
     /** 演奏時間を取得する */
     virtual int GetLength ();
@@ -168,7 +166,7 @@ namespace xgm
     /** コンフィグレーションの更新情報通知を受け取るコールバック */
     virtual void Notify (int id);
 
-    // Notify for panning
+    /** Notify for panning */
     virtual void NotifyPan (int id);
 
     /** time_in_ms時点でのデバイス情報を取得する */
@@ -176,11 +174,15 @@ namespace xgm
 
     /** Whether to use PAL/NTSC/Dendy based on flags and REGION config */
     virtual int GetRegion(UINT8 flags, int pref);
+
     enum {
         REGION_NTSC = 0,
         REGION_PAL,
         REGION_DENDY
     };
+
+    /** Refresh infinite playback setting from PLAY_ADVANCE config */
+    virtual void UpdateInfinite();
   };
 
 }// namespace

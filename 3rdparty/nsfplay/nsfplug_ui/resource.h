@@ -29,6 +29,7 @@
 #define IDD_MIXERBOX                    1016
 #define IDC_SECSPIN3                    1016
 #define IDI_MIXER                       1019
+#define IDC_PLAYADVANCE                 1019
 #define IDI_MEMORY                      1020
 #define IDD_MEMWRITE                    1022
 #define IDD_MASK                        1026
@@ -145,6 +146,7 @@
 #define IDC_UNMUTE                      2013
 #define IDC_TRI_MUTE                    2014
 #define IDC_VELOCITY                    2015
+#define IDC_DPCM_REVERSE                2015
 #define IDC_RANDOMIZE_TRI               2016
 #define ID_READTAG                      2018
 #define IDC_SAVE                        2021
@@ -239,9 +241,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        2108
+#define _APS_NEXT_RESOURCE_VALUE        2110
 #define _APS_NEXT_COMMAND_VALUE         32786
-#define _APS_NEXT_CONTROL_VALUE         2043
+#define _APS_NEXT_CONTROL_VALUE         2044
 #define _APS_NEXT_SYMED_VALUE           2000
 #endif
 #endif

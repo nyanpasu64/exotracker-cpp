@@ -3,17 +3,17 @@
 #include "nsfconfig.h"
 #include "nsfplay.h"
 
-#include "../../devices/sound/nes_apu.h"
-#include "../../devices/sound/nes_dmc.h"
-#include "../../devices/sound/nes_fds.h"
-#include "../../devices/sound/nes_mmc5.h"
+#include "../../devices/Sound/nes_apu.h"
+#include "../../devices/Sound/nes_dmc.h"
+#include "../../devices/Sound/nes_fds.h"
+#include "../../devices/Sound/nes_mmc5.h"
 
 using namespace xgm;
 
-char *NSFPlayerConfig::dname[NES_DEVICE_MAX] =
+const char *NSFPlayerConfig::dname[NES_DEVICE_MAX] =
   { "APU1", "APU2", "5B", "MMC5", "N163", "VRC6", "VRC7", "FDS" };
 
-char *NSFPlayerConfig::channel_name[NES_CHANNEL_MAX] =
+const char *NSFPlayerConfig::channel_name[NES_CHANNEL_MAX] =
   {
       "SQR0", "SQR1", "TRI", "NOISE", "DMC",
       "FDS",
@@ -106,11 +106,12 @@ NSFPlayerConfig::NSFPlayerConfig () : PlayerConfig ()
   CreateValue("NTSC_BASECYCLES", 1789773);
   CreateValue("PAL_BASECYCLES", 1662607);
   CreateValue("DENDY_BASECYCLES", 1773448);
-  CreateValue("IRQ_ENABLE", 1);
+  CreateValue("IRQ_ENABLE", 0);
   CreateValue("REGION", 0);
   CreateValue("LOG_CPU", 0);
   CreateValue("LOG_CPU_FILE", "nsf_write.log");
 
+  CreateValue("PLAY_ADVANCE", 0);
   CreateValue("FAST_SEEK", 1);
   CreateValue("QUALITY", 10);
   CreateValue("MASTER_VOLUME", 128);
@@ -119,7 +120,7 @@ NSFPlayerConfig::NSFPlayerConfig () : PlayerConfig ()
   {
       std::string str;
       char num[5];
-      ::itoa(i, num, 10);
+      vcm_itoa(i, num, 10);
       str = "CHANNEL_";
       if (i < 10) str += "0";
       str += num;
@@ -161,7 +162,7 @@ NSFPlayerConfig::NSFPlayerConfig () : PlayerConfig ()
     static const int DEFAULT_DEVICE_OPTION[NES_DEVICE_MAX][16] =
     {
         { 1, 1, 1, 0, 0 },
-        { 1, 1, 1, 0, 1, 1, 1 },
+        { 1, 1, 1, 0, 1, 1, 1, 1, 0 },
         {},
         { 1, 1 },
         { 0 },
@@ -182,35 +183,4 @@ NSFPlayerConfig::~NSFPlayerConfig ()
 {
 }
 
-// Load one
-bool NSFPlayerConfig::Load (const char *path, const char *sect, const char *name)
-{
-  char temp[256];
-  GetPrivateProfileString(sect,name,data[name].GetStr().c_str(),temp,255,path);
-  data[name] = vcm::Value(temp);
-  return true;
-}
 
-// Load all
-bool NSFPlayerConfig::Load (const char *path, const char *sect)
-{
-  std::map<std::string, vcm::Value>::iterator it;
-  for(it=data.begin(); it!=data.end(); it++)
-    Load(path, sect, it->first.c_str());
-  return true;
-}
-
-bool NSFPlayerConfig::Save (const char *path, const char *sect, const char *name)
-{
-  WritePrivateProfileString (sect, name, data[name], path);
-  return true;
-}
-
-bool NSFPlayerConfig::Save (const char *path, const char *sect)
-{
-  std::map<std::string, vcm::Value>::iterator it;
-  for(it=data.begin(); it!=data.end(); it++)
-    Save(path, sect, it->first.c_str());
-
- return true;
-}

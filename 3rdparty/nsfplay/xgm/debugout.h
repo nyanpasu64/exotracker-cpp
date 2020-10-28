@@ -34,10 +34,19 @@ namespace xgm
     }
   };
 #define DEBUG_OUT __DebugOut::printf
+
+  // overrides the next output sample (nsfplay.cpp)
+  // use to mark events in WAV output, turn quality high
+  // only works in _DEBUG build
+  extern int debug_mark;
 }
 
 #else
+#ifdef NDEBUG
+#define DEBUG_OUT(...)
+#else
 #define DEBUG_OUT printf
+#endif
 #endif
 
 #endif

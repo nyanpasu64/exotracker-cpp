@@ -42,7 +42,7 @@ BOOL APIENTRY DllMain (HANDLE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
     // ƒvƒŒƒCƒ„[ì¬
     npm.pl = new NSFPlayer();
     npm.sdat = new NSF();
-    npm.cf = new NSFPlayerConfig();
+    npm.cf = new NSFPlayerConfigIni();
 
     // Winamp”Å‚ÌÝ’è‚ðŠg’£
     npm.cf->CreateValue("WRITE_TAGINFO", 0);
@@ -80,6 +80,7 @@ BOOL APIENTRY DllMain (HANDLE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
     npm.cf->Load(IniPath,"NSFplug");
 
     if((*(npm.cf))["MASK_INIT"]) (*(npm.cf))["MASK"] = 0;
+	(*(npm.cf))["MULT_SPEED"] = 256; // reset speed to normal on startup
 
     // GUI initialized in Init()
     ui = NULL;

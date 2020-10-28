@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <cstring>
 #include "nes_cpu.h"
 #include "../Memory/nes_mem.h"
 #include "../Misc/nsf2_irq.h"
@@ -97,6 +98,9 @@ UINT32 Callback readByte (void *__THIS, UINT32 adr)
 
 void NES_CPU::run_from (UINT32 address)
 {
+	#if TRACE
+		DEBUG_OUT("run_from($%04X)\n",address);
+	#endif
 	breaked = false;
 	context.PC = PLAYER_RESERVED; // JSR, followed by infinite loop ("breaked")
 	breakpoint = context.PC+3;
@@ -149,7 +153,7 @@ int NES_CPU::Exec (int clocks)
 				if (fclocks_left_in_frame < 0)
 					context.clock = 0;
 				else
-					context.clock = unsigned int(fclocks_left_in_frame >> FRAME_FIXED)+1;
+					context.clock = (unsigned int)(fclocks_left_in_frame >> FRAME_FIXED)+1;
 			}
 			else
 				context.clock = clocks;
@@ -325,9 +329,11 @@ void NES_CPU::Start (
 
 	run_from (init_addr);
 
-	// temporarily disable PLAY for INIT
+	// temporarily disable PLAY and IRQ for INIT
+	bool irq_temp = enable_irq;
 	bool extra_init_temp = extra_init;
 	int play_addr_temp = play_addr;
+	enable_irq = false;
 	extra_init = false;
 	play_addr = -1;
 
@@ -335,6 +341,8 @@ void NES_CPU::Start (
 	// note: things like DMC, Frame Counter, NSF2 IRQ, MMC Frame Counter, etc. aren't receiving cycles here
 	//       but this should be OK?
 	//       - Use of IRQs should really be taking place in PLAY or non-returning second INIT.
+	//         IRQs are intentionally disabled here during first INIT to avoid issue with IRQs being mistaken
+	//         for the audio-free INIT segment, but a hardware implementation probably wouldn't prevent this.
 	//       - Timing between end of INIT and first PLAY is not guaranteed by the player and should not be relied on.
 	//       - For NSFs that do not reset $4017 this leaves the envelope starting in synch with the first PLAY.
 	//       - Waiting on an IRQ during the first init should hit the timeout and eventually trigger.
@@ -348,6 +356,7 @@ void NES_CPU::Start (
 			if (nmi_play) enable_nmi = true;
 		}
 	}
+	enable_irq = irq_temp; // restore enable_irq
 	extra_init = extra_init_temp; // restore extra_init
 	play_addr = play_addr_temp; // restore PLAY
 

@@ -70,7 +70,6 @@ namespace xgm
                 if (freq[i] >= 8 && sfreq[i] < 0x800 && sweep_amount[i] > 0) // update frequency if appropriate
                 {
                     freq[i] = sfreq[i] < 0 ? 0 : sfreq[i];
-                    if (scounter[i] > freq[i]) scounter[i] = freq[i];
                 }
                 sweep_div[i] = sweep_div_period[i] + 1;
 
@@ -96,11 +95,11 @@ namespace xgm
       {1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
     };
 
-    scounter[i] += clocks;
-    while (scounter[i] > freq[i])
+    scounter[i] -= clocks;
+    while (scounter[i] < 0)
     {
         sphase[i] = (sphase[i] + 1) & 15;
-        scounter[i] -= (freq[i] + 1);
+        scounter[i] += freq[i] + 1;
     }
 
     INT32 ret = 0;
@@ -165,8 +164,8 @@ namespace xgm
     }
     else
     {
-        m[0] = out[0] << 6;
-        m[1] = out[1] << 6;
+        m[0] = (out[0] * square_linear) / 15;
+        m[1] = (out[1] * square_linear) / 15;
     }
 
     b[0]  = m[0] * sm[0][0];
@@ -194,6 +193,8 @@ namespace xgm
     for(int i=1;i<32;i++) 
         square_table[i]=(INT32)((8192.0*95.88)/(8128.0/i+100));
 
+    square_linear = square_table[15]; // match linear scale to one full volume square of nonlinear
+
     for(int c=0;c<2;++c)
         for(int t=0;t<2;++t)
             sm[c][t] = 128;
@@ -209,19 +210,29 @@ namespace xgm
     gclock = 0;
     mask = 0;
 
-    scounter[0] = 0;
-    scounter[1] = 0;
-    sphase[0] = 0;
-    sphase[0] = 0;
-
-    sweep_div[0] = 1;
-    sweep_div[1] = 1;
-    envelope_div[0] = 0;
-    envelope_div[1] = 0;
-    length_counter[0] = 0;
-    length_counter[1] = 0;
-    envelope_counter[0] = 0;
-    envelope_counter[1] = 0;
+    for (int i=0; i<2; ++i)
+    {
+        scounter[i] = 0;
+        sphase[i] = 0;
+        duty[i] = 0;
+        volume[i] = 0;
+        freq[i] = 0;
+        sfreq[i] = 0;
+        sweep_enable[i] = 0;
+        sweep_mode[i] = 0;
+        sweep_write[i] = 0;
+        sweep_div_period[i] = 0;
+        sweep_div[i] = 1;
+        sweep_amount[i] = 0;
+        envelope_disable[i] = 0;
+        envelope_loop[i] = 0;
+        envelope_write[i] = 0;
+        envelope_div_period[i] = 0;
+        envelope_div[0] = 0;
+        envelope_counter[i] = 0;
+        length_counter[i] = 0;
+        enable[i] = 0;
+    }
 
     for (i = 0x4000; i < 0x4008; i++)
       Write (i, 0);
@@ -344,7 +355,6 @@ namespace xgm
       case 0x6:
         freq[ch] = val | (freq[ch] & 0x700) ;
         sweep_sqr(ch);
-        if (scounter[ch] > freq[ch]) scounter[ch] = freq[ch];
         break;
 
       case 0x3: 
@@ -358,7 +368,6 @@ namespace xgm
           length_counter[ch] = length_table[(val >> 3) & 0x1f];
         }
         sweep_sqr(ch);
-        if (scounter[ch] > freq[ch]) scounter[ch] = freq[ch];
         break;
 
       default:

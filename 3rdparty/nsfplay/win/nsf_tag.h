@@ -1,6 +1,7 @@
 #ifndef _NSF_TAG_H_
 #define _NSF_TAG_H_
-#include "../player/nsf/nsf.h"
+#include "../xgm/player/nsf/nsf.h"
+#include "../xgm/player/player.h"
 
 class NSF_TAG
 {

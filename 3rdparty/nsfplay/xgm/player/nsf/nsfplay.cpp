@@ -1,16 +1,18 @@
 #include <assert.h>
 #include <typeinfo>
+#include <cstring>
 #include "nsfplay.h"
 
 #include <time.h> // for srand() initialization
 
 namespace xgm
 {
+  int debug_mark = 0;
+
   NSFPlayer::NSFPlayer () : PlayerMSP ()
   {
     nsf = NULL;
 
-    const type_info &ti = typeid(this);
     sc[APU] = (apu = new NES_APU());
     sc[DMC] = (dmc = new NES_DMC());
     sc[FDS] = (fds = new NES_FDS());
@@ -37,6 +39,7 @@ namespace xgm
     fader.Attach(&rconv);
 
     nch = 1;
+    infinite = false;
   }
 
   NSFPlayer::~NSFPlayer ()
@@ -64,7 +67,7 @@ namespace xgm
     return playtime_detected;
   }
 
-  char *NSFPlayer::GetTitleString ()
+  const char *NSFPlayer::GetTitleString ()
   {
     if (nsf == NULL) return "(not loaded)";
 
@@ -95,7 +98,6 @@ namespace xgm
   void NSFPlayer::Reload ()
   {
     int i, bmax = 0;
-    UINT32 offset = 0;
 
     assert (nsf);
 
@@ -122,7 +124,7 @@ namespace xgm
     // select the loop detector
     if((*config)["DETECT_ALT"])
     {
-      const type_info &ti = typeid(ld);
+      const std::type_info &ti = typeid(ld);
       if(strcmp(ti.name(),"NESDetectorEx")!=0)
       {
         delete ld;
@@ -131,7 +133,7 @@ namespace xgm
     }
     else
     {
-      const type_info &ti = typeid(ld);
+      const std::type_info &ti = typeid(ld);
       if(strcmp(ti.name(),"NESDetector")!=0)
       {
         delete ld;
@@ -354,10 +356,9 @@ void NSFPlayer::SetPlayFreq (double r)
   {
     ::srand((unsigned)::time(NULL)); // randomizing random generator
 
-    time_in_ms = 0;  
-    silent_length = 0; 
+    time_in_ms = 0;
+    silent_length = 0;
     playtime_detected = false;
-    click_mode = PRE_CLICK;
     total_render = 0;
     frame_render = (int)(rate)/60; // ‰‰‘tî•ñ‚ðXV‚·‚éŽüŠú
     apu_clock_rest = 0.0;
@@ -417,7 +418,6 @@ void NSFPlayer::SetPlayFreq (double r)
     int region_register = (region == REGION_PAL) ? 1 : 0;
     if (region == REGION_DENDY && (nsf->regn & 4)) region_register = 2; // use 2 for Dendy iff explicitly supported, otherwise 0
 
-    int play_addr = (nsf->nsf2_bits & 0x40) ? -1 : nsf->play_address; // suppress play
     cpu.Start (
         nsf->init_address,
         nsf->play_address,
@@ -443,6 +443,14 @@ void NSFPlayer::SetPlayFreq (double r)
 
     for (int i=0;i<NES_DEVICE_MAX;++i)
       NotifyPan(i);
+
+    // suppress starting click by setting DC filter to balance the starting level at 0
+    int quality = config->GetValue("QUALITY").GetInt();
+    INT32 b[2];
+    for (int i=0; i < NES_DEVICE_MAX; ++i) sc[i]->Tick(0); // determine starting state for all sound units
+    fader.Tick(0);
+    for (int i=0; i < (quality+1); ++i) fader.Render(b); // warm up rconv/render with enough sample to reach a steady state
+    dcf.SetLevel(b); // DC filter will use the current DC level as its starting state
   }
 
   void NSFPlayer::DetectSilent ()
@@ -479,11 +487,14 @@ void NSFPlayer::SetPlayFreq (double r)
 
   void NSFPlayer::CheckTerminal ()
   {
-    if (fader.IsFading ())
-      return;
+    if(!infinite)
+    {
+      if (fader.IsFading ())
+        return;
 
-    if (time_in_ms + nsf->GetFadeTime () >= nsf->GetLength ())
-      fader.FadeStart (rate, nsf->GetFadeTime ());
+      if (time_in_ms + nsf->GetFadeTime () >= nsf->GetLength ())
+        fader.FadeStart (rate, nsf->GetFadeTime ());
+    }
   }
 
   UINT32 NSFPlayer::Skip (UINT32 length)
@@ -588,7 +599,6 @@ void NSFPlayer::SetPlayFreq (double r)
         for(i=0; i<5; i++)
           infobuf[FME7_TRK0+i].AddInfo(total_render,fme7->GetTrackInfo(i));
       }
-
     }
   }
   
@@ -671,6 +681,14 @@ void NSFPlayer::SetPlayFreq (double r)
       if     (out[1]<-32767) out[1]=-32767;
       else if( 32767<out[1]) out[1]= 32767;
 
+      #if _DEBUG
+          if (debug_mark)
+          {
+              out[0] = debug_mark;
+              debug_mark = 0;
+          }
+      #endif
+
       if (nch == 2)
       {
           b[0] = out[0];
@@ -710,6 +728,7 @@ void NSFPlayer::SetPlayFreq (double r)
   bool NSFPlayer::SetSong (int s)
   {
     nsf->song = s % nsf->songs;
+    UpdateInfinite();
     return true;
   }
 
@@ -722,6 +741,7 @@ void NSFPlayer::SetPlayFreq (double r)
         nsf->song -=nsf->songs;
         result = false;
     }
+    UpdateInfinite();
     return result;
   }
 
@@ -734,6 +754,7 @@ void NSFPlayer::SetPlayFreq (double r)
         nsf->song +=nsf->songs;
         result = false;
     }
+    UpdateInfinite();
     return result;
   }
 
@@ -891,6 +912,7 @@ void NSFPlayer::SetPlayFreq (double r)
     }
 
     NotifyPan(id);
+    UpdateInfinite();
   }
 
   void NSFPlayer::NotifyPan (int id)
@@ -983,6 +1005,11 @@ void NSFPlayer::SetPlayFreq (double r)
 
       // no valid regions? giving up
       return REGION_NTSC;
+  }
+
+  void NSFPlayer::UpdateInfinite()
+  {
+      infinite = 1 == (*config)["PLAY_ADVANCE"];
   }
 
 }

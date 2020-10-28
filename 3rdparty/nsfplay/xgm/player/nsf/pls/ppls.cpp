@@ -7,8 +7,10 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #include <crtdbg.h>
+#else
+#define stricmp strcasecmp
 #endif
 
 #include "ppls.h"
@@ -324,14 +326,13 @@ void PLSITEM_delete(PLSITEM *elem)
   free(elem) ;
 }
 
-static char *print_time(int time)
+static const char *print_time(int time)
 {
   static char buf[32] ;
-  int h,m,s,ss = 0 ;
+  int h,m,s = 0 ;
 
   if(time<0) return "" ;
 
-  ss = (time%1000) / 10 ;
   time /= 1000 ;
   s = time%60 ;
   time /= 60 ;

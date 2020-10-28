@@ -15,10 +15,6 @@ namespace xgm
   public:
     NSFPlayerConfig ();
     virtual ~NSFPlayerConfig();
-    virtual bool Load(const char * path, const char *sect);
-    virtual bool Save(const char * path, const char *sect);
-    virtual bool Load(const char * path, const char *sect, const char *name);
-    virtual bool Save(const char * path, const char *sect, const char *name);
 
     vcm::Value& GetDeviceConfig(int i, std::string key)
     {
@@ -40,7 +36,7 @@ namespace xgm
       if (id < 0) id = 0;
       if (id >= NES_CHANNEL_MAX) id = NES_CHANNEL_MAX-1;
       char num[5];
-      ::itoa(id, num, 10);
+      vcm_itoa(id, num, 10);
       std::string str;
       str = "CHANNEL_";
       if (id < 10) str += "0";
@@ -51,10 +47,10 @@ namespace xgm
     }
 
     /** デバイス毎の名前 */
-    static char *dname[NES_DEVICE_MAX];
+    static const char *dname[NES_DEVICE_MAX];
 
     // for channel/pan/mix
-    static char *channel_name[NES_CHANNEL_MAX]; // name of channel
+    static const char *channel_name[NES_CHANNEL_MAX]; // name of channel
     static int channel_device[NES_CHANNEL_MAX]; // device enum of channel
     static int channel_device_index[NES_CHANNEL_MAX]; // device channel index
     static int channel_track[NES_CHANNEL_MAX]; // trackinfo for channel

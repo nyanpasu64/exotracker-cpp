@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/bbbradsmith/nsfplay.git
 	branch = master
-	commit = cb007ddb020607815327f68bf1d12b7915df95a1
+	commit = 475c8926a39b21e6b8be19ccdb9a05ed7e5bb080
 	parent = 5780718bbe4176e2a8a911768df0b87d58614213
 	method = merge
 	cmdver = 0.4.1
