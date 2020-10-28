@@ -18,6 +18,7 @@ namespace audio::synth::nes_2a03_driver {
 using namespace doc::tuning;
 using namespace music_driver;
 using chip_kinds::Apu1ChannelID;
+using sequencer::EventsRef;
 
 // Pulse 1/2 driver
 
@@ -107,8 +108,8 @@ public:
     void tick(
         doc::Document const & document,
         TuningRef tuning_table,
-        sequencer::EventsRef events,
-        RegisterWriteQueue &/*out*/ register_writes
+        EventsRef events,
+        RegisterWriteQueue &/*mut*/ register_writes
     );
 };
 
@@ -137,8 +138,8 @@ public:
 
     void driver_tick(
         doc::Document const & document,
-        EnumMap<ChannelID, sequencer::EventsRef> const & channel_events,
-        RegisterWriteQueue &/*out*/ register_writes
+        EnumMap<ChannelID, EventsRef> const & channel_events,
+        RegisterWriteQueue &/*mut*/ register_writes
     ) {
         _pulse1_driver.tick(
             document,

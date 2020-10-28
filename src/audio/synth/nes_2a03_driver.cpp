@@ -114,7 +114,7 @@ void Apu1PulseDriver::stop_playback(
 void Apu1PulseDriver::tick(
     doc::Document const& document,
     TuningRef tuning_table,
-    sequencer::EventsRef events,
+    EventsRef events,
     RegisterWriteQueue & register_writes
 ) {
     for (doc::RowEvent event : events) {
