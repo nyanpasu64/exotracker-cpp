@@ -721,10 +721,4 @@ namespace xgm
     else
       return false;
   }
-
-  // IRQ support requires CPU read access
-  void NES_DMC::SetCPU(NES_CPU* cpu_)
-  {
-      cpu = cpu_;
-  }
 }                               // namespace
