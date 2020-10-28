@@ -208,6 +208,7 @@ public:
     /// When move-constructing NesSoundChip, fix the new _apu2's pointer.
     /// This is a non-owning pointer, so no double-free occurs when `other` is destroyed.
     NesSoundChip(NesSoundChip && other) : _apu1(other._apu1), _apu2(other._apu2) {
+        // Post-move hook, not initial constructor.
         _apu2.SetAPU(&_apu1);
     }
 
@@ -215,7 +216,14 @@ public:
     NesSoundChip & operator=(NesSoundChip &&) = delete;
 
     // Constructors
-    explicit NesSoundChip() {}
+    explicit NesSoundChip() {
+        // Disable nondeterministic behavior.
+        // OPT_RANDOMIZE_TRI also causes a pop when playback begins.
+        // This could be fixed someday by adding a Blip_Synth method
+        // to not generate sound on the first update.
+        _apu2.SetOption(xgm::NES_DMC::OPT_RANDOMIZE_TRI, 0);
+        _apu2.SetOption(xgm::NES_DMC::OPT_RANDOMIZE_NOISE, 0);
+    }
 
     void Reset() {
         _apu2.SetAPU(&_apu1);
