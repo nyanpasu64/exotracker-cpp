@@ -106,10 +106,6 @@ struct DocumentCopy {
     [[nodiscard]] chip_common::ChannelIndex chip_index_to_nchan(
         chip_common::ChipIndex chip
     ) const;
-
-    [[nodiscard]] uint8_t get_volume_digits(
-        chip_common::ChipIndex chip, chip_common::ChannelIndex channel
-    ) const;
 };
 
 /// Non-copyable version of Document. You must call clone() explicitly.

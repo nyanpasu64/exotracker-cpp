@@ -37,17 +37,6 @@ chip_common::ChannelIndex DocumentCopy::chip_index_to_nchan(
     return chip_common::CHIP_TO_NCHAN[chip_kind];
 }
 
-uint8_t DocumentCopy::get_volume_digits(
-    chip_common::ChipIndex chip, chip_common::ChannelIndex channel
-) const {
-    release_assert(chip < chips.size());
-    auto chip_kind = (size_t) chips[chip];
-
-    release_assert(chip_kind < (size_t) ChipKind::COUNT);
-    release_assert(channel < chip_common::CHIP_TO_NCHAN[chip_kind]);
-    return chip_common::CHIP_CHANNEL_TO_VOLUME_DIGITS[chip_kind][channel];
-}
-
 Document Document::clone() const {
     return (DocumentCopy const&) *this;
 }

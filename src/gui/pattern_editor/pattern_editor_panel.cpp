@@ -6,6 +6,7 @@
 #include "gui/cursor.h"
 #include "gui/move_cursor.h"
 #include "gui_common.h"
+#include "doc/gui_traits.h"
 #include "chip_kinds.h"
 #include "edit/edit_pattern.h"
 #include "util/distance.h"
@@ -65,6 +66,7 @@ using util::math::decrement_mod;
 using util::reverse::reverse;
 
 using timing::MaybeSequencerTime;
+using doc::gui_traits::get_volume_digits;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 
@@ -615,7 +617,8 @@ struct ColumnLayout {
 
             // Volume width depends on the current chip and channel.
             {
-                auto volume_width = document.get_volume_digits(chip_index, channel_index);
+                auto volume_width =
+                    get_volume_digits(document, chip_index, channel_index);
                 subcolumns.push_back(many_cells(SubColumn_::Volume{}, volume_width));
             }
 
@@ -690,7 +693,8 @@ using ColumnList = std::vector<Column>;
             subcolumns.push_back({SubColumn_::Instrument{}, 2});
 
             {
-                auto volume_width = document.get_volume_digits(chip_index, channel_index);
+                auto volume_width =
+                    get_volume_digits(document, chip_index, channel_index);
                 subcolumns.push_back({SubColumn_::Volume{}, volume_width});
             }
 
