@@ -32,7 +32,7 @@ namespace detail {
         QStringLiteral("B"),
     };
 
-    const int8_t semitone_diatonics[12] = {
+    const MaybeUnsigned semitone_diatonics[12] = {
         0, NA, 1, NA, 2, 3, NA, 4, NA, 5, NA, 6
     };
 }

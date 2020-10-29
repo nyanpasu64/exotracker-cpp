@@ -21,8 +21,9 @@ namespace detail {
     constexpr static size_t NUM_DIATONIC = 7;
     extern const QString diatonic_names[NUM_DIATONIC];
 
-    constexpr int8_t NA = -1;
-    extern const int8_t semitone_diatonics[12];
+    using MaybeUnsigned = int8_t;
+    constexpr MaybeUnsigned NA = -1;
+    extern const MaybeUnsigned semitone_diatonics[12];
 }
 
 /// Converts a nybble into a single hex character.
@@ -60,9 +61,9 @@ using doc::events::NOTES_PER_OCTAVE;
         auto [octave, semitone] = div(note, NOTES_PER_OCTAVE);
         octave += cfg.gui_bottom_octave;
 
-        auto diatonic = detail::semitone_diatonics[semitone];
-        if (diatonic >= 0) {
-            return detail::diatonic_names[diatonic]
+        auto maybe_diatonic = detail::semitone_diatonics[semitone];
+        if (maybe_diatonic >= 0) {
+            return detail::diatonic_names[maybe_diatonic]
                 + accidental
                 + (octave < 0 ? QStringLiteral("-") : format_hex_1(octave & 0xf));
         } else if (accidental_mode == AccidentalMode::Sharp) {
