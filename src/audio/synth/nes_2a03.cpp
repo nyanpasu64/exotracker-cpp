@@ -84,6 +84,16 @@ public:
         release_assert(clocks_per_sound_update < 100);
         _chip.Reset();
 
+        // Cancel out DC. Necessary for nsfplay APU2.
+        {
+            // Tick(0) is valid. https://github.com/bbbradsmith/nsfplay/commit/14cb23159584427053a6e5456bb1f9ce8d0918d5
+            _chip.Tick(0);
+
+            std::array<xgm::INT32, 2> stereo_out;
+            _chip.Render(&stereo_out[0]);
+            _blip_synth.center_dc(stereo_out[0]);
+        }
+
         // Do *not* sample at t=0.
         // You must run nsfplay synth to produce audio to sample.
         _pq.set_timeout(SampleEvent::Sample, _clocks_per_smp);
@@ -127,10 +137,9 @@ public:
             clock += dclk;
         };
 
-        std::array<xgm::INT32, 2> stereo_out;
-
         /// Outputs audio from internal stereo [2]amplitude.
         auto take_sample = [&]() {
+            std::array<xgm::INT32, 2> stereo_out;
             _chip.Render(&stereo_out[0]);
             _blip_synth.update(
                 (blip_nclock_t) (clk_begin + clock), stereo_out[0], &blip
