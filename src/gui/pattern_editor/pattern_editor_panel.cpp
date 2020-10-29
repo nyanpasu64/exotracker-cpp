@@ -65,6 +65,8 @@ using util::math::decrement_mod;
 using util::reverse::reverse;
 
 using timing::MaybeSequencerTime;
+using chip_common::ChipIndex;
+using chip_common::ChannelIndex;
 
 PatternEditorShortcuts::PatternEditorShortcuts(QWidget * widget) :
     #define COMMA ,
@@ -327,8 +329,8 @@ void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
 // See doc.h for documentation of how patterns work.
 
 struct ChannelDraw {
-    chip_common::ChipIndex chip;
-    chip_common::ChannelIndex channel;
+    ChipIndex chip;
+    ChannelIndex channel;
     int xleft;
     int xright;
 };
@@ -437,8 +439,8 @@ struct LeftOfScreen{};
 struct RightOfScreen{};
 
 struct ColumnPx {
-    chip_common::ChipIndex chip;
-    chip_common::ChannelIndex channel;
+    ChipIndex chip;
+    ChannelIndex channel;
     int left_px;
     int right_px;
     RulerOrHandlePx block_handle;
@@ -585,12 +587,12 @@ struct ColumnLayout {
     ColumnLayout column_layout{.ruler = ruler, .cols = {}};
 
     for (
-        chip_common::ChipIndex chip_index = 0;
+        ChipIndex chip_index = 0;
         chip_index < document.chips.size();
         chip_index++
     ) {
         for (
-            chip_common::ChannelIndex channel_index = 0;
+            ChannelIndex channel_index = 0;
             channel_index < document.chip_index_to_nchan(chip_index);
             channel_index++
         ) {
@@ -651,8 +653,8 @@ struct SubColumnCells {
 using SubColumnList = std::vector<SubColumnCells>;
 
 struct Column {
-    chip_common::ChipIndex chip;
-    chip_common::ChannelIndex channel;
+    ChipIndex chip;
+    ChannelIndex channel;
     SubColumnList subcolumns;
 };
 
@@ -669,12 +671,12 @@ using ColumnList = std::vector<Column>;
     ColumnList column_list;
 
     for (
-        chip_common::ChipIndex chip_index = 0;
+        ChipIndex chip_index = 0;
         chip_index < document.chips.size();
         chip_index++
     ) {
         for (
-            chip_common::ChannelIndex channel_index = 0;
+            ChannelIndex channel_index = 0;
             channel_index < document.chip_index_to_nchan(chip_index);
             channel_index++
         ) {
