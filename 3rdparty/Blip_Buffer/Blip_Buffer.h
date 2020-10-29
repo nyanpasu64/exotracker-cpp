@@ -237,7 +237,7 @@ public:
     // When update(...Amplitude) is called,
     // the actual output value (assuming no DC removal) is around
     // (Amplitude / range) * volume * 65536.
-    Blip_Synth(unsigned int range, double volume) : impl( quality ) {
+    Blip_Synth(double volume, unsigned int range) : impl( quality ) {
         this->volume(volume, range);
     }
 };

@@ -77,7 +77,7 @@ class Synth {
 // impl
 public:
     Synth(ClockT clocks_per_sound_update)
-        : _blip_synth(RANGE, VOLUME)
+        : _blip_synth(VOLUME, RANGE)
         , _clocks_per_smp(clocks_per_sound_update)
     {
         // Sanity check.
