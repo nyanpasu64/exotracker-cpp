@@ -2700,11 +2700,14 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
         auto const & piano_keys = get_app().options().pattern_keys.piano_keys;
 
         for (auto const & [key_octave, key_row] : enumerate<int>(piano_keys)) {
-            int octave = _octave;
-            if (shift_pressed) {
-                octave += key_octave + (key_octave > 0 ? 1 : -1);
+            int octave;
+            if (is_noise(document, chip, channel)) {
+                // For noise channels, ignore global _octave, only use keyboard row.
+                octave = key_octave;
+            } else if (shift_pressed) {
+                octave = _octave + key_octave + (key_octave > 0 ? 1 : -1);
             } else {
-                octave += key_octave;
+                octave = _octave + key_octave;
             }
 
             for (auto const [semitone, curr_key] : enumerate<int>(key_row)) {
