@@ -12,7 +12,7 @@ using namespace chip_kinds;
 
 using ChipToNchanSized = EnumMap<ChipKind, ChannelIndex>;
 
-static constinit ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
+static constinit const ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
     /// EnumMap<ChipKind, ChannelIndex>
     ChipToNchanSized chip_to_nchan{};
 
