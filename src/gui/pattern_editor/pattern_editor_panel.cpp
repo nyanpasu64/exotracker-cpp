@@ -67,6 +67,7 @@ using util::reverse::reverse;
 
 using timing::MaybeSequencerTime;
 using doc::gui_traits::get_volume_digits;
+using doc::gui_traits::is_noise;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 
@@ -1812,9 +1813,13 @@ static void draw_pattern_foreground(
                             draw_release(subcolumn, note_color);
                         } else {
                             painter.setPen(note_color);
-                            QString s = format::midi_to_note_name(
-                                note_cfg, document.accidental_mode, note
-                            );
+
+                            QString s = is_noise(document, column.chip, column.channel)
+                                ? format::midi_to_noise_name(note)
+                                : format::midi_to_note_name(
+                                    note_cfg, document.accidental_mode, note
+                                );
+
                             draw_text(s, subcolumn.center_px());
                         }
 

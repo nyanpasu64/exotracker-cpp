@@ -49,4 +49,13 @@ uint8_t get_volume_digits(Document const& doc, ChipIndex chip, ChannelIndex chan
     return CHIP_CHANNEL_TO_VOLUME_DIGITS[chip_kind][channel];
 }
 
+bool is_noise(Document const& doc, ChipIndex chip, ChannelIndex channel) {
+    release_assert(chip < doc.chips.size());
+    if (doc.chips[chip] == chip_kinds::ChipKind::Nes) {
+        return channel == (ChannelIndex) chip_kinds::NesChannelID::Noise;
+    }
+
+    return false;
+}
+
 }

@@ -23,4 +23,8 @@ extern const ChipChannelToVolumeDigits CHIP_CHANNEL_TO_VOLUME_DIGITS;
     Document const& doc, ChipIndex chip, ChannelIndex channel
 );
 
+[[nodiscard]] bool is_noise(
+    Document const& doc, ChipIndex chip, ChannelIndex channel
+);
+
 }

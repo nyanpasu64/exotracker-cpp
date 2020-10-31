@@ -76,4 +76,18 @@ using doc::events::NOTES_PER_OCTAVE;
     return impl(impl, note.value, cfg.natural_char);
 }
 
+[[nodiscard]] inline QString midi_to_noise_name(doc::events::Note note) {
+    if (note.is_cut()) {
+        return QStringLiteral("---");
+    }
+    if (note.is_release()) {
+        return QStringLiteral("===");
+    }
+    if (!note.is_valid_note()) {
+        return QStringLiteral("%1?").arg(note.value);
+    }
+
+    return QStringLiteral("$%1").arg(format_hex_2((uint8_t) note.value));
+}
+
 }
