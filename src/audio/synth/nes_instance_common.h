@@ -56,11 +56,6 @@ public:
         _chip_sequencer.seek(document, time);
     }
 
-    void stop_playback() override {
-        _chip_sequencer.stop_playback();
-        _driver.stop_playback(/*mut*/ _register_writes);
-    }
-
     void tempo_changed(doc::Document const & document) override {
         _chip_sequencer.tempo_changed(document);
     }
@@ -73,25 +68,20 @@ public:
         _chip_sequencer.timeline_modified(document);
     }
 
-private:
-    void flush_register_writes() {
-        // You should not tick the driver before the previous tick finishes playing.
-        release_assert(_register_writes.num_unread() == 0);
-        _register_writes.clear();
+    void stop_playback() override {
+        _chip_sequencer.stop_playback();
+        _driver.stop_playback(/*mut*/ _register_writes);
     }
 
-public:
     SequencerTime sequencer_driver_tick(doc::Document const & document) override {
         auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);
 
-        flush_register_writes();
         _driver.driver_tick(document, channel_events, /*mut*/ _register_writes);
 
         return chip_time;
     }
 
     void driver_tick(doc::Document const & document) override {
-        flush_register_writes();
         _driver.driver_tick(document, {}, /*mut*/ _register_writes);
     }
 

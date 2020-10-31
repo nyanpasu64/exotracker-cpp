@@ -107,70 +107,71 @@ void OverallSynth::synthesize_overall(
     AudioCommand * const orig_cmd = _seen_command.load(std::memory_order_relaxed);
     AudioCommand * cmd = orig_cmd;
 
-    // Handle all commands we haven't seen yet.
+    /// Handle all commands we haven't seen yet.
+    auto handle_commands = [this, &cmd, &seq_time] () {
+        ModifiedInt total_modified = 0;
 
-    ModifiedInt total_modified = 0;
+        // Paired with CommandQueue::push() store(release).
+        for (
+            ; AudioCommand * next = cmd->next.load(std::memory_order_acquire); cmd = next
+        ) {
+            cmd_queue::MessageBody * msg = &next->msg;
 
-    // Paired with CommandQueue::push() store(release).
-    for (
-        ; AudioCommand * next = cmd->next.load(std::memory_order_acquire); cmd = next
-    ) {
-        cmd_queue::MessageBody * msg = &next->msg;
+            // Process each command from the GUI.
+            if (auto seek_to = std::get_if<cmd_queue::SeekTo>(msg)) {
+                // Seek and play.
+                _sequencer_running = true;
+                for (auto & chip : _chip_instances) {
+                    chip->stop_playback();
+                    chip->seek(_document, seek_to->time);
+                }
+                seq_time = std::nullopt;
 
-        // Process each command from the GUI.
-        if (auto seek_to = std::get_if<cmd_queue::SeekTo>(msg)) {
-            // Seek and play.
-            _sequencer_running = true;
+            } else
+            if (std::get_if<cmd_queue::StopPlayback>(msg)) {
+                // Stop playback.
+                _sequencer_running = false;
+                for (auto & chip : _chip_instances) {
+                    chip->stop_playback();
+                }
+                seq_time = std::nullopt;
+            } else
+            if (auto edit_ptr = std::get_if<cmd_queue::EditBox>(msg)) {
+                // Edit synth's copy of the document.
+                auto & edit = **edit_ptr;
+
+                // It's okay to apply edits mid-tick,
+                // since _document is only examined by the sequencer and driver,
+                // not the hardware synth.
+                edit.apply_swap(_document);
+
+                // If not _sequencer_running, edits don't matter. upon playback, we'll seek.
+                if (!_sequencer_running) {
+                    continue;
+                }
+
+                auto modified = edit.modified();
+                total_modified |= modified;
+            }
+        }
+
+        if (total_modified & ModifiedFlags::Tempo) {
             for (auto & chip : _chip_instances) {
-                chip->stop_playback();
-                chip->seek(_document, seek_to->time);
+                chip->tempo_changed(_document);
             }
-            seq_time = std::nullopt;
+        }
 
-        } else
-        if (std::get_if<cmd_queue::StopPlayback>(msg)) {
-            // Stop playback.
-            _sequencer_running = false;
+        if (total_modified & ModifiedFlags::TimelineRows) {
             for (auto & chip : _chip_instances) {
-                chip->stop_playback();
+                chip->timeline_modified(_document);
             }
-            seq_time = std::nullopt;
-        } else
-        if (auto edit_ptr = std::get_if<cmd_queue::EditBox>(msg)) {
-            // Edit synth's copy of the document.
-            auto & edit = **edit_ptr;
-
-            // It's okay to apply edits mid-tick,
-            // since _document is only examined by the sequencer and driver,
-            // not the hardware synth.
-            edit.apply_swap(_document);
-
-            // If not _sequencer_running, edits don't matter. upon playback, we'll seek.
-            if (!_sequencer_running) {
-                continue;
+            // Invalidates all sequencer state. We do not need to check the other flags.
+        } else if (total_modified & ModifiedFlags::Patterns) {
+            for (auto & chip : _chip_instances) {
+                chip->doc_edited(_document);
             }
-
-            auto modified = edit.modified();
-            total_modified |= modified;
         }
-    }
-
-    if (total_modified & ModifiedFlags::Tempo) {
-        for (auto & chip : _chip_instances) {
-            chip->tempo_changed(_document);
-        }
-    }
-
-    if (total_modified & ModifiedFlags::TimelineRows) {
-        for (auto & chip : _chip_instances) {
-            chip->timeline_modified(_document);
-        }
-        // Invalidates all sequencer state. We do not need to check the other flags.
-    } else if (total_modified & ModifiedFlags::Patterns) {
-        for (auto & chip : _chip_instances) {
-            chip->doc_edited(_document);
-        }
-    }
+    };
 
     // TODO Instrument/tuning edits might invalidate driver or cause OOB reads.
 
@@ -224,6 +225,18 @@ void OverallSynth::synthesize_overall(
 
             // This is the important one.
             case SynthEvent::Tick: {
+                // Make sure all register writes from the previous frame
+                // have been processed by the synth.
+                // Set both read and write pointers to 0,
+                // so RegisterWriteQueue won't reject further writes.
+                for (auto & chip : _chip_instances) {
+                    chip->flush_register_writes();
+                }
+
+                // We only stop or start playback at the beginning of a tick.
+                // May write to registers.
+                handle_commands();
+
                 ChipIndex const nchip = (ChipIndex) _chip_instances.size();
 
                 for (ChipIndex chip_index = 0; chip_index < nchip; chip_index++) {

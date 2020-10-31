@@ -71,11 +71,6 @@ public:
     /// (grid cell and beat fraction).
     virtual void seek(doc::Document const & document, timing::GridAndBeat time) = 0;
 
-    /// May/not mutate _register_writes.
-    /// You are required to call driver_tick() afterwards on the same tick,
-    /// or notes may not necessarily stop.
-    virtual void stop_playback() = 0;
-
     /// Similar to seek(), but ignores events entirely (only looks at tempo/rounding).
     /// Keeps position in event list, recomputes real time in ticks.
     /// Can be called before doc_edited() if both tempo and events edited.
@@ -90,6 +85,15 @@ public:
     /// Rows may be added, deleted, or change duration,
     /// so invalidate both real time and events.
     virtual void timeline_modified(doc::Document const & document) = 0;
+
+    /// Call on each tick, before calling any functions which run the driver
+    /// (stop_playback() or [sequencer_]driver_tick()).
+    void flush_register_writes();
+
+    /// May/not mutate _register_writes.
+    /// You are required to call driver_tick() afterwards on the same tick,
+    /// or notes may not necessarily stop.
+    virtual void stop_playback() = 0;
 
     /// Ticks sequencer and runs driver.
     ///

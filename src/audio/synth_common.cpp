@@ -1,4 +1,5 @@
 #include "synth_common.h"
+#include "util/release_assert.h"
 
 
 namespace audio::synth {
@@ -12,6 +13,13 @@ enum class ChipEvent {
     COUNT,
 };
 
+}
+
+
+void ChipInstance::flush_register_writes() {
+    // You should not tick the driver before the previous tick finishes playing.
+    release_assert(_register_writes.num_unread() == 0);
+    _register_writes.clear();
 }
 
 void ChipInstance::run_chip_for(
