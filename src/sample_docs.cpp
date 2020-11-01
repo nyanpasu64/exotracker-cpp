@@ -40,13 +40,14 @@ static Document empty() {
     SequencerOptions sequencer_options{.ticks_per_beat = 24};
 
     Instruments instruments;
-    instruments[0] = music_box();
+    instruments[0] = Instrument{};
+    instruments[1] = music_box();
+    instruments[2] = Instrument{.wave_index={{1}}};
 
-    ChipList chips{ChipKind::Apu1, ChipKind::Apu1};
+    ChipList chips{ChipKind::Nes};
 
     ChipChannelSettings chip_channel_settings = {
-        {{}, {}},
-        {{}, {}},
+        {{}, {}, {}, {}, {}},
     };
 
     Timeline timeline;
@@ -72,7 +73,7 @@ static Document empty() {
 
         return TimelineRow{
             .nbeats = 16,
-            .chip_channel_cells = {{move(ch0), move(ch1)}, {move(ch2), move(ch3)}},
+            .chip_channel_cells = {{move(ch0), move(ch1), move(ch2), move(ch3), {}}},
         };
     }());
 

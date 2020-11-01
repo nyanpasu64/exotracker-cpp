@@ -3,6 +3,8 @@
 #include "edit/modified.h"
 #include "util/release_assert.h"
 
+#include <fmt/core.h>
+
 #include <cstddef>  // size_t
 #include <optional>
 #include <utility>  // std::move
@@ -45,7 +47,19 @@ OverallSynth::OverallSynth(
                 break;
             }
 
-            case ChipKind::COUNT: break;
+            case ChipKind::Nes: {
+                _chip_instances.emplace_back(nes_2a03::make_NesInstance(
+                    chip_index,
+                    CLOCKS_PER_S,
+                    _document.frequency_table,
+                    _clocks_per_sound_update));
+                break;
+            }
+
+            default:
+                throw std::logic_error(fmt::format(
+                    "OverallSynth() unhandled chip_kind {}", (int) chip_kind
+                ));
         }
     }
 

@@ -18,6 +18,7 @@ static constinit ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
 
 #define INITIALIZE(chip)  chip_to_nchan[ChipKind::chip] = enum_count<chip##ChannelID>;
     INITIALIZE(Apu1)
+    INITIALIZE(Nes)
 #undef INITIALIZE
 
     for (ChannelIndex nchan : chip_to_nchan) {
@@ -42,6 +43,7 @@ using EnumArray = std::array<ValueT, enum_count<EnumT>>;
 /// APU1 pulse 1/2 has 4-bit volumes, or 1 digit.
 /// FIXME I changed it to 2 digits as a test. Remove this before pushing.
 static const EnumArray<Apu1ChannelID, uint8_t> Apu1_VOL_DIGITS{1, 2};
+static const EnumArray<NesChannelID, uint8_t> Nes_VOL_DIGITS{1, 1, 1, 1, 2};
 
 using ChipChannelToVolumeDigitsSized = EnumMap<ChipKind, uint8_t const*>;
 
@@ -51,6 +53,7 @@ static constinit ChipChannelToVolumeDigitsSized CHIP_CHANNEL_TO_VOLUME_DIGITS_SI
 
 #define INITIALIZE(chip)  out[ChipKind::chip] = chip##_VOL_DIGITS.data();
     INITIALIZE(Apu1)
+    INITIALIZE(Nes)
 #undef INITIALIZE
 
     for (auto chan_ptr : out) {

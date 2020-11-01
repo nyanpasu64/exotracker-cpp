@@ -16,6 +16,12 @@ std::unique_ptr<ChipInstance> make_Apu1Instance(
     doc::FrequenciesRef frequencies,
     ClockT clocks_per_sound_update);
 
+std::unique_ptr<ChipInstance> make_NesInstance(
+    chip_common::ChipIndex chip_index,
+    ClockT clocks_per_sec,
+    doc::FrequenciesRef frequencies,
+    ClockT clocks_per_sound_update);
+
 // End namespaces
 }
 }

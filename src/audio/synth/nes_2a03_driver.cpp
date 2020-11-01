@@ -172,9 +172,10 @@ void Apu1PulseDriver::tick(
     // Length counter is enabled based on $4015, length_halt, AND length.
     // But length_halt=1 also enables envelope looping.
 
-    // Written by FamiTracker's .nsf driver, but not necessary.
-    // _next_state.length_halt = 1;
-    // _next_state.length = 1;
+    // Set the length (table) counter to 1 (pulse is muted after it reaches 0).
+    _next_state.length = 1;
+    // Prevent length counter from being decremented (causing pulse to mute).
+    _next_state.length_halt = 1;
 
     // https://wiki.nesdev.com/w/index.php/APU_Sweep
     // >if the negate flag is false, the shift count is zero, and the current period is at least $400, the target period will be large enough to mute the channel.
@@ -207,6 +208,18 @@ Apu1Driver::Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
     , _pulse2_driver{1}
 {}
 
+
+// # Apu2Driver
+
+void Apu2Driver::stop_playback(RegisterWriteQueue &/*mut*/ register_writes) {
+}
+
+void Apu2Driver::driver_tick(
+    doc::Document const& document,
+    EnumMap<ChannelID, EventsRef> const& channel_events,
+    RegisterWriteQueue &/*mut*/ register_writes)
+{
+}
 
 #ifdef UNITTEST
 TEST_CASE("Ensure make_tuning_table() produces only valid register values.") {

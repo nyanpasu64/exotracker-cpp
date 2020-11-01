@@ -5,6 +5,7 @@
 #include "audio/event_queue.h"
 #include "chip_kinds.h"
 #include "timing_common.h"
+#include "util/copy_move.h"
 #include "util/distance.h"
 #include "util/release_assert.h"
 
@@ -18,15 +19,20 @@ namespace audio {
 namespace synth {
 namespace nes_2a03 {
 
-using chip_kinds::Apu1ChannelID;
-using timing::SequencerTime;
-using sequencer::ChipSequencer;
-using nes_instance::ImplChipInstance;
 using nes_2a03_driver::Apu1Driver;
+using nes_2a03_driver::Apu2Driver;
+using nes_2a03_driver::NesDriver;
+using nes_instance::ImplChipInstance;
+using sequencer::ChipSequencer;
+using timing::SequencerTime;
+using chip_kinds::Apu1ChannelID;
+using chip_kinds::NesChannelID;
 
 
 // APU1 single pulse wave playing at volume F produces values 0 and 1223.
 constexpr int APU1_RANGE = 3000;
+// Selected ad-hoc.
+constexpr int NES_RANGE = 6000;
 
 constexpr double VOLUME = 0.5;
 
@@ -179,6 +185,87 @@ std::unique_ptr<ChipInstance> make_Apu1Instance(
         chip_index,
         Apu1Driver(clocks_per_sec, frequencies),
         Apu1Synth(clocks_per_sound_update));
+}
+
+/// Full NES 2A03 sound chip (APU1+APU2).
+class NesSoundChip {
+private:
+    using ChannelID = NesChannelID;
+
+// fields
+    // Synth objects
+    xgm::NES_APU _apu1;
+
+    // xgm::NES_DMC holds references to xgm::NES_APU.
+    // As a result, _apu2 is stored after _apu1, so _apu2 gets destroyed first.
+    xgm::NES_DMC _apu2;
+
+// impl
+public:
+    DISABLE_COPY(NesSoundChip)
+
+    /// _apu2 points to _apu1.
+    /// When move-constructing NesSoundChip, fix the new _apu2's pointer.
+    /// This is a non-owning pointer, so no double-free occurs when `other` is destroyed.
+    NesSoundChip(NesSoundChip && other) : _apu1(other._apu1), _apu2(other._apu2) {
+        _apu2.SetAPU(&_apu1);
+    }
+
+    /// Not necessary to implement this.
+    NesSoundChip & operator=(NesSoundChip &&) = delete;
+
+    // Constructors
+    explicit NesSoundChip() {}
+
+    void Reset() {
+        _apu2.SetAPU(&_apu1);
+
+        _apu1.Reset();
+        _apu2.Reset();
+    }
+
+    bool Write (uint32_t adr, uint32_t val) {
+        bool out = false;
+
+        // not short-circuiting
+        out |= _apu1.Write(adr, val);
+        out |= _apu2.Write(adr, val);
+
+        return out;
+    }
+
+    void Tick(uint32_t clocks) {
+        // may call FrameSequence() on both APU1 and APU2.
+        _apu2.TickFrameSequence(clocks);
+
+        _apu1.Tick(clocks);
+        _apu2.Tick(clocks);
+    }
+
+    void Render(int32_t out[2]) {
+        int32_t temp[2];
+
+        _apu1.Render(out);
+
+        _apu2.Render(temp);
+        out[0] += temp[0];
+        out[1] += temp[1];
+    }
+};
+
+using NesSynth = Synth<NesSoundChip, NES_RANGE>;
+using NesInstance = ImplChipInstance<NesDriver, NesSynth>;
+
+std::unique_ptr<ChipInstance> make_NesInstance(
+    chip_common::ChipIndex chip_index,
+    ClockT clocks_per_sec,
+    doc::FrequenciesRef frequencies,
+    ClockT clocks_per_sound_update)
+{
+    return std::make_unique<NesInstance>(
+        chip_index,
+        NesDriver(clocks_per_sec, frequencies),
+        NesSynth(clocks_per_sound_update));
 }
 
 // End namespaces

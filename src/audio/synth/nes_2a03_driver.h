@@ -18,6 +18,7 @@ namespace audio::synth::nes_2a03_driver {
 using namespace doc::tuning;
 using namespace music_driver;
 using chip_kinds::Apu1ChannelID;
+using chip_kinds::NesChannelID;
 using sequencer::EventsRef;
 
 // Pulse 1/2 driver
@@ -157,6 +158,67 @@ public:
     }
 };
 
+
+
+class Apu2Driver {
+// types
+    // Apu2ChannelID was removed. Apu2Driver cannot be used standalone.
+    using ChannelID = NesChannelID;
+
+// impl
+public:
+    Apu2Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
+    {}
+
+    DISABLE_COPY(Apu2Driver)
+    DEFAULT_MOVE(Apu2Driver)
+
+    void stop_playback(RegisterWriteQueue &/*mut*/ register_writes);
+
+    void driver_tick(
+        doc::Document const& document,
+        EnumMap<ChannelID, EventsRef> const& channel_events,
+        RegisterWriteQueue &/*mut*/ register_writes);
+};
+
+class NesDriver {
+public:
+    using ChannelID = NesChannelID;
+
+// fields
+private:
+    Apu1Driver _apu1_driver;
+    Apu2Driver _apu2_driver;
+
+// impl
+public:
+    NesDriver(ClockT clocks_per_sec, FrequenciesRef frequencies)
+        : _apu1_driver(clocks_per_sec, frequencies)
+        , _apu2_driver(clocks_per_sec, frequencies)
+    {}
+
+    void stop_playback(RegisterWriteQueue &/*mut*/ register_writes) {
+        _apu1_driver.stop_playback(register_writes);
+        _apu2_driver.stop_playback(register_writes);
+    }
+
+    void driver_tick(
+        doc::Document const& document,
+        EnumMap<ChannelID, EventsRef> const& channel_events,
+        RegisterWriteQueue &/*mut*/ register_writes)
+    {
+        {
+            EnumMap<Apu1ChannelID, EventsRef> apu1_events;
+            apu1_events[Apu1ChannelID::Pulse1] = channel_events[ChannelID::Pulse1];
+            apu1_events[Apu1ChannelID::Pulse2] = channel_events[ChannelID::Pulse2];
+            _apu1_driver.driver_tick(document, apu1_events, register_writes);
+        }
+
+        // _apu2_driver uses NesChannelID and is not usable by itself.
+        // But no conversions i guess...
+        _apu2_driver.driver_tick(document, channel_events, register_writes);
+    }
+};
 
 // namespace
 }
