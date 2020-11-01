@@ -126,6 +126,8 @@ TEST_PUBLIC:
     Apu1PulseDriver _pulse1_driver;
     Apu1PulseDriver _pulse2_driver;
 
+    static constexpr int PULSE_PERIOD = 16;
+
 public:
     Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies);
 
@@ -158,16 +160,176 @@ public:
     }
 };
 
+// # Apu2TriDriver
 
+class Apu2TriDriver {
+// types
+    struct Envelopes {
+        ITER_TYPE(volume) volume;
+
+        /// Not used, but we want to make sure foreach() can handle i16 as well as u8.
+        ITER_TYPE(pitch) pitch;
+
+        ITER_TYPE(arpeggio) arpeggio;
+
+        Envelopes();
+
+        template<typename Func>
+        void foreach(Func f) {
+            f(volume);
+            f(pitch);
+            f(arpeggio);
+        }
+    };
+
+    BEGIN_BITFIELD_TYPE(Registers, int32_t)
+        // Access bit fields.
+    //  ADD_BITFIELD_MEMBER(memberName,     offset,         bits)
+        ADD_BITFIELD_MEMBER(linear,         BYTE(0) + 0,    7)
+        ADD_BITFIELD_MEMBER(control,        BYTE(0) + 7,    1)
+
+        // Period: clock/cycle = (period_reg + 1) * 32
+        ADD_BITFIELD_MEMBER(period_reg,     BYTE(2) + 0,    BYTE(1) + 3)
+        ADD_BITFIELD_MEMBER(length,         BYTE(3) + 3,    5)
+
+        // Access raw bytes in endian-independent fashion.
+        constexpr static Address BYTES = 4;
+        ADD_BITFIELD_ARRAY(bytes, /*offset*/ 0, /*bits*/ 8, /*numItems*/ BYTES)
+    END_BITFIELD_TYPE()
+
+// constants
+public:
+    static constexpr int MAX_PERIOD = decltype(Registers::period_reg)::Maximum;
+
+private:
+    static constexpr int TRI_PERIOD = 32;
+
+// fields
+private:
+    TuningOwned _tuning_table;
+
+    Envelopes _envs{};
+    doc::Note _prev_note = 0;
+    bool _prev_volume = true;
+
+    bool _first_tick_occurred = false;
+    Registers _prev_state = 0;
+    Registers _next_state = 0;
+
+// impl
+public:
+    Apu2TriDriver(ClockT clocks_per_sec, FrequenciesRef frequencies);
+
+    Apu2TriDriver(TuningOwned _tuning_table) noexcept;
+
+    void stop_playback(RegisterWriteQueue &/*mut*/ register_writes);
+
+    void tick(
+        doc::Document const& document,
+        EventsRef events,
+        RegisterWriteQueue &/*mut*/ register_writes);
+};
+
+class Apu2NoiseDriver {
+// types
+    struct Envelopes {
+        ITER_TYPE(volume) volume;
+        ITER_TYPE(arpeggio) arpeggio;
+        ITER_TYPE(wave_index) wave_index;
+
+        Envelopes();
+
+        template<typename Func>
+        void foreach(Func f) {
+            f(volume);
+            f(arpeggio);
+            f(wave_index);
+        }
+    };
+
+    BEGIN_BITFIELD_TYPE(Registers, int32_t)
+        // Access bit fields.
+    //  ADD_BITFIELD_MEMBER(memberName,     offset,         bits)
+        ADD_BITFIELD_MEMBER(volume,         BYTE(0) + 0,    4)
+        ADD_BITFIELD_MEMBER(const_vol,      BYTE(0) + 4,    1)
+        ADD_BITFIELD_MEMBER(length_halt,    BYTE(0) + 5,    1)
+
+        ADD_BITFIELD_MEMBER(period_reg,     BYTE(2) + 0,    4)
+        ADD_BITFIELD_MEMBER(pitched,        BYTE(2) + 7,    1)
+
+        ADD_BITFIELD_MEMBER(length,         BYTE(3) + 3,    5)
+
+        // Access raw bytes in endian-independent fashion.
+        constexpr static Address BYTES = 4;
+        ADD_BITFIELD_ARRAY(bytes, /*offset*/ 0, /*bits*/ 8, /*numItems*/ BYTES)
+    END_BITFIELD_TYPE()
+
+// constants
+public:
+    static constexpr int MAX_VOLUME = decltype(Registers::volume)::Maximum;
+    static constexpr int MAX_PERIOD = decltype(Registers::period_reg)::Maximum;
+
+// fields
+private:
+    Envelopes _envs{};
+    doc::Note _prev_note = 0;
+    int _prev_volume = MAX_VOLUME;
+
+    bool _first_tick_occurred = false;
+    Registers _prev_state = 0;
+    Registers _next_state = 0;
+
+// impl
+public:
+    Apu2NoiseDriver() noexcept;
+
+    DISABLE_COPY(Apu2NoiseDriver)
+    DEFAULT_MOVE(Apu2NoiseDriver)
+
+    void stop_playback(RegisterWriteQueue &/*mut*/ register_writes);
+
+    void tick(
+        doc::Document const& document,
+        EventsRef events,
+        RegisterWriteQueue &/*mut*/ register_writes);
+};
+
+/// Stub driver, only used to set DMC level ($4011).
+class Apu2DpcmDriver {
+public:
+    Apu2DpcmDriver() = default;
+    DISABLE_COPY(Apu2DpcmDriver)
+    DEFAULT_MOVE(Apu2DpcmDriver)
+
+private:
+    void set_dmc(RegisterWriteQueue &/*mut*/ register_writes, Byte amplitude);
+
+public:
+    void stop_playback(RegisterWriteQueue &/*mut*/ register_writes);
+
+    void tick(
+        doc::Document const& document,
+        EventsRef events,
+        RegisterWriteQueue &/*mut*/ register_writes);
+};
 
 class Apu2Driver {
 // types
     // Apu2ChannelID was removed. Apu2Driver cannot be used standalone.
     using ChannelID = NesChannelID;
 
+// fields
+TEST_PUBLIC:
+    Apu2TriDriver _tri_driver;
+    Apu2NoiseDriver _noise_driver;
+    Apu2DpcmDriver _dpcm_driver;
+
 // impl
 public:
     Apu2Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
+        : _tri_driver(clocks_per_sec, frequencies)
+        , _noise_driver()
+        , _dpcm_driver()
     {}
 
     DISABLE_COPY(Apu2Driver)

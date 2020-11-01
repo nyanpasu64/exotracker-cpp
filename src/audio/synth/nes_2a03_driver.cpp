@@ -14,45 +14,38 @@ namespace audio::synth::nes_2a03_driver {
 using doc::Instrument;
 
 /// given: frequency
-/// find: period_reg clamped between [$0, $7FF]
+/// find: period_reg clamped between [$0, max_register] (for 2a03, $7ff)
 static RegisterInt register_quantize(
-    FreqDouble const cycles_per_second, ClockT const clocks_per_second
-) {
-    /*
-    period [clock/cycle] = 16 * (period_reg + 1)
-    period [clock/s]/[cycle/s] = clocks_per_second / frequency
-
-    16 * (period_reg + 1) = clocks_per_second / frequency   </16, -1>
-    period_reg = clocks_per_second / frequency / 16, -clamped 1
-    */
-
-    int reg = (int) lround(clocks_per_second / (cycles_per_second * 16) - 1);
+    FreqDouble cycles__second,
+    ClockT clocks__second,
+    int samples__cycle,
+    int max_register)
+{
+    auto clocks__sample = clocks__second / (samples__cycle * cycles__second);
+    int reg = (int) lround(clocks__sample - 1);
     // Clamps to [lo, hi] inclusive.
-    reg = std::clamp(reg, 0, Apu1PulseDriver::MAX_PERIOD);
+    reg = std::clamp(reg, 0, max_register);
     return reg;
 }
 
-#ifdef UNITTEST
-TEST_CASE("Ensure register_quantize() produces correct values.") {
-    // 0CC-FamiTracker uses 1789773 as the master clock rate.
-    // Given A440, it writes $0FD to the APU1 pulse period.
-    CHECK(register_quantize(440, 1789773) == 0x0FD);
-}
-#endif
-
 static TuningOwned make_tuning_table(
-    FrequenciesRef const frequencies,  // cycle/s
-    ClockT const clocks_per_second  // clock/s
-) {
+    FrequenciesRef frequencies,  // cycle/s
+    ClockT clocks__second,  // NES clock rate
+    int samples__cycle,  // Varies by pulse vs. tri
+    int max_register)
+{
     TuningOwned out;
     out.resize(doc::CHROMATIC_COUNT);
 
     for (size_t i = 0; i < doc::CHROMATIC_COUNT; i++) {
-        out[i] = register_quantize(frequencies[i], clocks_per_second);
+        out[i] = register_quantize(
+            frequencies[i], clocks__second, samples__cycle, max_register
+        );
     }
     return out;
 }
 
+// # Apu1PulseDriver
 
 Apu1PulseDriver::Envelopes::Envelopes()
     : volume(&Instrument::volume, MAX_VOLUME)
@@ -67,9 +60,7 @@ Apu1PulseDriver::Apu1PulseDriver(
     , _base_address(Address(0x4000 + 0x4 * pulse_num))
 {}
 
-void Apu1PulseDriver::stop_playback(
-    [[maybe_unused]] RegisterWriteQueue & register_writes
-) {
+void Apu1PulseDriver::stop_playback(RegisterWriteQueue &) {
     /*
     When we stop all notes, we want to reset all mutable state
     (except for cached register contents).
@@ -203,15 +194,248 @@ void Apu1PulseDriver::tick(
 static_assert(std::is_move_constructible_v<Apu1Driver>, "");
 
 Apu1Driver::Apu1Driver(ClockT clocks_per_sec, FrequenciesRef frequencies)
-    : _tuning_table(make_tuning_table(frequencies, clocks_per_sec))
+    : _tuning_table(make_tuning_table(
+        frequencies, clocks_per_sec, PULSE_PERIOD, Apu1PulseDriver::MAX_PERIOD
+    ))
     , _pulse1_driver{0}
     , _pulse2_driver{1}
 {}
+
+// # Apu2TriDriver
+
+Apu2TriDriver::Envelopes::Envelopes()
+    : volume{&Instrument::volume, 1}
+    , pitch{&Instrument::pitch, 0}
+    , arpeggio{&Instrument::arpeggio, 0}
+{}
+
+Apu2TriDriver::Apu2TriDriver(ClockT clocks_per_sec, FrequenciesRef frequencies)
+    : _tuning_table(make_tuning_table(
+        frequencies, clocks_per_sec, TRI_PERIOD, MAX_PERIOD
+    ))
+{}
+
+Apu2TriDriver::Apu2TriDriver(TuningOwned tuning_table) noexcept
+    : _tuning_table(std::move(tuning_table))
+{}
+
+void Apu2TriDriver::stop_playback(RegisterWriteQueue &/*mut*/) {
+    // sets _next_state = silence.
+    // Setting _prev_state is unnecessary because _first_tick_occurred is false
+    // and the next tick will overwrite all registers.
+    *this = Apu2TriDriver(std::move(_tuning_table));
+}
+
+void Apu2TriDriver::tick(
+    doc::Document const& document,
+    EventsRef events,
+    RegisterWriteQueue &/*mut*/ register_writes
+) {
+    for (doc::RowEvent event : events) {
+        if (event.note.has_value()) {
+            doc::Note note = *event.note;
+
+            if (note.is_valid_note()) {
+                ENV_FOREACH(_envs, iter, iter.note_on(event.instr));
+                _prev_note = note;
+
+            } else if (note.is_release()) {
+                ENV_FOREACH(_envs, iter, iter.release(document));
+
+            } else if (note.is_cut()) {
+                ENV_FOREACH(_envs, iter, iter.note_cut());
+            }
+        }
+        if (event.instr.has_value()) {
+            ENV_FOREACH(_envs, iter, iter.switch_instrument(*event.instr))
+        }
+        if (event.volume.has_value()) {
+            _prev_volume = *event.volume != 0;
+        }
+    }
+
+    // https://wiki.nesdev.com/w/index.php/APU_Triangle
+
+    bool reload_linear_counter = false;
+
+    // Set chip volume and increment volume envelope.
+    {
+        bool playing = _prev_volume && _envs.volume.next(document);
+        if (playing) {
+            // Bit 6:0=1111111: Set the linear counter to nonzero to enable tri.
+            // Bit 7=1: stop the length (table) counter from ticking
+            // and keep writing a nonzero value to the linear counter
+            // to keep tri playing.
+            _next_state.bytes[0] = 0xff;
+
+            // Reload linear counter to trigger playback.
+            // (Why is this necessary?)
+            reload_linear_counter = true;
+
+        } else {
+            // Bit 6:0=0000000: Set the linear counter to zero to mute tri.
+            // Bit 7=1: stop the length (table) counter from ticking
+            // and keep writing zero value to the linear counter (meaningless).
+            _next_state.bytes[0] = 0x80;
+        }
+    }
+
+    // ignore _envs.pitch until we implement pitch envelopes.
+
+    // Set chip pitch and increment arpeggio envelope.
+    _next_state.period_reg = [&] {
+        // In 0CC, arpeggios are processed and pitch registers are written to
+        // even if volume is 0, but not after a note cut.
+        //
+        // Changing pitch may write to $4003, which resets phase and creates a click.
+        // There is a way to avoid this click: http://forums.nesdev.com/viewtopic.php?t=231
+        // I did not implement that method, so I get clicks.
+        auto note = _prev_note.value + _envs.arpeggio.next(document);
+        note = std::clamp(note, 0, doc::CHROMATIC_COUNT - 1);
+        return _tuning_table[(size_t) note];
+    }();
+
+    // Output register writes.
+    if (!_first_tick_occurred || _next_state.bytes[0] != _prev_state.bytes[0]) {
+        register_writes.push_write({0x4008, Byte(_next_state.bytes[0])});
+    }
+
+    // $4009 is unused.
+    if (!_first_tick_occurred || _next_state.bytes[2] != _prev_state.bytes[2]) {
+        register_writes.push_write({0x400A, Byte(_next_state.bytes[2])});
+    }
+
+    // $400B has the side effect of reloading the linear counter.
+    // So unconditionally write it if desired.
+    if (
+        !_first_tick_occurred ||
+        reload_linear_counter ||
+        _next_state.bytes[3] != _prev_state.bytes[3]
+    ) {
+        register_writes.push_write({0x400B, Byte(_next_state.bytes[3])});
+    }
+
+    _first_tick_occurred = true;
+    _prev_state = _next_state;
+    return;
+}
+
+// # Apu2NoiseDriver
+
+Apu2NoiseDriver::Envelopes::Envelopes()
+    : volume(&Instrument::volume, MAX_VOLUME)
+    , arpeggio(&Instrument::arpeggio, 0)
+    , wave_index(&Instrument::wave_index, 0)
+{}
+
+Apu2NoiseDriver::Apu2NoiseDriver() noexcept {
+}
+
+void Apu2NoiseDriver::stop_playback(RegisterWriteQueue &/*mut*/) {
+    *this = Apu2NoiseDriver();
+}
+
+void Apu2NoiseDriver::tick(
+    doc::Document const& document,
+    EventsRef events,
+    RegisterWriteQueue &/*mut*/ register_writes)
+{
+    for (doc::RowEvent event : events) {
+        if (event.note.has_value()) {
+            doc::Note note = *event.note;
+
+            if (note.is_valid_note()) {
+                ENV_FOREACH(_envs, iter, iter.note_on(event.instr));
+                _prev_note = note;
+
+            } else if (note.is_release()) {
+                ENV_FOREACH(_envs, iter, iter.release(document));
+            } else if (note.is_cut()) {
+                ENV_FOREACH(_envs, iter, iter.note_cut());
+            }
+        }
+        if (event.instr.has_value()) {
+            ENV_FOREACH(_envs, iter, iter.switch_instrument(*event.instr))
+        }
+        if (event.volume.has_value()) {
+            _prev_volume = std::clamp(int(*event.volume), 0, MAX_VOLUME);
+        }
+    }
+
+    // Set chip volume and increment volume envelope.
+    _next_state.volume =
+        volume_calc::volume_mul_4x4_4(_prev_volume, _envs.volume.next(document));
+
+    // Set noise/pitched and increment duty envelope.
+    _next_state.pitched = _envs.wave_index.next(document) & 1;
+
+    // Set noise pitch and increment arpeggio envelope.
+    _next_state.period_reg =
+        ((_prev_note.value + _envs.arpeggio.next(document)) & 0xf) ^ 0xf;
+
+    // https://wiki.nesdev.com/w/index.php/APU_Envelope
+    _next_state.const_vol = 1;
+
+    // Set the length (table) counter to 1 (noise is muted after it reaches 0).
+    _next_state.length = 1;
+    // Prevent length counter from being decremented (causing noise to mute).
+    _next_state.length_halt = 1;
+
+    for (Address byte_idx = 0; byte_idx < Registers::BYTES; byte_idx++) {
+        if (
+            !_first_tick_occurred
+            || _next_state.bytes[byte_idx] != _prev_state.bytes[byte_idx]
+        ) {
+            auto write = RegisterWrite{
+                .address = (Address) (0x400C + byte_idx),
+                .value = (Byte) (_next_state.bytes[byte_idx])
+            };
+            register_writes.push_write(write);
+        }
+    }
+    _first_tick_occurred = true;
+    _prev_state = _next_state;
+    return;
+}
+
+// # Apu2DpcmDriver
+
+void Apu2DpcmDriver::set_dmc(
+    RegisterWriteQueue &/*mut*/ register_writes, Byte amplitude
+) {
+    register_writes.push_write({0x4011, amplitude});
+}
+
+void Apu2DpcmDriver::stop_playback(RegisterWriteQueue &/*mut*/ register_writes) {
+    register_writes.push_write({0x4011, 0});
+}
+
+void Apu2DpcmDriver::tick(
+    doc::Document const& document,
+    EventsRef events,
+    RegisterWriteQueue &/*mut*/ register_writes)
+{
+    for (doc::RowEvent event : events) {
+        if (event.note.has_value()) {
+            doc::Note note = *event.note;
+
+            if (note.is_cut()) {
+                set_dmc(register_writes, 0);
+            }
+        }
+        if (event.volume.has_value()) {
+            set_dmc(register_writes, *event.volume);
+        }
+    }
+}
 
 
 // # Apu2Driver
 
 void Apu2Driver::stop_playback(RegisterWriteQueue &/*mut*/ register_writes) {
+    _tri_driver.stop_playback(register_writes);
+    _noise_driver.stop_playback(register_writes);
+    _dpcm_driver.stop_playback(register_writes);
 }
 
 void Apu2Driver::driver_tick(
@@ -219,13 +443,20 @@ void Apu2Driver::driver_tick(
     EnumMap<ChannelID, EventsRef> const& channel_events,
     RegisterWriteQueue &/*mut*/ register_writes)
 {
+    _tri_driver.tick(document, channel_events[ChannelID::Tri], register_writes);
+    _noise_driver.tick(document, channel_events[ChannelID::Noise], register_writes);
+    _dpcm_driver.tick(document, channel_events[ChannelID::Dpcm], register_writes);
 }
 
 #ifdef UNITTEST
 TEST_CASE("Ensure make_tuning_table() produces only valid register values.") {
     // 0CC-FamiTracker uses 1789773 as the master clock rate.
     // Given A440, it writes $0FD to the APU1 pulse period.
-    CHECK(register_quantize(440, 1789773) == 0x0FD);
+    CHECK(
+        register_quantize(
+            440, 1789773, Apu1Driver::PULSE_PERIOD, Apu1PulseDriver::MAX_PERIOD
+        ) == 0x0FD
+    );
 
     FrequenciesOwned freq;
     freq.resize(doc::CHROMATIC_COUNT);
@@ -234,7 +465,10 @@ TEST_CASE("Ensure make_tuning_table() produces only valid register values.") {
     freq[2] = 1'000'000;
     freq[3] = 1'000'000'000;
 
-    TuningOwned tuning_table = make_tuning_table(freq, 1789773);
+    TuningOwned tuning_table =
+        make_tuning_table(
+            freq, 1789773, Apu1Driver::PULSE_PERIOD, Apu1PulseDriver::MAX_PERIOD
+        );
     // 2A03 has 11-bit tuning registers.
     for (RegisterInt reg : tuning_table) {
         CHECK(0 <= reg);
