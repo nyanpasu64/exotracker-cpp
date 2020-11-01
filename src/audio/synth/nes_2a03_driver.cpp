@@ -182,7 +182,7 @@ void Apu1PulseDriver::tick(
     _next_state.bytes[1] = 0x08;
 
 
-    for (Address byte_idx = 0; byte_idx < Apu1Reg::BYTES; byte_idx++) {
+    for (Address byte_idx = 0; byte_idx < Registers::BYTES; byte_idx++) {
         if (
             !_first_tick_occurred
             || _next_state.bytes[byte_idx] != _prev_state.bytes[byte_idx]

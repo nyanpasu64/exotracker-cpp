@@ -55,7 +55,7 @@ class Apu1PulseDriver {
     // The read value can only be negative
     // if the ADD_BITFIELD_MEMBER has the same length as the storage type
     // (AKA the type returned by member accesses).
-    BEGIN_BITFIELD_TYPE(Apu1Reg, int32_t)
+    BEGIN_BITFIELD_TYPE(Registers, int32_t)
         // Access bit fields.
     //  ADD_BITFIELD_MEMBER(memberName,     offset,         bits)
         ADD_BITFIELD_MEMBER(volume,         BYTE(0) + 0,    4)
@@ -74,9 +74,9 @@ class Apu1PulseDriver {
 
 // constants
 public:
-    static constexpr int MAX_VOLUME = decltype(Apu1Reg::volume)::Maximum;
+    static constexpr int MAX_VOLUME = decltype(Registers::volume)::Maximum;
     static_assert (MAX_VOLUME == 15, "huh?");
-    static constexpr int MAX_PERIOD = decltype(Apu1Reg::period_reg)::Maximum;
+    static constexpr int MAX_PERIOD = decltype(Registers::period_reg)::Maximum;
 
 // fields
 private:
@@ -90,8 +90,8 @@ private:
     doc::Note _prev_note = 0;
     int _prev_volume = MAX_VOLUME;
 
-    Apu1Reg _prev_state = 0;
-    Apu1Reg _next_state = 0;
+    Registers _prev_state = 0;
+    Registers _next_state = 0;
 
 // impl
 public:
@@ -106,7 +106,7 @@ public:
     // so after Apu1PulseDriver writes to channels,
     // Apu1Driver can toggle hardware envelopes.
     void tick(
-        doc::Document const & document,
+        doc::Document const& document,
         TuningRef tuning_table,
         EventsRef events,
         RegisterWriteQueue &/*mut*/ register_writes
@@ -137,8 +137,8 @@ public:
     }
 
     void driver_tick(
-        doc::Document const & document,
-        EnumMap<ChannelID, EventsRef> const & channel_events,
+        doc::Document const& document,
+        EnumMap<ChannelID, EventsRef> const& channel_events,
         RegisterWriteQueue &/*mut*/ register_writes
     ) {
         _pulse1_driver.tick(
