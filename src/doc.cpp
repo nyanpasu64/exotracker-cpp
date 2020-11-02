@@ -1,6 +1,7 @@
 #include "doc.h"
 #include "chip_kinds.h"
 #include "util/enum_map.h"
+#include "util/enumerate.h"
 #include "util/release_assert.h"
 
 #include <cmath>  // pow
@@ -44,6 +45,9 @@ Document Document::clone() const {
 void post_init(Document & document) {
     // Set tables to the correct length.
     document.instruments.v.resize(MAX_INSTRUMENTS);
+
+    // We could assert instead of resizing,
+    // but that makes it more difficult for unit tests to construct test documents.
     document.frequency_table.resize(CHROMATIC_COUNT);
 
     release_assert_equal(document.chip_channel_settings.size(), document.chips.size());
@@ -58,7 +62,13 @@ void post_init(Document & document) {
 
     // Reserve 32 elements to ensure that adding blocks is bounded-time.
     for (auto & row : document.timeline) {
-        for (auto & chan_cells : row.chip_channel_cells) {
+        release_assert_equal(row.chip_channel_cells.size(), document.chips.size());
+
+        for (
+            auto const& [chip, chan_cells]
+            : enumerate<ChipIndex>(row.chip_channel_cells)
+        ) {
+            release_assert_equal(chan_cells.size(), document.chip_index_to_nchan(chip));
             for (auto & cell : chan_cells) {
                 cell._raw_blocks.reserve(MAX_BLOCKS_PER_CELL);
             }
