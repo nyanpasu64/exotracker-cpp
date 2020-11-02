@@ -191,7 +191,7 @@ static Document world_revolution() {
 
     Instruments instruments;
 
-    InstrumentIndex BASS = 0;
+    constexpr InstrumentIndex BASS = 0;
     instruments[BASS] = Instrument {
         .volume = {{7, 7, 7, 7, 7, 3}},
         .pitch = {{}},
@@ -199,7 +199,7 @@ static Document world_revolution() {
         .wave_index = {{1, 1, 1, 0}},
     };
 
-    InstrumentIndex TRUMPET = 1;
+    constexpr InstrumentIndex TRUMPET = 1;
     instruments[TRUMPET] = Instrument {
         .volume = {{5, 6, 7, 8, 8, 9}},
         .pitch = {{}},
@@ -207,8 +207,14 @@ static Document world_revolution() {
         .wave_index = {{1, 1, 0}},
     };
 
-    ChipList chips{ChipKind::Apu1};
-    ChipChannelSettings chip_channel_settings{{{}, {}}};
+    constexpr InstrumentIndex TAMBOURINE = 2;
+    instruments[TAMBOURINE] = Instrument{
+        .volume = {{15, 15, 12, 10, 8, 6, 5, 8, 4, 2, 6, 4, 2, 4, 2, 1, 2, 1, 0, 2, 1, 0, 1, 0, 0}},
+        .wave_index = {{0, 1}},
+    };
+
+    ChipList chips{ChipKind::Nes};
+    ChipChannelSettings chip_channel_settings{{{}, {}, {}, {}, {}}};
 
     Timeline timeline;
 
@@ -233,6 +239,25 @@ static Document world_revolution() {
 
         return out;
     };
+
+    constexpr Note NOISE_HIGH = 0xD;
+    constexpr Note NOISE_LOW = 0xC;
+
+    auto noise_loop = TimelineCell{TimelineBlock::from_events({
+        Ev(0, NOISE_HIGH).instr(TAMBOURINE),
+        Ev(at(0, 1, 2), NOISE_LOW),
+        Ev(at(1, 1, 2), NOISE_HIGH),
+        Ev(at(2, 1, 2), NOISE_LOW),
+        Ev(4, NOISE_HIGH),
+        Ev(at(4, 1, 2), NOISE_LOW),
+        Ev(at(5, 1, 2), NOISE_HIGH),
+        Ev(at(6, 1, 2), NOISE_LOW),
+        Ev(7, NOISE_LOW),
+    }, 8)};
+
+    auto dpcm_level = TimelineCell{TimelineBlock::from_events({
+        Ev(0, {}).volume(0x7f)
+    })};
 
     timeline.push_back([&]() -> TimelineRow {
         // Add two blocks into one grid cell, as a test case.
@@ -286,9 +311,30 @@ static Document world_revolution() {
             TimelineBlock{12, 16, Pattern{generate_bass(1, 7), 1}},
         };
 
+        auto tri = TimelineCell{
+            TimelineBlock{0, 8, {{
+                // 0
+                Ev(0, pitch(5, 9)),
+                Ev(at(3, 2, 4), pitch(5, 7)),
+                Ev(at(3, 3, 4), pitch(5, 9)),
+                Ev(4, pitch(5, 7)),
+                Ev(6, pitch(5, 4)),
+            }}},
+            TimelineBlock{8, 16, {{
+                // 8
+                Ev(0, pitch(5, 9)),
+                Ev(at(3, 2, 4), pitch(5, 7)),
+                Ev(at(3, 3, 4), pitch(5, 9)),
+                Ev(4, pitch(6, 0)),
+                Ev(6, pitch(6, -1)),
+            }}},
+        };
+
         return TimelineRow{
             .nbeats = 16,
-            .chip_channel_cells = {{move(ch0), move(ch1)}},
+            .chip_channel_cells = {{
+                move(ch0), move(ch1), move(tri), noise_loop, dpcm_level
+            }},
         };
     }());
     timeline.push_back([&]() -> TimelineRow {
@@ -312,9 +358,22 @@ static Document world_revolution() {
         })};
         auto ch1 = TimelineCell{TimelineBlock::from_events(generate_bass(8))};
 
+        auto tri = TimelineCell{
+            TimelineBlock{0, 8, {{
+                // 0
+                Ev(0, pitch(5, 9)),
+                Ev(at(3, 2, 4), pitch(5, 7)),
+                Ev(at(3, 3, 4), pitch(5, 9)),
+                Ev(4, pitch(5, 7)),
+                Ev(6, pitch(5, 4)),
+            }}},
+        };
+
         return TimelineRow {
             .nbeats = 8,
-            .chip_channel_cells = {{move(ch0), move(ch1)}},
+            .chip_channel_cells = {{
+                move(ch0), move(ch1), move(tri), noise_loop, dpcm_level
+            }},
     };
     }());
 
