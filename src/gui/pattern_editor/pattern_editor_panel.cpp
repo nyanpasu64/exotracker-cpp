@@ -68,6 +68,7 @@ using util::reverse::reverse;
 using timing::MaybeSequencerTime;
 using doc::gui_traits::get_volume_digits;
 using doc::gui_traits::is_noise;
+using doc::gui_traits::channel_name;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 
@@ -820,8 +821,7 @@ static void draw_header(
         painter.drawText(
             header::TEXT_X,
             header::TEXT_Y,
-            QString("chip %1 chan %2").arg(chip).arg(channel)
-        );
+            QString(channel_name(document, chip, channel)));
 
         draw_header_border(channel_rect);
     }
