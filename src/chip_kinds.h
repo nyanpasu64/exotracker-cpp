@@ -6,10 +6,15 @@
 
 namespace chip_kinds {
 
+#define FOREACH_CHIP_KIND(X) \
+    X(Apu1) \
+    X(Nes)
+
 /// List of sound chips supported.
 enum class ChipKind : uint32_t {
-    Apu1,
-    Nes,
+    #define DEF_ENUM_MEMBER(NAME)  NAME,
+    FOREACH_CHIP_KIND(DEF_ENUM_MEMBER)
+    #undef DEF_ENUM_MEMBER
 
     COUNT,
 };

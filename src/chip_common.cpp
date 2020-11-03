@@ -17,17 +17,8 @@ static constinit const ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
     ChipToNchanSized chip_to_nchan{};
 
     #define INITIALIZE(chip)  chip_to_nchan[ChipKind::chip] = enum_count<chip##ChannelID>;
-    INITIALIZE(Apu1)
-    INITIALIZE(Nes)
+    FOREACH_CHIP_KIND(INITIALIZE)
     #undef INITIALIZE
-
-    for (ChannelIndex nchan : chip_to_nchan) {
-        if (nchan == 0) {
-            throw std::logic_error(
-                "Code error: ChipKind without an initialized channel count!"
-            );
-        }
-    }
 
     return chip_to_nchan;
 }();

@@ -25,17 +25,8 @@ ChipChannelToVolumeDigitsSized CHIP_CHANNEL_TO_VOLUME_DIGITS_SIZED = []() {
     ChipChannelToVolumeDigitsSized out{};
 
     #define INITIALIZE(chip)  out[ChipKind::chip] = chip##_VOL_DIGITS.data();
-    INITIALIZE(Apu1)
-    INITIALIZE(Nes)
+    FOREACH_CHIP_KIND(INITIALIZE)
     #undef INITIALIZE
-
-    for (auto chan_ptr : out) {
-        if (chan_ptr == nullptr) {
-            throw std::logic_error(
-                "Code error: ChipKind without a list of volume widths!"
-            );
-        }
-    }
 
     return out;
 }();
