@@ -17,12 +17,9 @@ static const EnumArray<Apu1ChannelID, uint8_t> Apu1_VOL_DIGITS{1, 1};
 /// For DPCM, we map the volume column to the 7-bit current DPCM level.
 static const EnumArray<NesChannelID, uint8_t> Nes_VOL_DIGITS{1, 1, 1, 1, 2};
 
-using ChipChannelToVolumeDigitsSized = EnumMap<ChipKind, uint8_t const*>;
-
-static constinit const
-ChipChannelToVolumeDigitsSized CHIP_CHANNEL_TO_VOLUME_DIGITS_SIZED = []() {
+static constinit const auto CHIP_CHANNEL_TO_VOLUME_DIGITS_SIZED = []() {
     // Compare to chip_common.cpp.
-    ChipChannelToVolumeDigitsSized out{};
+    EnumMap<ChipKind, uint8_t const*> out{};
 
     #define INITIALIZE(chip)  out[ChipKind::chip] = chip##_VOL_DIGITS.data();
     FOREACH_CHIP_KIND(INITIALIZE)

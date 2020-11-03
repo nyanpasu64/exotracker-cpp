@@ -10,11 +10,9 @@ using namespace chip_kinds;
 
 // # CHIP_TO_NCHAN
 
-using ChipToNchanSized = EnumMap<ChipKind, ChannelIndex>;
-
-static constinit const ChipToNchanSized CHIP_TO_NCHAN_SIZED = [] {
+static constinit const auto CHIP_TO_NCHAN_SIZED = [] {
     /// EnumMap<ChipKind, ChannelIndex>
-    ChipToNchanSized chip_to_nchan{};
+    EnumMap<ChipKind, ChannelIndex> chip_to_nchan{};
 
     #define INITIALIZE(chip)  chip_to_nchan[ChipKind::chip] = enum_count<chip##ChannelID>;
     FOREACH_CHIP_KIND(INITIALIZE)
