@@ -56,6 +56,14 @@ configuration:
   - Debug
   - Release
 
+for:
+  -
+    matrix:
+      only:
+        - configuration: Release
+    environment:
+      DISABLE_PCH: 1
+
 # to run your custom scripts instead of automatic MSBuild
 build_script:
   - cmd: py -3 ci/build_appveyor.py build

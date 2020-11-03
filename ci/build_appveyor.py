@@ -52,11 +52,21 @@ def run(*strings: T.List[str], **kwargs):
     subprocess.run(args, check=True, **kwargs)
 
 
+def parse_bool_int(s: str) -> T.Optional[bool]:
+    return {"": False, "0": False, "1": True}.get(s, None)
+
+
 """Which VM and build configuration (32/64, compiler, target OS) is being used."""
 APPVEYOR_JOB_NAME = os.environ.get("APPVEYOR_JOB_NAME", "APPVEYOR_JOB_NAME")
 
 """Debug or release build."""
 CONFIGURATION = os.environ.get("CONFIGURATION", "Release")
+
+"""Disable precompiled headers to expose missing #includes."""
+DISABLE_PCH = os.environ.get("DISABLE_PCH", "0")
+DISABLE_PCH = parse_bool_int(DISABLE_PCH)
+if DISABLE_PCH is None:
+    raise ValueError("DISABLE_PCH environment value must be 0 or 1 if present")
 
 """Version string."""
 APPVEYOR_BUILD_VERSION = os.environ.get("APPVEYOR_BUILD_VERSION", "UnknownVer")
@@ -85,7 +95,13 @@ BUILD_DIR = sanitize_path(f"build-{APPVEYOR_JOB_NAME}-{CONFIGURATION}")
 
 
 def build():
+    CMAKE_USER_BEGIN = Path("cmake_user_begin.cmake").resolve()
+
     resolve_compilers()
+
+    if DISABLE_PCH:
+        with CMAKE_USER_BEGIN.open("a") as f:
+            f.write("set(USE_PCH FALSE)\n")
 
     os.makedirs(BUILD_DIR, exist_ok=True)
     os.chdir(BUILD_DIR)
