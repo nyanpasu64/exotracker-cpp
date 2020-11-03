@@ -10,8 +10,11 @@ template<typename EnumT, typename ValueT>
 using EnumArray = std::array<ValueT, enum_count<EnumT>>;
 
 /// APU1 pulse 1/2 has 4-bit volumes, or 1 digit.
-/// FIXME I changed it to 2 digits as a test. Remove this before pushing.
-static const EnumArray<Apu1ChannelID, uint8_t> Apu1_VOL_DIGITS{1, 2};
+static const EnumArray<Apu1ChannelID, uint8_t> Apu1_VOL_DIGITS{1, 1};
+
+/// Triangle has no volume control, but use 1 digit as a mute control.
+/// Noise has 4-bit volumes.
+/// For DPCM, we map the volume column to the 7-bit current DPCM level.
 static const EnumArray<NesChannelID, uint8_t> Nes_VOL_DIGITS{1, 1, 1, 1, 2};
 
 using ChipChannelToVolumeDigitsSized = EnumMap<ChipKind, uint8_t const*>;
