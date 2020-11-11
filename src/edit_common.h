@@ -16,7 +16,7 @@ class BaseEditCommand;
 /// Non-null pointer.
 ///
 /// All edit commands return an EditBox with no indication of cursor movement.
-/// PatternEditorPanel is responsible for moving MainWindow's cursor,
+/// PatternEditor is responsible for moving MainWindow's cursor,
 /// and MainWindow is responsible for saving old/new cursor positions in a CursorEdit.
 ///
 /// Is this a good design? I don't know.

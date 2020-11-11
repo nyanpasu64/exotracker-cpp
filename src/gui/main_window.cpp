@@ -1,6 +1,6 @@
 #define main_window_INTERNAL public
 #include "main_window.h"
-#include "gui/pattern_editor/pattern_editor_panel.h"
+#include "gui/pattern_editor.h"
 #include "gui/timeline_editor.h"
 #include "gui/move_cursor.h"
 #include "lib/layout_macros.h"
@@ -50,7 +50,7 @@ using std::unique_ptr;
 using std::make_unique;
 
 using gui::lib::IconToolBar;
-using gui::pattern_editor::PatternEditorPanel;
+using gui::pattern_editor::PatternEditor;
 using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
 using doc::BeatFraction;
@@ -267,7 +267,7 @@ struct MainWindowUi : MainWindow {
     QAction * _follow_playback;
     QAction * _compact_view;
 
-    // Widgets
+    // Panels
     TimelineEditor * _timeline_editor;
 
     struct Timeline {
@@ -280,6 +280,9 @@ struct MainWindowUi : MainWindow {
         QAction * clone_row;
     } _timeline;
 
+    PatternEditor * _pattern_editor;
+
+    // Control panel
     // Per-song ephemeral state
     QSpinBox * _zoom_level;
 
@@ -300,9 +303,7 @@ struct MainWindowUi : MainWindow {
     QComboBox * _step_direction;
     QCheckBox * _step_to_event;
 
-    PatternEditorPanel * _pattern_editor_panel;
-
-    /// Output: _pattern_editor_panel.
+    /// Output: _pattern_editor.
     void setup_widgets() {
 
         auto main = this;
@@ -354,6 +355,7 @@ struct MainWindowUi : MainWindow {
             l->setContentsMargins(0, 0, 0, 0);
 
             // Top panel.
+            // TODO draggable timeline/control/instrument/pattern panels
             setup_panel(l);
 
             // Pattern view.
@@ -362,9 +364,9 @@ struct MainWindowUi : MainWindow {
 
                 c->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
                 l->setContentsMargins(0, 0, 0, 0);
-                {l__w(PatternEditorPanel(this));
+                {l__w(PatternEditor(this));
                     w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
-                    _pattern_editor_panel = w;
+                    _pattern_editor = w;
                 }
             }
         }
@@ -838,7 +840,7 @@ public:
 
         // If cursor is out of bounds, move to last row in pattern.
         if (cursor_y.beat >= nbeats) {
-            auto rows_per_beat = _pattern_editor_panel->zoom_level();
+            auto rows_per_beat = _pattern_editor->zoom_level();
 
             BeatFraction rows = nbeats * rows_per_beat;
             int prev_row = util::math::frac_prev(rows);
@@ -865,8 +867,8 @@ public:
         , _audio(std::move(document))
     {
         // Setup GUI.
-        setup_widgets();  // Output: _pattern_editor_panel.
-        _pattern_editor_panel->set_history(_audio.document_getter());
+        setup_widgets();  // Output: _pattern_editor.
+        _pattern_editor->set_history(_audio.document_getter());
         _timeline_editor->set_history(_audio.document_getter());
 
         // Hook up refresh timer.
@@ -949,7 +951,7 @@ public:
 
     void on_startup(config::Options const& options) {
         // Upon application startup, pattern editor panel is focused.
-        _pattern_editor_panel->setFocus();
+        _pattern_editor->setFocus();
 
         connect(_exit, &QAction::triggered, this, &QWidget::close);
 
@@ -984,21 +986,21 @@ public:
         // making it hard to navigate the code.
         // So supply the name twice, once like a _field and once like a method.
         #define BIND_SPIN(FIELD, METHOD) \
-            FIELD->setValue(_pattern_editor_panel->METHOD()); \
+            FIELD->setValue(_pattern_editor->METHOD()); \
             connect_spin( \
-                FIELD, _pattern_editor_panel, &PatternEditorPanel::set_##METHOD \
+                FIELD, _pattern_editor, &PatternEditor::set_##METHOD \
             );
 
         #define BIND_CHECK(FIELD, METHOD) \
-            FIELD->setChecked(_pattern_editor_panel->METHOD()); \
+            FIELD->setChecked(_pattern_editor->METHOD()); \
             connect_check( \
-                FIELD, _pattern_editor_panel, &PatternEditorPanel::set_##METHOD \
+                FIELD, _pattern_editor, &PatternEditor::set_##METHOD \
             );
 
         #define BIND_COMBO(FIELD, METHOD) \
-            FIELD->setCurrentIndex((int) _pattern_editor_panel->METHOD()); \
+            FIELD->setCurrentIndex((int) _pattern_editor->METHOD()); \
             connect_combo( \
-                FIELD, _pattern_editor_panel, &PatternEditorPanel::set_##METHOD##_int \
+                FIELD, _pattern_editor, &PatternEditor::set_##METHOD##_int \
             );
 
         // _ticks_per_beat obtains its value through update_gui_from_doc().
@@ -1023,14 +1025,14 @@ public:
             };
 
             // Visual octave: add offset.
-            _octave->setValue(_pattern_editor_panel->octave() + gui_bottom_octave());
+            _octave->setValue(_pattern_editor->octave() + gui_bottom_octave());
 
             // MIDI octave: subtract offset.
             connect_spin(
                 _octave,
-                _pattern_editor_panel,
+                _pattern_editor,
                 [this, gui_bottom_octave] (int octave) {
-                    _pattern_editor_panel->set_octave(octave - gui_bottom_octave());
+                    _pattern_editor->set_octave(octave - gui_bottom_octave());
                 }
             );
         }
@@ -1094,7 +1096,7 @@ public:
 
             // "A QWidget should only have one of each action and adding an action
             // it already has will not cause the same action to be in the widget twice."
-            _pattern_editor_panel->addAction(&action);
+            _pattern_editor->addAction(&action);
         };
 
         auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
@@ -1199,7 +1201,7 @@ public:
     ///
     /// (how does reactivity work lol, and how do i get it)
     void update_widgets() {
-        _pattern_editor_panel->update();  // depends on _cursor and _history
+        _pattern_editor->update();  // depends on _cursor and _history
 
         // TODO find a less hacky way to update item count
         _timeline_editor->set_history(_audio.document_getter());

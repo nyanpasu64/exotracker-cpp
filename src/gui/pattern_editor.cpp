@@ -1,5 +1,5 @@
-#define PatternEditorPanel_INTERNAL public
-#include "pattern_editor_panel.h"
+#define pattern_editor_INTERNAL public
+#include "pattern_editor.h"
 
 #include "gui/lib/format.h"
 #include "gui/lib/painter_ext.h"
@@ -86,7 +86,7 @@ PatternEditorShortcuts::PatternEditorShortcuts(QWidget * widget) :
     #undef X
 {}
 
-W_OBJECT_IMPL(PatternEditorPanel)
+W_OBJECT_IMPL(PatternEditor)
 
 /*
 TODO:
@@ -115,7 +115,7 @@ namespace header {
 }
 
 // # Constructor
-static void setup_shortcuts(PatternEditorPanel & self) {
+static void setup_shortcuts(PatternEditor & self) {
     using config::KeyInt;
     using config::chord;
 
@@ -143,7 +143,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     #undef X
 
     // Keystroke handlers have no arguments and don't know if Shift is held or not.
-    using Method = void (PatternEditorPanel::*)();
+    using Method = void (PatternEditor::*)();
 
     enum class AlterSelection {
         None,
@@ -153,7 +153,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
 
     // This code is confusing. Hopefully I can fix it.
     static auto const on_key_pressed = [] (
-        PatternEditorPanel & self, Method method, AlterSelection alter_selection
+        PatternEditor & self, Method method, AlterSelection alter_selection
     ) {
         if (alter_selection == AlterSelection::Clear) {
             self._win._cursor.clear_select();
@@ -199,7 +199,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
 
     // Copy, don't borrow, local lambdas.
     #define X(KEY) \
-        connect_shortcut_pair(self._shortcuts.KEY, &PatternEditorPanel::KEY##_pressed);
+        connect_shortcut_pair(self._shortcuts.KEY, &PatternEditor::KEY##_pressed);
     SHORTCUT_PAIRS(X, )
     #undef X
 
@@ -215,7 +215,7 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     };
 
     #define X(KEY) \
-        connect_shortcut(self._shortcuts.KEY, &PatternEditorPanel::KEY##_pressed);
+        connect_shortcut(self._shortcuts.KEY, &PatternEditor::KEY##_pressed);
     SHORTCUTS(X, )
     #undef X
 }
@@ -257,7 +257,7 @@ static PatternFontMetrics calc_single_font_metrics(QFont const & font) {
     };
 }
 
-static void calc_font_metrics(PatternEditorPanel & self) {
+static void calc_font_metrics(PatternEditor & self) {
     auto & visual = get_app().options().visual;
 
     self._pattern_font_metrics = calc_single_font_metrics(visual.pattern_font);
@@ -271,7 +271,7 @@ static void calc_font_metrics(PatternEditorPanel & self) {
     );
 }
 
-void create_image(PatternEditorPanel & self) {
+void create_image(PatternEditor & self) {
     /*
     https://www.qt.io/blog/2009/12/16/qt-graphics-and-performance-an-overview
 
@@ -302,7 +302,7 @@ void create_image(PatternEditorPanel & self) {
     self._temp_image = QImage(self.geometry().size(), format);
 }
 
-PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
+PatternEditor::PatternEditor(MainWindow * win, QWidget * parent)
     : QWidget(parent)
     , _win{*win}
     , _get_document(GetDocument::empty())
@@ -321,11 +321,11 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
     // setContextMenuPolicy(Qt::CustomContextMenu);
 }
 
-doc::Document const& PatternEditorPanel::get_document() const {
+doc::Document const& PatternEditor::get_document() const {
     return _get_document();
 }
 
-void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
+void PatternEditor::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
 
     create_image(*this);
@@ -504,7 +504,7 @@ struct ColumnLayout {
 
 /// Compute where on-screen to draw each pattern column.
 [[nodiscard]] static ColumnLayout gen_column_layout(
-    PatternEditorPanel const & self,
+    PatternEditor const & self,
     doc::Document const & document
 ) {
     int const width_per_char = self._pattern_font_metrics.width;
@@ -673,7 +673,7 @@ using ColumnList = std::vector<Column>;
 ///
 /// TODO add function in self for determining subcolumn visibility.
 [[nodiscard]] static ColumnList gen_column_list(
-    PatternEditorPanel const & self,
+    PatternEditor const & self,
     doc::Document const & document
 ) {
     ColumnList column_list;
@@ -726,7 +726,7 @@ using ColumnList = std::vector<Column>;
 // columns, cfg, and document are identical between different drawing phases.
 // inner_rect is not.
 static void draw_header(
-    PatternEditorPanel & self,
+    PatternEditor & self,
     doc::Document const &document,
     ColumnLayout const & columns,
     QPainter & painter,
@@ -838,7 +838,7 @@ using PxInt = int;
 //using PxNat = uint32_t;
 
 /// Convert a relative timestamp to a vertical display offset.
-PxInt pixels_from_beat(PatternEditorPanel const & widget, BeatFraction beat) {
+PxInt pixels_from_beat(PatternEditor const & widget, BeatFraction beat) {
     PxInt out = doc::round_to_int(
         beat * widget._zoom_level * widget._pixels_per_row
     );
@@ -868,7 +868,7 @@ enum class Direction {
 
 /// Stores the location of a grid cell on-screen.
 struct GridCellIteratorState {
-    PatternEditorPanel const & _widget;
+    PatternEditor const & _widget;
     doc::Document const & _document;
 
     // Screen pixels (non-negative, but mark as signed to avoid conversion errors)
@@ -888,7 +888,7 @@ struct GridCellIteratorState {
 
 public:
     static std::tuple<GridCellIteratorState, PxInt> make(
-        PatternEditorPanel const & widget,  // holds reference
+        PatternEditor const & widget,  // holds reference
         doc::Document const & document,  // holds reference
         PxInt const screen_height
     ) {
@@ -1070,7 +1070,7 @@ using CellIter = doc::TimelineCellIterRef;
 
 /// Draw the background lying behind notes/etc.
 static void draw_pattern_background(
-    PatternEditorPanel & self,
+    PatternEditor & self,
     doc::Document const &document,
     ColumnLayout const & columns,
     QPainter & painter,
@@ -1536,7 +1536,7 @@ static void draw_pattern_background(
 
 /// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
 static void draw_pattern_foreground(
-    PatternEditorPanel & self,
+    PatternEditor & self,
     doc::Document const &document,
     ColumnLayout const & columns,
     QPainter & painter,
@@ -1985,7 +1985,7 @@ static void draw_pattern_foreground(
 }
 
 
-static void draw_pattern(PatternEditorPanel & self) {
+static void draw_pattern(PatternEditor & self) {
     doc::Document const & document = self.get_document();
     auto & visual = get_app().options().visual;
 
@@ -2045,7 +2045,7 @@ static void draw_pattern(PatternEditorPanel & self) {
     }
 }
 
-void PatternEditorPanel::paintEvent(QPaintEvent * /*event*/) {
+void PatternEditor::paintEvent(QPaintEvent * /*event*/) {
     // Repaints the whole window, not just the invalidated area.
     // I've never seen event->rect() being anything other than the full widget.
     // Additionally, in Qt 5 Linux and Qt 6, event->rect() is expressed in virtual pixels,
@@ -2061,7 +2061,7 @@ void PatternEditorPanel::paintEvent(QPaintEvent * /*event*/) {
 
 // # Cursor movement
 
-void PatternEditorPanel::up_pressed() {
+void PatternEditor::up_pressed() {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = _zoom_level,
@@ -2074,7 +2074,7 @@ void PatternEditorPanel::up_pressed() {
     _win._cursor.set_y(move_cursor::move_up(document, cursor, args, move_cfg));
 }
 
-void PatternEditorPanel::down_pressed() {
+void PatternEditor::down_pressed() {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = _zoom_level,
@@ -2088,7 +2088,7 @@ void PatternEditorPanel::down_pressed() {
 }
 
 
-void PatternEditorPanel::prev_beat_pressed() {
+void PatternEditor::prev_beat_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
@@ -2096,7 +2096,7 @@ void PatternEditorPanel::prev_beat_pressed() {
     _win._cursor.set_y(move_cursor::prev_beat(document, cursor_y, move_cfg));
 }
 
-void PatternEditorPanel::next_beat_pressed() {
+void PatternEditor::next_beat_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
@@ -2105,13 +2105,13 @@ void PatternEditorPanel::next_beat_pressed() {
 }
 
 
-void PatternEditorPanel::prev_event_pressed() {
+void PatternEditor::prev_event_pressed() {
     doc::Document const & document = get_document();
     auto ev_time = move_cursor::prev_event(document, _win._cursor.get());
     _win._cursor.set_y(ev_time);
 }
 
-void PatternEditorPanel::next_event_pressed() {
+void PatternEditor::next_event_pressed() {
     doc::Document const & document = get_document();
     auto ev_time = move_cursor::next_event(document, _win._cursor.get());
     _win._cursor.set_y(ev_time);
@@ -2122,7 +2122,7 @@ void PatternEditorPanel::next_event_pressed() {
 /// avoid scrolling more than _ patterns in a single Page Down keystroke.
 constexpr int MAX_PAGEDOWN_SCROLL = 16;
 
-void PatternEditorPanel::scroll_prev_pressed() {
+void PatternEditor::scroll_prev_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
@@ -2144,7 +2144,7 @@ void PatternEditorPanel::scroll_prev_pressed() {
     _win._cursor.set_y(cursor_y);
 }
 
-void PatternEditorPanel::scroll_next_pressed() {
+void PatternEditor::scroll_next_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
@@ -2167,7 +2167,7 @@ void PatternEditorPanel::scroll_next_pressed() {
     _win._cursor.set_y(cursor_y);
 }
 
-void PatternEditorPanel::top_pressed() {
+void PatternEditor::top_pressed() {
     auto cursor_y = _win._cursor.get().y;
 
     if (get_app().options().move_cfg.home_end_switch_patterns && cursor_y.beat <= 0) {
@@ -2180,7 +2180,7 @@ void PatternEditorPanel::top_pressed() {
     _win._cursor.set_y(cursor_y);
 }
 
-void PatternEditorPanel::bottom_pressed() {
+void PatternEditor::bottom_pressed() {
     doc::Document const& document = get_document();
     auto raw_select = _win._cursor.raw_select();
 
@@ -2229,7 +2229,7 @@ void PatternEditorPanel::bottom_pressed() {
 }
 
 template<void alter_mod(GridIndex & x, GridIndex den)>
-inline void switch_grid_index(PatternEditorPanel & self) {
+inline void switch_grid_index(PatternEditor & self) {
     doc::Document const & document = self.get_document();
     auto cursor_y = self._win._cursor.get().y;
 
@@ -2247,10 +2247,10 @@ inline void switch_grid_index(PatternEditorPanel & self) {
     self._win._cursor.set_y(cursor_y);
 }
 
-void PatternEditorPanel::prev_pattern_pressed() {
+void PatternEditor::prev_pattern_pressed() {
     switch_grid_index<decrement_mod>(*this);
 }
-void PatternEditorPanel::next_pattern_pressed() {
+void PatternEditor::next_pattern_pressed() {
     switch_grid_index<increment_mod>(*this);
 }
 
@@ -2274,7 +2274,7 @@ but allows the user to switch to exclusive indexing
 which is useful when snapping the cursor to a non-grid-aligned event.
 */
 
-static CursorX move_left(PatternEditorPanel const& self, CursorX cursor_x) {
+static CursorX move_left(PatternEditor const& self, CursorX cursor_x) {
     doc::Document const& document = self.get_document();
     ColumnList cols = gen_column_list(self, document);
 
@@ -2300,7 +2300,7 @@ static CursorX move_left(PatternEditorPanel const& self, CursorX cursor_x) {
     return cursor_x;
 }
 
-static CursorX move_right(PatternEditorPanel const& self, CursorX cursor_x) {
+static CursorX move_right(PatternEditor const& self, CursorX cursor_x) {
     doc::Document const& document = self.get_document();
     ColumnList cols = gen_column_list(self, document);
 
@@ -2323,13 +2323,13 @@ static CursorX move_right(PatternEditorPanel const& self, CursorX cursor_x) {
     return cursor_x;
 }
 
-void PatternEditorPanel::left_pressed() {
+void PatternEditor::left_pressed() {
     auto cursor_x = _win._cursor.get().x;
     cursor_x = move_left(*this, cursor_x);
     _win._cursor.set_x(cursor_x);
 }
 
-void PatternEditorPanel::right_pressed() {
+void PatternEditor::right_pressed() {
     auto cursor_x = _win._cursor.get().x;
     cursor_x = move_right(*this, cursor_x);
     _win._cursor.set_x(cursor_x);
@@ -2363,7 +2363,7 @@ CursorX cursor_clamp_subcol(ColumnList const& cols, CursorX cursor_x) {
     return cursor_x;
 }
 
-void PatternEditorPanel::scroll_left_pressed() {
+void PatternEditor::scroll_left_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
@@ -2379,7 +2379,7 @@ void PatternEditorPanel::scroll_left_pressed() {
     _win._cursor.set_x(cursor_x);
 }
 
-void PatternEditorPanel::scroll_right_pressed() {
+void PatternEditor::scroll_right_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
@@ -2395,17 +2395,17 @@ void PatternEditorPanel::scroll_right_pressed() {
     _win._cursor.set_x(cursor_x);
 }
 
-void PatternEditorPanel::escape_pressed() {
+void PatternEditor::escape_pressed() {
     _win._cursor.clear_select();
 }
 
-void PatternEditorPanel::toggle_edit_pressed() {
+void PatternEditor::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;
 }
 
 // Begin document mutation
 
-static Cursor step_down_only(PatternEditorPanel const& self, Cursor cursor) {
+static Cursor step_down_only(PatternEditor const& self, Cursor cursor) {
     doc::Document const & document = self.get_document();
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = self._zoom_level,
@@ -2419,7 +2419,7 @@ static Cursor step_down_only(PatternEditorPanel const& self, Cursor cursor) {
     return cursor;
 }
 
-static Cursor step_cursor(PatternEditorPanel const& self) {
+static Cursor step_cursor(PatternEditor const& self) {
     doc::Document const & document = self.get_document();
     auto cursor = self._win._cursor.get();
 
@@ -2488,7 +2488,7 @@ static Cursor step_cursor(PatternEditorPanel const& self) {
 
 namespace ed = edit::edit_pattern;
 
-auto calc_cursor_x(PatternEditorPanel const & self) ->
+auto calc_cursor_x(PatternEditor const & self) ->
     std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumnCells, CellIndex>
 {
     doc::Document const & document = self.get_document();
@@ -2509,7 +2509,7 @@ auto calc_cursor_x(PatternEditorPanel const & self) ->
 // Problem is, delete_key_pressed() is *not* called through keyPressEvent(),
 // but through QShortcut.
 
-void PatternEditorPanel::delete_key_pressed() {
+void PatternEditor::delete_key_pressed() {
     if (!_edit_mode) {
         return;
     }
@@ -2524,7 +2524,7 @@ void PatternEditorPanel::delete_key_pressed() {
 }
 
 void note_pressed(
-    PatternEditorPanel & self,
+    PatternEditor & self,
     doc::ChipIndex chip,
     doc::ChannelIndex channel,
     doc::Note note
@@ -2544,7 +2544,7 @@ void note_pressed(
     );
 }
 
-void PatternEditorPanel::note_cut_pressed() {
+void PatternEditor::note_cut_pressed() {
     if (!_edit_mode) {
         return;
     }
@@ -2557,7 +2557,7 @@ void PatternEditorPanel::note_cut_pressed() {
     }
 }
 
-void PatternEditorPanel::select_all_pressed() {
+void PatternEditor::select_all_pressed() {
     doc::Document const& document = get_document();
 
     ColumnList column_list = gen_column_list(*this, document);
@@ -2573,7 +2573,7 @@ void PatternEditorPanel::select_all_pressed() {
     _win._cursor.raw_select_mut()->select_all(document, col_to_nsubcol, _zoom_level);
 }
 
-void PatternEditorPanel::selection_padding_pressed() {
+void PatternEditor::selection_padding_pressed() {
     if (auto & select = _win._cursor.raw_select_mut()) {
         // If selection enabled, toggle whether to include bottom row.
         select->toggle_padding(_zoom_level);
@@ -2594,7 +2594,7 @@ struct DigitField {
 };
 
 static void add_digit(
-    PatternEditorPanel & self,
+    PatternEditor & self,
     doc::ChipIndex chip,
     doc::ChannelIndex channel,
     DigitField field,
@@ -2642,7 +2642,7 @@ struct EffectField {
 };
 
 static void add_effect_char(
-    PatternEditorPanel & self,
+    PatternEditor & self,
     doc::ChipIndex chip,
     doc::ChannelIndex channel,
     EffectField field,
@@ -2687,7 +2687,7 @@ static void add_effect_char(
 
 /// Handles events based on physical layout rather than shortcuts.
 /// Basically note and effect/hex input only.
-void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
+void PatternEditor::keyPressEvent(QKeyEvent * event) {
     auto const& document = get_document();
     auto keycode = qkeycode::toKeycode(event);
     DEBUG_PRINT(
@@ -2775,7 +2775,7 @@ void PatternEditorPanel::keyPressEvent(QKeyEvent * event) {
         throw std::logic_error("Invalid subcolumn passed to keyPressEvent()");
 }
 
-void PatternEditorPanel::keyReleaseEvent(QKeyEvent * event) {
+void PatternEditor::keyReleaseEvent(QKeyEvent * event) {
     auto dom_code = qkeycode::toKeycode(event);
     DEBUG_PRINT(
         "KeyRelease {}=\"{}\", modifier {}, repeat? {}\n",

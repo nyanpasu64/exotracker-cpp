@@ -193,7 +193,7 @@ add_executable(exotracker-qt
     src/gui/lib/color.cpp
     src/gui/lib/format.cpp  # Unfortunately tied to QString.
     src/gui/lib/painter_ext.cpp
-    src/gui/pattern_editor/pattern_editor_panel.cpp
+    src/gui/pattern_editor.cpp
     src/gui/timeline_editor.cpp
 
     # Resources

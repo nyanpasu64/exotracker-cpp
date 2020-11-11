@@ -1,5 +1,4 @@
-#ifndef PATTERNEDITORPANEL_H
-#define PATTERNEDITORPANEL_H
+#pragma once
 
 #include "doc.h"
 #include "gui/main_window.h"
@@ -17,6 +16,10 @@
 #include <functional>  // std::reference_wrapper
 
 namespace gui::pattern_editor {
+// This is undefined behavior. I don't care.
+#ifndef pattern_editor_INTERNAL
+#define pattern_editor_INTERNAL private
+#endif
 
 struct PatternFontMetrics {
     /// Width of a standard character (like 'M').
@@ -113,11 +116,6 @@ struct PatternEditorShortcuts {
     explicit PatternEditorShortcuts(QWidget * widget);
 };
 
-// This is undefined behavior. I don't care.
-#ifndef PatternEditorPanel_INTERNAL
-#define PatternEditorPanel_INTERNAL private
-#endif
-
 // I'm starting to regret subclassing QWidget,
 // which intermixes my fields with QWidget fields.
 // I should've, idk, defined my own class,
@@ -126,13 +124,13 @@ struct PatternEditorShortcuts {
 using main_window::MainWindow;
 using history::GetDocument;
 
-class PatternEditorPanel : public QWidget
+class PatternEditor : public QWidget
 {
-    W_OBJECT(PatternEditorPanel)
+    W_OBJECT(PatternEditor)
 public:
-    explicit PatternEditorPanel(MainWindow * win, QWidget * parent = nullptr);
+    explicit PatternEditor(MainWindow * win, QWidget * parent = nullptr);
 
-PatternEditorPanel_INTERNAL:
+pattern_editor_INTERNAL:
     using Super = QWidget;
 
     // # Non-user-facing state.
@@ -141,7 +139,7 @@ PatternEditorPanel_INTERNAL:
     MainWindow & _win;
 
     /// Stores document and undo/redo history.
-    /// Is read by PatternEditorPanel running in main thread.
+    /// Is read by PatternEditor running in main thread.
     /// When switching documents, can be reassigned by MainWindow(?) running in main thread.
     GetDocument _get_document;
 
@@ -177,7 +175,7 @@ public:
         _get_document = get_document;
     }
 
-    // Trying to paint a PatternEditorPanel with an empty history results in a crash,
+    // Trying to paint a PatternEditor with an empty history results in a crash,
     // so setting an empty history is useless.
     // void unset_history();
 
@@ -202,7 +200,7 @@ public:
     PROPERTY(bool, _step_to_event, step_to_event)
 
 // Implementation
-PatternEditorPanel_INTERNAL:
+pattern_editor_INTERNAL:
     [[nodiscard]] doc::Document const& get_document() const;
 
     void resizeEvent(QResizeEvent* event) override;
@@ -221,8 +219,6 @@ PatternEditorPanel_INTERNAL:
     void keyPressEvent(QKeyEvent * event) override;
     void keyReleaseEvent(QKeyEvent * event) override;
 };
-
-#endif // PATTERNEDITORPANEL_H
 
 // namespace
 }
