@@ -1,3 +1,4 @@
+#define main_window_INTERNAL public
 #include "main_window.h"
 #include "gui/pattern_editor/pattern_editor_panel.h"
 #include "gui/timeline_editor.h"
@@ -531,7 +532,7 @@ class AudioComponent {
     // Points to History and CommandQueue, must be listed after them.
     std::optional<AudioThreadHandle> _audio_handle;
 
-    // impl
+// impl
 public:
     AudioComponent(doc::Document document) : _history(std::move(document)) {
     }
@@ -548,8 +549,7 @@ public:
         return _history.get_document();
     }
 
-    // # Command queue.
-
+// # Command queue.
 private:
     /// Return a command to be sent to the audio thread.
     /// It ignores the command's contents,
@@ -582,8 +582,7 @@ private:
         }
     }
 
-    // # Lifecycle transitions.
-
+// # Lifecycle transitions.
 private:
     /// Output: _curr_audio_device.
     void scan_devices() {
@@ -654,8 +653,7 @@ public:
         );
     }
 
-    // # Play/pause commands.
-
+// # Play/pause commands.
 public:
     MaybeSequencerTime maybe_seq_time() {
         // not const because of gc_command_queue().
@@ -715,8 +713,7 @@ private:
         _audio_state = AudioState::Stopped;
     }
 
-    // # Document edit commands.
-
+// # Document edit commands.
 private:
     void send_edit(AudioComponent & audio, edit::EditBox command) {
         if (audio._audio_handle.has_value()) {
@@ -815,8 +812,6 @@ public:
     AudioComponent _audio;
 
     // impl MainWindow
-    void _() override {}
-
     doc::Document const& get_document() const {
         return _audio.get_document();
     }

@@ -20,6 +20,9 @@
 #include <variant>
 
 namespace gui::main_window {
+#ifndef main_window_INTERNAL
+#define main_window_INTERNAL private
+#endif
 
 using audio::output::AudioThreadHandle;
 using timing::GridAndBeat;
@@ -183,24 +186,24 @@ class MainWindow : public QMainWindow, public StateComponent {
     W_OBJECT(MainWindow)
 
 public:
-
-public:
-    // impl
-    static std::unique_ptr<MainWindow> make(
-        doc::Document document, QWidget * parent = nullptr
-    );
-
+// interface
     static MainWindow & get_instance();
-
-    MainWindow(QWidget *parent = nullptr);
-    virtual void _() = 0;
-    virtual ~MainWindow();
 
     virtual AudioState audio_state() const = 0;
 
     /// MoveCursor determines whether to save and move the cursor (for pattern edits)
     /// or not (for non-pattern edits).
     virtual void push_edit(edit::EditBox command, MoveCursor cursor_move) = 0;
+
+// constructors
+    static std::unique_ptr<MainWindow> make(
+        doc::Document document, QWidget * parent = nullptr
+    );
+
+    virtual ~MainWindow();
+
+main_window_INTERNAL:
+    MainWindow(QWidget *parent = nullptr);
 };
 
 
