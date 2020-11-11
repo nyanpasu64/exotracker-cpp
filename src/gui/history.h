@@ -4,11 +4,6 @@
 #include "edit_common.h"
 #include "util/copy_move.h"
 
-#include <boost/core/noncopyable.hpp>
-
-#include <array>
-#include <atomic>
-#include <memory>
 #include <vector>
 
 namespace gui::history {
@@ -44,7 +39,7 @@ public:
 
     /// Get a const reference to the document.
     /// To modify the document, use EditBox/CursorEdit.
-    doc::Document const & get_document() const {
+    doc::Document const& get_document() const noexcept {
         return _document;
     }
 
@@ -66,6 +61,38 @@ public:
     /// and returns a copy of the command, used to update GUI cursor location
     /// and send to the audio thread.
     void redo();
+};
+
+/// Cannot be used at static initialization time, before main() begins.
+extern History const EMPTY_HISTORY;
+
+/// Class wrapping a History pointer, only allowing the user to get the current document.
+/// Used by GUI panel widgets to obtain the current document.
+class GetDocument {
+    History const* _history;
+
+public:
+    /// Holds a reference to `history` passed in.
+    /// If History is owned by MainWindow
+    /// and each GetDocument is owned by a child QWidget panel,
+    /// then History will outlive all GetDocument pointing to it.
+    GetDocument(History const& history) noexcept
+        : _history(&history)
+    {}
+
+    /// Construct an empty GetDocument which returns an empty document.
+    /// Cannot be called at static initialization time, before main() begins.
+    static GetDocument empty() noexcept {
+        return GetDocument(EMPTY_HISTORY);
+    }
+
+    doc::Document const& get_document() const noexcept {
+        return _history->get_document();
+    }
+
+    doc::Document const& operator()() const noexcept {
+        return _history->get_document();
+    }
 };
 
 }

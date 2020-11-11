@@ -124,6 +124,7 @@ struct PatternEditorShortcuts {
 // and subclassed QWidget to contain an instance of my class?
 
 using main_window::MainWindow;
+using history::GetDocument;
 
 class PatternEditorPanel : public QWidget
 {
@@ -139,13 +140,10 @@ PatternEditorPanel_INTERNAL:
     /// Parent pointer of the subclass type.
     MainWindow & _win;
 
-    // Upon construction, history = dummy_history, until a document is created and assigned.
-    history::History _dummy_history;
-
     /// Stores document and undo/redo history.
     /// Is read by PatternEditorPanel running in main thread.
     /// When switching documents, can be reassigned by MainWindow(?) running in main thread.
-    std::reference_wrapper<history::History const> _history;
+    GetDocument _get_document;
 
     // Cached private state. Be sure to update when changing fonts.
     PatternFontMetrics _pattern_font_metrics;
@@ -172,17 +170,16 @@ PatternEditorPanel_INTERNAL:
     // Non-empty if free scrolling is enabled.
     std::optional<GridAndBeat> _free_scroll_position;
 
-    // impl
+// Interface
 public:
     /// Called by main function.
-    void set_history(history::History const& history) {
-        _history = history;
+    void set_history(GetDocument get_document) {
+        _get_document = get_document;
     }
 
-    /// Unsure if useful or not.
-    void unset_history() {
-        _history = _dummy_history;
-    }
+    // Trying to paint a PatternEditorPanel with an empty history results in a crash,
+    // so setting an empty history is useless.
+    // void unset_history();
 
     #define PROPERTY(TYPE, FIELD, METHOD) \
         [[nodiscard]] TYPE METHOD() const { \
@@ -204,17 +201,14 @@ public:
     }
     PROPERTY(bool, _step_to_event, step_to_event)
 
-protected:
+// Implementation
+PatternEditorPanel_INTERNAL:
+    [[nodiscard]] doc::Document const& get_document() const;
+
+    void resizeEvent(QResizeEvent* event) override;
 
     // paintEvent() is a pure function (except for screen output).
     void paintEvent(QPaintEvent *event) override;
-    void resizeEvent(QResizeEvent* event) override;
-
-PatternEditorPanel_INTERNAL:
-
-    [[nodiscard]] doc::Document const & get_document() const {
-        return _history.get().get_document();
-    }
 
     // QShortcut signals are bound to a lambda slot, which calls these methods.
 
@@ -224,7 +218,6 @@ PatternEditorPanel_INTERNAL:
     SHORTCUTS(X, )
     #undef X
 
-protected:
     void keyPressEvent(QKeyEvent * event) override;
     void keyReleaseEvent(QKeyEvent * event) override;
 };

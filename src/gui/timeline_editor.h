@@ -5,23 +5,22 @@
 
 #include <QWidget>
 
-#include <memory>
-
 namespace gui::timeline_editor {
 
-using history::History;
+using history::GetDocument;
 using main_window::MainWindow;
 
 class TimelineEditor : public QWidget {
     // impl
 protected:
-    // OrderEditor() constructor
+    // TimelineEditor() constructor
     using QWidget::QWidget;
 
 public:
+    /// Holds a persistent aliased reference to MainWindow.
     static TimelineEditor * make(MainWindow * win, QWidget * parent = nullptr);
 
-    virtual void set_history(History const& history) = 0;
+    virtual void set_history(GetDocument get_document) = 0;
 
     virtual void update_cursor() = 0;
 

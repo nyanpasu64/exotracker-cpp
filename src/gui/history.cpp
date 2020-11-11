@@ -84,4 +84,6 @@ void History::redo() {
     undo_stack.push_back(std::move(command));
 }
 
+History const EMPTY_HISTORY = History(doc::DocumentCopy{});
+
 }

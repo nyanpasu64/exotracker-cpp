@@ -516,6 +516,7 @@ struct MainWindowUi : MainWindow {
 };
 
 using gui::history::History;
+using gui::history::GetDocument;
 
 class AudioComponent {
     // GUI/audio communication.
@@ -541,8 +542,8 @@ public:
         return _audio_state;
     }
 
-    History & history() {
-        return _history;
+    GetDocument document_getter() {
+        return GetDocument(_history);
     }
 
     doc::Document const& get_document() const {
@@ -865,8 +866,8 @@ public:
     {
         // Setup GUI.
         setup_widgets();  // Output: _pattern_editor_panel.
-        _pattern_editor_panel->set_history(_audio.history());
-        _timeline_editor->set_history(_audio.history());
+        _pattern_editor_panel->set_history(_audio.document_getter());
+        _timeline_editor->set_history(_audio.document_getter());
 
         // Hook up refresh timer.
         connect(
@@ -1201,7 +1202,7 @@ public:
         _pattern_editor_panel->update();  // depends on _cursor and _history
 
         // TODO find a less hacky way to update item count
-        _timeline_editor->set_history(_audio.history());
+        _timeline_editor->set_history(_audio.document_getter());
         _timeline_editor->update_cursor();
 
         doc::Document const& doc = get_document();

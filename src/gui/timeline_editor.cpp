@@ -17,29 +17,21 @@ namespace gui::timeline_editor {
 /// This is based off
 /// https://doc.qt.io/qt-5/model-view-programming.html#a-read-only-example-model.
 struct HistoryWrapper : QAbstractListModel {
-    // Upon construction, history = dummy_history, until a document is created and assigned.
-    History _dummy_history{doc::DocumentCopy{}};
+    GetDocument _get_document;
 
-    // Non-null.
-    History const* _history = &_dummy_history;
+// impl
+    HistoryWrapper(GetDocument get_document)
+        : _get_document(get_document)
+    {}
 
-    // impl
     [[nodiscard]] doc::Document const & get_document() const {
-        return _history->get_document();
+        return _get_document();
     }
 
-    void set_history(History const& history) {
-        auto old_n = int(get_document().timeline.size());
-        if (old_n > 0) {
-            emit beginRemoveRows({}, 0, old_n - 1);
-            _history = &_dummy_history;
-            emit endRemoveRows();
-        }
-
-        auto n = int(history.get_document().timeline.size());
-        emit beginInsertRows({}, 0, n - 1);
-        _history = &history;
-        emit endInsertRows();
+    void set_history(GetDocument get_document) {
+        beginResetModel();
+        _get_document = get_document;
+        endResetModel();
     }
 
     // impl QAbstractListModel
@@ -62,7 +54,8 @@ struct HistoryWrapper : QAbstractListModel {
             return QVariant();
     }
 
-    QModelIndex cursor_y(MainWindow & win) {
+    /// Binds win's cursor y position, to this model.
+    QModelIndex get_cursor_y_from(MainWindow const& win) {
         return createIndex((int) win._cursor.get().y.grid, 0);
     }
 };
@@ -78,6 +71,7 @@ public:
     explicit TimelineEditorImpl(MainWindow * win, QWidget * parent)
         : TimelineEditor(parent)
         , _win(*win)
+        , _model(GetDocument::empty())
     {
         auto c = this;
         auto l = new QVBoxLayout(c);
@@ -98,13 +92,13 @@ public:
         return _model.get_document();
     }
 
-    void set_history(History const& history) override {
+    void set_history(GetDocument get_document) override {
+        _model.set_history(get_document);
         update_cursor();
-        _model.set_history(history);
     }
 
     void update_cursor() override {
-        QModelIndex order_y = _model.cursor_y(_win);
+        QModelIndex order_y = _model.get_cursor_y_from(_win);
 
         QItemSelectionModel & widget_select = *_widget->selectionModel();
         widget_select.select(order_y, QItemSelectionModel::ClearAndSelect);

@@ -305,8 +305,7 @@ void create_image(PatternEditorPanel & self) {
 PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
     : QWidget(parent)
     , _win{*win}
-    , _dummy_history{doc::DocumentCopy{}}
-    , _history{_dummy_history}
+    , _get_document(GetDocument::empty())
     , _shortcuts{this}
 {
     // Focus widget on click.
@@ -320,6 +319,10 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
 
     // setAttribute(Qt::WA_Hover);  (generates paint events when mouse cursor enters/exits)
     // setContextMenuPolicy(Qt::CustomContextMenu);
+}
+
+doc::Document const& PatternEditorPanel::get_document() const {
+    return _get_document();
 }
 
 void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
