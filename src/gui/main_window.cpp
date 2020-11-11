@@ -308,6 +308,7 @@ struct MainWindowUi : MainWindow {
 
         auto main = this;
 
+        // Menu
         {main__m();
             {m__m(tr("&File"));
                 _exit = m->addAction(tr("E&xit"));
@@ -343,6 +344,7 @@ struct MainWindowUi : MainWindow {
             }
         }
 
+        // Toolbar
         {main__tb(IconToolBar(false));  // No button borders
             tb->setFloatable(false);
             tb->setAllowedAreas(Qt::TopToolBarArea);
@@ -351,34 +353,29 @@ struct MainWindowUi : MainWindow {
             // TODO add zoom checkbox
         }
 
+        // Central widget
         {main__central_c_l(QWidget, QVBoxLayout);
             l->setContentsMargins(0, 0, 0, 0);
 
-            // Top panel.
-            // TODO draggable timeline/control/instrument/pattern panels
-            setup_panel(l);
+            // Top dock area. TODO make panels draggable and rearrangeable
+            {l__c_l(QWidget, QHBoxLayout);
+                c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
-            // Pattern view.
-            {l__c_l(QFrame, QVBoxLayout);
-                c->setFrameStyle(int(QFrame::StyledPanel) | QFrame::Sunken);
+                // Timeline editor panel.
+                timeline_editor_panel(l);
 
-                c->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
-                l->setContentsMargins(0, 0, 0, 0);
-                {l__w(PatternEditor(this));
-                    w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
-                    _pattern_editor = w;
-                }
+                // Control panel.
+                control_panel(l);
             }
+
+            // Main body is the pattern editor.
+            pattern_editor_panel(l);
         }
     }
 
     static constexpr int MAX_ZOOM_LEVEL = 64;
 
-    void setup_panel(QBoxLayout * l) { {  // needed to allow shadowing
-        l__c_l(QWidget, QHBoxLayout);
-        c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-
-        // Timeline editor.
+    void timeline_editor_panel(QBoxLayout * l) {
         {l__c_l(QGroupBox, QVBoxLayout)
             c->setTitle(tr("Timeline"));
             {l__w_factory(TimelineEditor::make(this))
@@ -403,6 +400,12 @@ struct MainWindowUi : MainWindow {
                 );
             }
         }
+    }
+
+    void control_panel(QBoxLayout * l) { {  // needed to allow shadowing
+        l__c_l(QWidget, QHBoxLayout);
+        c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
+        l->setContentsMargins(0, 0, 0, 0);
 
         // Song options.
         {l__l(QVBoxLayout);
@@ -515,6 +518,19 @@ struct MainWindowUi : MainWindow {
             l->addStretch();
         }
     } }
+
+    void pattern_editor_panel(QBoxLayout * l) {
+        {l__c_l(QFrame, QVBoxLayout);
+            c->setFrameStyle(int(QFrame::StyledPanel) | QFrame::Sunken);
+
+            c->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+            l->setContentsMargins(0, 0, 0, 0);
+            {l__w(PatternEditor(this));
+                w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+                _pattern_editor = w;
+            }
+        }
+    }
 };
 
 using gui::history::History;
