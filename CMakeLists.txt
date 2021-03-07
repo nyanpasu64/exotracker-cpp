@@ -88,7 +88,7 @@ include_directories(SYSTEM 3rdparty 3rdparty/fmt_/include)
 ## Add dependencies
 
 set(CMAKE_AUTORCC ON)
-find_package(Qt5 COMPONENTS Widgets REQUIRED)
+find_package(Qt6 COMPONENTS Widgets REQUIRED)
 
 set(RTAUDIO_BUILD_TESTING FALSE)
 add_subdirectory("3rdparty/rtaudio" EXCLUDE_FROM_ALL)
@@ -200,7 +200,7 @@ add_executable(exotracker-qt
     res/exotracker.qrc
 )
 target_compile_options(exotracker-qt PRIVATE "${options}")
-target_link_libraries(exotracker-qt PRIVATE exotracker-headless rtaudio Qt5::Widgets qkeycode)
+target_link_libraries(exotracker-qt PRIVATE exotracker-headless rtaudio Qt::Widgets qkeycode)
 
 if(USE_PCH)
     target_precompile_headers(exotracker-qt PRIVATE
