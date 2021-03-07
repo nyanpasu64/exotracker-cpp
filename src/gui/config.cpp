@@ -150,7 +150,7 @@ inline namespace visual {
         SubColumn subcolumn, bool focused
     ) const {
         // How bright to draw subcolumn backgrounds.
-        qreal bg_colorize = _subcolumn_bg_colorize;
+        auto bg_colorize = _subcolumn_bg_colorize;
 
         QColor fg = get_subcolumn_color_raw(*this, subcolumn);
         QColor bg = lerp_colors(base_subcolumn_bg, fg, bg_colorize);
@@ -163,9 +163,9 @@ inline namespace visual {
     ) const {
         QColor fg = get_subcolumn_color_raw(*this, subcolumn);
 
-        qreal divider_colorize = EXPR(
-            qreal bg_colorize = _subcolumn_bg_colorize;
-            qreal fg_colorize = 1.;
+        auto divider_colorize = EXPR(
+            auto bg_colorize = _subcolumn_bg_colorize;
+            float fg_colorize = 1.;
             return lerp(bg_colorize, fg_colorize, _subcolumn_divider_colorize);
         );
         QColor divider = lerp_colors(base_subcolumn_bg, fg, divider_colorize);
