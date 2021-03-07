@@ -17,6 +17,7 @@ namespace gui::config {
 #endif
 
 using doc::accidental::AccidentalMode;
+using gui::lib::color::ColorF;
 
 inline namespace keys {
     // # Shortcuts
@@ -199,19 +200,19 @@ inline namespace visual {
         /// How opaquely to draw cells at a different grid index (time).
         /// At 0, unfocused patterns have the same color as the background.
         /// At 1, unfocused patterns have the same color as focused grid cells.
-        qreal _unfocused_brightness;
+        ColorF _unfocused_brightness;
         // TODO early-exit when drawing inactive patterns, if _unfocused_brightness = 0.
         // But foreach_grid(find_selection) cannot do this.
 
         /// How much to blend subcolumn colors into subcolumn backgrounds.
         /// At 0, subcolumn backgrounds have color "base_subcolumn_bg".
         /// At 1, subcolumn backgrounds have the same color as foreground text.
-        qreal _subcolumn_bg_colorize;
+        ColorF _subcolumn_bg_colorize;
 
         /// How bright to make subcolumn dividers.
         /// At 0, dividers have the same color as the subcolumn background.
         /// At 1, dividers have the same color as foreground text.
-        qreal _subcolumn_divider_colorize;
+        ColorF _subcolumn_divider_colorize;
 
     public:
         /// Cursor row color gradient.

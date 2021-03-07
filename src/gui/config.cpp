@@ -61,10 +61,10 @@ inline namespace visual {
             // # Numeric values.
 
             /// Unfocused grid cells.
-            ._unfocused_brightness = 0.4,
+            ._unfocused_brightness = ColorF(0.4),
             /// Subcolumn bg/dividers.
-            ._subcolumn_bg_colorize = 0.05,
-            ._subcolumn_divider_colorize = 0.15,
+            ._subcolumn_bg_colorize = ColorF(0.05),
+            ._subcolumn_divider_colorize = ColorF(0.15),
 
             /// Cursor row color gradient.
             .cursor_top_alpha = 64,
@@ -177,7 +177,7 @@ inline namespace visual {
         QColor border_blend = _block_handle.value() >= overall_bg.value()
             ? config::gray(255)
             : config::gray(0);
-        auto border = lerp_colors(_block_handle, border_blend, 0.4);
+        auto border = lerp_colors(_block_handle, border_blend, 0.4f);
 
         return dim_unfocused(*this, border, focused);
     }
