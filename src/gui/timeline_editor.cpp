@@ -109,6 +109,10 @@ public:
         QItemSelectionModel & widget_select = *_widget->selectionModel();
         widget_select.select(order_y, QItemSelectionModel::ClearAndSelect);
     }
+
+    QSize sizeHint() const override {
+        return {0, 0};
+    }
 };
 
 TimelineEditor * TimelineEditor::make(MainWindow * win, QWidget * parent) {
