@@ -157,6 +157,15 @@ PatternEditorPanel_INTERNAL:
     QImage _image;  // TODO remove?
     QImage _temp_image;
 
+    /// We tell Qt to scale the canvas so each virtual pixel is
+    /// an integer number of physical pixels.
+    /// This makes "1px" lines thicker and quantizes element positions.
+    int _canvas_pixel_ratio;
+
+    /// We scale the fonts by a smaller factor.
+    /// This affects element positions, but not line thicknesses.
+    qreal _canvas_font_ratio;
+
     // # User interaction internals.
     PatternEditorShortcuts _shortcuts;
     bool _edit_mode = false;
