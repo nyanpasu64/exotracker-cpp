@@ -1982,11 +1982,9 @@ static void draw_pattern_foreground(
 }
 
 
-static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
+static void draw_pattern(PatternEditorPanel & self) {
     doc::Document const & document = self.get_document();
     auto & visual = get_app().options().visual;
-
-    // TODO maybe only draw repaint_rect? And use Qt::IntersectClip?
 
     self._image.fill(visual.overall_bg);
 
@@ -2040,12 +2038,22 @@ static void draw_pattern(PatternEditorPanel & self, const QRect repaint_rect) {
     {
         // Draw pixmap onto this widget.
         auto paint_on_screen = QPainter(&self);
-        paint_on_screen.drawImage(repaint_rect, self._image);
+        paint_on_screen.drawImage(self.rect(), self._image);
     }
 }
 
-void PatternEditorPanel::paintEvent(QPaintEvent *event) {
-    draw_pattern(*this, event->rect());
+void PatternEditorPanel::paintEvent(QPaintEvent * /*event*/) {
+    // Repaints the whole window, not just the invalidated area.
+    // I've never seen event->rect() being anything other than the full widget.
+    // Additionally, in Qt 5 Linux and Qt 6, event->rect() is expressed in virtual pixels,
+    // which don't map 1:1 to a screen invalidation region in physical pixels,
+    // making region-based invalidation nonsensical.
+
+    // Is it practical to perform partial redraws when the canvas scrolls?
+    // FamiTracker and BambooTracker(?) do it, but it's more difficult in Exo
+    // since events can overlap.
+
+    draw_pattern(*this);
 }
 
 // # Cursor movement
