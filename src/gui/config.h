@@ -271,7 +271,7 @@ struct Options {
         .gui_bottom_octave = -1,
         .sharp_char = '#',
         .flat_char = 'b',
-        .natural_char = 0xB7,
+        .natural_char = QChar(0xB7),
     };
 
     AccidentalMode default_accidental_mode = AccidentalMode::Sharp;

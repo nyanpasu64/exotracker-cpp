@@ -743,9 +743,9 @@ static void draw_header(
         // You need to assign the color map afterwards.
         // List of QPalette colors at https://doc.qt.io/qt-5/qpalette.html#ColorRole-enum
         grad.setStops(QGradientStops{
-            QPair{0., self.palette().button().color()},
-            QPair{0.4, self.palette().light().color()},
-            QPair{1., self.palette().button().color().darker(135)},
+            {0., self.palette().button().color()},
+            {0.4, self.palette().light().color()},
+            {1., self.palette().button().color().darker(135)},
         });
 
         // Then cast it into a QBrush, and draw the background.
@@ -1051,8 +1051,8 @@ QLinearGradient make_gradient(
     bottom_color.setAlpha(bottom_alpha);
 
     grad.setStops(QGradientStops{
-        QPair{0., top_color},
-        QPair{1., bottom_color},
+        {0., top_color},
+        {1., bottom_color},
     });
 
     return grad;
@@ -1716,7 +1716,7 @@ static void draw_pattern_foreground(
                 auto draw_cells = [&draw_char](
                     QString const& text, gsl::span<qreal const> cell_centers
                 ) {
-                    int nchar = text.size();
+                    auto nchar = text.size();
                     release_assert((size_t) nchar == cell_centers.size());
 
                     for (int i = 0; i < nchar; i++) {
@@ -1731,11 +1731,11 @@ static void draw_pattern_foreground(
                 auto draw_text = [
                     &draw_char, width_per_char = self._pattern_font_metrics.width
                 ] (QString const& text, qreal center_x) {
-                    int nchar = text.size();
+                    auto nchar = text.size();
                     if (!(nchar >= 1)) return;
 
                     // Compute the center x of the leftmost character.
-                    qreal char_center_x = center_x - (nchar - 1) * width_per_char / qreal(2);
+                    qreal char_center_x = center_x - qreal(nchar - 1) * width_per_char / qreal(2);
 
                     // One would think you could draw a character using a QPainter
                     // without performing a heap allocation...
