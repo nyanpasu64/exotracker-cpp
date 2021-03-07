@@ -220,7 +220,9 @@ static void setup_shortcuts(PatternEditorPanel & self) {
     #undef X
 }
 
-void create_image(PatternEditorPanel & self) {
+static void calc_font_metrics(PatternEditorPanel & self);
+
+void setup_image_scaling(PatternEditorPanel & self) {
     /*
     https://www.qt.io/blog/2009/12/16/qt-graphics-and-performance-an-overview
 
@@ -244,16 +246,39 @@ void create_image(PatternEditorPanel & self) {
     was stored separately from the pixmap data.
     */
 
+    auto device_pixel_ratio = self.devicePixelRatioF();
+
+    // pray to RNGesus that we don't get rounding errors
+    // and duplicated/missing rows/columns of pixels on-screen...
+    // qt removing the ability to get the physical size of a widget was a mistake.
+    auto physical_size = (self.geometry().size() * device_pixel_ratio);
+
+    self._canvas_pixel_ratio = qRound(device_pixel_ratio - qreal(0.25));
+    self._canvas_font_ratio = device_pixel_ratio / self._canvas_pixel_ratio;
+
     QPixmap pixmap{QSize{1, 1}};
     // On Windows, it's QImage::Format_RGB32.
     auto format = pixmap.toImage().format();
-    self._image = QImage(self.geometry().size(), format);
-    self._temp_image = QImage(self.geometry().size(), format);
+
+    self._image = QImage(physical_size, format);
+    self._image.setDevicePixelRatio(self._canvas_pixel_ratio);
+    self._temp_image = QImage(physical_size, format);
+    self._temp_image.setDevicePixelRatio(self._canvas_pixel_ratio);
+
+    // Uses self._image and self._canvas_font_ratio.
+    calc_font_metrics(self);
 }
 
-static PatternFontMetrics calc_single_font_metrics(QFont const & font) {
+static QFont scaled_font(PatternEditorPanel const& self, QFont font) {
+    font.setPointSizeF(font.pointSizeF() * self._canvas_font_ratio);
+    return font;
+}
+
+static PatternFontMetrics calc_single_font_metrics(
+    PatternEditorPanel const& self, QFont const& font)
+{
     auto & visual = get_app().options().visual;
-    QFontMetrics metrics{font};
+    QFontMetrics metrics{scaled_font(self, font), &self._image};
 
     // height() == ascent() + descent().
     // lineSpacing() == height() + (leading() often is 0).
@@ -291,7 +316,7 @@ static PatternFontMetrics calc_single_font_metrics(QFont const & font) {
 static void calc_font_metrics(PatternEditorPanel & self) {
     auto & visual = get_app().options().visual;
 
-    self._pattern_font_metrics = calc_single_font_metrics(visual.pattern_font);
+    self._pattern_font_metrics = calc_single_font_metrics(self, visual.pattern_font);
 
     self._pixels_per_row = std::max(
         visual.font_tweaks.pixels_above_text
@@ -300,6 +325,10 @@ static void calc_font_metrics(PatternEditorPanel & self) {
             + visual.font_tweaks.pixels_below_text,
         1
     );
+}
+
+static void set_scaled_font(PatternEditorPanel const& self, QPainter & painter, QFont font) {
+    painter.setFont(scaled_font(self, font));
 }
 
 PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
@@ -314,9 +343,8 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
 
     setMinimumSize(128, 320);
 
-    calc_font_metrics(*this);
     setup_shortcuts(*this);
-    create_image(*this);
+    setup_image_scaling(*this);
 
     // setAttribute(Qt::WA_Hover);  (generates paint events when mouse cursor enters/exits)
     // setContextMenuPolicy(Qt::CustomContextMenu);
@@ -325,7 +353,7 @@ PatternEditorPanel::PatternEditorPanel(MainWindow * win, QWidget * parent)
 void PatternEditorPanel::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
 
-    create_image(*this);
+    setup_image_scaling(*this);
     // Qt automatically calls paintEvent().
 }
 
@@ -730,7 +758,7 @@ static void draw_header(
     QSize const inner_size
 ) {
     // Use standard app font for header text.
-    painter.setFont(QFont{});
+    set_scaled_font(self, painter, QFont{});
 
     GridRect inner_rect{QPoint{0, 0}, inner_size};
 
@@ -1512,7 +1540,7 @@ static void draw_pattern_background(
                 // Draw current beat.
                 QString s = format_hex_2((uint8_t) curr_beats.numerator());
 
-                painter.setFont(visual.pattern_font);
+                set_scaled_font(self, painter, visual.pattern_font);
                 painter.setPen(note_line_beat);
 
                 DrawText draw_text{visual.pattern_font};
@@ -1550,7 +1578,7 @@ static void draw_pattern_foreground(
         temp_painter.drawImage(0, 0, self._image);
     }
 
-    painter.setFont(visual.pattern_font);
+    set_scaled_font(self, painter, visual.pattern_font);
     DrawText text_painter{painter.font()};
 
     // Dimensions of the note cut/release rectangles.
@@ -2036,7 +2064,7 @@ static void draw_pattern(PatternEditorPanel & self) {
     }
 
     {
-        // Draw pixmap onto this widget.
+        // Draw image onto this widget.
         auto paint_on_screen = QPainter(&self);
         paint_on_screen.drawImage(self.rect(), self._image);
     }
