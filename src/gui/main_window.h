@@ -34,7 +34,9 @@ enum class AudioState {
 using cursor::Cursor;
 using cursor::CursorX;
 
-/// A user selection in the document.
+/// External representation of a selection in the document,
+/// used for rendering and copy/paste.
+/// Stores top and bottom, and left and right.
 ///
 /// left and right are both inclusive, and must lie in bounds.
 ///
@@ -58,6 +60,9 @@ enum class SelectionMode {
 
 using ColumnToNumSubcol = gsl::span<cursor::SubColumnIndex>;
 
+/// Internal representation of selection, used for cursor movement.
+/// Stores the begin position (usually fixed) and endpoint (usually moves with cursor),
+/// and how much extra time below the selection's bottom (either begin or end) to select.
 class RawSelection {
     /// Starting point of the selection.
     Cursor _begin;
