@@ -2,6 +2,8 @@
 #include "doc.h"
 #include "gui/lib/layout_macros.h"
 
+#include <verdigris/wobjectimpl.h>
+
 // Widgets
 #include <QListView>
 
@@ -12,11 +14,14 @@
 #include <QString>
 
 namespace gui::timeline_editor {
+W_OBJECT_IMPL(TimelineEditor)
 
 /// QAbstractItemModel is confusing.
 /// This is based off
 /// https://doc.qt.io/qt-5/model-view-programming.html#a-read-only-example-model.
-struct HistoryWrapper : QAbstractListModel {
+class HistoryWrapper : public QAbstractListModel {
+    W_OBJECT(HistoryWrapper)
+public:
     GetDocument _get_document;
 
 // impl
@@ -59,8 +64,10 @@ struct HistoryWrapper : QAbstractListModel {
         return createIndex((int) win._cursor.get().y.grid, 0);
     }
 };
+W_OBJECT_IMPL(HistoryWrapper)
 
 class TimelineEditorImpl : public TimelineEditor {
+    W_OBJECT(TimelineEditorImpl)
 public:
     MainWindow & _win;
 
@@ -108,6 +115,7 @@ public:
         return {0, 0};
     }
 };
+W_OBJECT_IMPL(TimelineEditorImpl)
 
 TimelineEditor * TimelineEditor::make(MainWindow * win, QWidget * parent) {
     return new TimelineEditorImpl(win, parent);

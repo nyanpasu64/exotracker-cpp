@@ -3,6 +3,8 @@
 #include "history.h"
 #include "gui/main_window.h"
 
+#include <verdigris/wobjectdefs.h>
+
 #include <QWidget>
 
 namespace gui::timeline_editor {
@@ -11,7 +13,7 @@ using history::GetDocument;
 using main_window::MainWindow;
 
 class TimelineEditor : public QWidget {
-    // impl
+    W_OBJECT(TimelineEditor)
 protected:
     // TimelineEditor() constructor
     using QWidget::QWidget;
