@@ -2,6 +2,7 @@
 #include "main_window.h"
 #include "gui/pattern_editor.h"
 #include "gui/timeline_editor.h"
+#include "gui/instrument_list.h"
 #include "gui/move_cursor.h"
 #include "lib/layout_macros.h"
 #include "gui_common.h"
@@ -53,6 +54,7 @@ using gui::lib::IconToolBar;
 using gui::pattern_editor::PatternEditor;
 using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
+using gui::instrument_list::InstrumentList;
 using doc::BeatFraction;
 using util::math::ceildiv;
 using util::math::frac_floor;
@@ -280,6 +282,8 @@ struct MainWindowUi : MainWindow {
         QAction * clone_row;
     } _timeline;
 
+    InstrumentList * _instrument_list;
+
     PatternEditor * _pattern_editor;
 
     // Control panel
@@ -359,13 +363,16 @@ struct MainWindowUi : MainWindow {
 
             // Top dock area. TODO make panels draggable and rearrangeable
             {l__c_l(QWidget, QHBoxLayout);
-                c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+                c->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
                 // Timeline editor panel.
                 timeline_editor_panel(l);
 
                 // Control panel.
                 control_panel(l);
+
+                // Instrument list panel.
+                instrument_list_panel(l);
             }
 
             // Main body is the pattern editor.
@@ -377,10 +384,10 @@ struct MainWindowUi : MainWindow {
 
     void timeline_editor_panel(QBoxLayout * l) {
         {l__c_l(QGroupBox, QVBoxLayout)
+            c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
             c->setTitle(tr("Timeline"));
             {l__w_factory(TimelineEditor::make(this))
                 _timeline_editor = w;
-                // w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
             }
             {l__w(IconToolBar(true))  // Show button borders.
                 _timeline.add_row = w->add_icon_action(
@@ -518,6 +525,13 @@ struct MainWindowUi : MainWindow {
             l->addStretch();
         }
     } }
+
+    void instrument_list_panel(QBoxLayout * l) {
+        {l__w_factory(InstrumentList::make(this))
+            _instrument_list = w;
+            w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+        }
+    }
 
     void pattern_editor_panel(QBoxLayout * l) {
         {l__c_l(QFrame, QVBoxLayout);
@@ -886,6 +900,7 @@ public:
         setup_widgets();  // Output: _pattern_editor.
         _pattern_editor->set_history(_audio.document_getter());
         _timeline_editor->set_history(_audio.document_getter());
+        _instrument_list->set_history(_audio.document_getter());
 
         // Hook up refresh timer.
         connect(

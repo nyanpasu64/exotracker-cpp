@@ -1,0 +1,118 @@
+#include "instrument_list.h"
+#include "doc.h"
+#include "gui/lib/layout_macros.h"
+
+#include <verdigris/wobjectimpl.h>
+
+// Widgets
+#include <QListView>
+
+// Layouts
+#include <QVBoxLayout>
+
+namespace gui::instrument_list {
+W_OBJECT_IMPL(InstrumentList)
+
+namespace {
+class HistoryWrapper : public QAbstractListModel {
+    W_OBJECT(HistoryWrapper)
+public:
+    GetDocument _get_document;
+
+// impl
+    HistoryWrapper(GetDocument get_document)
+        : _get_document(get_document)
+    {}
+
+    [[nodiscard]] doc::Document const & get_document() const {
+        return _get_document();
+    }
+
+    void set_history(GetDocument get_document) {
+        beginResetModel();
+        _get_document = get_document;
+        endResetModel();
+    }
+
+    // impl QAbstractListModel
+    int rowCount(QModelIndex const & parent) const override {
+        return int(get_document().instruments.v.size());
+    }
+
+    QVariant data(QModelIndex const & index, int role) const override {
+        auto & x = get_document().instruments.v;
+
+        if (!index.isValid())
+            return QVariant();
+
+        auto row = (size_t) index.row();
+        if (row >= x.size())
+            return QVariant();
+
+        if (role == Qt::DisplayRole) {
+            if (x[row].has_value()) {
+                return QStringLiteral("%1 - %2")
+                    .arg(row, 2, 16, QLatin1Char('0'))
+                    .arg(QString::fromStdString(x[row]->name));
+            } else {
+                return QStringLiteral("%1").arg(row, 2, 16, QLatin1Char('0'));
+            }
+        } else
+            return QVariant();
+    }
+};
+W_OBJECT_IMPL(HistoryWrapper)
+
+class InstrumentListImpl : public InstrumentList {
+    W_OBJECT(InstrumentListImpl)
+public:
+    MainWindow & _win;
+
+    HistoryWrapper _model;
+    QListView * _widget;
+
+    explicit InstrumentListImpl(MainWindow * win, QWidget * parent)
+        : InstrumentList(parent)
+        , _win(*win)
+        , _model(GetDocument::empty())
+    {
+        auto c = this;
+        auto l = new QVBoxLayout(c);
+        setLayout(l);
+
+        l->setContentsMargins(0, 0, 0, 0);
+
+        {
+            l__w(QListView);
+            _widget = w;
+            w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+        }
+
+        _widget->setModel(&_model);
+    }
+
+    [[nodiscard]] doc::Document const & get_document() const {
+        return _model.get_document();
+    }
+
+    void set_history(GetDocument get_document) override {
+        _model.set_history(get_document);
+        update_selection();
+    }
+
+    void update_selection() override {
+//        QModelIndex order_y = _model.get_cursor_y_from(_win);
+
+//        QItemSelectionModel & widget_select = *_widget->selectionModel();
+//        widget_select.select(order_y, QItemSelectionModel::ClearAndSelect);
+    }
+};
+W_OBJECT_IMPL(InstrumentListImpl)
+}
+
+InstrumentList * InstrumentList::make(MainWindow * win, QWidget * parent) {
+    return new InstrumentListImpl(win, parent);
+}
+
+// namespace
+}
