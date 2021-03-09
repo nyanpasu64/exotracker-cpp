@@ -816,10 +816,6 @@ public:
         return _audio.get_document();
     }
 
-    AudioState audio_state() const override {
-        return _audio.audio_state();
-    }
-
     /// Called after edit/undo/redo, which are capable of deleting the timeline row
     /// we're currently in.
     ///

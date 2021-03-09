@@ -189,8 +189,6 @@ public:
 // interface
     static MainWindow & get_instance();
 
-    virtual AudioState audio_state() const = 0;
-
     /// MoveCursor determines whether to save and move the cursor (for pattern edits)
     /// or not (for non-pattern edits).
     virtual void push_edit(edit::EditBox command, MoveCursor cursor_move) = 0;
