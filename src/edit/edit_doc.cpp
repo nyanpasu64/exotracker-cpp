@@ -81,7 +81,9 @@ struct EditRow {
 
     EditRow(EditRow const& other) : EditRow(other._grid, other._edit) {}
 
-    EditRow(EditRow && other) : EditRow(other._grid, std::move(other._edit)) {}
+    EditRow(EditRow && other) noexcept
+        : EditRow(other._grid, std::move(other._edit))
+    {}
 
     void apply_swap(doc::Document & document) {
         assert(document.timeline.capacity() >= MAX_GRID_CELLS);

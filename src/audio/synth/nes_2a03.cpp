@@ -216,7 +216,10 @@ public:
     /// _apu2 points to _apu1.
     /// When move-constructing NesSoundChip, fix the new _apu2's pointer.
     /// This is a non-owning pointer, so no double-free occurs when `other` is destroyed.
-    NesSoundChip(NesSoundChip && other) : _apu1(other._apu1), _apu2(other._apu2) {
+    NesSoundChip(NesSoundChip && other) noexcept
+        : _apu1(other._apu1)
+        , _apu2(other._apu2)
+    {
         // Post-move hook, not initial constructor.
         _apu2.SetAPU(&_apu1);
     }
