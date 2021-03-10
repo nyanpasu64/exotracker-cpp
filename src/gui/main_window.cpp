@@ -8,9 +8,11 @@
 #include "gui_common.h"
 #include "cmd_queue.h"
 #include "edit/edit_doc.h"
+#include "util/defer.h"
 #include "util/math.h"
 #include "util/release_assert.h"
 #include "util/reverse.h"
+#include "util/unwrap.h"
 
 #include <fmt/core.h>
 #include <rtaudio/RtAudio.h>
@@ -34,6 +36,7 @@
 // Other
 #include <QAction>
 #include <QDebug>
+#include <QFlags>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QScreen>
@@ -43,6 +46,7 @@
 #include <chrono>
 #include <iostream>
 #include <optional>
+#include <exception>  // std::uncaught_exceptions
 #include <stdexcept>  // logic_error
 
 namespace gui::main_window {
@@ -154,8 +158,6 @@ void RawSelection::select_all(
 
 // # impl CursorAndSelection
 
-W_OBJECT_IMPL(CursorAndSelection)
-
 cursor::Cursor const& CursorAndSelection::get() const {
     return _cursor;
 }
@@ -168,20 +170,15 @@ cursor::Cursor const* CursorAndSelection::operator->() const {
     return &_cursor;
 }
 
-Cursor & CursorAndSelection::get_internal() {
+Cursor & CursorAndSelection::get_mut() {
     return _cursor;
 }
 
-void CursorAndSelection::set_internal(Cursor cursor) {
+void CursorAndSelection::set(Cursor cursor) {
     _cursor = cursor;
     if (_select) {
         _select->set_end(_cursor);
     }
-}
-
-void CursorAndSelection::set(Cursor cursor) {
-    set_internal(cursor);
-    emit cursor_moved();
 }
 
 void CursorAndSelection::set_x(CursorX x) {
@@ -189,7 +186,6 @@ void CursorAndSelection::set_x(CursorX x) {
     if (_select) {
         _select->set_end(_cursor);
     }
-    emit cursor_moved();
 }
 
 void CursorAndSelection::set_y(GridAndBeat y) {
@@ -197,7 +193,6 @@ void CursorAndSelection::set_y(GridAndBeat y) {
     if (_select) {
         _select->set_end(_cursor);
     }
-    emit cursor_moved();
 }
 
 std::optional<RawSelection> CursorAndSelection::raw_select() const {
@@ -205,10 +200,6 @@ std::optional<RawSelection> CursorAndSelection::raw_select() const {
 }
 
 std::optional<RawSelection> & CursorAndSelection::raw_select_mut() {
-    // We emit the signal before _select is mutated.
-    // But the listener is connected via a Qt::QueuedConnection,
-    // so it only gets invoked once the mutating function exits to the event loop.
-    emit cursor_moved();
     return _select;
 }
 
@@ -222,17 +213,14 @@ std::optional<Selection> CursorAndSelection::get_select() const {
 void CursorAndSelection::enable_select(int rows_per_beat) {
     if (!_select) {
         _select = RawSelection(_cursor, rows_per_beat);
-        emit cursor_moved();
     }
 }
 
 void CursorAndSelection::clear_select() {
     if (_select) {
         _select = {};
-        emit cursor_moved();
     }
 }
-
 
 // # impl MainWindow
 
@@ -240,13 +228,14 @@ W_OBJECT_IMPL(MainWindow)
 
 static MainWindow * instance;
 
-MainWindow::MainWindow(QWidget *parent) :
+MainWindow::MainWindow(doc::Document document, QWidget *parent)
     // I kinda regret using the same name for namespace "history" and member variable "history".
     // But it's only a problem since C++ lacks pervasive `self`.
-    QMainWindow(parent)
+    : QMainWindow(parent)
+    , _state(std::move(document))
 {}
 
-
+namespace {
 // # MainWindow components
 
 using cmd_queue::CommandQueue;
@@ -547,16 +536,10 @@ struct MainWindowUi : MainWindow {
     }
 };
 
-using gui::history::History;
-using gui::history::GetDocument;
-
 class AudioComponent {
     // GUI/audio communication.
     AudioState _audio_state = AudioState::Stopped;
     CommandQueue _command_queue{};
-
-    // fields
-    History _history;
 
     // Audio.
     RtAudio _rt{};
@@ -567,19 +550,10 @@ class AudioComponent {
 
 // impl
 public:
-    AudioComponent(doc::Document document) : _history(std::move(document)) {
-    }
+    AudioComponent() = default;
 
     AudioState audio_state() const {
         return _audio_state;
-    }
-
-    GetDocument document_getter() {
-        return GetDocument(_history);
-    }
-
-    doc::Document const& get_document() const {
-        return _history.get_document();
     }
 
 // # Command queue.
@@ -659,7 +633,7 @@ private:
 
 public:
     /// Output: _audio_handle.
-    void setup_audio() {
+    void setup_audio(StateComponent const& state) {
         // TODO should this be handled by the constructor?
         // Initializes _curr_audio_device.
         scan_devices();
@@ -668,11 +642,11 @@ public:
 
         // Begin playing audio. Destroying this variable makes audio stop.
         _audio_handle = AudioThreadHandle::make(
-            _rt, _curr_audio_device, get_document().clone(), stub_command()
+            _rt, _curr_audio_device, state.document().clone(), stub_command()
         );
     }
 
-    void restart_audio_thread() {
+    void restart_audio_thread(StateComponent const& state) {
         // Only one stream can be running at a time.
         // The lifetimes of the old and new audio thread must not overlap.
         // So destroy the old before constructing the new.
@@ -682,7 +656,7 @@ public:
         _command_queue.clear();
 
         _audio_handle = AudioThreadHandle::make(
-            _rt, _curr_audio_device, get_document().clone(), stub_command()
+            _rt, _curr_audio_device, state.document().clone(), stub_command()
         );
     }
 
@@ -706,26 +680,26 @@ public:
         return maybe_seq_time;
     }
 
-    void play_pause(StateComponent & state) {
+    void play_pause(StateTransaction & tx) {
         if (_audio_handle.has_value()) {
             gc_command_queue();
 
             if (_audio_state == AudioState::Stopped) {
-                auto cursor = state._cursor->y;
+                auto cursor = tx.state().cursor().y;
                 cursor.beat = 0;
-                play_from(state, cursor);
+                play_from(tx, cursor);
             } else {
                 stop_play();
             }
         }
     }
 
-    void play_from_row(StateComponent & state) {
+    void play_from_row(StateTransaction & tx) {
         if (_audio_handle.has_value()) {
             gc_command_queue();
 
             if (_audio_state == AudioState::Stopped) {
-                play_from(state, state._cursor->y);
+                play_from(tx, {});
             } else {
                 stop_play();
             }
@@ -733,12 +707,15 @@ public:
     }
 
 private:
-    void play_from(StateComponent & state, GridAndBeat time) {
-        _command_queue.push(cmd_queue::PlayFrom{time});
+    void play_from(StateTransaction & tx, std::optional<GridAndBeat> time) {
+        auto start_time = time.value_or(tx.state().cursor().y);
+        _command_queue.push(cmd_queue::PlayFrom{start_time});
         _audio_state = AudioState::Starting;
 
-        // Move cursor to right spot, while waiting for audio thread to respond.
-        state._cursor.set_y(time);
+        if (time) {
+            // Move cursor to right spot, while waiting for audio thread to respond.
+            tx.cursor_mut().set_y(*time);
+        }
     }
 
     void stop_play() {
@@ -757,13 +734,13 @@ private:
 
 public:
     void push_edit(
-        StateComponent & state, edit::EditBox command, MoveCursor cursor_move
+        StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move
     ) {
         send_edit(*this, command->box_clone());
 
         edit::MaybeCursor before_cursor;
         edit::MaybeCursor after_cursor;
-        edit::Cursor const here = *state._cursor;
+        edit::Cursor const here = tx.state().cursor();
 
         auto p = &cursor_move;
         if (std::get_if<MoveCursor_::NotPatternEdit>(p)) {
@@ -775,41 +752,41 @@ public:
             after_cursor = move_from->after_or_here.value_or(here);
         }
 
-        _history.push(edit::CursorEdit{
+        tx.history_mut().push(edit::CursorEdit{
             std::move(command), before_cursor, after_cursor
         });
 
         if (after_cursor) {
-            // Does not emit cursor_moved()!
-            state._cursor.set_internal(*after_cursor);
+            tx.cursor_mut().set(*after_cursor);
         }
     }
 
-    bool undo(StateComponent & state) {
-        if (auto cursor_edit = _history.get_undo()) {
+    bool undo(StateTransaction & tx) {
+        if (auto cursor_edit = tx.history().get_undo()) {
             send_edit(*this, std::move(cursor_edit->edit));
             if (cursor_edit->before_cursor) {
-                state._cursor.set(*cursor_edit->before_cursor);
+                tx.cursor_mut().set(*cursor_edit->before_cursor);
             }
-            _history.undo();
+            tx.history_mut().undo();
             return true;
         }
         return false;
     }
 
-    bool redo(StateComponent & state) {
-        if (auto cursor_edit = _history.get_redo()) {
+    bool redo(StateTransaction & tx) {
+        if (auto cursor_edit = tx.history().get_redo()) {
             send_edit(*this, std::move(cursor_edit->edit));
             if (cursor_edit->after_cursor) {
-                state._cursor.set(*cursor_edit->after_cursor);
+                tx.cursor_mut().set(*cursor_edit->after_cursor);
             }
-            _history.redo();
+            tx.history_mut().redo();
             return true;
         }
         return false;
     }
 };
 
+}  // anonymous namespace
 
 // module-private
 class MainWindowImpl : public MainWindowUi {
@@ -844,19 +821,28 @@ public:
 
     AudioComponent _audio;
 
-    // impl MainWindow
+    // utility methods
     doc::Document const& get_document() const {
-        return _audio.get_document();
+        return _state.history().get_document();
+    }
+
+    // impl MainWindow
+
+    std::optional<StateTransaction> edit_state() final {
+        return StateTransaction::make(this);
+    }
+
+    StateTransaction edit_unwrap() final {
+        return unwrap(edit_state());
     }
 
     /// Called after edit/undo/redo, which are capable of deleting the timeline row
     /// we're currently in.
-    ///
-    /// You should call update_widgets() afterwards.
-    void clamp_cursor() {
+    void clamp_cursor(StateTransaction & tx) {
         doc::Document const& document = get_document();
 
-        auto cursor_y = _cursor->y;
+        auto cursor_y = _state.cursor().y;
+        auto const orig = cursor_y;
         auto ngrid = doc::GridIndex(document.timeline.size());
 
         if (cursor_y.grid >= ngrid) {
@@ -877,30 +863,27 @@ public:
             cursor_y.beat = BeatFraction{prev_row, rows_per_beat};
         }
 
-        // Does NOT emit cursor_moved().
-        _cursor.get_internal().y = cursor_y;
+        if (cursor_y != orig) {
+            tx.cursor_mut().set_y(cursor_y);
+        }
     }
 
-    void push_edit(edit::EditBox command, MoveCursor cursor_move) override {
-        // Never emits cursor_moved().
-        _audio.push_edit(*this, std::move(command), cursor_move);
-        clamp_cursor();
-
-        // So run this instead, which is equivalent
-        // (except immediate instead of queued).
-        update_widgets();
+    void push_edit(
+        StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move
+    ) override {
+        _audio.push_edit(tx, std::move(command), cursor_move);
+        clamp_cursor(tx);
     }
 
     // private methods
     MainWindowImpl(doc::Document document, QWidget * parent)
-        : MainWindowUi(parent)
-        , _audio(std::move(document))
+        : MainWindowUi(std::move(document), parent)
     {
         // Setup GUI.
         setup_widgets();  // Output: _pattern_editor.
-        _pattern_editor->set_history(_audio.document_getter());
-        _timeline_editor->set_history(_audio.document_getter());
-        _instrument_list->set_history(_audio.document_getter());
+        _pattern_editor->set_history(_state.document_getter());
+        _timeline_editor->set_history(_state.document_getter());
+        _instrument_list->set_history(_state.document_getter());
 
         // Hook up refresh timer.
         connect(
@@ -931,34 +914,20 @@ public:
                 }();
 
                 // Optionally set cursor to match play time.
-                if (_follow_playback->isChecked()) {
-                    if (_cursor->y != play_time) {
-                        _cursor.set_y(play_time);
-                    }
+                if (_follow_playback->isChecked() && _state.cursor().y != play_time) {
+                    edit_unwrap().cursor_mut().set_y(play_time);
                 }
 
-                // TODO write to _play_time field (even if cursor doesn't follow
-                // playback), and redraw audio/timeline editor.
+                // TODO if audio is playing, and cursor is detached from playback point,
+                // render playback point separately and redraw audio/timeline editor.
             }
-        );
-
-        // When the cursor moves, redraw all editors.
-        // Qt::QueuedConnection has "transactional" semantics;
-        // the callback will only run once the mutating function returns
-        // to the event loop, preventing intermediate states.
-        connect(
-            &_cursor,
-            &CursorAndSelection::cursor_moved,
-            this,
-            &MainWindowImpl::update_widgets,
-            Qt::QueuedConnection
         );
 
         setup_screen();
         // TODO setup_screen() when primaryScreen changed
         // TODO setup_timer() when refreshRate changed
 
-        _audio.setup_audio();
+        _audio.setup_audio(_state);
 
         // Last thing.
         on_startup(get_app().options());
@@ -1036,17 +1005,23 @@ public:
 
         // _ticks_per_beat obtains its value through update_gui_from_doc().
         connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
-            push_edit(
-                edit_doc::set_ticks_per_beat(ticks_per_beat),
-                MoveCursor_::NotPatternEdit{}
-            );
+            debug_unwrap(edit_state(), [&](auto & tx) {
+                push_edit(
+                    tx,
+                    edit_doc::set_ticks_per_beat(ticks_per_beat),
+                    MoveCursor_::NotPatternEdit{}
+                );
+            });
         });
 
         connect_spin(_length_beats, this, [this] (int grid_length_beats) {
-            push_edit(
-                edit_doc::set_grid_length(_cursor->y.grid, grid_length_beats),
-                MoveCursor_::NotPatternEdit{}
-            );
+            debug_unwrap(edit_state(), [&](auto & tx) {
+                push_edit(
+                    tx,
+                    edit_doc::set_grid_length(_state.cursor().y.grid, grid_length_beats),
+                    MoveCursor_::NotPatternEdit{}
+                );
+            });
         });
 
         // Bind octave field.
@@ -1088,7 +1063,7 @@ public:
         reload_shortcuts();
 
         // Initialize GUI state.
-        update_widgets();
+        edit_unwrap().update_all();
     }
 
     /// Compute the fixed zoom sequence, consisting of powers of 2
@@ -1140,14 +1115,14 @@ public:
 
         BIND_FROM_CONFIG(play_pause);
         connect_action(_play_pause, [this] () {
-            _audio.play_pause(*this);
-            update_widgets();
+            auto tx = edit_unwrap();
+            _audio.play_pause(tx);
         });
 
         BIND_FROM_CONFIG(play_from_row);
         connect_action(_play_from_row, [this] () {
-            _audio.play_from_row(*this);
-            update_widgets();
+            auto tx = edit_unwrap();
+            _audio.play_from_row(tx);
         });
 
         _undo.setShortcuts(QKeySequence::Undo);
@@ -1221,48 +1196,23 @@ public:
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
         this->addAction(&_restart_audio);
         connect_action(_restart_audio, [this] () {
-            _audio.restart_audio_thread();
+            _audio.restart_audio_thread(_state);
         });
-    }
-
-    // # Updating GUI from document
-
-    /// To avoid tricky stale-GUI bugs,
-    /// update the whole UI on any change to cursor or document.
-    ///
-    /// (how does reactivity work lol, and how do i get it)
-    void update_widgets() {
-        _pattern_editor->update();  // depends on _cursor and _history
-
-        // TODO find a less hacky way to update item count
-        _timeline_editor->set_history(_audio.document_getter());
-        _timeline_editor->update_cursor();
-
-        doc::Document const& doc = get_document();
-
-        {auto b = QSignalBlocker(_ticks_per_beat);
-            _ticks_per_beat->setValue(doc.sequencer_options.ticks_per_beat);
-        }
-
-        {auto b = QSignalBlocker(_length_beats);
-            auto nbeats = frac_floor(doc.timeline[_cursor->y.grid].nbeats);
-            _length_beats->setValue(nbeats);
-        }
     }
 
     // # Mutation methods, called when QAction are triggered.
 
     void undo() {
-        if (_audio.undo(*this)) {
-            clamp_cursor();
-            update_widgets();
+        auto tx = edit_unwrap();
+        if (_audio.undo(tx)) {
+            clamp_cursor(tx);
         }
     }
 
     void redo() {
-        if (_audio.redo(*this)) {
-            clamp_cursor();
-            update_widgets();
+        auto tx = edit_unwrap();
+        if (_audio.redo(tx)) {
+            clamp_cursor(tx);
         }
     }
 
@@ -1272,31 +1222,36 @@ public:
             return;
         }
 
+        auto old_grid = _state.cursor().y.grid;
+
         // Don't use this for undo.
         // If you do, "add, undo, add" will differ from "add".
         Cursor new_cursor = {
-            .x = _cursor->x,
+            .x = _state.cursor().x,
             .y = {
-                .grid = _cursor->y.grid + 1,
+                .grid = old_grid + 1,
                 .beat = 0,
             },
         };
 
+        auto tx = edit_unwrap();
         push_edit(
+            tx,
             edit_doc::add_timeline_row(
-                document, _cursor->y.grid + 1, _length_beats->value()
+                document, old_grid + 1, _length_beats->value()
             ),
-            move_to(new_cursor)
-        );
+            move_to(new_cursor));
     }
 
     void remove_timeline_row() {
+        auto old_grid = _state.cursor().y.grid;
+
         // The resulting cursor is invalid if you delete the last row.
         // clamp_cursor() will fix it.
         Cursor new_cursor = {
-            .x = _cursor->x,
+            .x = _state.cursor().x,
             .y = {
-                .grid = _cursor->y.grid,
+                .grid = old_grid,
                 .beat = 0,
             },
         };
@@ -1306,23 +1261,35 @@ public:
             return;
         }
 
-        push_edit(edit_doc::remove_timeline_row(_cursor->y.grid), move_to(new_cursor));
+        auto tx = edit_unwrap();
+        push_edit(
+            tx,
+            edit_doc::remove_timeline_row(_state.cursor().y.grid),
+            move_to(new_cursor));
     }
 
     void move_grid_up() {
-        if (_cursor->y.grid.v > 0) {
-            auto up = *_cursor;
+        auto const& cursor = _state.cursor();
+        if (cursor.y.grid.v > 0) {
+            auto up = cursor;
             up.y.grid--;
-            push_edit(edit_doc::move_grid_up(_cursor->y.grid), move_to(up));
+
+            auto tx = edit_unwrap();
+            push_edit(tx, edit_doc::move_grid_up(_state.cursor().y.grid), move_to(up));
         }
     }
 
     void move_grid_down() {
+        auto const& cursor = _state.cursor();
         auto & document = get_document();
-        if (_cursor->y.grid + 1 < document.timeline.size()) {
-            auto down = *_cursor;
+        if (cursor.y.grid + 1 < document.timeline.size()) {
+            auto down = cursor;
             down.y.grid++;
-            push_edit(edit_doc::move_grid_down(_cursor->y.grid), move_to(down));
+
+            auto tx = edit_unwrap();
+            push_edit(
+                tx, edit_doc::move_grid_down(_state.cursor().y.grid), move_to(down)
+            );
         }
     }
 
@@ -1332,16 +1299,118 @@ public:
             return;
         }
 
+        auto tx = edit_unwrap();
+
         // Right now the clone button keeps the cursor position.
         // Should it move the cursor down by 1 pattern, into the clone?
         // Or down to the beat 0 of the clone?
         push_edit(
-            edit_doc::clone_timeline_row(document, _cursor->y.grid), keep_cursor()
-        );
+            tx,
+            edit_doc::clone_timeline_row(document, _state.cursor().y.grid),
+            keep_cursor());
     }
 };
-
 W_OBJECT_IMPL(MainWindowImpl)
+
+
+// # GUI state mutation tracking (StateTransaction):
+
+StateTransaction::StateTransaction(MainWindowImpl *win)
+    : _win(win)
+    , _uncaught_exceptions(std::uncaught_exceptions())
+{
+    assert(!win->_state._during_update);
+}
+
+std::optional<StateTransaction> StateTransaction::make(MainWindowImpl *win) {
+    if (win->_state._during_update) {
+        return {};
+    }
+    return StateTransaction(win);
+}
+
+StateTransaction::StateTransaction(StateTransaction && other) noexcept
+    : _win(other._win)
+    , _uncaught_exceptions(other._uncaught_exceptions)
+    , _queued_updates(other._queued_updates)
+{
+    other._win = nullptr;
+}
+
+StateTransaction::~StateTransaction() noexcept(false) {
+    if (_win == nullptr) {
+        return;
+    }
+    auto & state = state_mut();
+    state._during_update = true;
+    defer {
+        state._during_update = false;
+    };
+
+    // If unwinding, skip updating the GUI; we don't want to do work during unwinding.
+    if (std::uncaught_exceptions() != _uncaught_exceptions) {
+        return;
+    }
+
+    auto e = _queued_updates;
+    using E = StateUpdateFlag;
+
+    // PatternEditor depends on _history and _cursor.
+    if (e & (E::DocumentEdited | E::CursorMoved)) {
+        _win->_pattern_editor->update();
+    }
+
+    // TimelineEditor depends on _history and _cursor.
+    if (e & E::DocumentEdited) {
+        // TODO find a less hacky way to update item count
+        _win->_timeline_editor->set_history(state.document_getter());
+    } else if (e & E::CursorMoved) {
+        _win->_timeline_editor->update_cursor();
+    }
+
+    // InstrumentList depends on _history and _instrument.
+    if (e & E::DocumentEdited) {
+        _win->_instrument_list->set_history(state.document_getter());
+    } else if (e & E::InstrumentSwitched) {
+        _win->_instrument_list->update_selection();
+    }
+
+    doc::Document const& doc = state.document();
+
+    if (e & E::DocumentEdited) {
+        auto b = QSignalBlocker(_win->_ticks_per_beat);
+        _win->_ticks_per_beat->setValue(doc.sequencer_options.ticks_per_beat);
+    }
+
+    if (e & (E::DocumentEdited | E::CursorMoved)) {
+        auto b = QSignalBlocker(_win->_length_beats);
+        auto nbeats = frac_floor(doc.timeline[state.cursor().y.grid].nbeats);
+        _win->_length_beats->setValue(nbeats);
+    }
+}
+
+StateComponent const& StateTransaction::state() const {
+    return _win->_state;
+}
+
+StateComponent & StateTransaction::state_mut() {
+    return _win->_state;
+}
+
+history::History & StateTransaction::history_mut() {
+    _queued_updates |= StateUpdateFlag::DocumentEdited;
+    return state_mut()._history;
+}
+
+CursorAndSelection & StateTransaction::cursor_mut() {
+    _queued_updates |= StateUpdateFlag::CursorMoved;
+    return state_mut()._cursor;
+}
+
+void StateTransaction::set_instrument(int instrument) {
+    _queued_updates |= StateUpdateFlag::InstrumentSwitched;
+    state_mut()._instrument = instrument;
+}
 
 // public
 std::unique_ptr<MainWindow> MainWindow::make(doc::Document document, QWidget * parent) {

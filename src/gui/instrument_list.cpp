@@ -1,6 +1,7 @@
 #include "instrument_list.h"
 #include "doc.h"
 #include "gui/lib/layout_macros.h"
+#include "util/unwrap.h"
 
 #include <verdigris/wobjectimpl.h>
 
@@ -9,6 +10,9 @@
 
 // Layouts
 #include <QVBoxLayout>
+
+// Other
+#include <QSignalBlocker>
 
 namespace gui::instrument_list {
 W_OBJECT_IMPL(InstrumentList)
@@ -60,6 +64,10 @@ public:
         } else
             return QVariant();
     }
+
+    QModelIndex get_instrument_idx_from(MainWindow const& win) {
+        return createIndex(win._state.instrument(), 0);
+    }
 };
 W_OBJECT_IMPL(HistoryWrapper)
 
@@ -86,9 +94,21 @@ public:
             l__w(QListView);
             _widget = w;
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+            w->setWrapping(true);
         }
 
         _widget->setModel(&_model);
+        connect(
+            _widget->selectionModel(), &QItemSelectionModel::selectionChanged,
+            win, [win](const QItemSelection &selected, const QItemSelection &) {
+                // Only 1 element can be selected at once, or 0 if you ctrl+click.
+                assert(selected.size() <= 1);
+                if (!selected.empty()) {
+                    debug_unwrap(win->edit_state(), [&](auto & tx) {
+                        tx.set_instrument(selected[0].top());
+                    });
+                }
+            });
     }
 
     [[nodiscard]] doc::Document const & get_document() const {
@@ -101,10 +121,23 @@ public:
     }
 
     void update_selection() override {
-//        QModelIndex order_y = _model.get_cursor_y_from(_win);
+        QModelIndex instr_idx = _model.get_instrument_idx_from(_win);
 
-//        QItemSelectionModel & widget_select = *_widget->selectionModel();
-//        widget_select.select(order_y, QItemSelectionModel::ClearAndSelect);
+        QItemSelectionModel & widget_select = *_widget->selectionModel();
+        // _widget->selectionModel() merely responds to the active instrument.
+        // Block signals when we change it to match the active instrument.
+        auto s = QSignalBlocker(widget_select);
+        widget_select.select(instr_idx, QItemSelectionModel::ClearAndSelect);
+
+        // Hack to avoid scrolling a widget before it's shown
+        // (which causes broken layout and crashes).
+        // This probably won't have any bad effects,
+        // since when the app starts, the instrument number is always 0,
+        // and even if it was nonzero, only the scrolling will be wrong,
+        // not the actual selected instrument (which could cause a desync).
+        if (isVisible()) {
+            _widget->scrollTo(instr_idx);
+        }
     }
 };
 W_OBJECT_IMPL(InstrumentListImpl)

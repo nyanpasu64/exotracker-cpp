@@ -61,7 +61,7 @@ public:
 
     /// Binds win's cursor y position, to this model.
     QModelIndex get_cursor_y_from(MainWindow const& win) {
-        return createIndex((int) win._cursor.get().y.grid, 0);
+        return createIndex((int) win._state.cursor().y.grid, 0);
     }
 };
 W_OBJECT_IMPL(HistoryWrapper)
