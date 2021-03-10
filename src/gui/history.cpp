@@ -15,7 +15,7 @@ void History::push(CursorEdit command) {
     // Move new state into current.
     command.apply_swap(_document);
 
-    if (undo_stack.size()) {
+    if (!undo_stack.empty()) {
         auto & prev = undo_stack.back();
 
         // Only true if:

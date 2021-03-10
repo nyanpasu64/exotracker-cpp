@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <utility>
 
 namespace gui::lib {
 
@@ -43,7 +44,7 @@ static QToolButton * toolbar_widget(QToolBar * tb, QAction * action) {
 
 QAction * IconToolBar::add_icon_action(QString alt, QString icon) {
     QAction * action = addAction(alt);
-    action->setIcon(icons::get_icon(icon, iconSize()));
+    action->setIcon(icons::get_icon(std::move(icon), iconSize()));
 
     // Set flat button borders.
     toolbar_widget(this, action)->setAutoRaise(!_button_borders);

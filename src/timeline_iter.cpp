@@ -106,7 +106,7 @@ ReverseBlockIterator ReverseBlockIterator::from_beat(
         ._timeline = timeline,
 
         ._orig_grid = now.grid,
-        ._orig_pattern_start = (cell_patterns.size() ? cell_patterns.back().begin_time : 0),
+        ._orig_pattern_start = (!cell_patterns.empty() ? cell_patterns.back().begin_time : 0),
 
         ._grid = now.grid,
         ._cell_patterns = cell_patterns,
@@ -190,7 +190,7 @@ std::optional<BlockIteratorRef> ReverseBlockIterator::next() {
 
             begin:
             DEBUG_PRINT("reverse, patterns size {}\n", _cell_patterns.size());
-            if (_cell_patterns.size())
+            if (!_cell_patterns.empty())
             for (_pattern = _cell_patterns.size() - 1; ;) {
                 scrBeginScope;
                 doc::PatternRef pattern = _cell_patterns[_pattern];

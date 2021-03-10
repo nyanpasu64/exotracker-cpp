@@ -31,15 +31,15 @@ struct HistoryWrapper : QAbstractListModel {
     void set_history(History const& history) {
         auto old_n = int(get_document().timeline.size());
         if (old_n > 0) {
-            emit beginRemoveRows({}, 0, old_n - 1);
+            beginRemoveRows({}, 0, old_n - 1);
             _history = &_dummy_history;
-            emit endRemoveRows();
+            endRemoveRows();
         }
 
         auto n = int(history.get_document().timeline.size());
-        emit beginInsertRows({}, 0, n - 1);
+        beginInsertRows({}, 0, n - 1);
         _history = &history;
-        emit endInsertRows();
+        endInsertRows();
     }
 
     // impl QAbstractListModel

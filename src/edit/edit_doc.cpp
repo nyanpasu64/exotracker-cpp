@@ -116,8 +116,7 @@ struct EditRow {
         }
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
-        (void) prev;
+    bool can_coalesce(BaseEditCommand & /*prev*/) const {
         return false;
     }
 
@@ -199,7 +198,7 @@ struct MoveGridDown {
         std::swap(document.timeline[_grid], document.timeline[_grid + 1]);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_coalesce(BaseEditCommand & /*prev*/) const {
         return false;
     }
 

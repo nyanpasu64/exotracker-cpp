@@ -598,7 +598,7 @@ private:
             print("    {}: ", i);
 
             RtAudio::DeviceInfo info = _rt.getDeviceInfo(i);
-            if (info.probed == true) {
+            if (info.probed) {
                 print(
                     "name={}, rate={}, out_nchan={}\n",
                     info.name,

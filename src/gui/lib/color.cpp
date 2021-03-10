@@ -4,7 +4,7 @@
 
 namespace gui::lib::color {
 
-QColor lerp_colors(QColor c1, QColor c2, qreal position) {
+QColor lerp_colors(QColor const& c1, QColor const& c2, qreal position) {
     #define GET_COLOR(I) \
         qreal r##I, g##I, b##I; \
         c##I.getRgbF(&r##I, &g##I, &b##I);
@@ -20,7 +20,7 @@ QColor lerp_colors(QColor c1, QColor c2, qreal position) {
     #undef BLEND_COLOR
 }
 
-QColor lerp_srgb(QColor c1, QColor c2, qreal position) {
+QColor lerp_srgb(QColor const& c1, QColor const& c2, qreal position) {
     GET_COLOR(1)
     GET_COLOR(2)
 

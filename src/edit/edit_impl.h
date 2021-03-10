@@ -42,12 +42,10 @@ inline EditBox make_command(Body body) {
 /// but doesn't modify the document.
 struct NullEditCommand {
 
-    void apply_swap(doc::Document & document) {
-        (void) document;
+    void apply_swap(doc::Document & /*document*/) {
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
-        (void) prev;
+    bool can_coalesce(BaseEditCommand & /*prev*/) const {
         return false;
     }
 
