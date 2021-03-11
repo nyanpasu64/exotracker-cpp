@@ -62,6 +62,8 @@ struct Arguments {
 
 int main(int argc, char *argv[])
 {
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
     gui::app::GuiApp a(argc, argv);
 
     // Parse command-line arguments.
