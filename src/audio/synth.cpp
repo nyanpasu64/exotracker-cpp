@@ -95,13 +95,15 @@ void OverallSynth::synthesize_overall(
     // Thread creation will act as a memory barrier, so we don't need a fence.
     // Only the audio thread writes to _maybe_seq_time and _seen_command.
 
-    // The "end of callback" time will get exposed to the GUI
-    // once the audio starts (not finishes) playing...
-    // but I don't care anymore.
     MaybeSequencerTime const orig_seq_time =
         _maybe_seq_time.load(std::memory_order_relaxed);
 
-    // Increases as we run ticks.
+    /// The sequencer's current timestamp in the document.
+    /// Increases as the sequencer gets ticked. (Each channel's sequencer is expected to stay in sync.)
+    ///
+    /// The "end of callback" `seq_time` will get exposed to the GUI
+    /// once the audio starts (not finishes) playing.
+    /// This is a minor timing discrepancy, but not worth fixing.
     MaybeSequencerTime seq_time = orig_seq_time;
 
     AudioCommand * const orig_cmd = _seen_command.load(std::memory_order_relaxed);
@@ -118,22 +120,26 @@ void OverallSynth::synthesize_overall(
             cmd_queue::MessageBody * msg = &next->msg;
 
             // Process each command from the GUI.
-            if (auto seek_to = std::get_if<cmd_queue::SeekTo>(msg)) {
-                // Seek and play.
-                _sequencer_running = true;
+            if (auto play_from = std::get_if<cmd_queue::PlayFrom>(msg)) {
+                // Seek chip sequencers.
                 for (auto & chip : _chip_instances) {
                     chip->stop_playback();
-                    chip->seek(_document, seek_to->time);
+                    chip->seek(_document, play_from->time);
                 }
-                seq_time = std::nullopt;
 
+                // Begin playback (start ticking sequencers).
+                _sequencer_running = true;
+                // If _sequencer_running == true, SynthEvent::Tick unconditionally
+                // overwrites seq_time after calling handle_commands().
             } else
             if (std::get_if<cmd_queue::StopPlayback>(msg)) {
-                // Stop playback.
-                _sequencer_running = false;
+                // Stop active notes.
                 for (auto & chip : _chip_instances) {
                     chip->stop_playback();
                 }
+
+                // Stop ticking sequencers.
+                _sequencer_running = false;
                 seq_time = std::nullopt;
             } else
             if (auto edit_ptr = std::get_if<cmd_queue::EditBox>(msg)) {

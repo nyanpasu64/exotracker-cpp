@@ -67,8 +67,10 @@ public:
 
     virtual ~ChipInstance() = default;
 
-    /// Seek the sequencer to this time in the document
-    /// (grid cell and beat fraction).
+    /// Seek the sequencer to this time in the document (grid cell and beat fraction).
+    /// ChipInstance does not know if the song/sequencer is playing or not.
+    /// OverallSynth is responsible for calling sequencer_driver_tick() during playback,
+    /// and stop_playback() once followed by driver_tick() when not playing.
     virtual void seek(doc::Document const & document, timing::GridAndBeat time) = 0;
 
     /// Similar to seek(), but ignores events entirely (only looks at tempo/rounding).

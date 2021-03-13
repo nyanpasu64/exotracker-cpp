@@ -13,10 +13,10 @@ namespace cmd_queue {
 #define audio_cmd_INTERNAL private
 #endif
 
-struct SeekTo {
+struct PlayFrom {
     timing::GridAndBeat time;
 
-    SeekTo(timing::GridAndBeat time)
+    PlayFrom(timing::GridAndBeat time)
         : time{time}
     {}
 
@@ -25,15 +25,15 @@ struct SeekTo {
     // https://en.cppreference.com/w/cpp/language/rule_of_three
 
     // this macro invocation is *so* hacky
-    explicit DEFAULT_COPY(SeekTo)
-    DEFAULT_MOVE(SeekTo)
+    explicit DEFAULT_COPY(PlayFrom)
+    DEFAULT_MOVE(PlayFrom)
 };
 
 struct StopPlayback {};
 
 using edit::EditBox;
 
-using MessageBody = std::variant<SeekTo, StopPlayback, EditBox>;
+using MessageBody = std::variant<PlayFrom, StopPlayback, EditBox>;
 
 /// Exposed to audio thread.
 struct AudioCommand {

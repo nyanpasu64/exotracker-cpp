@@ -73,7 +73,7 @@ using cmd_queue::CommandQueue;
 
 CommandQueue play_from_begin() {
     CommandQueue out;
-    out.push(cmd_queue::SeekTo{timing::GridAndBeat{0, 0}});
+    out.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
     return out;
 }
 

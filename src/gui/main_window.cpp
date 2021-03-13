@@ -701,7 +701,7 @@ public:
 
 private:
     void play_from(StateComponent & state, GridAndBeat time) {
-        _command_queue.push(cmd_queue::SeekTo{time});
+        _command_queue.push(cmd_queue::PlayFrom{time});
         _audio_state = AudioState::Starting;
 
         // Move cursor to right spot, while waiting for audio thread to respond.
