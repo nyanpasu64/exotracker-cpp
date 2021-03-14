@@ -58,11 +58,6 @@ public:
         else
             return QVariant();
     }
-
-    /// Binds win's cursor y position, to this model.
-    QModelIndex get_cursor_y_from(MainWindow const& win) {
-        return createIndex((int) win._state.cursor().y.grid, 0);
-    }
 };
 W_OBJECT_IMPL(TimelineModel)
 
@@ -105,7 +100,7 @@ public:
     }
 
     void update_cursor() override {
-        QModelIndex order_y = _model.get_cursor_y_from(_win);
+        QModelIndex order_y = _model.index((int) _win._state.cursor().y.grid, 0);
 
         QItemSelectionModel & widget_select = *_widget->selectionModel();
         widget_select.select(order_y, QItemSelectionModel::ClearAndSelect);

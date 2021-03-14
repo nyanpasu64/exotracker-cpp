@@ -64,10 +64,6 @@ public:
         } else
             return QVariant();
     }
-
-    QModelIndex get_instrument_idx_from(MainWindow const& win) {
-        return createIndex(win._state.instrument(), 0);
-    }
 };
 W_OBJECT_IMPL(InstrumentListModel)
 
@@ -121,7 +117,7 @@ public:
     }
 
     void update_selection() override {
-        QModelIndex instr_idx = _model.get_instrument_idx_from(_win);
+        QModelIndex instr_idx = _model.index(_win._state.instrument(), 0);
 
         QItemSelectionModel & widget_select = *_widget->selectionModel();
         // _widget->selectionModel() merely responds to the active instrument.
