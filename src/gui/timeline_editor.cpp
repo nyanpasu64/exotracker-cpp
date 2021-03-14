@@ -19,13 +19,13 @@ W_OBJECT_IMPL(TimelineEditor)
 /// QAbstractItemModel is confusing.
 /// This is based off
 /// https://doc.qt.io/qt-5/model-view-programming.html#a-read-only-example-model.
-class HistoryWrapper : public QAbstractListModel {
-    W_OBJECT(HistoryWrapper)
+class TimelineModel : public QAbstractListModel {
+    W_OBJECT(TimelineModel)
 public:
     GetDocument _get_document;
 
 // impl
-    HistoryWrapper(GetDocument get_document)
+    TimelineModel(GetDocument get_document)
         : _get_document(get_document)
     {}
 
@@ -64,14 +64,14 @@ public:
         return createIndex((int) win._state.cursor().y.grid, 0);
     }
 };
-W_OBJECT_IMPL(HistoryWrapper)
+W_OBJECT_IMPL(TimelineModel)
 
 class TimelineEditorImpl : public TimelineEditor {
     W_OBJECT(TimelineEditorImpl)
 public:
     MainWindow & _win;
 
-    HistoryWrapper _model;
+    TimelineModel _model;
     QListView * _widget;
 
     // impl

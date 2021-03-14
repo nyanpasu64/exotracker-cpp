@@ -18,13 +18,13 @@ namespace gui::instrument_list {
 W_OBJECT_IMPL(InstrumentList)
 
 namespace {
-class HistoryWrapper : public QAbstractListModel {
-    W_OBJECT(HistoryWrapper)
+class InstrumentListModel : public QAbstractListModel {
+    W_OBJECT(InstrumentListModel)
 public:
     GetDocument _get_document;
 
 // impl
-    HistoryWrapper(GetDocument get_document)
+    InstrumentListModel(GetDocument get_document)
         : _get_document(get_document)
     {}
 
@@ -69,14 +69,14 @@ public:
         return createIndex(win._state.instrument(), 0);
     }
 };
-W_OBJECT_IMPL(HistoryWrapper)
+W_OBJECT_IMPL(InstrumentListModel)
 
 class InstrumentListImpl : public InstrumentList {
     W_OBJECT(InstrumentListImpl)
 public:
     MainWindow & _win;
 
-    HistoryWrapper _model;
+    InstrumentListModel _model;
     QListView * _widget;
 
     explicit InstrumentListImpl(MainWindow * win, QWidget * parent)
