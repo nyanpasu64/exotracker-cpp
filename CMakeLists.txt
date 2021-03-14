@@ -201,6 +201,7 @@ add_executable(exotracker-qt
 )
 target_compile_options(exotracker-qt PRIVATE "${options}")
 target_link_libraries(exotracker-qt PRIVATE exotracker-headless rtaudio Qt5::Widgets qkeycode)
+target_include_directories(exotracker-qt SYSTEM BEFORE PRIVATE ${Qt5Gui_PRIVATE_INCLUDE_DIRS})
 
 if(USE_PCH)
     target_precompile_headers(exotracker-qt PRIVATE
