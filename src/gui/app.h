@@ -12,11 +12,9 @@ namespace gui::app {
 
 using config::Options;
 
-struct SetFont {
-    SetFont();
-};
+void before_create_hooks();
 
-class GuiApp : public QApplication, private SetFont {
+class GuiApp : public QApplication {
     W_OBJECT(GuiApp)
 
 private:
@@ -48,7 +46,7 @@ private:
     // SavedState _state;
 
 public:
-    using QApplication::QApplication;
+    GuiApp(int &argc, char **argv, int = ApplicationFlags);
 
     Options const & options() const {
         return _options;

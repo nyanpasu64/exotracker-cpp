@@ -62,6 +62,7 @@ struct Arguments {
 
 int main(int argc, char *argv[])
 {
+    gui::app::before_create_hooks();
     gui::app::GuiApp a(argc, argv);
 
     // Parse command-line arguments.
