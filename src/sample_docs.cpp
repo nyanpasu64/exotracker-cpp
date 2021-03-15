@@ -47,6 +47,7 @@ static Document empty() {
     instruments[0] = Instrument{"blank"};
     instruments[1] = music_box();
     instruments[2] = Instrument{.name = "25%", .wave_index = {{1}}};
+    instruments[0x10] = Instrument{.name = "50%", .wave_index = {{2}}};
 
     ChipList chips{ChipKind::Nes};
 
