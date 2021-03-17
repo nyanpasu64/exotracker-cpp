@@ -7,6 +7,7 @@
 #include "edit_common.h"
 #include "timing_common.h"
 #include "audio/output.h"
+#include "util/copy_move.h"
 
 #include <gsl/span>
 #include <verdigris/wobjectdefs.h>
@@ -86,9 +87,9 @@ class RawSelection {
 public:
     explicit RawSelection(Cursor cursor, int rows_per_beat);
 
-    [[nodiscard]] Selection get_select() const;
+    Selection get_select() const;
 
-    [[nodiscard]] doc::BeatFraction bottom_padding() const {
+    doc::BeatFraction bottom_padding() const {
         return _bottom_padding;
     }
 
@@ -108,9 +109,7 @@ public:
 ///
 /// Selections are a hard problem. Requirements which led to this API design at
 /// https://docs.google.com/document/d/1HBrF1W_5vKFMwHbaN6ONvtnmGAgawlJYsdZTbTUClmA/edit#heading=h.q2iq7gfnt5i8
-class CursorAndSelection : public QObject {
-    W_OBJECT(CursorAndSelection)
-
+class CursorAndSelection {
 private:
     Cursor _cursor{};
     std::optional<RawSelection> _select{};
@@ -118,29 +117,24 @@ private:
     // impl
 public:
     // # Cursor position
-    [[nodiscard]] Cursor const& get() const;
+    Cursor const& get() const;
     Cursor const& operator*() const;
     Cursor const* operator->() const;
 
-    /// When emitted, a message is sent to the GUI to redraw widgets.
-    /// The widgets are only redrawn when the code returns to the event loop.
-    void cursor_moved() W_SIGNAL(cursor_moved)
-
     /// Only called by PatternEditorImpl during edit/undo/redo.
-    Cursor & get_internal();
-
-    /// Only called by AudioComponent during edits.
-    void set_internal(Cursor cursor);
+    Cursor & get_mut();
 
     /// Moving the cursor always updates the selection endpoint.
     void set(Cursor cursor);
     void set_x(CursorX x);
     void set_y(GridAndBeat y);
 
+
     // # Selection
-    [[nodiscard]] std::optional<RawSelection> raw_select() const;
-    [[nodiscard]] std::optional<RawSelection> & raw_select_mut();
-    [[nodiscard]] std::optional<Selection> get_select() const;
+    std::optional<RawSelection> raw_select() const;
+    std::optional<RawSelection> & raw_select_mut();
+
+    std::optional<Selection> get_select() const;
 
     /// If selection not enabled, begin from cursor position.
     /// Otherwise continue selection.
@@ -172,26 +166,150 @@ inline MoveCursor keep_cursor() {
     return MoveCursor_::MoveFrom{{}, {}};
 }
 
-struct StateComponent {
+using gui::history::History;
+using gui::history::GetDocument;
+
+class StateComponent {
+private:
+    History _history;
+
     // If we don't use QListView, we really don't need a "cursor_moved" signal.
     // Each method updates the cursor location, then the screen is redrawn at 60fps.
     CursorAndSelection _cursor{};
 
     int _instrument = 0;
-    bool _insert_instrument = true;
+
+public:
+    bool _insert_instrument = true;  // no side effects when changed, so let the world see
+
+    /// Whether the GUI is being updated in response to events.
+    bool _during_update = false;
+
+// impl
+public:
+    StateComponent(doc::Document document)
+        : _history(std::move(document))
+    {}
+
+    History const& history() const {
+        return _history;
+    }
+
+    GetDocument document_getter() {
+        return GetDocument(_history);
+    }
+
+    doc::Document const& document() const {
+        return _history.get_document();
+    }
+
+    Cursor const& cursor() const {
+        return _cursor.get();
+    }
+
+    std::optional<Selection> select() const {
+        return _cursor.get_select();
+    }
+
+    std::optional<RawSelection> raw_select() const {
+        return _cursor.raw_select();
+    }
+
+    int instrument() const {
+        return _instrument;
+    }
+
+    friend class StateTransaction;
 };
 
+// # GUI state mutation tracking (StateTransaction):
+
+/// Used to find which portion of the GUI needs to be redrawn.
+enum class StateUpdateFlag : uint32_t {
+    None = 0,
+    All = ~(uint32_t)0,
+    DocumentEdited = 0x1,
+    CursorMoved = 0x2,
+    InstrumentSwitched = 0x4,
+};
+Q_DECLARE_FLAGS(StateUpdateFlags, StateUpdateFlag)
+Q_DECLARE_OPERATORS_FOR_FLAGS(StateUpdateFlags)
+
+class MainWindow;
+class MainWindowImpl;
+
+class [[nodiscard]] StateTransaction {
+main_window_INTERNAL:
+    MainWindowImpl * _win;
+
+    int _uncaught_exceptions;
+
+    /// Which part of the GUI needs to be redrawn due to events.
+    StateUpdateFlags _queued_updates = StateUpdateFlag::None;
+
+// impl
+private:
+    StateTransaction(MainWindowImpl * win);
+
+public:
+    static std::optional<StateTransaction> make(MainWindowImpl * win);
+
+    DISABLE_COPY(StateTransaction)
+    StateTransaction & operator=(StateTransaction &&) = delete;
+    StateTransaction(StateTransaction && other) noexcept;
+
+    /// Uses the destructor to update the GUI in response to changes,
+    /// so does nontrivial work and could throw exceptions
+    /// (no clue if exceptions propagate through Qt).
+    ~StateTransaction() noexcept(false);
+
+    StateComponent const& state() const;
+private:
+    StateComponent & state_mut();
+
+// Mutations:
+public:
+    void update_all() {
+        _queued_updates = StateUpdateFlag::All;
+    }
+
+    History const& history() const {
+        return state().history();
+    }
+    History & history_mut();
+
+    CursorAndSelection & cursor_mut();
+
+    void set_instrument(int instrument);
+};
+
+
 /// Everything exposed to other modules goes here. GUI widgets/etc. go in MainWindowPrivate.
-class MainWindow : public QMainWindow, public StateComponent {
+class MainWindow : public QMainWindow {
     W_OBJECT(MainWindow)
 
 public:
+    StateComponent _state;
+
 // interface
     static MainWindow & get_instance();
 
+    /// Fails if another edit transaction is logging or responding to changes.
+    ///
+    /// QActions triggered by the user should never occur reentrantly,
+    /// so use `unwrap(edit_state())` or `edit_unwrap()` (throws exception if concurrent).
+    ///
+    /// Signals generated by widgets (eg. spinboxes) may occur reentrantly
+    /// if you forget to use QSignalBlocker when ~StateTransaction() sets widget values,
+    /// so use `debug_unwrap(edit_state(), lambda)` (if edit in progress,
+    /// assert on debug builds and otherwise skip function call)
+    virtual std::optional<StateTransaction> edit_state() = 0;
+
+    virtual StateTransaction edit_unwrap() = 0;
+
     /// MoveCursor determines whether to save and move the cursor (for pattern edits)
     /// or not (for non-pattern edits).
-    virtual void push_edit(edit::EditBox command, MoveCursor cursor_move) = 0;
+    virtual void push_edit(StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move) = 0;
 
 // constructors
     static std::unique_ptr<MainWindow> make(
@@ -201,8 +319,7 @@ public:
     virtual ~MainWindow();
 
 main_window_INTERNAL:
-    MainWindow(QWidget *parent = nullptr);
+    MainWindow(doc::Document document, QWidget *parent = nullptr);
 };
-
 
 }

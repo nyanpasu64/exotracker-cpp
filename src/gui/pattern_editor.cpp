@@ -14,6 +14,7 @@
 #include "util/math.h"
 #include "util/release_assert.h"
 #include "util/reverse.h"
+#include "util/unwrap.h"
 
 #include <fmt/core.h>
 #include <gsl/span>
@@ -155,12 +156,13 @@ static void setup_shortcuts(PatternEditor & self) {
     static auto const on_key_pressed = [] (
         PatternEditor & self, Method method, AlterSelection alter_selection
     ) {
+        auto tx = self._win.edit_unwrap();
         if (alter_selection == AlterSelection::Clear) {
-            self._win._cursor.clear_select();
+            tx.cursor_mut().clear_select();
         }
         if (alter_selection == AlterSelection::Extend) {
             // Begin or extend selection at old cursor position.
-            self._win._cursor.enable_select(self._zoom_level);
+            tx.cursor_mut().enable_select(self._zoom_level);
         }
         // Move cursor.
         std::invoke(method, self);
@@ -352,6 +354,8 @@ using cursor::CursorX;
 using cursor::ColumnIndex;
 using cursor::SubColumnIndex;
 using cursor::CellIndex;
+using main_window::Selection;
+using main_window::RawSelection;
 using DigitIndex = uint32_t;
 using util::distance;
 
@@ -833,6 +837,22 @@ static void draw_header(
 
 namespace {
 
+// # Utility functions:
+
+Cursor const& get_cursor(PatternEditor const& widget) {
+    return widget._win._state.cursor();
+}
+
+std::optional<Selection> get_select(PatternEditor const& widget) {
+    return widget._win._state.select();
+}
+
+std::optional<RawSelection> get_raw_sel(PatternEditor const& widget) {
+    return widget._win._state.raw_select();
+}
+
+// # Pattern drawing:
+
 // yay inconsistency
 using PxInt = int;
 //using PxNat = uint32_t;
@@ -892,8 +912,9 @@ public:
         doc::Document const & document,  // holds reference
         PxInt const screen_height
     ) {
+        GridAndBeat cursor_y = get_cursor(widget).y;
         PxInt const cursor_from_pattern_top =
-            pixels_from_beat(widget, widget._win._cursor->y.beat);
+            pixels_from_beat(widget, cursor_y.beat);
 
         GridAndBeat scroll_position;
         PxInt pattern_top_from_screen_top;
@@ -910,7 +931,7 @@ public:
                 cursor_from_pattern_top + pattern_top_from_screen_top;
         } else {
             // Cursor-locked scrolling.
-            scroll_position = widget._win._cursor->y;
+            scroll_position = cursor_y;
 
             cursor_from_screen_top = centered_cursor_pos(screen_height);
             pattern_top_from_screen_top =
@@ -1295,7 +1316,7 @@ static void draw_pattern_background(
     });
 
     // Draw selection.
-    if (auto maybe_select = self._win._cursor.get_select()) {
+    if (auto maybe_select = get_select(self)) {
         auto select = *maybe_select;
 
         // Limit selections to patterns, not ruler.
@@ -1452,7 +1473,7 @@ static void draw_pattern_background(
             visual.cursor_bottom_alpha
         );
 
-        auto cursor_x = self._win._cursor->x;
+        auto cursor_x = get_cursor(self).x;
         if (cursor_x.column >= columns.cols.size()) {
             cursor_x.column = 0;
             cursor_x.subcolumn = 0;
@@ -1965,7 +1986,7 @@ static void draw_pattern_foreground(
         );
 
         // Draw cursor cell outline:
-        auto cursor_x = self._win._cursor->x;
+        auto cursor_x = get_cursor(self).x;
 
         // If cursor is on-screen, draw cell outline.
         if (auto & col = columns.cols[cursor_x.column]) {
@@ -2070,8 +2091,9 @@ void PatternEditor::up_pressed() {
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    auto cursor = _win._cursor.get();
-    _win._cursor.set_y(move_cursor::move_up(document, cursor, args, move_cfg));
+    auto cursor = get_cursor(*this);
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(move_cursor::move_up(document, cursor, args, move_cfg));
 }
 
 void PatternEditor::down_pressed() {
@@ -2083,8 +2105,9 @@ void PatternEditor::down_pressed() {
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    auto cursor = _win._cursor.get();
-    _win._cursor.set_y(move_cursor::move_down(document, cursor, args, move_cfg));
+    auto cursor = get_cursor(*this);
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(move_cursor::move_down(document, cursor, args, move_cfg));
 }
 
 
@@ -2092,29 +2115,33 @@ void PatternEditor::prev_beat_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto cursor_y = _win._cursor.get().y;
-    _win._cursor.set_y(move_cursor::prev_beat(document, cursor_y, move_cfg));
+    auto cursor_y = get_cursor(*this).y;
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(move_cursor::prev_beat(document, cursor_y, move_cfg));
 }
 
 void PatternEditor::next_beat_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto cursor_y = _win._cursor.get().y;
-    _win._cursor.set_y(move_cursor::next_beat(document, cursor_y, move_cfg));
+    auto cursor_y = get_cursor(*this).y;
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(move_cursor::next_beat(document, cursor_y, move_cfg));
 }
 
 
 void PatternEditor::prev_event_pressed() {
     doc::Document const & document = get_document();
-    auto ev_time = move_cursor::prev_event(document, _win._cursor.get());
-    _win._cursor.set_y(ev_time);
+    auto ev_time = move_cursor::prev_event(document, get_cursor(*this));
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(ev_time);
 }
 
 void PatternEditor::next_event_pressed() {
     doc::Document const & document = get_document();
-    auto ev_time = move_cursor::next_event(document, _win._cursor.get());
-    _win._cursor.set_y(ev_time);
+    auto ev_time = move_cursor::next_event(document, get_cursor(*this));
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(ev_time);
 }
 
 
@@ -2126,7 +2153,7 @@ void PatternEditor::scroll_prev_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto cursor_y = _win._cursor.get().y;
+    auto cursor_y = get_cursor(*this).y;
 
     cursor_y.beat -= move_cfg.page_down_distance;
 
@@ -2141,14 +2168,15 @@ void PatternEditor::scroll_prev_pressed() {
         }
     }
 
-    _win._cursor.set_y(cursor_y);
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(cursor_y);
 }
 
 void PatternEditor::scroll_next_pressed() {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
-    auto cursor_y = _win._cursor.get().y;
+    auto cursor_y = get_cursor(*this).y;
 
     cursor_y.beat += move_cfg.page_down_distance;
 
@@ -2164,11 +2192,12 @@ void PatternEditor::scroll_next_pressed() {
         }
     }
 
-    _win._cursor.set_y(cursor_y);
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(cursor_y);
 }
 
 void PatternEditor::top_pressed() {
-    auto cursor_y = _win._cursor.get().y;
+    auto cursor_y = get_cursor(*this).y;
 
     if (get_app().options().move_cfg.home_end_switch_patterns && cursor_y.beat <= 0) {
         if (cursor_y.grid.v > 0) {
@@ -2177,12 +2206,13 @@ void PatternEditor::top_pressed() {
     }
 
     cursor_y.beat = 0;
-    _win._cursor.set_y(cursor_y);
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(cursor_y);
 }
 
 void PatternEditor::bottom_pressed() {
     doc::Document const& document = get_document();
-    auto raw_select = _win._cursor.raw_select();
+    auto raw_select = get_raw_sel(*this);
 
     // TODO pick a way of handling edge cases.
     //  We should use the same method of moving the cursor to end of pattern,
@@ -2211,7 +2241,7 @@ void PatternEditor::bottom_pressed() {
         return document.timeline[cursor_y.grid].nbeats - bottom_padding;
     };
 
-    auto cursor_y = _win._cursor.get().y;
+    auto cursor_y = get_cursor(*this).y;
     auto bottom_beat = calc_bottom(cursor_y);
 
     if (
@@ -2225,13 +2255,14 @@ void PatternEditor::bottom_pressed() {
     }
 
     cursor_y.beat = bottom_beat;
-    _win._cursor.set_y(cursor_y);
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_y(cursor_y);
 }
 
 template<void alter_mod(GridIndex & x, GridIndex den)>
 inline void switch_grid_index(PatternEditor & self) {
     doc::Document const & document = self.get_document();
-    auto cursor_y = self._win._cursor.get().y;
+    auto cursor_y = get_cursor(self).y;
 
     alter_mod(cursor_y.grid, (GridIndex) document.timeline.size());
 
@@ -2244,7 +2275,8 @@ inline void switch_grid_index(PatternEditor & self) {
         cursor_y.beat = BeatFraction{prev_row, self._zoom_level};
     }
 
-    self._win._cursor.set_y(cursor_y);
+    auto tx = self._win.edit_unwrap();
+    tx.cursor_mut().set_y(cursor_y);
 }
 
 void PatternEditor::prev_pattern_pressed() {
@@ -2324,15 +2356,19 @@ static CursorX move_right(PatternEditor const& self, CursorX cursor_x) {
 }
 
 void PatternEditor::left_pressed() {
-    auto cursor_x = _win._cursor.get().x;
+    auto cursor_x = get_cursor(*this).x;
     cursor_x = move_left(*this, cursor_x);
-    _win._cursor.set_x(cursor_x);
+
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_x(cursor_x);
 }
 
 void PatternEditor::right_pressed() {
-    auto cursor_x = _win._cursor.get().x;
+    auto cursor_x = get_cursor(*this).x;
     cursor_x = move_right(*this, cursor_x);
-    _win._cursor.set_x(cursor_x);
+
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_x(cursor_x);
 }
 
 // TODO implement comparison between subcolumn variants,
@@ -2367,7 +2403,7 @@ void PatternEditor::scroll_left_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    CursorX cursor_x = _win._cursor.get().x;
+    CursorX cursor_x = get_cursor(*this).x;
     if (cursor_x.column > 0) {
         cursor_x.column--;
     } else {
@@ -2376,14 +2412,15 @@ void PatternEditor::scroll_left_pressed() {
 
     cursor_x = cursor_clamp_subcol(cols, cursor_x);
 
-    _win._cursor.set_x(cursor_x);
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_x(cursor_x);
 }
 
 void PatternEditor::scroll_right_pressed() {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    CursorX cursor_x = _win._cursor.get().x;
+    CursorX cursor_x = get_cursor(*this).x;
 
     cursor_x.column++;
     if (cursor_x.column >= ncol(cols)) {
@@ -2392,11 +2429,13 @@ void PatternEditor::scroll_right_pressed() {
 
     cursor_x = cursor_clamp_subcol(cols, cursor_x);
 
-    _win._cursor.set_x(cursor_x);
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().set_x(cursor_x);
 }
 
 void PatternEditor::escape_pressed() {
-    _win._cursor.clear_select();
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut().clear_select();
 }
 
 void PatternEditor::toggle_edit_pressed() {
@@ -2421,7 +2460,7 @@ static Cursor step_down_only(PatternEditor const& self, Cursor cursor) {
 
 static Cursor step_cursor(PatternEditor const& self) {
     doc::Document const & document = self.get_document();
-    auto cursor = self._win._cursor.get();
+    auto cursor = get_cursor(self);
 
     switch (self._step_direction) {
     case StepDirection::Down:
@@ -2492,7 +2531,7 @@ auto calc_cursor_x(PatternEditor const & self) ->
     std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumnCells, CellIndex>
 {
     doc::Document const & document = self.get_document();
-    auto cursor_x = self._win._cursor->x;
+    auto cursor_x = get_cursor(self).x;
 
     Column column = gen_column_list(self, document)[cursor_x.column];
     SubColumnCells subcolumn = column.subcolumns[cursor_x.subcolumn];
@@ -2514,12 +2553,14 @@ void PatternEditor::delete_key_pressed() {
         return;
     }
     doc::Document const & document = get_document();
-    auto abs_time = _win._cursor->y;
+    auto abs_time = get_cursor(*this).y;
 
     auto [chip, channel, subcolumn, _cell] = calc_cursor_x(*this);
+    auto tx = _win.edit_unwrap();
     _win.push_edit(
+        tx,
         ed::delete_cell(document, chip, channel, subcolumn.type, abs_time),
-        main_window::move_to(step_down_only(*this, _win._cursor.get()))
+        main_window::move_to(step_down_only(*this, get_cursor(*this)))
     );
 }
 
@@ -2530,13 +2571,16 @@ void note_pressed(
     doc::Note note
 ) {
     std::optional<doc::InstrumentIndex> instrument{};
-    if (self._win._insert_instrument) {
-        instrument = {self._win._instrument};
+    auto const& state = self._win._state;
+    if (state._insert_instrument) {
+        instrument = {state.instrument()};
     }
 
-    auto abs_time = self._win._cursor->y;
+    auto abs_time = get_cursor(self).y;
 
+    auto tx = self._win.edit_unwrap();
     self._win.push_edit(
+        tx,
         ed::insert_note(
             self.get_document(), chip, channel, abs_time, note, instrument
         ),
@@ -2569,17 +2613,21 @@ void PatternEditor::select_all_pressed() {
     }
 
     // TODO add a method abstraction?
-    _win._cursor.enable_select(_zoom_level);
-    _win._cursor.raw_select_mut()->select_all(document, col_to_nsubcol, _zoom_level);
+    auto tx = _win.edit_unwrap();
+    auto & cursor = tx.cursor_mut();
+    cursor.enable_select(_zoom_level);
+    cursor.raw_select_mut()->select_all(document, col_to_nsubcol, _zoom_level);
 }
 
 void PatternEditor::selection_padding_pressed() {
-    if (auto & select = _win._cursor.raw_select_mut()) {
+    auto tx = _win.edit_unwrap();
+    auto & cursor = tx.cursor_mut();
+    if (auto & select = cursor.raw_select_mut()) {
         // If selection enabled, toggle whether to include bottom row.
         select->toggle_padding(_zoom_level);
     } else {
         // Otherwise create a single-cell selection.
-        _win._cursor.enable_select(_zoom_level);
+        cursor.enable_select(_zoom_level);
     }
 }
 
@@ -2605,7 +2653,7 @@ static void add_digit(
     using main_window::MoveCursor;
 
     auto const& document = self.get_document();
-    auto abs_time = self._win._cursor->y;
+    auto abs_time = get_cursor(self).y;
 
     // TODO add support for DigitAction::ShiftLeft?
     // We'd have to track "cursor items" and "digits per item" separately,
@@ -2626,11 +2674,13 @@ static void add_digit(
     auto [number, box] = ed::add_digit(
         document, chip, channel, abs_time, field.type, digit_action, nybble
     );
-    self._win.push_edit(std::move(box), move_cursor);
+
+    auto tx = self._win.edit_unwrap();
+    self._win.push_edit(tx, std::move(box), move_cursor);
 
     // Update saved instrument number.
     if (std::holds_alternative<SubColumn_::Instrument>(field.type)) {
-        self._win._instrument = number;
+        tx.set_instrument(number);
     }
 
     // TODO update saved volume number? (is it useful?)
@@ -2657,7 +2707,7 @@ static void add_effect_char(
     using main_window::MoveCursor;
 
     auto const& document = self.get_document();
-    auto abs_time = self._win._cursor->y;
+    auto abs_time = get_cursor(self).y;
 
     doc::EffectName dummy_name{doc::EFFECT_NAME_PLACEHOLDER, c};
 
@@ -2682,7 +2732,8 @@ static void add_effect_char(
     auto box = ed::add_effect_char(
         document, chip, channel, abs_time, field.type, effect_action
     );
-    self._win.push_edit(std::move(box), move_cursor);
+    auto tx = self._win.edit_unwrap();
+    self._win.push_edit(tx, std::move(box), move_cursor);
 }
 
 /// Handles events based on physical layout rather than shortcuts.

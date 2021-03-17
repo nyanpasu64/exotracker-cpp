@@ -749,7 +749,7 @@ struct InterfaceStateTag {};
 
 #define W_OBJECT_COMMON(TYPE) \
         using W_ThisType = TYPE; \
-        static constexpr auto W_UnscopedName = w_internal::viewLiteral(#TYPE); /* so we don't repeat it in W_CONSTRUCTOR */ \
+        Q_DECL_UNUSED static constexpr auto W_UnscopedName = w_internal::viewLiteral(#TYPE); /* so we don't repeat it in W_CONSTRUCTOR */ \
         friend struct w_internal::FriendHelper; \
         template<typename W_Flag> static inline constexpr int w_flagAlias(W_Flag) { return 0; } \
     public: \

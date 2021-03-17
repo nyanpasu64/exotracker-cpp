@@ -2,6 +2,7 @@
 
 #include "util/copy_move.h"
 
+#include <string>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -28,6 +29,7 @@ using ByteEnvelope = Envelope<int8_t>;
 using ShortEnvelope = Envelope<int16_t>;
 
 struct Instrument {
+    std::string name;
     // TODO implement envelope reuse.
     ByteEnvelope volume{};
     ShortEnvelope pitch{};

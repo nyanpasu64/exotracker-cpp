@@ -28,7 +28,11 @@ static Instrument music_box() {
     };
 
     return Instrument{
-        .volume={volume()}, .pitch={{}}, .arpeggio={{7, 0}}, .wave_index={{2, 2}}
+        .name = "Music Box",
+        .volume = {volume()},
+        .pitch = {{}},
+        .arpeggio = {{7, 0}},
+        .wave_index = {{2, 2}}
     };
 }
 
@@ -40,9 +44,10 @@ static Document empty() {
     SequencerOptions sequencer_options{.ticks_per_beat = 24};
 
     Instruments instruments;
-    instruments[0] = Instrument{};
+    instruments[0] = Instrument{"blank"};
     instruments[1] = music_box();
-    instruments[2] = Instrument{.wave_index={{1}}};
+    instruments[2] = Instrument{.name = "25%", .wave_index = {{1}}};
+    instruments[0x10] = Instrument{.name = "50%", .wave_index = {{2}}};
 
     ChipList chips{ChipKind::Nes};
 
@@ -96,6 +101,9 @@ static Document dream_fragments() {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 43,
     };
+
+    Instruments instruments;
+    instruments[0] = music_box();
 
     // We only have 1 chip.
     auto const chip_kind = chip_kinds::ChipKind::Apu1;
@@ -170,9 +178,6 @@ static Document dream_fragments() {
         };
     }());
 
-    Instruments instruments;
-    instruments[0] = music_box();
-
     return DocumentCopy {
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
@@ -193,6 +198,7 @@ static Document world_revolution() {
 
     constexpr InstrumentIndex BASS = 0;
     instruments[BASS] = Instrument {
+        .name = "Bass",
         .volume = {{7, 7, 7, 7, 7, 3}},
         .pitch = {{}},
         .arpeggio = {{}},
@@ -201,6 +207,7 @@ static Document world_revolution() {
 
     constexpr InstrumentIndex TRUMPET = 1;
     instruments[TRUMPET] = Instrument {
+        .name = "Trumpet",
         .volume = {{5, 6, 7, 8, 8, 9}},
         .pitch = {{}},
         .arpeggio = {{}},
@@ -208,7 +215,8 @@ static Document world_revolution() {
     };
 
     constexpr InstrumentIndex TAMBOURINE = 2;
-    instruments[TAMBOURINE] = Instrument{
+    instruments[TAMBOURINE] = Instrument {
+        .name = "Tambourine",
         .volume = {{15, 15, 12, 10, 8, 6, 5, 8, 4, 2, 6, 4, 2, 4, 2, 1, 2, 1, 0, 2, 1, 0, 1, 0, 0}},
         .wave_index = {{0, 1}},
     };
@@ -394,8 +402,10 @@ static Document render_test() {
 
     Instruments instruments;
 
+    char const* names[] = {"12.5%", "25%", "50%"};
     for (size_t i = 0; i <= 2; i++) {
         instruments[i] = Instrument {
+            .name = names[i],
             .volume = {{15}},
             .pitch = {{}},
             .arpeggio = {{}},
@@ -455,6 +465,7 @@ static Document audio_test() {
 
     Instruments instruments;
     instruments[0] = Instrument {
+        .name = "50%",
         .volume = {{15}},
         .pitch = {{}},
         .arpeggio = {{}},

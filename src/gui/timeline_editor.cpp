@@ -19,13 +19,13 @@ W_OBJECT_IMPL(TimelineEditor)
 /// QAbstractItemModel is confusing.
 /// This is based off
 /// https://doc.qt.io/qt-5/model-view-programming.html#a-read-only-example-model.
-class HistoryWrapper : public QAbstractListModel {
-    W_OBJECT(HistoryWrapper)
+class TimelineModel : public QAbstractListModel {
+    W_OBJECT(TimelineModel)
 public:
     GetDocument _get_document;
 
 // impl
-    HistoryWrapper(GetDocument get_document)
+    TimelineModel(GetDocument get_document)
         : _get_document(get_document)
     {}
 
@@ -58,20 +58,15 @@ public:
         else
             return QVariant();
     }
-
-    /// Binds win's cursor y position, to this model.
-    QModelIndex get_cursor_y_from(MainWindow const& win) {
-        return createIndex((int) win._cursor.get().y.grid, 0);
-    }
 };
-W_OBJECT_IMPL(HistoryWrapper)
+W_OBJECT_IMPL(TimelineModel)
 
 class TimelineEditorImpl : public TimelineEditor {
     W_OBJECT(TimelineEditorImpl)
 public:
     MainWindow & _win;
 
-    HistoryWrapper _model;
+    TimelineModel _model;
     QListView * _widget;
 
     // impl
@@ -105,7 +100,7 @@ public:
     }
 
     void update_cursor() override {
-        QModelIndex order_y = _model.get_cursor_y_from(_win);
+        QModelIndex order_y = _model.index((int) _win._state.cursor().y.grid, 0);
 
         QItemSelectionModel & widget_select = *_widget->selectionModel();
         widget_select.select(order_y, QItemSelectionModel::ClearAndSelect);
