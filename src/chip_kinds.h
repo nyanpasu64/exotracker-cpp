@@ -7,8 +7,7 @@
 namespace chip_kinds {
 
 #define FOREACH_CHIP_KIND(X) \
-    X(Apu1) \
-    X(Nes)
+    X(Spc700) \
 
 /// List of sound chips supported.
 enum class ChipKind : uint32_t {
@@ -19,19 +18,15 @@ enum class ChipKind : uint32_t {
     COUNT,
 };
 
-enum class Apu1ChannelID {
-    Pulse1,
-    Pulse2,
-    COUNT,
-};
-
-/// Full APU 1+2
-enum class NesChannelID {
-    Pulse1,
-    Pulse2,
-    Tri,
-    Noise,
-    Dpcm,
+enum class Spc700ChannelID {
+    Channel1,
+    Channel2,
+    Channel3,
+    Channel4,
+    Channel5,
+    Channel6,
+    Channel7,
+    Channel8,
     COUNT,
 };
 

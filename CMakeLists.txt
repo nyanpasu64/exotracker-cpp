@@ -97,12 +97,11 @@ add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
 
 add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
 
-add_library(lib-3rdparty STATIC
-    3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
-    3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
-)
-target_compile_options(lib-3rdparty PRIVATE ${options-3rdparty})
-
+# add_library(lib-3rdparty STATIC
+#     3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
+#     3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
+# )
+# target_compile_options(lib-3rdparty PRIVATE ${options-3rdparty})
 
 ## Core library, document and synth only (used for future player plugins).
 # No editing or command support.
@@ -128,8 +127,6 @@ add_library(exotracker-core
 
     # 2A03 audio
     src/audio/synth/volume_calc_common.cpp
-    src/audio/synth/nes_2a03.cpp
-    src/audio/synth/nes_2a03_driver.cpp
 
     # Glue files
     src/doc.cpp
@@ -141,7 +138,8 @@ add_library(exotracker-core
     src/util/format.cpp
 )
 target_compile_options(exotracker-core PRIVATE "${options}")
-target_link_libraries(exotracker-core PRIVATE lib-3rdparty rtaudio)
+# target_link_libraries(exotracker-core PRIVATE lib-3rdparty rtaudio)
+target_link_libraries(exotracker-core PRIVATE rtaudio)
 target_link_libraries(exotracker-core PUBLIC fmt::fmt)
 
 if(USE_PCH)
@@ -240,38 +238,37 @@ if(
 endif()
 
 
-## Unit tests
-add_executable(exotracker-tests
-    tests/run_tests.cpp
-    tests/test_utils/parameterize.cpp
+### Unit tests
+#add_executable(exotracker-tests
+#    tests/run_tests.cpp
+#    tests/test_utils/parameterize.cpp
 
-    tests/test_document.cpp
-    tests/test_blip_buffer.cpp
-    tests/test_edit_history.cpp
-    tests/test_math.cpp
-    tests/audio/test_event_queue.cpp
-    tests/audio/test_sequencer.cpp
-    tests/audio/test_synth.cpp
-    tests/test_utils/test_parameterize.cpp
+#    tests/test_document.cpp
+#    tests/test_blip_buffer.cpp
+#    tests/test_edit_history.cpp
+#    tests/test_math.cpp
+#    tests/audio/test_event_queue.cpp
+#    tests/audio/test_sequencer.cpp
+#    tests/audio/test_synth.cpp
+#    tests/test_utils/test_parameterize.cpp
 
-    # for #ifdef UNITTEST
-    src/doc.cpp
-    src/gui/move_cursor.cpp
-    src/audio/synth/envelope.cpp
-    src/audio/synth/nes_2a03_driver.cpp
-    src/audio/synth/volume_calc_common.cpp
-    src/doc/timeline.cpp
-)
-target_compile_options(exotracker-tests PRIVATE "${options}")
-target_include_directories(exotracker-tests PUBLIC tests)
-target_link_libraries(exotracker-tests PRIVATE exotracker-headless)
-target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
+#    # for #ifdef UNITTEST
+#    src/doc.cpp
+#    src/gui/move_cursor.cpp
+#    src/audio/synth/envelope.cpp
+#    src/audio/synth/volume_calc_common.cpp
+#    src/doc/timeline.cpp
+#)
+#target_compile_options(exotracker-tests PRIVATE "${options}")
+#target_include_directories(exotracker-tests PUBLIC tests)
+#target_link_libraries(exotracker-tests PRIVATE exotracker-headless)
+#target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
 
-if(USE_PCH)
-    target_precompile_headers(exotracker-tests PRIVATE
-        precompiled_headers/exotracker_lib.h
-    )
-endif()
+#if(USE_PCH)
+#    target_precompile_headers(exotracker-tests PRIVATE
+#        precompiled_headers/exotracker_lib.h
+#    )
+#endif()
 
 
 # This can be used to enable asan (-fsanitize=memory/undefined/leak).

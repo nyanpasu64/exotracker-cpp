@@ -15,13 +15,7 @@ using EnumArray = std::array<ValueT, enum_count<EnumT>>;
 
 // # CHIP_CHANNEL_TO_VOLUME_DIGITS, get_volume_digits()
 
-/// APU1 pulse 1/2 has 4-bit volumes, or 1 digit.
-static const EnumArray<Apu1ChannelID, uint8_t> Apu1_VOL_DIGITS{1, 1};
-
-/// Triangle has no volume control, but use 1 digit as a mute control.
-/// Noise has 4-bit volumes.
-/// For DPCM, we map the volume column to the 7-bit current DPCM level.
-static const EnumArray<NesChannelID, uint8_t> Nes_VOL_DIGITS{1, 1, 1, 1, 2};
+static const EnumArray<Spc700ChannelID, uint8_t> Spc700_VOL_DIGITS{2, 2, 2, 2, 2, 2, 2, 2};
 
 static constinit const auto CHIP_CHANNEL_TO_VOLUME_DIGITS_SIZED = []() {
     // Compare to chip_common.cpp.
@@ -50,22 +44,21 @@ uint8_t get_volume_digits(Document const& doc, ChipIndex chip, ChannelIndex chan
 // # is_noise()
 
 bool is_noise(Document const& doc, ChipIndex chip, ChannelIndex channel) {
-    release_assert(chip < doc.chips.size());
-    if (doc.chips[chip] == chip_kinds::ChipKind::Nes) {
-        return channel == (ChannelIndex) chip_kinds::NesChannelID::Noise;
-    }
-
     return false;
 }
 
 
 // # channel_name()
 
-static constinit const EnumArray<Apu1ChannelID, char const*> Apu1_CHANNEL_NAMES{
-    "Pulse 1", "Pulse 2",
-};
-static constinit const EnumArray<NesChannelID, char const*> Nes_CHANNEL_NAMES{
-    "Pulse 1", "Pulse 2", "Triangle", "Noise", "DPCM"
+static constinit const EnumArray<Spc700ChannelID, char const*> Spc700_CHANNEL_NAMES{
+    "Channel 1",
+    "Channel 2",
+    "Channel 3",
+    "Channel 4",
+    "Channel 5",
+    "Channel 6",
+    "Channel 7",
+    "Channel 8",
 };
 
 static constinit const auto CHIP_CHANNEL_NAME = [] () {

@@ -36,23 +36,10 @@ OverallSynth::OverallSynth(
         ChipKind chip_kind = _document.chips[chip_index];
 
         switch (chip_kind) {
-            case ChipKind::Apu1: {
+            case ChipKind::Spc700: {
                 // Possibly more efficient than push_back,
                 // and silences false error in IDE.
-                _chip_instances.emplace_back(nes_2a03::make_Apu1Instance(
-                    chip_index,
-                    CLOCKS_PER_S,
-                    _document.frequency_table,
-                    _clocks_per_sound_update));
-                break;
-            }
-
-            case ChipKind::Nes: {
-                _chip_instances.emplace_back(nes_2a03::make_NesInstance(
-                    chip_index,
-                    CLOCKS_PER_S,
-                    _document.frequency_table,
-                    _clocks_per_sound_update));
+//                _chip_instances.emplace_back(spc700::make_Spc700Instance());
                 break;
             }
 

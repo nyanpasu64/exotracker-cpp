@@ -9,6 +9,7 @@
 
 namespace sample_docs {
 
+#if 0
 using namespace doc;
 using namespace doc_util::event_builder;
 using Ev = EventBuilder;
@@ -568,19 +569,20 @@ static Document block_test() {
         .timeline = move(timeline),
     };
 }
+#endif
 
 
 std::string const DEFAULT_DOC = "world-revolution";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
-    std::map<std::string, doc::Document> out;
-    out.insert({"empty", empty()});
-    out.insert({"dream-fragments", dream_fragments()});
-    out.insert({"world-revolution", world_revolution()});
-    out.insert({"render-test", render_test()});
-    out.insert({"audio-test", audio_test()});
-    out.insert({"block-test", block_test()});
-    return out;
+   std::map<std::string, doc::Document> out;
+//    out.insert({"empty", empty()});
+//    out.insert({"dream-fragments", dream_fragments()});
+//    out.insert({"world-revolution", world_revolution()});
+//    out.insert({"render-test", render_test()});
+//    out.insert({"audio-test", audio_test()});
+//    out.insert({"block-test", block_test()});
+   return out;
 }();
 
 }
