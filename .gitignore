@@ -91,3 +91,4 @@ compile_commands.json
 /cmake_user_begin.cmake
 /cmake_user_end.cmake
 .cmake
+/.cache/*
