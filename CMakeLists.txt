@@ -107,9 +107,6 @@ add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
 # No editing or command support.
 # (cmd_queue.cpp may be added later for playback commands.)
 add_library(exotracker-core
-    ## Audio
-    3rdparty/Blip_Buffer/Blip_Buffer.cpp
-
     # Library (widely used, uncoupled)
     src/audio/event_queue.cpp
 
