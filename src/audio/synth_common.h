@@ -1,6 +1,5 @@
 #pragma once
 
-#include "make_blip_buffer.h"
 #include "synth/music_driver_common.h"
 #include "event_queue.h"
 #include "audio_common.h"
@@ -9,6 +8,7 @@
 #include "timing_common.h"
 #include "util/enum_map.h"
 #include "util/copy_move.h"
+#include "util/release_assert.h"
 
 #include <gsl/span>
 
@@ -39,7 +39,7 @@ int constexpr TICKS_PER_S = 60;
 /// This type is used widely, so import to audio::synth.
 using event_queue::ClockT;
 
-using SampleT = uint32_t;
+using NsampT = uint32_t;
 
 /// Static polymorphic properties of classes,
 /// which can be accessed via pointers to subclasses.
@@ -48,6 +48,10 @@ using SampleT = uint32_t;
 
 #define STATIC(type_name_parens, value) \
     type_name_parens const final { return value; }
+
+struct WriteTo {
+
+};
 
 /// Base class, for a single NES chip's (software driver + sequencers
 /// + hardware emulator synth).
@@ -109,9 +113,7 @@ public:
     void run_chip_for(
         ClockT const prev_to_tick,
         ClockT const prev_to_next,
-        Blip_Buffer & nes_blip,
-        gsl::span<Amplitude> temp_buffer
-    );
+        WriteTo write_to);
 
 private:
     /// Called with data from _register_writes.
@@ -122,7 +124,7 @@ public:
     /// If the synth generates audio via Blip_Synth, nsamp_returned == 0.
     /// If the synth writes audio into `write_buffer`,
     /// nsamp_returned == how many samples were written.
-    using NsampWritten = SampleT;
+    using NsampWritten = NsampT;
 
 private:
     /// Cannot cross tick boundaries, nor register-write boundaries.
@@ -135,8 +137,7 @@ private:
         ClockT clk_begin,
         ClockT nclk,
         gsl::span<Amplitude> write_buffer,
-        Blip_Buffer & blip
-    ) = 0;
+        WriteTo write_to) = 0;
 };
 
 // end namespaces

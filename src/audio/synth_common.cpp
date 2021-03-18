@@ -25,10 +25,9 @@ void ChipInstance::flush_register_writes() {
 void ChipInstance::run_chip_for(
     ClockT prev_to_tick,
     ClockT prev_to_next,
-    Blip_Buffer & nes_blip,
-    gsl::span<Amplitude> temp_buffer
-) {
-
+    WriteTo write_to)
+{
+    #if 0
     // The function must end before/equal to the next tick.
     assert(prev_to_next <= prev_to_tick);
     prev_to_next = std::min(prev_to_next, prev_to_tick);
@@ -115,6 +114,7 @@ void ChipInstance::run_chip_for(
         assert(nsamp_total == nsamp_expected);
         nes_blip.mix_samples(&temp_buffer[0], nsamp_total);
     }
+    #endif
 }
 
 // end namespace

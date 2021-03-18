@@ -24,7 +24,6 @@ OverallSynth::OverallSynth(
     : _stereo_nchan(stereo_nchan)
     , _document(std::move(document_moved_from))
     , _clocks_per_sound_update(audio_options.clocks_per_sound_update)
-    , _nes_blip(smp_per_s, CLOCKS_PER_S)
 {
     // Constructor runs on GUI thread. Fields later be read on audio thread.
     _maybe_seq_time.store(MaybeSequencerTime{}, std::memory_order_relaxed);
@@ -56,6 +55,11 @@ OverallSynth::OverallSynth(
 using edit::ModifiedInt;
 using edit::ModifiedFlags;
 
+template<typename T>
+T unimplemented() {
+    throw "up";
+}
+
 void OverallSynth::synthesize_overall(
     gsl::span<Amplitude> output_buffer,
     size_t const mono_smp_per_block
@@ -69,7 +73,7 @@ void OverallSynth::synthesize_overall(
 
     // GSL uses std::ptrdiff_t (not size_t) for sizes and indexes.
     // Compilers may define ::ptrdiff_t in global namespace. https://github.com/RobotLocomotion/drake/issues/2374
-    blip_nsamp_t const nsamp = (blip_nsamp_t) mono_smp_per_block;
+    NsampT const nsamp = (NsampT) mono_smp_per_block;
 
     /*
     Blip_Buffer::count_clocks(nsamp) initially clamped nsamp to (..., _capacity].
@@ -77,7 +81,7 @@ void OverallSynth::synthesize_overall(
     So passing in any nsamp in [2^16, ...) will fail due to integer overflow.
     So if we want to accept large nsamp, we must recompute nclk_to_play after each tick.
     */
-    blip_nsamp_t samples_so_far = 0;  // [0, nsamp]
+    NsampT samples_so_far = 0;  // [0, nsamp]
 
     // Thread creation will act as a memory barrier, so we don't need a fence.
     // Only the audio thread writes to _maybe_seq_time and _seen_command.
@@ -178,32 +182,22 @@ void OverallSynth::synthesize_overall(
         // If I were to remove that clamping, it would overflow at 65536
         // due to `count << BLIP_BUFFER_ACCURACY`.
         // To avoid overflow, repeatedly compute it in the loop.
-        ClockT nclk_to_play = (ClockT) _nes_blip.count_clocks(nsamp - samples_so_far);
+        ClockT nclk_to_play = unimplemented<ClockT>();
         _events.set_timeout(SynthEvent::EndOfCallback, nclk_to_play);
 
         ClockT prev_to_tick = _events.get_time_until(SynthEvent::Tick);
         auto [event_id, prev_to_next] = _events.next_event();
         if (event_id == SynthEvent::EndOfCallback) {
-            assert(_nes_blip.count_samples(nclk_to_play) == nsamp - samples_so_far);
+            assert(unimplemented<NsampT>() == nsamp - samples_so_far);
         }
 
         // Synthesize audio (synth's time passes).
         if (prev_to_next > 0) {
             // Actually synthesize audio.
             for (auto & chip : _chip_instances) {
-                chip->run_chip_for(prev_to_tick, prev_to_next, _nes_blip, _temp_buffer);
+                chip->run_chip_for(prev_to_tick, prev_to_next, {});
             }
-
-            // Read audio from blip_buffer.
-            _nes_blip.end_frame((blip_nclock_t) prev_to_next);
-
-            auto writable_region = output_buffer.subspan(samples_so_far);
-
-            blip_nsamp_t nsamp_returned = _nes_blip.read_samples(
-                &writable_region[0],
-                (blip_nsamp_t) writable_region.size()
-            );
-
+            NsampT nsamp_returned = unimplemented<NsampT>();
             samples_so_far += nsamp_returned;
         }
 
@@ -212,7 +206,6 @@ void OverallSynth::synthesize_overall(
             // implementation detail
             case SynthEvent::EndOfCallback: {
                 release_assert_equal(samples_so_far, nsamp);
-                release_assert(_nes_blip.samples_avail() == 0);
                 goto end;
             }
 

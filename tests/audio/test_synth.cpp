@@ -83,7 +83,7 @@ CommandQueue play_from_begin() {
 std::vector<Amplitude> run_new_synth(
     doc::Document const & document,
     uint32_t smp_per_s,
-    blip_nsamp_t nsamp,
+    NsampT nsamp,
     AudioCommand * stub_command,
     AudioOptions audio_options
 ) {
