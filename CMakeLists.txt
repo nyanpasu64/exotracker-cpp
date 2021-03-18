@@ -97,6 +97,8 @@ add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
 
 add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
 
+add_subdirectory("3rdparty/snes9x-dsp" EXCLUDE_FROM_ALL)
+
 # add_library(lib-3rdparty STATIC
 #     3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
 #     3rdparty/nsfplay/xgm/devices/Sound/nes_dmc.cpp
@@ -135,8 +137,7 @@ add_library(exotracker-core
     src/util/format.cpp
 )
 target_compile_options(exotracker-core PRIVATE "${options}")
-# target_link_libraries(exotracker-core PRIVATE lib-3rdparty rtaudio)
-target_link_libraries(exotracker-core PRIVATE rtaudio)
+target_link_libraries(exotracker-core PRIVATE snes9x-dsp rtaudio)
 target_link_libraries(exotracker-core PUBLIC fmt::fmt)
 
 if(USE_PCH)
