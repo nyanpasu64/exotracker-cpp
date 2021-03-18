@@ -7,7 +7,7 @@
 
 #include <utility>  // std::move
 
-namespace audio::synth::nes_instance {
+namespace audio::synth::impl_chip {
 
 using std::move;
 using chip_common::ChipIndex;
@@ -93,10 +93,9 @@ private:  // called by ChipInstance
     NsampWritten synth_run_clocks(
         ClockT const clk_begin,
         ClockT const nclk,
-        gsl::span</*mut*/ Amplitude> write_buffer,
-        Blip_Buffer & blip
-    ) override {
-        return _synth.run_clocks(clk_begin, nclk, write_buffer, blip);
+        WriteTo write_to)
+    override {
+        return _synth.run_clocks(clk_begin, nclk, write_to);
     }
 };
 

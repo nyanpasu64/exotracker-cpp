@@ -1,13 +1,12 @@
 #pragma once
 
 #include "doc.h"
+#include "sequencer_driver_common.h"
 #include "chip_common.h"
 #include "timing_common.h"
 #include "util/enum_map.h"
 #include "util/release_assert.h"
 #include "util/compare.h"
-
-#include <gsl/span>
 
 #include <tuple>
 #include <vector>
@@ -18,7 +17,7 @@ using namespace chip_common;
 using timing::SequencerTime;
 using timing::GridAndBeat;
 
-using EventsRef = gsl::span<doc::RowEvent const>;
+using sequencer_driver::EventsRef;
 using doc::EventIndex;
 
 /// Why signed? Events can have negative offsets and play before their anchor beat,

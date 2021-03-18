@@ -50,7 +50,7 @@ using NsampT = uint32_t;
     type_name_parens const final { return value; }
 
 struct WriteTo {
-
+    gsl::span<Amplitude> out;
 };
 
 /// Base class, for a single NES chip's (software driver + sequencers
@@ -136,7 +136,6 @@ private:
     virtual NsampWritten synth_run_clocks(
         ClockT clk_begin,
         ClockT nclk,
-        gsl::span<Amplitude> write_buffer,
         WriteTo write_to) = 0;
 };
 

@@ -3,6 +3,7 @@
 // Do not include synth_common.h, since synth_common.h includes this file.
 #include "audio/event_queue.h"
 #include "util/copy_move.h"
+#include "sequencer_driver_common.h"
 
 #include <cassert>
 #include <vector>
@@ -113,6 +114,8 @@ public:
         return vec.size() - output.index;
     }
 };
+
+using sequencer_driver::EventsRef;
 
 // end namespace
 }

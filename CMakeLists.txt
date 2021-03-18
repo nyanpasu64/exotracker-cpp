@@ -128,8 +128,10 @@ add_library(exotracker-core
     # Implementation files
     src/audio/synth.cpp
 
-    # 2A03 audio
+    # SPC700 audio
     src/audio/synth/volume_calc_common.cpp
+    src/audio/synth/spc700.cpp
+    # src/audio/synth/spc700_driver.cpp
 
     # Glue files
     src/doc.cpp
