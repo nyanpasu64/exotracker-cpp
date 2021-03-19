@@ -13,6 +13,12 @@ set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Build (rtaudio, fmt, ...?) as shared lib
 # Turn it off to avoid weirdness.
 set(RTAUDIO_STATIC_MSVCRT FALSE)
 
+# libsamplerate ships with 3 sinc tables of different qualities.
+# SRC_SINC_BEST_QUALITY uses a massive 1.36 megabyte sinc table,
+# and exotracker doesn't even use SRC_SINC_BEST_QUALITY.
+# So turn it off to save space in exotracker binaries.
+set(LIBSAMPLERATE_ENABLE_SINC_BEST_CONVERTER FALSE CACHE BOOL "[libsamplerate] Enable Best Sinc Interpolator converter")
+
 set(USE_PCH FALSE)
 if(COMMAND target_precompile_headers)
     set(USE_PCH TRUE)
@@ -92,12 +98,10 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
 set(RTAUDIO_BUILD_TESTING FALSE)
 add_subdirectory("3rdparty/rtaudio" EXCLUDE_FROM_ALL)
-
 add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
-
 add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
-
 add_subdirectory("3rdparty/snes9x-dsp" EXCLUDE_FROM_ALL)
+add_subdirectory("3rdparty/libsamplerate" EXCLUDE_FROM_ALL)
 
 # add_library(lib-3rdparty STATIC
 #     3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
@@ -138,7 +142,7 @@ add_library(exotracker-core
 )
 target_compile_options(exotracker-core PRIVATE "${options}")
 target_link_libraries(exotracker-core PRIVATE snes9x-dsp rtaudio)
-target_link_libraries(exotracker-core PUBLIC fmt::fmt)
+target_link_libraries(exotracker-core PUBLIC fmt::fmt samplerate)
 
 if(USE_PCH)
     target_precompile_headers(exotracker-core PRIVATE
