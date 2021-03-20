@@ -25,16 +25,16 @@ class BlipViewerWindow : public QWidget {
 
     QCheckBox * _log_scale;
     QLabel * _width_nsamp_label;
-    QLabel * _treble_db_label;
-    QLabel * _rolloff_freq_label;
     QLabel * _sample_rate_label;
     QLabel * _cutoff_freq_label;
+    QLabel * _treble_freq_label;
+    QLabel * _treble_db_label;
 
     QSlider * _width_nsamp;
-    QSlider * _treble_db;
-    QSlider * _rolloff_freq;
     QSlider * _sample_rate;
     QSlider * _cutoff_freq;
+    QSlider * _treble_freq;
+    QSlider * _treble_db;
 
     bool _draw_queued = false;
 
@@ -74,27 +74,13 @@ public:
                 ASSIGN(_width_nsamp)
                 w->setOrientation(Qt::Horizontal);
                 w->setRange(8, 128);
-                w->setValue(16);
-            }
-            {form__left_right(QLabel, QSlider);
-                ASSIGN(_treble_db)
-                w->setOrientation(Qt::Horizontal);
-                w->setRange(-90, 5);
-                w->setValue(-24);  // famitracker's default value... an empty blip_eq_t() defaults to 0.
-            }
-            {form__left_right(QLabel, QSlider);
-                ASSIGN(_rolloff_freq)
-                w->setOrientation(Qt::Horizontal);
-                w->setRange(0, 48000);
-                w->setValue(12000);  // famitracker's default value... an empty blip_eq_t() defaults to 0.
-                w->setSingleStep(100);
-                w->setPageStep(1000);
+                w->setValue(64);
             }
             {form__left_right(QLabel, QSlider);
                 ASSIGN(_sample_rate)
                 w->setOrientation(Qt::Horizontal);
                 w->setRange(0, 96000);
-                w->setValue(48000);
+                w->setValue(44100);
                 w->setSingleStep(100);
                 w->setPageStep(1000);
             }
@@ -102,18 +88,32 @@ public:
                 ASSIGN(_cutoff_freq)
                 w->setOrientation(Qt::Horizontal);
                 w->setRange(0, 48000);
-                w->setValue(0);  // idk what this does, famitracker doesn't supply it, defaults to 0.
+                w->setValue(23100);  // 0 = "pick automatically"
                 w->setSingleStep(100);
                 w->setPageStep(1000);
+            }
+            {form__left_right(QLabel, QSlider);
+                ASSIGN(_treble_freq)
+                w->setOrientation(Qt::Horizontal);
+                w->setRange(0, 48000);
+                w->setValue(21000);
+                w->setSingleStep(100);
+                w->setPageStep(1000);
+            }
+            {form__left_right(QLabel, QSlider);
+                ASSIGN(_treble_db)
+                w->setOrientation(Qt::Horizontal);
+                w->setRange(-90, 5);
+                w->setValue(-24);  // famitracker's default value... an empty blip_eq_t() defaults to 0.
             }
         }
 
         QObject::connect(_log_scale, &QCheckBox::toggled, this, &Self::draw);
         QObject::connect(_width_nsamp, &QSlider::valueChanged, this, &Self::draw);
-        QObject::connect(_treble_db, &QSlider::valueChanged, this, &Self::draw);
-        QObject::connect(_rolloff_freq, &QSlider::valueChanged, this, &Self::draw);
         QObject::connect(_sample_rate, &QSlider::valueChanged, this, &Self::draw);
         QObject::connect(_cutoff_freq, &QSlider::valueChanged, this, &Self::draw);
+        QObject::connect(_treble_freq, &QSlider::valueChanged, this, &Self::draw);
+        QObject::connect(_treble_db, &QSlider::valueChanged, this, &Self::draw);
         draw();
     }
 
@@ -121,18 +121,18 @@ public:
         #define LABEL(NAME, TEMPLATE) \
             NAME##_label->setText(QStringLiteral(TEMPLATE).arg(NAME->value()))
 
-        LABEL(_width_nsamp, "Half-width (samples): %1");
-        LABEL(_treble_db, "Treble (Nyquist?) attenuation (dB): %1");
-        LABEL(_rolloff_freq, "Treble attenuation frequency: %1");
-        LABEL(_sample_rate, "Sample rate: %1");
-        LABEL(_cutoff_freq, "Cutoff frequency (?): %1");
+        LABEL(_width_nsamp, "Full-width (samples): %1");
+        LABEL(_sample_rate, "Sample rate (Hz): %1");
+        LABEL(_cutoff_freq, "Cutoff frequency (Hz): %1");
+        LABEL(_treble_freq, "Treble shelf (Hz): %1");
+        LABEL(_treble_db, "Treble shelf (dB): %1");
 
         _draw_queued = false;
 
         // Generate impulse
         int width = _width_nsamp->value();
         auto eq = blip_eq_t(
-            _treble_db->value(), _rolloff_freq->value(), _sample_rate->value(), _cutoff_freq->value()
+            _treble_db->value(), _treble_freq->value(), _sample_rate->value(), _cutoff_freq->value()
         );
 
         std::vector<float> fimpulse;
