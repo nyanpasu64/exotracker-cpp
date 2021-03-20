@@ -7,22 +7,19 @@
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QSlider>
-#include <QtCharts>
-#include <QChartView>
-
-using namespace QtCharts;
+#include <QFormLayout>
+#include <qwt/qwt_plot.h>
+#include <qwt/qwt_plot_grid.h>
+#include <qwt/qwt_plot_curve.h>
 
 #define MOVE
 #define BORROW
 using std::move;
 
 class BlipViewerWindow : public QWidget {
-    QChartView * _chartView;
-
-    QChart * _chart;
-    QLineSeries * _series;
-    QValueAxis * _axisX;
-    QValueAxis * _axisY;
+    QwtPlot * _plot;
+    QwtPlotGrid * _grid;
+    QwtPlotCurve * _curve;
 
     QLabel * _width_nsamp_label;
     QLabel * _treble_db_label;
@@ -42,29 +39,26 @@ public:
     using Self = BlipViewerWindow;
 
     BlipViewerWindow(QWidget * parent = nullptr) : QWidget(parent) {
-        // Object setup
-        _chart = new QChart();
+//        _series = new QLineSeries();
+//        _chart->legend()->hide();
+//        _chart->addSeries(MOVE _series);
+//        _chart->setTitle("blip_buffer");
 
-        _series = new QLineSeries();
-        _chart->legend()->hide();
-        _chart->addSeries(MOVE _series);
-        _chart->setTitle("blip_buffer");
+//        _axisX = new QValueAxis;
+//        _axisX->setTickAnchor(0);
+//        _axisX->setTickInterval(0.5);
+//        _axisX->setTickType(QValueAxis::TicksDynamic);
+//        _axisX->setLabelFormat("%.1f");
+//        _chart->addAxis(MOVE _axisX, Qt::AlignBottom);
+//        _series->attachAxis(_axisX);
 
-        _axisX = new QValueAxis;
-        _axisX->setTickAnchor(0);
-        _axisX->setTickInterval(0.5);
-        _axisX->setTickType(QValueAxis::TicksDynamic);
-        _axisX->setLabelFormat("%.1f");
-        _chart->addAxis(MOVE _axisX, Qt::AlignBottom);
-        _series->attachAxis(_axisX);
-
-        _axisY = new QValueAxis;
-        _axisY->setTickAnchor(0);
-        _axisY->setTickInterval(2048);
-        _axisY->setTickType(QValueAxis::TicksDynamic);
-        _axisY->setLabelFormat("%.0f");
-        _chart->addAxis(MOVE _axisY, Qt::AlignLeft);
-        _series->attachAxis(_axisY);
+//        _axisY = new QValueAxis;
+//        _axisY->setTickAnchor(0);
+//        _axisY->setTickInterval(2048);
+//        _axisY->setTickType(QValueAxis::TicksDynamic);
+//        _axisY->setLabelFormat("%.0f");
+//        _chart->addAxis(MOVE _axisY, Qt::AlignLeft);
+//        _series->attachAxis(_axisY);
 
         // GUI setup
         auto c = this;
@@ -72,12 +66,17 @@ public:
         auto l = new QVBoxLayout;
         c->setLayout(l);
 
-        QChartView * chartView;
-        {l__w(QChartView(MOVE _chart));
-            chartView = w;
+        {l__w(QwtPlot);
+            _plot = w;
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-            chartView->setRenderHint(QPainter::Antialiasing);
         }
+
+        // Object setup
+        _curve = new QwtPlotCurve;
+        _curve->attach(_plot);
+
+        _grid = new QwtPlotGrid;
+        _grid->attach(_plot);
 
         {l__c_form(QWidget, QFormLayout);
             #define ASSIGN(NAME) \
@@ -153,20 +152,17 @@ public:
         int const half_size = blip_res / 2 * (width - 1);
         eq.generate( &fimpulse [blip_res], half_size );
 
+        QVector<double> xs, ys;
         auto points = QList<QPointF>();
         for (int i = 0; i < blip_res + half_size; i++) {
-            float x = i - (blip_res + half_size);
+            double x = i - (blip_res + half_size);
             x /= blip_res;
-            points.append({x, fimpulse[i]});
+            xs.append(x);
+            ys.append(fimpulse[i]);
         }
 
-        // seriously if you don't removeSeries(), Qt tries to redraw the whole fucking chart
-        // on every single point you add... even if you pass in a whole list of points at once.
-        // who needs transactional behavior or lazy redraw, when you have the chad O(n^2)?
-        _chart->removeSeries(_series);
-        _series->clear();
-        _series->append(points);
-        _chart->addSeries(_series);
+        _curve->setSamples(xs, ys);
+        _plot->replot();
     };
 
     void draw() {

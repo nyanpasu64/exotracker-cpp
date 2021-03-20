@@ -89,7 +89,6 @@ include_directories(SYSTEM 3rdparty 3rdparty/fmt_/include)
 
 set(CMAKE_AUTORCC ON)
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
-find_package(Qt5 COMPONENTS Charts)
 
 set(RTAUDIO_BUILD_TESTING FALSE)
 add_subdirectory("3rdparty/rtaudio" EXCLUDE_FROM_ALL)
@@ -185,7 +184,7 @@ add_executable(blip-buffer-gui
     3rdparty/Blip_Buffer/Blip_Buffer.cpp
     blip_buffer_gui/main.cpp
 )
-target_link_libraries(blip-buffer-gui PRIVATE fmt::fmt Qt5::Widgets Qt5::Charts)
+target_link_libraries(blip-buffer-gui PRIVATE fmt::fmt Qt5::Widgets qwt)
 
 
 ## GUI editor, uses Qt
