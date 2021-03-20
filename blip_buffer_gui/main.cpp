@@ -24,6 +24,12 @@ class BlipViewerWindow : public QWidget {
     QValueAxis * _axisX;
     QValueAxis * _axisY;
 
+    QLabel * _width_nsamp_label;
+    QLabel * _treble_db_label;
+    QLabel * _rolloff_freq_label;
+    QLabel * _sample_rate_label;
+    QLabel * _cutoff_freq_label;
+
     QSlider * _width_nsamp;
     QSlider * _treble_db;
     QSlider * _rolloff_freq;
@@ -74,35 +80,46 @@ public:
         }
 
         {l__c_form(QWidget, QFormLayout);
-            {form__label_w("Half-width (samples)", QSlider);
-                _width_nsamp = w;
+            #define ASSIGN(NAME) \
+                NAME##_label = left; \
+                NAME = right; \
+                auto w = right;
+
+            {form__left_right(QLabel, QSlider);
+                ASSIGN(_width_nsamp)
                 w->setOrientation(Qt::Horizontal);
                 w->setRange(8, 32);
                 w->setValue(16);
             }
-            {form__label_w("Treble (Nyquist?) attenuation (dB)", QSlider);
-                _treble_db = w;
+            {form__left_right(QLabel, QSlider);
+                ASSIGN(_treble_db)
                 w->setOrientation(Qt::Horizontal);
                 w->setRange(-90, 5);
                 w->setValue(-24);  // famitracker's default value... an empty blip_eq_t() defaults to 0.
             }
-            {form__label_w("Treble attenuation frequency", QSlider);
-                _rolloff_freq = w;
+            {form__left_right(QLabel, QSlider);
+                ASSIGN(_rolloff_freq)
                 w->setOrientation(Qt::Horizontal);
                 w->setRange(0, 48000);
                 w->setValue(12000);  // famitracker's default value... an empty blip_eq_t() defaults to 0.
+                w->setSingleStep(100);
+                w->setPageStep(1000);
             }
-            {form__label_w("Sample rate", QSlider);
-                _sample_rate = w;
+            {form__left_right(QLabel, QSlider);
+                ASSIGN(_sample_rate)
                 w->setOrientation(Qt::Horizontal);
                 w->setRange(0, 96000);
                 w->setValue(48000);
+                w->setSingleStep(100);
+                w->setPageStep(1000);
             }
-            {form__label_w("Cutoff frequency (?)", QSlider);
-                _cutoff_freq = w;
+            {form__left_right(QLabel, QSlider);
+                ASSIGN(_cutoff_freq)
                 w->setOrientation(Qt::Horizontal);
                 w->setRange(0, 48000);
                 w->setValue(0);  // idk what this does, famitracker doesn't supply it, defaults to 0.
+                w->setSingleStep(100);
+                w->setPageStep(1000);
             }
         }
 
@@ -115,13 +132,23 @@ public:
     }
 
     void force_draw() {
+        #define LABEL(NAME, TEMPLATE) \
+            NAME##_label->setText(QStringLiteral(TEMPLATE).arg(NAME->value()))
+
+        LABEL(_width_nsamp, "Half-width (samples): %1");
+        LABEL(_treble_db, "Treble (Nyquist?) attenuation (dB): %1");
+        LABEL(_rolloff_freq, "Treble attenuation frequency: %1");
+        LABEL(_sample_rate, "Sample rate: %1");
+        LABEL(_cutoff_freq, "Cutoff frequency (?): %1");
+
         _draw_queued = false;
         int width = _width_nsamp->value();
         auto eq = blip_eq_t(
             _treble_db->value(), _rolloff_freq->value(), _sample_rate->value(), _cutoff_freq->value()
         );
 
-        float fimpulse [blip_res / 2 * (blip_widest_impulse_ - 1) + blip_res * 2] = {0};
+        std::vector<float> fimpulse;
+        fimpulse.resize(blip_res / 2 * width + blip_res);
 
         int const half_size = blip_res / 2 * (width - 1);
         eq.generate( &fimpulse [blip_res], half_size );
