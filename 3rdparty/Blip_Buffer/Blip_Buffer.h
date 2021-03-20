@@ -252,7 +252,7 @@ public:
     // See blip_buffer.txt
     blip_eq_t( double treble, blip_long rolloff_freq, blip_long sample_rate, blip_long cutoff_freq = 0 );
 
-private:
+public:
     double treble;
     blip_long rolloff_freq;
     blip_long sample_rate;
