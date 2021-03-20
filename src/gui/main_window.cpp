@@ -744,8 +744,8 @@ public:
 
         auto p = &cursor_move;
         if (std::get_if<MoveCursor_::NotPatternEdit>(p)) {
-            before_cursor = {};
-            after_cursor = {};
+            before_cursor = std::nullopt;
+            after_cursor = std::nullopt;
         } else
         if (auto move_from = std::get_if<MoveCursor_::MoveFrom>(p)) {
             before_cursor = move_from->before_or_here.value_or(here);
