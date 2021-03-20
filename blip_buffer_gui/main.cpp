@@ -42,27 +42,6 @@ public:
     using Self = BlipViewerWindow;
 
     BlipViewerWindow(QWidget * parent = nullptr) : QWidget(parent) {
-//        _series = new QLineSeries();
-//        _chart->legend()->hide();
-//        _chart->addSeries(MOVE _series);
-//        _chart->setTitle("blip_buffer");
-
-//        _axisX = new QValueAxis;
-//        _axisX->setTickAnchor(0);
-//        _axisX->setTickInterval(0.5);
-//        _axisX->setTickType(QValueAxis::TicksDynamic);
-//        _axisX->setLabelFormat("%.1f");
-//        _chart->addAxis(MOVE _axisX, Qt::AlignBottom);
-//        _series->attachAxis(_axisX);
-
-//        _axisY = new QValueAxis;
-//        _axisY->setTickAnchor(0);
-//        _axisY->setTickInterval(2048);
-//        _axisY->setTickType(QValueAxis::TicksDynamic);
-//        _axisY->setLabelFormat("%.0f");
-//        _chart->addAxis(MOVE _axisY, Qt::AlignLeft);
-//        _series->attachAxis(_axisY);
-
         // GUI setup
         auto c = this;
 
