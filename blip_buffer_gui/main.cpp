@@ -8,9 +8,11 @@
 #include <QVBoxLayout>
 #include <QSlider>
 #include <QFormLayout>
+#include <QCheckBox>
 #include <qwt/qwt_plot.h>
 #include <qwt/qwt_plot_grid.h>
 #include <qwt/qwt_plot_curve.h>
+#include <qwt/qwt_scale_engine.h>
 
 #define MOVE
 #define BORROW
@@ -21,6 +23,7 @@ class BlipViewerWindow : public QWidget {
     QwtPlotGrid * _grid;
     QwtPlotCurve * _curve;
 
+    QCheckBox * _log_scale;
     QLabel * _width_nsamp_label;
     QLabel * _treble_db_label;
     QLabel * _rolloff_freq_label;
@@ -73,10 +76,10 @@ public:
 
         // Object setup
         _curve = new QwtPlotCurve;
-        _curve->attach(_plot);
+        MOVE _curve->attach(_plot);
 
         _grid = new QwtPlotGrid;
-        _grid->attach(_plot);
+        MOVE _grid->attach(_plot);
 
         {l__c_form(QWidget, QFormLayout);
             #define ASSIGN(NAME) \
@@ -84,10 +87,14 @@ public:
                 NAME = right; \
                 auto w = right;
 
+            {form__label_w("", QCheckBox("Log Scale"));
+                _log_scale = w;
+            }
+
             {form__left_right(QLabel, QSlider);
                 ASSIGN(_width_nsamp)
                 w->setOrientation(Qt::Horizontal);
-                w->setRange(8, 32);
+                w->setRange(8, 128);
                 w->setValue(16);
             }
             {form__left_right(QLabel, QSlider);
@@ -122,6 +129,7 @@ public:
             }
         }
 
+        QObject::connect(_log_scale, &QCheckBox::toggled, this, &Self::draw);
         QObject::connect(_width_nsamp, &QSlider::valueChanged, this, &Self::draw);
         QObject::connect(_treble_db, &QSlider::valueChanged, this, &Self::draw);
         QObject::connect(_rolloff_freq, &QSlider::valueChanged, this, &Self::draw);
@@ -141,6 +149,8 @@ public:
         LABEL(_cutoff_freq, "Cutoff frequency (?): %1");
 
         _draw_queued = false;
+
+        // Generate impulse
         int width = _width_nsamp->value();
         auto eq = blip_eq_t(
             _treble_db->value(), _rolloff_freq->value(), _sample_rate->value(), _cutoff_freq->value()
@@ -152,13 +162,28 @@ public:
         int const half_size = blip_res / 2 * (width - 1);
         eq.generate( &fimpulse [blip_res], half_size );
 
+        // Plot data
+        bool log_scale = _log_scale->isChecked();
+        if (log_scale) {
+            _plot->setAxisScale(QwtPlot::yLeft, -96, 0);
+
+        } else {
+            _plot->setAxisScale(QwtPlot::yLeft, -0.25, 1);
+        }
+
         QVector<double> xs, ys;
         auto points = QList<QPointF>();
         for (int i = 0; i < blip_res + half_size; i++) {
             double x = i - (blip_res + half_size);
             x /= blip_res;
             xs.append(x);
-            ys.append(fimpulse[i]);
+
+            double y = fimpulse[i] / 4096;
+            if (log_scale) {
+                ys.append(20. * log10(fabs(y)));
+            } else {
+                ys.append(y);
+            }
         }
 
         _curve->setSamples(xs, ys);
