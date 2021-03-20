@@ -359,11 +359,6 @@ inline void Blip_Synth<quality>::offset_resampled( blip_resampled_time_t time,
 
     imp_t const* BLIP_RESTRICT imp = impulses + blip_res - phase;
 
-    #if defined (_M_IX86) || defined (_M_IA64) || defined (__i486__) || \
-            defined (__x86_64__) || defined (__ia64__) || defined (__i386__)
-
-    // straight forward implementation resulted in better code on GCC for x86
-
     #define ADD_IMP( out, in ) \
         buf [out] += (blip_long) imp [blip_res * (in)] * delta
 
@@ -390,47 +385,6 @@ inline void Blip_Synth<quality>::offset_resampled( blip_resampled_time_t time,
 
         ADD_IMP( rev    , 1 );
         ADD_IMP( rev + 1, 0 );
-
-    #else
-
-    // for RISC processors, help compiler by reading ahead of writes
-
-    #define BLIP_FWD( i ) {\
-        blip_long t0 =                       i0 * delta + buf [fwd     + i];\
-        blip_long t1 = imp [blip_res * (i + 1)] * delta + buf [fwd + 1 + i];\
-        i0 =           imp [blip_res * (i + 2)];\
-        buf [fwd     + i] = t0;\
-        buf [fwd + 1 + i] = t1;\
-    }
-    #define BLIP_REV( r ) {\
-        blip_long t0 =                 i0 * delta + buf [rev     - r];\
-        blip_long t1 = imp [blip_res * r] * delta + buf [rev + 1 - r];\
-        i0 =           imp [blip_res * (r - 1)];\
-        buf [rev     - r] = t0;\
-        buf [rev + 1 - r] = t1;\
-    }
-
-        blip_long i0 = *imp;
-        BLIP_FWD( 0 )
-        if ( quality > 8  ) BLIP_FWD( 2 )
-        if ( quality > 12 ) BLIP_FWD( 4 )
-        {
-            blip_long t0 =                   i0 * delta + buf [fwd + mid - 1];
-            blip_long t1 = imp [blip_res * mid] * delta + buf [fwd + mid    ];
-            imp = impulses + phase;
-            i0 = imp [blip_res * mid];
-            buf [fwd + mid - 1] = t0;
-            buf [fwd + mid    ] = t1;
-        }
-        if ( quality > 12 ) BLIP_REV( 6 )
-        if ( quality > 8  ) BLIP_REV( 4 )
-        BLIP_REV( 2 )
-
-        blip_long t0 =   i0 * delta + buf [rev    ];
-        blip_long t1 = *imp * delta + buf [rev + 1];
-        buf [rev    ] = t0;
-        buf [rev + 1] = t1;
-    #endif
 }
 
 #undef BLIP_FWD
