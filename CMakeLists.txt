@@ -187,6 +187,14 @@ add_executable(blip-buffer-gui
 target_link_libraries(blip-buffer-gui PRIVATE fmt::fmt Qt5::Widgets qwt)
 
 
+find_package(SndFile REQUIRED)
+add_executable(blip-resampler
+    3rdparty/Blip_Buffer/Blip_Buffer.cpp
+    blip_resampler/main.cpp
+)
+target_link_libraries(blip-resampler PRIVATE SndFile::sndfile fmt::fmt)
+
+
 ## GUI editor, uses Qt
 add_executable(exotracker-qt
     # GUI
