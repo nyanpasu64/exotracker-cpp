@@ -161,7 +161,7 @@ private:
 
     // Internal
     typedef blip_ulong blip_resampled_time_t;
-    int const blip_widest_impulse_ = 16;
+    int const blip_widest_impulse_ = 32;
     int const blip_buffer_extra_ = blip_widest_impulse_ + 2;
     int const blip_res = 1 << BLIP_PHASE_BITS;
     class blip_eq_t;
