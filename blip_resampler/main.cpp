@@ -15,6 +15,8 @@ int main(int argc, char ** argv) {
     buf.bass_freq(0);
 
     auto synth = Blip_Synth<blip_high_quality>(1, 65536);
+//    synth.treble_eq(blip_eq_t(-13., 20000, 44100, 22050));
+    synth.treble_eq(blip_eq_t(0, 0, 44100, 0));
 
     int chunk_size = input.samplerate() / 10;
 
