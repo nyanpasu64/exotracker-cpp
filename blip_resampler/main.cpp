@@ -12,6 +12,8 @@ int main(int argc, char ** argv) {
     auto output = SndfileHandle(argv[2], SFM_WRITE, SF_FORMAT_WAV | SF_FORMAT_PCM_16, 1, 44100);
 
     auto buf = Blip_Buffer(44100, input.samplerate());
+    buf.bass_freq(0);
+
     auto synth = Blip_Synth<blip_high_quality>(1, 65536);
 
     int chunk_size = input.samplerate() / 10;
