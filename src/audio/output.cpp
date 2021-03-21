@@ -70,7 +70,7 @@ public:
         size_t stereo_smp_per_block = size_t(synth._stereo_nchan) * mono_smp_per_block;
 
         static_assert(
-            (STEREO_NCHAN == 2) && (rtaudio_flags | RTAUDIO_NONINTERLEAVED),
+            (STEREO_NCHAN == 2) && (rtaudio_flags & RTAUDIO_NONINTERLEAVED),
             "rtaudio_callback() assumes planar stereo"
         );
         gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
