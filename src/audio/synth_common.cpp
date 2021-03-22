@@ -18,7 +18,7 @@ enum class ChipEvent {
 
 void ChipInstance::flush_register_writes() {
     // You should not tick the driver before the previous tick finishes playing.
-    release_assert(_register_writes.num_unread() == 0);
+    release_assert_equal(_register_writes.num_unread(), 0);
     _register_writes.clear();
 }
 

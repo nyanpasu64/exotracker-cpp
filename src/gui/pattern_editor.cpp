@@ -1741,7 +1741,7 @@ static void draw_pattern_foreground(
                     QString const& text, gsl::span<qreal const> cell_centers
                 ) {
                     int nchar = text.size();
-                    release_assert((size_t) nchar == cell_centers.size());
+                    release_assert_equal((size_t) nchar, cell_centers.size());
 
                     for (int i = 0; i < nchar; i++) {
                         draw_char(text[i], cell_centers[(size_t) i]);
