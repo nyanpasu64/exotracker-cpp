@@ -8,6 +8,7 @@
 #include "doc/timed_events.h"
 #include "doc/event_list.h"
 #include "doc/timeline.h"
+#include "doc/sample.h"
 #include "doc/instr.h"
 #include "doc/accidental_common.h"
 #include "chip_common.h"
@@ -24,6 +25,7 @@ using namespace ::doc::events;
 using namespace ::doc::timed_events;
 using namespace ::doc::event_list;
 using namespace ::doc::timeline;
+using namespace ::doc::sample;
 using namespace ::doc::instr;
 using accidental::AccidentalMode;
 
@@ -91,6 +93,7 @@ struct DocumentCopy {
     /// and typing character c will write effect 0c immediately.
     uint32_t effect_name_chars = 1;
 
+    Samples samples;
     Instruments instruments;
 
     /// vector<ChipIndex -> ChipKind>
