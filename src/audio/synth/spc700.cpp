@@ -18,8 +18,7 @@ Spc700Synth::Spc700Synth() {
     _chip.init(_ram_64k);
 }
 
-void Spc700Synth::write_memory(RegisterWrite write) {
-    _ram_64k[write.address] = write.value;
+void Spc700Synth::write_reg(RegisterWrite write) {
     _chip.write(write.address, write.value);
 }
 

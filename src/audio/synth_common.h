@@ -131,7 +131,7 @@ public:
 private:
     /// Called by run_chip_for() with data from _register_writes.
     /// Time does not pass.
-    virtual void synth_write_memory(RegisterWrite write) = 0;
+    virtual void synth_write_reg(RegisterWrite write) = 0;
 
     /// Called by run_chip_for() once per register write.
     /// Cannot cross register-write boundaries.

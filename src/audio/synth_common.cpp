@@ -77,7 +77,7 @@ ChipInstance::NsampWritten ChipInstance::run_chip_for(
         case ChipEvent::RegWrite: {
             // This assumes that there is a register write command,
             // and asserts that its time_before == 0.
-            synth_write_memory(_register_writes.pop());
+            synth_write_reg(_register_writes.pop());
             fetch_next_reg(_register_writes, chip_events);
             break;
         }

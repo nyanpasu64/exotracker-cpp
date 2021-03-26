@@ -23,7 +23,7 @@ struct TimeRef {
 template<int begin, int end, typename T>
 using Range = T;
 
-using Address = uint16_t;
+using Address = uint8_t;
 using Byte = uint8_t;
 
 struct RegisterWrite {

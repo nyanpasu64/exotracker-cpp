@@ -23,7 +23,10 @@ class Spc700Synth {
 public:
     Spc700Synth();
 
-    void write_memory(RegisterWrite write);
+    /// Write to a S-DSP register (not to ARAM).
+    /// (In the actual SNES, this corresponds to a $F2 write followed by $F3.)
+    /// (Writing sample data should be accomplished by mutating _ram_64k directly.)
+    void write_reg(RegisterWrite write);
 
     ChipInstance::NsampWritten run_clocks(
         ClockT const nclk,

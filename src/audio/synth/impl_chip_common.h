@@ -90,8 +90,8 @@ public:
     }
 
 private:  // called by ChipInstance
-    void synth_write_memory(RegisterWrite write) override {
-        _synth.write_memory(write);
+    void synth_write_reg(RegisterWrite write) override {
+        _synth.write_reg(write);
     }
 
     NsampWritten synth_run_clocks(
