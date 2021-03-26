@@ -76,13 +76,13 @@ public:
 
     // Is this a usable API? I don't know.
     // I think music_driver::TimeRef will make it easier to use.
-    void add_time(ClockT dtime) {
+    void wait(ClockT dtime) {
         input.accum_dtime += dtime;
     }
 
-    void push_write(RegisterWrite val) {
+    void write(Address address, Byte value) {
         assert(!output.pending());
-        RelativeRegisterWrite relative{.write=val, .time_before=input.accum_dtime};
+        RelativeRegisterWrite relative{.write={address, value}, .time_before=input.accum_dtime};
         input.accum_dtime = 0;
 
         vec.push_back(relative);
