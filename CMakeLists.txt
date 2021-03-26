@@ -118,7 +118,7 @@ add_library(exotracker-core
 
     # Common files (tightly coupled)
     src/audio/audio_common.cpp
-    src/audio/synth_common.cpp
+    src/audio/synth/chip_instance_common.cpp
     src/audio/synth/envelope.cpp
     src/audio/synth/sequencer.cpp
     src/audio/synth/music_driver_common.cpp

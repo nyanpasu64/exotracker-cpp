@@ -1,6 +1,5 @@
 #pragma once
 
-// Do not include synth_common.h, since synth_common.h includes this file.
 #include "audio/event_queue.h"
 #include "sequencer_driver_common.h"
 #include "util/copy_move.h"

@@ -12,9 +12,9 @@
 #include <optional>
 #include <utility>  // std::move
 
-namespace audio {
-namespace synth {
+namespace audio::synth {
 
+using namespace chip_instance;
 using chip_kinds::ChipKind;
 
 /// Maximum number of sample frames the SNES emulator can generate in one tick.
@@ -370,6 +370,5 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
     );
 }
 
-// end namespaces
-}
+// end namespace
 }

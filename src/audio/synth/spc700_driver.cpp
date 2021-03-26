@@ -1,5 +1,6 @@
 #include "spc700_driver.h"
 #include "spc700_p.h"
+#include "chip_instance_common.h"
 #include "doc.h"
 #include "util/release_assert.h"
 
@@ -26,6 +27,7 @@ Spc700ChannelDriver::Spc700ChannelDriver(uint8_t channel_id)
 }
 
 constexpr double CENTS_PER_OCTAVE = 1200.;
+using chip_instance::SAMPLES_PER_S_IDEAL;
 
 static uint16_t calc_tuning(
     FrequenciesRef freq_table, doc::SampleTuning const& tuning, doc::Note note

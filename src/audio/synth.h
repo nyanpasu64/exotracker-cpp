@@ -1,6 +1,6 @@
 #pragma once
 
-#include "synth_common.h"
+#include "synth/chip_instance_common.h"
 #include "audio_common.h"
 #include "callback.h"
 #include "doc.h"
@@ -18,6 +18,7 @@
 namespace audio {
 namespace synth {
 
+using chip_instance::ChipInstance;
 using cmd_queue::AudioCommand;
 using timing::MaybeSequencerTime;
 

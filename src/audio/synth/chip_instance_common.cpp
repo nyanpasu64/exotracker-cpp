@@ -1,8 +1,8 @@
-#include "synth_common.h"
+#include "chip_instance_common.h"
 #include "util/release_assert.h"
 
 
-namespace audio::synth {
+namespace audio::synth::chip_instance {
 
 namespace {
 
@@ -21,7 +21,7 @@ void ChipInstance::flush_register_writes() {
     _register_writes.clear();
 }
 
-ChipInstance::NsampWritten ChipInstance::run_chip_for(
+NsampWritten ChipInstance::run_chip_for(
     ClockT num_clocks,
     WriteTo write_to)
 {

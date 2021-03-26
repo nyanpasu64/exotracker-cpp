@@ -1,8 +1,10 @@
 #pragma once
 
-#include "audio/synth_common.h"
+#include "chip_instance_common.h"
 
 namespace audio::synth::spc700 {
+
+using chip_instance::ChipInstance;
 
 std::unique_ptr<ChipInstance> make_Spc700Instance(
     chip_common::ChipIndex chip_index,

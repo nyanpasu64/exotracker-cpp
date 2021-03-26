@@ -22,7 +22,7 @@ void Spc700Synth::write_reg(RegisterWrite write) {
     _chip.write(write.address, write.value);
 }
 
-ChipInstance::NsampWritten Spc700Synth::run_clocks(
+NsampWritten Spc700Synth::run_clocks(
     ClockT const nclk, WriteTo write_to
 ) {
     _chip.set_output(write_to.data(), write_to.size());

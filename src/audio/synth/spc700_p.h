@@ -1,6 +1,7 @@
 #pragma once
 
 #include "spc700.h"
+#include "music_driver_common.h"
 #include "../synth_common.h"
 
 #include <snes9x-dsp/SPC_DSP.h>
@@ -12,6 +13,8 @@ namespace audio::synth::spc700_driver {
 }
 
 namespace audio::synth::spc700 {
+
+using music_driver::RegisterWrite;
 
 constexpr size_t SPC_MEMORY_SIZE = 0x1'0000;
 
@@ -28,7 +31,7 @@ public:
     /// (Writing sample data should be accomplished by mutating _ram_64k directly.)
     void write_reg(RegisterWrite write);
 
-    ChipInstance::NsampWritten run_clocks(
+    NsampWritten run_clocks(
         ClockT const nclk,
         WriteTo write_to);
 

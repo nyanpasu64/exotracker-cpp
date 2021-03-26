@@ -1,7 +1,7 @@
 #pragma once
 
 #include "./sequencer.h"
-#include "../synth_common.h"
+#include "chip_instance_common.h"
 #include "timing_common.h"
 #include "util/enum_map.h"
 
@@ -10,6 +10,8 @@
 namespace audio::synth::impl_chip {
 
 using std::move;
+using chip_instance::ChipInstance;
+using chip_instance::RegisterWrite;
 using chip_common::ChipIndex;
 using timing::SequencerTime;
 
