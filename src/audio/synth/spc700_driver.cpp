@@ -117,7 +117,7 @@ void Spc700Driver::reset_state(
     Spc700Synth & synth,
     RegisterWriteQueue & regs)
 {
-    synth._chip.reset();
+    synth._p->chip.reset();
 
     // TODO replace *this with a freshly constructed instance?
     // idk, state management is hard, and we need a principled strategy (idk what yet).
@@ -250,16 +250,16 @@ void Spc700Driver::reload_samples(
 
             // Write the sample entry.
             size_t sample_entry_addr = SAMPLE_DIR + i * SAMPLE_DIR_ENTRY_SIZE;
-            synth._ram_64k[sample_entry_addr + 0] = (uint8_t) sample_start_addr;
-            synth._ram_64k[sample_entry_addr + 1] = (uint8_t) (sample_start_addr >> 8);
-            synth._ram_64k[sample_entry_addr + 2] = (uint8_t) sample_loop_addr;
-            synth._ram_64k[sample_entry_addr + 3] = (uint8_t) (sample_loop_addr >> 8);
+            synth._p->ram_64k[sample_entry_addr + 0] = (uint8_t) sample_start_addr;
+            synth._p->ram_64k[sample_entry_addr + 1] = (uint8_t) (sample_start_addr >> 8);
+            synth._p->ram_64k[sample_entry_addr + 2] = (uint8_t) sample_loop_addr;
+            synth._p->ram_64k[sample_entry_addr + 3] = (uint8_t) (sample_loop_addr >> 8);
 
             // Write the sample data.
             std::copy(
                 smp.brr.begin(),
                 smp.brr.begin() + (ptrdiff_t) brr_size_clamped,
-                &synth._ram_64k[sample_start_addr]);
+                &synth._p->ram_64k[sample_start_addr]);
 
             sample_start_addr = sample_end_addr;
             _samples_valid[i] = true;
