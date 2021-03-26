@@ -2,6 +2,8 @@
 
 #include "chip_instance_common.h"
 
+#include <memory>
+
 namespace audio::synth::spc700 {
 
 using chip_instance::ChipInstance;

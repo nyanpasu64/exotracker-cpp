@@ -8,7 +8,7 @@
 
 #include <cstdint>
 
-namespace audio::synth::spc700 {
+namespace audio::synth::spc700_synth {
     // this class is friends with Spc700Driver, so we can load samples directly.
     class Spc700Synth;
 }
@@ -52,6 +52,8 @@ public:
         Spc700ChipFlags & flags);
 };
 
+using spc700_synth::Spc700Synth;
+
 class Spc700Driver {
 private:
     // TODO save the address of each sample
@@ -74,13 +76,13 @@ public:
     // RegisterWriteQueue is currently unused.
     void reset_state(
         doc::Document const& document,
-        spc700::Spc700Synth & synth,
+        Spc700Synth & synth,
         RegisterWriteQueue & register_writes);
 
     // RegisterWriteQueue is currently unused.
     void reload_samples(
         doc::Document const& document,
-        spc700::Spc700Synth & synth,
+        Spc700Synth & synth,
         RegisterWriteQueue & register_writes);
 
     void stop_playback(RegisterWriteQueue /*mut*/& register_writes);

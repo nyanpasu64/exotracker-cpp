@@ -1,5 +1,5 @@
 #include "spc700_driver.h"
-#include "spc700_p.h"
+#include "spc700_synth.h"
 #include "chip_instance_common.h"
 #include "doc.h"
 #include "util/release_assert.h"
@@ -114,7 +114,7 @@ Spc700Driver::Spc700Driver(NsampT samples_per_sec, doc::FrequenciesRef frequenci
 
 void Spc700Driver::reset_state(
     doc::Document const& document,
-    spc700::Spc700Synth & synth,
+    Spc700Synth & synth,
     RegisterWriteQueue & regs)
 {
     synth._chip.reset();
@@ -174,14 +174,14 @@ constexpr size_t SAMPLE_DIR = 0x100;
 /// due to C++ endian/alignment/strict aliasing issues.
 constexpr size_t SAMPLE_DIR_ENTRY_SIZE = 4;
 
-using spc700::SPC_MEMORY_SIZE;
+using spc700_synth::SPC_MEMORY_SIZE;
 
 // TODO test this method.
 // Issue is, it's not the most test-friendly method, due to debug assertions,
 // writing directly to RAM, and the sample-reloading API still being in flux.
 void Spc700Driver::reload_samples(
     doc::Document const& document,
-    spc700::Spc700Synth & synth,
+    Spc700Synth & synth,
     RegisterWriteQueue & regs)
 {
     std::fill(std::begin(_samples_valid), std::end(_samples_valid), false);

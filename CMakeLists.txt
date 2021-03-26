@@ -132,6 +132,7 @@ add_library(exotracker-core
     src/audio/synth/volume_calc_common.cpp
     src/audio/synth/spc700.cpp
     src/audio/synth/spc700_driver.cpp
+    src/audio/synth/spc700_synth.cpp
 
     # Glue files
     src/doc.cpp

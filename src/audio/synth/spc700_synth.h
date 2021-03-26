@@ -12,7 +12,7 @@ namespace audio::synth::spc700_driver {
     class Spc700Driver;
 }
 
-namespace audio::synth::spc700 {
+namespace audio::synth::spc700_synth {
 
 using music_driver::RegisterWrite;
 
@@ -39,6 +39,5 @@ public:
     /// when editing the sample layout.
     friend class spc700_driver::Spc700Driver;
 };
-
 
 }
