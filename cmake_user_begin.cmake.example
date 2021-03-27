@@ -1,7 +1,8 @@
 # Example: Enable asan/ubsan on debug builds
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined,leak")
+    # Apparently -fsanitize=address bundles (cut-down?) versions of undefined and leak.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 endif()
 
 # Why not -fsanitize=memory?
@@ -16,4 +17,4 @@ endif()
 
 
 # Example: Disable PCH.
-set(USE_PCH FALSE)
+#set(USE_PCH FALSE)
