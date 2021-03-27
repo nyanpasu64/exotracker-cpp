@@ -168,11 +168,16 @@ OverallSynth::OverallSynth(
 
         switch (chip_kind) {
             case ChipKind::Spc700: {
-                // Possibly more efficient than push_back,
-                // and silences false error in IDE.
-               _chip_instances.emplace_back(spc700::make_Spc700Instance(
+                auto instance = spc700::make_Spc700Instance(
                    chip_index, SAMPLES_PER_S_IDEAL, _document.frequency_table
-                ));
+                );
+
+                // This results in flush_register_writes() crashing,
+                // for reasons I'm not entirely sure about.
+                // It doesn't matter because reset_state() calls reload_samples().
+                // instance->reload_samples(_document);
+
+                _chip_instances.emplace_back(std::move(instance));
                 break;
             }
 

@@ -67,6 +67,8 @@ public:
 
     virtual ~ChipInstance() = default;
 
+    // # Sequencer methods.
+
     /// Seek the sequencer to this time in the document (grid cell and beat fraction).
     /// ChipInstance does not know if the song/sequencer is playing or not.
     /// OverallSynth is responsible for calling sequencer_driver_tick() during playback,
@@ -88,9 +90,15 @@ public:
     /// so invalidate both real time and events.
     virtual void timeline_modified(doc::Document const & document) = 0;
 
-    /// Call on each tick, before calling any functions which run the driver
-    /// (stop_playback() or [sequencer_]driver_tick()).
-    void flush_register_writes();
+    // # Driver methods
+
+    /// Must be called upon construction, or when samples change.
+    /// Repack all samples into RAM, and stops all running notes
+    /// (which would be playing at the wrong point).
+    ///
+    /// TODO only stop samples being played, and remap addresses of running samples
+    /// (construct a mapping table using additional sample allocation/mapping metadata).
+    virtual void reload_samples(doc::Document const & document) = 0;
 
     /// May/not mutate _register_writes.
     /// You are required to call driver_tick() afterwards on the same tick,
@@ -105,6 +113,12 @@ public:
     /// Runs driver, ignoring sequencer. Called when the song is not playing.
     virtual void driver_tick(doc::Document const & document) = 0;
 
+    // # Base class methods
+
+    /// Call on each tick, before calling any functions which run the driver
+    /// (stop_playback() or [sequencer_]driver_tick()).
+    void flush_register_writes();
+
     using NsampWritten = NsampT;
 
     /// Run the chip for 1 tick, applying register writes and generating audio.
@@ -115,7 +129,7 @@ public:
         WriteTo write_to);
 
 private:
-    /// Called with data from _register_writes.
+    /// Called by run_chip_for() with data from _register_writes.
     /// Time does not pass.
     virtual void synth_write_memory(RegisterWrite write) = 0;
 
