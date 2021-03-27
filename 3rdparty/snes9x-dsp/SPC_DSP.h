@@ -20,7 +20,7 @@ public:
 	// Sets destination for output samples. If out is NULL or out_size is 0,
 	// doesn't generate any.
 	typedef short sample_t;
-	void set_output( sample_t* out, int out_size );
+	void set_output( sample_t* out, size_t out_size );
 
 	// Number of samples written to output since it was last set, always
 	// a multiple of 2. Undefined if more samples were generated than

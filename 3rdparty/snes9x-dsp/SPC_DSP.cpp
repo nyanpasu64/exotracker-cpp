@@ -64,7 +64,7 @@ static BOOST::uint8_t const initial_regs [SPC_DSP::register_count] =
 	out += 2;\
 }
 
-void SPC_DSP::set_output( sample_t* out, int size )
+void SPC_DSP::set_output( sample_t* out, size_t size )
 {
 	require( (size & 1) == 0 ); // must be even
 	m.out_begin = out;
