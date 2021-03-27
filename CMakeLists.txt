@@ -243,37 +243,36 @@ if(
 endif()
 
 
-### Unit tests
-#add_executable(exotracker-tests
-#    tests/run_tests.cpp
-#    tests/test_utils/parameterize.cpp
+## Unit tests
+add_executable(exotracker-tests
+    tests/run_tests.cpp
+    tests/test_utils/parameterize.cpp
 
-#    tests/test_document.cpp
-#    tests/test_blip_buffer.cpp
-#    tests/test_edit_history.cpp
-#    tests/test_math.cpp
-#    tests/audio/test_event_queue.cpp
-#    tests/audio/test_sequencer.cpp
-#    tests/audio/test_synth.cpp
-#    tests/test_utils/test_parameterize.cpp
+    tests/test_document.cpp
+    tests/test_edit_history.cpp
+    tests/test_math.cpp
+    tests/audio/test_event_queue.cpp
+    tests/audio/test_sequencer.cpp
+    tests/audio/test_synth.cpp
+    tests/test_utils/test_parameterize.cpp
 
-#    # for #ifdef UNITTEST
-#    src/doc.cpp
-#    src/gui/move_cursor.cpp
-#    src/audio/synth/envelope.cpp
-#    src/audio/synth/volume_calc_common.cpp
-#    src/doc/timeline.cpp
-#)
-#target_compile_options(exotracker-tests PRIVATE "${options}")
-#target_include_directories(exotracker-tests PUBLIC tests)
-#target_link_libraries(exotracker-tests PRIVATE exotracker-headless)
-#target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
+    # for #ifdef UNITTEST
+    src/doc.cpp
+    src/gui/move_cursor.cpp
+    # src/audio/synth/envelope.cpp
+    src/audio/synth/volume_calc_common.cpp
+    src/doc/timeline.cpp
+)
+target_compile_options(exotracker-tests PRIVATE "${options}")
+target_include_directories(exotracker-tests PUBLIC tests)
+target_link_libraries(exotracker-tests PRIVATE exotracker-headless)
+target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
 
-#if(USE_PCH)
-#    target_precompile_headers(exotracker-tests PRIVATE
-#        precompiled_headers/exotracker_lib.h
-#    )
-#endif()
+if(USE_PCH)
+    target_precompile_headers(exotracker-tests PRIVATE
+        precompiled_headers/exotracker_lib.h
+    )
+endif()
 
 
 # This can be used to enable asan (-fsanitize=memory/undefined/leak).

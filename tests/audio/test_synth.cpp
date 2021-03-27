@@ -1,66 +1,84 @@
 #include "audio/synth.h"
-#include "audio/synth/nes_2a03_driver.h"
+#include "audio/synth/chip_instance_common.h"
+#include "audio/synth/spc700_driver.h"
 #include "doc.h"
 #include "chip_kinds.h"
 #include "cmd_queue.h"
 #include "timing_common.h"
+#include "doc_util/sample_instrs.h"
 #include "test_utils/parameterize.h"
 
 #include <fmt/core.h>
 
 #include <cstdint>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <vector>
 #include <utility>  // std::move
 
 #include "doctest.h"
 
-using audio::synth::nes_2a03_driver::Apu1Driver;
-using audio::synth::nes_2a03_driver::Apu1PulseDriver;
+using audio::synth::NsampT;
+using audio::synth::spc700_driver::Spc700Driver;
+using audio::synth::spc700_driver::Spc700ChannelDriver;
+using chip_kinds::Spc700ChannelID;
 using std::move;
 
+using namespace doc_util::sample_instrs;
 
-enum class TestChannelID {
-    NONE,
-    Pulse1,
-    Pulse2,
-};
 
-static doc::Document one_note_document(TestChannelID which_channel, doc::Note pitch) {
+using MaybeChannelID = std::optional<Spc700ChannelID>;
+
+static doc::Document one_note_document(MaybeChannelID which_channel, doc::Note pitch) {
     using namespace doc;
 
-    ChipList chips{ChipKind::Apu1};
+    Samples samples;
+    samples[0] = pulse_50();
+
+    Instruments instruments;
+    instruments[0] = Instrument {
+        .name = "50%",
+        .keysplit = {InstrumentPatch {
+            .sample_idx = 0,
+            .adsr = INFINITE,
+        }}
+    };
+
+    ChipList chips{ChipKind::Spc700};
 
     Timeline timeline;
 
     timeline.push_back([&]() -> TimelineRow {
-        EventList one_note {{0, {pitch}}};
+        EventList one_note {TimedRowEvent{0, RowEvent{pitch, 0}}};
         EventList blank {};
 
-        TimelineCell ch0{TimelineBlock::from_events(
-            which_channel == TestChannelID::Pulse1 ? one_note : blank
-        )};
-
-        TimelineCell ch1{TimelineBlock::from_events(
-            which_channel == TestChannelID::Pulse2 ? one_note : blank
-        )};
+        std::vector<TimelineCell> channel_cells;
+        for (size_t i = 0; i < enum_count<Spc700ChannelID>; i++) {
+            if (which_channel == Spc700ChannelID(i)) {
+                channel_cells.push_back(TimelineCell{TimelineBlock::from_events(one_note)});
+            } else {
+                channel_cells.push_back(TimelineCell{});
+            }
+        }
 
         return TimelineRow {
             .nbeats = 4,
-            .chip_channel_cells = {{move(ch0), move(ch1)}},
+            .chip_channel_cells = {move(channel_cells)},
         };
     }());
 
     return DocumentCopy {
         .sequencer_options = SequencerOptions{
-            .ticks_per_beat = 24,
-        },
+            .ticks_per_beat = 48,
+            .beats_per_minute = 100,
+            },
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
-        .instruments = {},
+        .samples = move(samples),
+        .instruments = move(instruments),
         .chips = chips,
-        .chip_channel_settings = {{{}, {}}},
+        .chip_channel_settings = spc_chip_channel_settings(),
         .timeline = move(timeline),
     };
 }
@@ -87,17 +105,19 @@ std::vector<Amplitude> run_new_synth(
     AudioCommand * stub_command,
     AudioOptions audio_options
 ) {
+    using audio::synth::STEREO_NCHAN;
+
     CAPTURE(smp_per_s);
     CAPTURE(nsamp);
 
     // (int stereo_nchan, int smp_per_s, locked_doc::GetDocument &/*'a*/ document)
     audio::synth::OverallSynth synth{
-        1, smp_per_s, document.clone(), stub_command, audio_options
+        STEREO_NCHAN, smp_per_s, document.clone(), stub_command, audio_options
     };
 
     std::vector<Amplitude> buffer;
-    buffer.resize(nsamp);
-    synth.synthesize_overall(/*mut*/ buffer, buffer.size());
+    buffer.resize(nsamp * STEREO_NCHAN);
+    synth.synthesize_overall(/*mut*/ buffer, nsamp);
 
     return buffer;
 };
@@ -124,28 +144,43 @@ void check_signed_amplitude(gsl::span<Amplitude> buffer, Amplitude threshold) {
     // This will require importing a FFT library.
 }
 
-PARAMETERIZE(all_audio_options, AudioOptions, audio_options,
-    OPTION(audio_options.clocks_per_sound_update, 1);
-    OPTION(audio_options.clocks_per_sound_update, 2);
-    OPTION(audio_options.clocks_per_sound_update, 4);
-    OPTION(audio_options.clocks_per_sound_update, 8);
-    OPTION(audio_options.clocks_per_sound_update, 16);
+PARAMETERIZE(all_channels, Spc700ChannelID, which_channel,
+    OPTION(which_channel, Spc700ChannelID::Channel1);
+    OPTION(which_channel, Spc700ChannelID::Channel2);
+    OPTION(which_channel, Spc700ChannelID::Channel3);
+    OPTION(which_channel, Spc700ChannelID::Channel4);
+    OPTION(which_channel, Spc700ChannelID::Channel5);
+    OPTION(which_channel, Spc700ChannelID::Channel6);
+    OPTION(which_channel, Spc700ChannelID::Channel7);
+    OPTION(which_channel, Spc700ChannelID::Channel8);
 )
 
-PARAMETERIZE(all_channels, TestChannelID, which_channel,
-    OPTION(which_channel, TestChannelID::Pulse1);
-    OPTION(which_channel, TestChannelID::Pulse2);
-)
-
-/// Previously Apu1Driver/Apu1PulseDriver would not write registers upon startup,
-/// unless incoming notes set them to a nonzero value.
-/// When playing high notes (period <= 0xff),
-/// no sound would come out unless a low note played first.
-TEST_CASE("Test that empty documents produce silence") {
+TEST_CASE("Test that not beginning playback produces silence") {
     AudioOptions audio_options;
-    PICK(all_audio_options(audio_options));
 
-    TestChannelID which_channel = TestChannelID::NONE;
+    MaybeChannelID which_channel = {};
+    doc::Note random_note{60};
+    doc::Document document{one_note_document(which_channel, random_note)};
+    CommandQueue no_command;
+
+    std::vector<Amplitude> buffer = run_new_synth(
+        document, 48000, 4 * 1024, no_command.begin(), audio_options
+    );
+    for (size_t idx = 0; idx < buffer.size(); idx++) {
+        Amplitude y = buffer[idx];
+        if (y != 0) {
+            CAPTURE(idx);
+            CHECK(y == 0);
+        }
+    }
+}
+
+
+TEST_CASE("Test that playing empty documents produces silence") {
+    // This test fails, whereas the one above passes. IDK what's wrong.
+    AudioOptions audio_options;
+
+    MaybeChannelID which_channel = {};
     doc::Note random_note{60};
     doc::Document document{one_note_document(which_channel, random_note)};
     CommandQueue play_commands = play_from_begin();
@@ -162,79 +197,39 @@ TEST_CASE("Test that empty documents produce silence") {
     }
 }
 
-/// Previously Apu1Driver/Apu1PulseDriver would not write registers upon startup,
-/// unless incoming notes set them to a nonzero value.
-/// When playing high notes (period <= 0xff),
-/// no sound would come out unless a low note played first.
-TEST_CASE("Test that high notes (with upper 3 bits zero) produce sound") {
+using audio::synth::chip_instance::SAMPLES_PER_S_IDEAL;
 
-    TestChannelID which_channel;
-    AudioOptions audio_options;
-    CommandQueue play_commands = play_from_begin();
+TEST_CASE("Test that notes produce sound") {
 
-    PICK(all_channels(which_channel, all_audio_options(audio_options)));
-
-    doc::Note high_note{72};
-    doc::Document document{one_note_document(which_channel, high_note)};
-
-    Apu1Driver driver{
-        audio::synth::CLOCKS_PER_S, document.frequency_table
-    };
-
-    // Pick `high_note` that we know to have a period register <= 0xff.
-    // This ensures that the period register's high bits are all 0.
-    CHECK(driver._tuning_table[(size_t) high_note.value] <= 0xff);
-
-    std::vector<Amplitude> buffer = run_new_synth(
-        document, 48000, 4 * 1024, play_commands.begin(), audio_options
-    );
-    Amplitude const THRESHOLD = 1000;
-    check_signed_amplitude(buffer, THRESHOLD);
-}
-
-/// The 2A03's sweep unit will silence the bottom octave of notes,
-/// unless the negate flag is set.
-/// Make sure the bottom octave produces sound.
-TEST_CASE("Test that low notes (with uppermost bit set) produce sound") {
-
-    TestChannelID which_channel;
+    Spc700ChannelID which_channel;
     AudioOptions audio_options;
 
-    PICK(all_channels(which_channel, all_audio_options(audio_options)));
+    PICK(all_channels(which_channel));
 
-    doc::Note low_note{36};
-    doc::Document document{one_note_document(which_channel, low_note)};
-    CommandQueue play_commands = play_from_begin();
+    for (doc::Note note = 36; note.value <= 84; note.value += 6) {
+        CAPTURE(note.value);
+        doc::Document document{one_note_document(which_channel, note)};
+        CommandQueue play_commands = play_from_begin();
 
-    Apu1Driver driver{
-        audio::synth::CLOCKS_PER_S, document.frequency_table
-    };
+        auto driver = Spc700Driver(SAMPLES_PER_S_IDEAL, document.frequency_table);
 
-    // Pick `low_note` that we know to be in the bottom octave of notes.
-    CHECK(
-        driver._tuning_table[(size_t) low_note.value]
-        >= (Apu1PulseDriver::MAX_PERIOD + 1) / 2
-    );
-
-    std::vector<Amplitude> buffer = run_new_synth(
-        document, 48000, 4 * 1024, play_commands.begin(), audio_options
-    );
-    Amplitude const THRESHOLD = 1000;
-    check_signed_amplitude(buffer, THRESHOLD);
+        std::vector<Amplitude> buffer = run_new_synth(
+            document, 48000, 4 * 1024, play_commands.begin(), audio_options
+        );
+        constexpr Amplitude THRESHOLD = 0.04f;
+        check_signed_amplitude(buffer, THRESHOLD);
+    }
 }
 
 TEST_CASE("Send random values into AudioInstance and look for assertion errors") {
 
     doc::Note note{60};
-    doc::Document document{one_note_document(TestChannelID::Pulse1, note)};
+    doc::Document document{one_note_document(Spc700ChannelID::Channel1, note)};
     CommandQueue play_commands = play_from_begin();
 
-    Apu1Driver driver{
-        audio::synth::CLOCKS_PER_S, document.frequency_table
-    };
+    auto driver = Spc700Driver(SAMPLES_PER_S_IDEAL, document.frequency_table);
 
     AudioOptions audio_options;
-    PICK(all_audio_options(audio_options));
 
 #define INCREASE(x)  x = (x) * 3 / 2 + 3
 
@@ -261,14 +256,14 @@ TEST_CASE("Send all note pitches into AudioInstance and look for assertion error
     CommandQueue play_commands = play_from_begin();
     for (doc::ChromaticInt pitch = 0; pitch < doc::CHROMATIC_COUNT; pitch++) {
         doc::Document document{
-            one_note_document(TestChannelID::Pulse1, {pitch})
+            one_note_document(Spc700ChannelID::Channel1, {pitch})
         };
         run_new_synth(
             document,
             32000,
             1000,
             play_commands.begin(),
-            AudioOptions{.clocks_per_sound_update = 1}
+            AudioOptions{}
         );
     }
 }

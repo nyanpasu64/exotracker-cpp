@@ -3,6 +3,7 @@
 #include "timing_common.h"
 #include "sample_docs.h"
 #include "doc_util/event_builder.h"
+#include "doc_util/sample_instrs.h"
 #include "test_utils/parameterize.h"
 
 #include <fmt/core.h>
@@ -21,12 +22,14 @@ namespace audio::synth::sequencer {
 using namespace doc;
 using chip_kinds::ChipKind;
 using namespace doc_util::event_builder;
+using doc_util::sample_instrs::spc_chip_channel_settings;
 using Ev = EventBuilder;
 using std::move;
 
 static Document simple_doc() {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 10,
+        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -38,11 +41,9 @@ static Document simple_doc() {
             {1, {1}},
         })};
 
-        TimelineCell ch1{};
-
         return TimelineRow{
             .nbeats = 2,
-            .chip_channel_cells = {{move(ch0), move(ch1)}},
+            .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
     }());
 
@@ -50,9 +51,10 @@ static Document simple_doc() {
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
+        .samples = Samples(),
         .instruments = Instruments(),
-        .chips = {ChipKind::Apu1},
-        .chip_channel_settings = {{{}, {}}},
+        .chips = {ChipKind::Spc700},
+        .chip_channel_settings = spc_chip_channel_settings(),
         .timeline = move(timeline),
     };
 }
@@ -157,15 +159,19 @@ TEST_CASE("Test seeking") {
     }
 }
 
+char const * DOC_NAMES[] {
+    "dream-fragments",
+//    "world-revolution",
+};
+
 TEST_CASE("Ensure sequencer behaves the same with and without reloading position") {
-    char const * doc_names[] {"dream-fragments", "world-revolution"};
-    for (auto doc_name : doc_names) {
+    for (auto doc_name : DOC_NAMES) {
         CAPTURE(doc_name);
         Document const & document = sample_docs::DOCUMENTS.at(doc_name);
 
         for (
             ChannelIndex chan = 0;
-            chan < CHIP_TO_NCHAN[(size_t) ChipKind::Apu1];
+            chan < CHIP_TO_NCHAN[(size_t) ChipKind::Spc700];
             chan++
         ) {
             CAPTURE(chan);
@@ -214,14 +220,13 @@ TEST_CASE("Ensure sequencer behaves the same with and without reloading position
 }
 
 TEST_CASE("Reload tempo on every tick, and ensure it doesn't affect behavior") {
-    char const * doc_names[] {"dream-fragments", "world-revolution"};
-    for (auto doc_name : doc_names) {
+    for (auto doc_name : DOC_NAMES) {
         CAPTURE(doc_name);
         Document const & document = sample_docs::DOCUMENTS.at(doc_name);
 
         for (
             ChannelIndex chan = 0;
-            chan < CHIP_TO_NCHAN[(size_t) ChipKind::Apu1];
+            chan < CHIP_TO_NCHAN[(size_t) ChipKind::Spc700];
             chan++
         ) {
             CAPTURE(chan);
@@ -270,6 +275,7 @@ static Document parametric_doc(
 ) {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 10,
+        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -286,7 +292,7 @@ static Document parametric_doc(
 
         return TimelineRow {
             .nbeats = 4,
-            .chip_channel_cells = {{move(ch0), {}}},
+            .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
     }());
 
@@ -315,7 +321,7 @@ static Document parametric_doc(
 
         return TimelineRow {
             .nbeats = 4,
-            .chip_channel_cells = {{move(ch0), {}}},
+            .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
     }());
 
@@ -323,9 +329,10 @@ static Document parametric_doc(
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
+        .samples = Samples(),
         .instruments = Instruments(),
-        .chips = {ChipKind::Apu1},
-        .chip_channel_settings = {{{}, {}}},
+        .chips = {ChipKind::Spc700},
+        .chip_channel_settings = spc_chip_channel_settings(),
         .timeline = move(timeline),
     };
 }
@@ -340,6 +347,7 @@ static Document short_doc(
 ) {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 10,
+        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -355,7 +363,7 @@ static Document short_doc(
 
         return TimelineRow {
             .nbeats = 4,
-            .chip_channel_cells = {{move(ch0), {}}},
+            .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
     }());
 
@@ -363,9 +371,10 @@ static Document short_doc(
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
+        .samples = Samples(),
         .instruments = Instruments(),
-        .chips = {ChipKind::Apu1},
-        .chip_channel_settings = {{{}, {}}},
+        .chips = {ChipKind::Spc700},
+        .chip_channel_settings = spc_chip_channel_settings(),
         .timeline = move(timeline),
     };
 }
@@ -376,6 +385,7 @@ static Document gap_doc(
 ) {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 10,
+        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -395,29 +405,30 @@ static Document gap_doc(
 
         return TimelineRow {
             .nbeats = 4,
-            .chip_channel_cells = {{move(ch0), {}}},
+            .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
     }());
 
     // grid 1
     timeline.push_back(TimelineRow {
         .nbeats = 4,
-        .chip_channel_cells = {{{}, {}}},
+        .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
     });
 
     // grid 2
     timeline.push_back(TimelineRow {
         .nbeats = 4,
-        .chip_channel_cells = {{{}, {}}},
+        .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
     });
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
+        .samples = Samples(),
         .instruments = Instruments(),
-        .chips = {ChipKind::Apu1},
-        .chip_channel_settings = {{{}, {}}},
+        .chips = {ChipKind::Spc700},
+        .chip_channel_settings = spc_chip_channel_settings(),
         .timeline = move(timeline),
     };
 }
@@ -690,8 +701,7 @@ TEST_CASE("Switch tempos twice on every tick, and ensure it doesn't affect behav
     // OverallSynth's current design coalesces all tempo changes on the same callback,
     // but multiple callbacks can occur without an intervening tick.
 
-    char const * doc_names[] {"dream-fragments", "world-revolution"};
-    for (auto doc_name : doc_names) {
+    for (auto doc_name : DOC_NAMES) {
         CAPTURE(doc_name);
         Document const& doc = sample_docs::DOCUMENTS.at(doc_name);
 

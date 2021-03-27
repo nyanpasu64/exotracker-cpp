@@ -389,16 +389,19 @@ GridAndBeat cursor_step(
 #include "doc.h"
 #include "chip_kinds.h"
 #include "doc_util/event_builder.h"
+#include "doc_util/sample_instrs.h"
 
 namespace gui::move_cursor {
 
 using namespace doc;
 using chip_kinds::ChipKind;
 using namespace doc_util::event_builder;
+using doc_util::sample_instrs::spc_chip_channel_settings;
 
 static Document empty_doc(int n_seq_entry) {
     SequencerOptions sequencer_options{
         .ticks_per_beat = 10,
+        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -409,10 +412,8 @@ static Document empty_doc(int n_seq_entry) {
             .chip_channel_cells = {
                 // chip 0
                 {
-                    // channel 0
-                    {},
-                    // channel 1
-                    {},
+                    // 8 channels
+                    {}, {}, {}, {}, {}, {}, {}, {}
                 }
             },
         });
@@ -422,9 +423,10 @@ static Document empty_doc(int n_seq_entry) {
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
+        .samples = Samples(),
         .instruments = Instruments(),
-        .chips = {ChipKind::Apu1},
-        .chip_channel_settings = {{{}, {}}},
+        .chips = {ChipKind::Spc700},
+        .chip_channel_settings = spc_chip_channel_settings(),
         .timeline = timeline
     };
 }
