@@ -6,6 +6,12 @@
 
 #include "blargg_common.h"
 
+//#define SPC_DEBUG
+
+#ifdef SPC_DEBUG
+#include <fmt/core.h>
+#endif
+
 extern "C" { typedef void (*dsp_copy_func_t)( unsigned char** io, void* state, size_t ); }
 
 class SPC_DSP {
@@ -261,6 +267,10 @@ inline int SPC_DSP::read( int addr ) const
 
 inline void SPC_DSP::write( int addr, int data )
 {
+	#ifdef SPC_DEBUG
+	fmt::print(stderr, "write {:02x}={:02x}\n", addr, data);
+	#endif
+
 	assert( (unsigned) addr < register_count );
 
 	m.regs [addr] = (uint8_t) data;
@@ -275,8 +285,12 @@ inline void SPC_DSP::write( int addr, int data )
 		break;
 
 	case 0x0C:
-		if ( addr == r_kon )
+		if ( addr == r_kon ) {
+			#ifdef SPC_DEBUG
+			fmt::print(stderr, "    new_kon={:02x}\n", data);
+			#endif
 			m.new_kon = (uint8_t) data;
+		}
 
 		if ( addr == r_endx ) // always cleared, regardless of data written
 		{

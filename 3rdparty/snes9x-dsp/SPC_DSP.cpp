@@ -553,9 +553,17 @@ inline unsigned SPC_DSP::read_counter( int rate )
 
 //// Envelope
 
+#define VOICE_IDX() (v - &m.voices[0])
+
 inline void SPC_DSP::run_envelope( voice_t* const v )
 {
 	int env = v->env;
+
+	#ifdef SPC_DEBUG
+	fmt::print(stderr, "run_envelope({})\n", VOICE_IDX());
+	fmt::print(stderr, "    value {}, mode {}\n", v->env, v->env_mode);
+	#endif
+
 	if ( v->env_mode == env_release ) // 60%
 	{
 		if ( (env -= 0x8) < 0 )
@@ -709,14 +717,25 @@ MISC_CLOCK( 28 )
 }
 MISC_CLOCK( 29 )
 {
-	if ( (m.every_other_sample ^= 1) != 0 )
+	if ( (m.every_other_sample ^= 1) != 0 ) {
+		auto old = m.new_kon;
 		m.new_kon &= ~m.kon; // clears KON 63 clocks after it was last read
+		#ifdef SPC_DEBUG
+		fmt::print(stderr,
+			"MISC_CLOCK(29) m.new_kon {:02x} = {:02x} & {:02x}\n", m.new_kon, old, ~m.kon
+		);
+		#endif
+	}
 }
 MISC_CLOCK( 30 )
 {
 	if ( m.every_other_sample )
 	{
 		m.kon    = m.new_kon;
+		#ifdef SPC_DEBUG
+		fmt::print(stderr, "MISC_CLOCK(30) m.kon = {:02x} = m.new_kon\n", m.kon);
+		#endif
+
 		m.t_koff = REG(koff) | m.mute_mask;
 	}
 
@@ -831,6 +850,9 @@ inline VOICE_CLOCK( V3c )
 		// KON
 		if ( m.kon & v->vbit )
 		{
+			#ifdef SPC_DEBUG
+			fmt::print(stderr, "V3c({}) v->env_mode = env_attack\n", VOICE_IDX());
+			#endif
 			v->kon_delay = 5;
 			v->env_mode  = env_attack;
 		}
