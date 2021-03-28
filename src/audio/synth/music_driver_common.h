@@ -80,6 +80,19 @@ public:
         input.accum_dtime += dtime;
     }
 
+    void wait_write(ClockT dtime, Address address, Byte value) {
+        wait(dtime);
+        write(address, value);
+    }
+
+    void wait_write(Address address, Byte value) {
+        // zero-page register writes take 4 cycles,
+        // and s-dsp register writes take 2 zero-page writes.
+        // the real driver will be slower because it does real work between register writes.
+        wait(8);
+        write(address, value);
+    }
+
     void write(Address address, Byte value) {
         assert(!output.pending());
         RelativeRegisterWrite relative{.write={address, value}, .time_before=input.accum_dtime};
