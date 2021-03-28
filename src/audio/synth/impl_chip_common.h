@@ -68,6 +68,10 @@ public:
         _chip_sequencer.timeline_modified(document);
     }
 
+    void reset_state(doc::Document const& document) override {
+        _driver.reset_state(document, /*mut*/ _synth, /*mut*/ _register_writes);
+    }
+
     void reload_samples(doc::Document const & document) override {
         _driver.reload_samples(document, /*mut*/ _synth, /*mut*/ _register_writes);
     }

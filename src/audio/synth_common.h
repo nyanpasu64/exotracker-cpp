@@ -92,6 +92,9 @@ public:
 
     // # Driver methods
 
+    /// idk anymore
+    virtual void reset_state(doc::Document const& document) = 0;
+
     /// Must be called upon construction, or when samples change.
     /// Repack all samples into RAM, and stops all running notes
     /// (which would be playing at the wrong point).

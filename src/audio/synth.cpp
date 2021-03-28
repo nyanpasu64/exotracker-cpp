@@ -240,7 +240,8 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
             if (auto play_from = std::get_if<cmd_queue::PlayFrom>(msg)) {
                 // Seek chip sequencers.
                 for (auto & chip : _chip_instances) {
-                    chip->stop_playback();
+                    // chip->stop_playback();
+                    chip->reset_state(_document);
                     chip->seek(_document, play_from->time);
                 }
 
