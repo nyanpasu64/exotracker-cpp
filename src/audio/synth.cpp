@@ -21,7 +21,14 @@ using chip_kinds::ChipKind;
 /// This amounts to nearly 1/3 of a second, which is absurdly high
 /// considering tick rates are generally in the 100s of Hz.
 constexpr size_t MAX_SNES_BLOCK_SIZE = 10'000;
+
+//#define DONT_RESAMPLE
+
+#ifdef DONT_RESAMPLE
+constexpr uint32_t OVERSAMPLING_FACTOR = 1;
+#else
 constexpr uint32_t OVERSAMPLING_FACTOR = 4;
+#endif
 
 SpcResampler::SpcResampler(int stereo_nchan, uint32_t smp_per_s)
     : _stereo_nchan(stereo_nchan)
@@ -37,8 +44,15 @@ SpcResampler::SpcResampler(int stereo_nchan, uint32_t smp_per_s)
         .src_ratio = _output_smp_per_s / (SAMPLES_PER_S_IDEAL * OVERSAMPLING_FACTOR),
     })
 {
+    int resampler_mode = SRC_SINC_MEDIUM_QUALITY;
+
+    #ifdef DONT_RESAMPLE
+    _resampler_args.src_ratio = 1.f;
+    resampler_mode = SRC_ZERO_ORDER_HOLD;
+    #endif
+
     int error;
-    _resampler = src_new(SRC_SINC_MEDIUM_QUALITY, stereo_nchan, &error);
+    _resampler = src_new(resampler_mode, stereo_nchan, &error);
     if (error) {
         throw std::runtime_error(fmt::format(
             "Failed to create resampler, src_new() error {}", error
