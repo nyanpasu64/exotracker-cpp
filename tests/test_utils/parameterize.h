@@ -5,6 +5,7 @@
 #include <functional>
 #include <string>
 #include <unordered_set>
+#include <utility>  // std::move
 
 #include <ostream>
 #include "doctest.h"
@@ -68,7 +69,7 @@ SubcaseNameMaybe subcase_tree(
     leaf_stack += subcase_tree( \
         stack, #k " = " #v, [&](SubcaseName stack2) { \
             k = v; \
-            return inner(stack2); \
+            return inner(std::move(stack2)); \
         } \
     )
 
