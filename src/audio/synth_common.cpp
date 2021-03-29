@@ -8,7 +8,6 @@ namespace {
 
 enum class ChipEvent {
     RegWrite,
-    PauseCallback,  // pause register writes.
     EndOfTick,  // Should never be popped. Its value is used to ensure all RegWrite complete during the current tick.
     COUNT,
 };
@@ -22,99 +21,74 @@ void ChipInstance::flush_register_writes() {
     _register_writes.clear();
 }
 
-void ChipInstance::run_chip_for(
-    ClockT prev_to_tick,
-    ClockT prev_to_next,
+ChipInstance::NsampWritten ChipInstance::run_chip_for(
+    ClockT num_clocks,
     WriteTo write_to)
 {
-    #if 0
     // The function must end before/equal to the next tick.
-    assert(prev_to_next <= prev_to_tick);
-    prev_to_next = std::min(prev_to_next, prev_to_tick);
+    EventQueue<ChipEvent> chip_events;
+    chip_events.set_timeout(ChipEvent::EndOfTick, num_clocks);
 
-    EventQueue<ChipEvent> reg_q;
-    reg_q.set_timeout(ChipEvent::PauseCallback, prev_to_next);
-    reg_q.set_timeout(ChipEvent::EndOfTick, prev_to_tick);
-
-    // sometimes i feel like i'm cargo-culting rust's
-    // "pass mutable references as parameters,
-    // don't make the closure hold onto them" rule in c++
+    /// Schedule the next register write command (from _register_writes)
+    /// on chip_events (a timing system).
     auto fetch_next_reg = [](
         RegisterWriteQueue & _register_writes,
-        EventQueue<ChipEvent> & reg_q
+        EventQueue<ChipEvent> & chip_events
     ) {
         if (auto * next_reg = _register_writes.peek_mut()) {
             // Truncate all timestamps so they don't overflow current tick
             // (mimic how FamiTracker does it).
             next_reg->time_before = std::min(
-                next_reg->time_before, reg_q.get_time_until(ChipEvent::EndOfTick)
+                next_reg->time_before, chip_events.get_time_until(ChipEvent::EndOfTick)
             );
-            reg_q.set_timeout(ChipEvent::RegWrite, next_reg->time_before);
+            chip_events.set_timeout(ChipEvent::RegWrite, next_reg->time_before);
         }
     };
-    fetch_next_reg(_register_writes, reg_q);
+    fetch_next_reg(_register_writes, chip_events);
 
-    gsl::span buffer_tail = temp_buffer;
+    gsl::span buffer_tail = write_to;
 
     // Time elapsed (in clocks).
-    ClockT nclock_elapsed = 0;
 
     // Total samples written to per-chip mixing buffer.
     // If writing to _nes_blip, should end at 0. Otherwise should end at nsamp_expected.
-    SampleT nsamp_total = 0;
-
-    // Total samples we should receive from run_chip_for().
-    [[maybe_unused]] SampleT const nsamp_expected =
-        nes_blip.count_samples(prev_to_next);
+    NsampT nsamp_total = 0;
 
     while (true) {
-        auto ev = reg_q.next_event();
+        // Find the time until the next event (either "time of register write" or "end of tick").
+        auto ev = chip_events.next_event();
 
-        // Run the synth to generate audio (time passes).
         if (ev.clk_elapsed > 0) {
+            // Update the list of register write commands, with the time elapsed.
             if (auto * next_reg = _register_writes.peek_mut()) {
                 next_reg->time_before -= ev.clk_elapsed;
             }
 
-            SampleT nsamp_from_call = synth_run_clocks(
-                nclock_elapsed, ev.clk_elapsed, buffer_tail, nes_blip
-            );
+            // Run the synth to generate audio (time passes).
+            NsampT nsamp_from_call = synth_run_clocks(ev.clk_elapsed, buffer_tail);
 
-            nclock_elapsed += ev.clk_elapsed;
             nsamp_total += nsamp_from_call;
-            buffer_tail = buffer_tail.subspan(nsamp_from_call);
+            buffer_tail = buffer_tail.subspan(nsamp_from_call * STEREO_NCHAN);
         }
 
         // Write registers (time doesn't pass).
         ChipEvent id = ev.event_id;
         switch (id) {
         case ChipEvent::RegWrite: {
-            // pop() would be unsafe or unwrap() in Rust.
+            // This assumes that there is a register write command,
+            // and asserts that its time_before == 0.
             synth_write_memory(_register_writes.pop());
-            fetch_next_reg(_register_writes, reg_q);
+            fetch_next_reg(_register_writes, chip_events);
             break;
         }
-        case ChipEvent::PauseCallback: {
-            goto end_while;
-        }
         case ChipEvent::EndOfTick: {
-            // Should never happen. This function has a precondition:
-            // Clk_to_run (PauseCallback) <= Clk_before_tick (EndOfTick).
-            // This ensures that PauseCallback will always abort the loop before EndOfTick occurs.
-            // And if same time, (int)PauseCallback < (int)EndOfTick.
-            assert(false);
             goto end_while;
         }
         case ChipEvent::COUNT: break;
         }
     }
     end_while:
-
-    if (nsamp_total > 0) {
-        assert(nsamp_total == nsamp_expected);
-        nes_blip.mix_samples(&temp_buffer[0], nsamp_total);
-    }
-    #endif
+    return nsamp_total;
 }
 
 // end namespace

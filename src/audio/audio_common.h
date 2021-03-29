@@ -10,12 +10,11 @@
 
 namespace audio {
 
-using Amplitude = int16_t;
+using Amplitude = float;
 using event_queue::ClockT;
 
 struct AudioOptions {
     // Passed to synth only.
-    ClockT clocks_per_sound_update;
 };
 
 }

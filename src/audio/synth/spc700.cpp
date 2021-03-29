@@ -1,6 +1,7 @@
 #include "spc700.h"
 #include "spc700_driver.h"
 #include "impl_chip_common.h"
+#include "../synth_common.h"
 
 #include <snes9x-dsp/SPC_DSP.h>
 
@@ -28,11 +29,12 @@ public:
     }
 
     ChipInstance::NsampWritten run_clocks(
-        ClockT const clk_begin,
         ClockT const nclk,
         WriteTo write_to)
     {
-        throw "up";
+        _chip.set_output(write_to.data(), write_to.size());
+        _chip.run(nclk);
+        return NsampT(_chip.out_pos() - write_to.data()) / STEREO_NCHAN;
     }
 
 };
@@ -41,12 +43,12 @@ using Spc700Instance = ImplChipInstance<Spc700Driver, Spc700Synth>;
 
 std::unique_ptr<ChipInstance> make_Spc700Instance(
     chip_common::ChipIndex chip_index,
-    ClockT clocks_per_sec,
+    NsampT samples_per_sec,
     doc::FrequenciesRef frequencies)
 {
     return std::make_unique<Spc700Instance>(
         chip_index,
-        Spc700Driver(clocks_per_sec, frequencies),
+        Spc700Driver(samples_per_sec, frequencies),
         Spc700Synth());
 }
 

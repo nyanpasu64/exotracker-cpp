@@ -1057,7 +1057,15 @@ ECHO_CLOCK( 27 )
 		SPC_DSP_OUT_HOOK( l, r );
 	#else
 		sample_t* out = m.out;
-		WRITE_SAMPLES( l, r, out );
+
+		// We are supplied a huge array buffer (nearly 1/3 second of audio).
+		// We should never reach the end.
+		assert(out + 2 <= m.out_end);
+
+		// If we do reach the end, avoid writing past the end of the array.
+		if (out + 2 <= m.out_end) {
+			WRITE_SAMPLES( l, r, out );
+		}
 		m.out = out;
 	#endif
 }

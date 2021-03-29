@@ -30,7 +30,17 @@ using accidental::AccidentalMode;
 constexpr TickT MAX_TICKS_PER_BEAT = 127;
 
 struct SequencerOptions {
+    /// Usually 48.
     TickT ticks_per_beat;
+
+    /// BPM tempo. The module will play at approximately this tempo,
+    /// with rounding and range dependent on ticks_per_beat.
+    double beats_per_minute;
+
+    /// Use the tempo exactly (or a close approximation)
+    /// instead of rounding to the SNES timer precision.
+    /// Turning this on causes in-tracker playback and SPC export to diverge.
+    bool use_exact_tempo = false;
 };
 
 // Tuning table types

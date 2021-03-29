@@ -22,24 +22,18 @@ using timing::SequencerTime;
 using music_driver::RegisterWrite;
 using music_driver::RegisterWriteQueue;
 
-// https://wiki.nesdev.com/w/index.php/CPU
-// >Emulator authors may wish to emulate the NTSC NES/Famicom CPU at 21441960 Hz...
-// >to ensure a synchronised/stable 60 frames per second.[2]
-// int const MASTER_CLK_PER_S = 21'441'960;
-
-// Except 2A03 APU operates off CPU clock (master clock / 12 if NTSC).
-// https://wiki.nesdev.com/w/index.php/FDS_audio
-// FDS also operates off CPU clock, despite 0CC storing master clock in a constant.
-int constexpr CLOCKS_PER_S = 1'786'830;
-
-// NTSC is approximately 60 fps.
-int constexpr TICKS_PER_S = 60;
-
-
 /// This type is used widely, so import to audio::synth.
 using event_queue::ClockT;
 
 using NsampT = uint32_t;
+
+/// Nominal sampling rate, used when computing tuning tables and tempos.
+/// The user changing the emulated sampling rate rate (and clock rate)
+/// should not affect how the driver computes pitches and timers,
+/// since that would introduce a source of behavioral discrepancies.
+constexpr NsampT SAMPLES_PER_S_IDEAL = 32040;
+
+constexpr uint32_t STEREO_NCHAN = 2;
 
 /// Static polymorphic properties of classes,
 /// which can be accessed via pointers to subclasses.
@@ -49,9 +43,11 @@ using NsampT = uint32_t;
 #define STATIC(type_name_parens, value) \
     type_name_parens const final { return value; }
 
-struct WriteTo {
-    gsl::span<Amplitude> out;
-};
+/// A sample of digital audio, directly from the S-DSP.
+using SpcAmplitude = int16_t;
+
+/// Unfiltered non-oversampled digital audio, directly from the S-DSP.
+using WriteTo = gsl::span<SpcAmplitude>;
 
 /// Base class, for a single NES chip's (software driver + sequencers
 /// + hardware emulator synth).
@@ -109,10 +105,13 @@ public:
     /// Runs driver, ignoring sequencer. Called when the song is not playing.
     virtual void driver_tick(doc::Document const & document) = 0;
 
-    /// Cannot cross tick boundaries. Can cross register-write boundaries.
-    void run_chip_for(
-        ClockT const prev_to_tick,
-        ClockT const prev_to_next,
+    using NsampWritten = NsampT;
+
+    /// Run the chip for 1 tick, applying register writes and generating audio.
+    /// Can cross register-write boundaries.
+    /// Calls synth_run_clocks() once per register write.
+    NsampWritten run_chip_for(
+        ClockT const num_clocks,
         WriteTo write_to);
 
 private:
@@ -120,21 +119,9 @@ private:
     /// Time does not pass.
     virtual void synth_write_memory(RegisterWrite write) = 0;
 
-public:
-    /// If the synth generates audio via Blip_Synth, nsamp_returned == 0.
-    /// If the synth writes audio into `write_buffer`,
-    /// nsamp_returned == how many samples were written.
-    using NsampWritten = NsampT;
-
-private:
-    /// Cannot cross tick boundaries, nor register-write boundaries.
-    ///
-    /// Most NesChipSynth subclasses will write to a Blip_Buffer
-    /// (if they have a Blip_Synth with a mutable aliased reference to Blip_Buffer).
-    /// The VRC7 will write to a Blip_Synth at high frequency (like Mesen).
-    /// The FDS will instead write lowpassed audio to write_buffer.
+    /// Called by run_chip_for() once per register write.
+    /// Cannot cross register-write boundaries.
     virtual NsampWritten synth_run_clocks(
-        ClockT clk_begin,
         ClockT nclk,
         WriteTo write_to) = 0;
 };

@@ -2,10 +2,10 @@
 
 // Do not include synth_common.h, since synth_common.h includes this file.
 #include "audio/event_queue.h"
-#include "util/copy_move.h"
 #include "sequencer_driver_common.h"
+#include "util/copy_move.h"
+#include "util/release_assert.h"
 
-#include <cassert>
 #include <vector>
 
 namespace audio::synth::music_driver {
@@ -104,7 +104,7 @@ public:
     RegisterWrite pop() {
         assert(!input.pending());
 
-        assert(output.index < vec.size());
+        release_assert(output.index < vec.size());
         RelativeRegisterWrite out = vec[output.index++];
         assert(out.time_before == 0);
         return out.write;

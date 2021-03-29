@@ -9,6 +9,8 @@
 #include "util/enum_map.h"
 #include "util/copy_move.h"
 
+#include <samplerate.h>
+
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -16,66 +18,36 @@
 namespace audio {
 namespace synth {
 
-/// States for the synth callback loop.
-enum class SynthEvent {
-    // EndOfCallback comes before Tick.
-    // If a callback ends at the same time as a tick occurs,
-    // the tick should happen next callback.
-    EndOfCallback,
-    Tick,
-    COUNT
-};
-
 using cmd_queue::AudioCommand;
 using timing::MaybeSequencerTime;
 
-/// Preconditions:
-/// - Sampling rate must be 1000 or more.
-///   Otherwise blip_buffer constructor/set_sample_rate() breaks.
-/// - Tick rate must be over 4 tick/second.
-///   Otherwise blip_buffer count_clocks(nsamp) breaks.
-/// - samp/s / ticks/sec < 65536. Otherwise _temp_buffer overflows.
+class SpcResampler {
+    SRC_STATE * _resampler = nullptr;
+    gsl::span<float> _input;  // Points into OverallSynth's members.
+
+    int _stereo_nchan;
+    double _output_smp_per_s;
+    SRC_DATA _resampler_args = {};
+
+public:
+    SpcResampler(int stereo_nchan, uint32_t smp_per_s);
+    ~SpcResampler();
+
+    template<typename Fn>
+    void resample(Fn generate_input, gsl::span<float> out);
+};
+
+/// Preconditions: TODO???
 class OverallSynth : public callback::CallbackInterface {
     DISABLE_COPY_MOVE(OverallSynth)
-
-    // runtime constants
-public:
-    uint32_t const _stereo_nchan;
 
 private:
     doc::Document _document;
 
-    /*
-    TODO this should be configurable.
-
-    But if const, it must be computed within the initializer list,
-    instead of in constructor body.
-    And it's hard to put complex computations/expressions there.
-
-    So ideally I'd write a Rust-style static factory method instead,
-    and rely on guaranteed copy elision for returning.
-    https://jonasdevlieghere.com/guaranteed-copy-elision/#guaranteedcopyelision
-    Problem is, you can't call a static factory method
-    from an owner (AudioThreadHandle) 's initializer list... :S
-
-    When the sampling rate, stereo_nchan, or tick rate change,
-    do we create a new OutputCallback or reconfigure the existing one?
-
-    In OpenMPT, ticks/s can change within a song, so it would need to be a method.
-    */
-    ClockT const _clocks_per_tick = CLOCKS_PER_S / TICKS_PER_S;
-
-    /// Must be 1 or greater.
-    /// Increasing it past 1 causes compatible sound synths to only be sampled
-    /// (sent to Blip_Buffer) every n clocks.
-    ///
-    /// Not all sound synths may actually take this as a parameter.
-    /// In particular, N163 and VRC7 use time-division mixing,
-    /// which has high-frequency content and may produce lots of aliasing if downsampled.
-    ClockT const _clocks_per_sound_update;
-
     // fields
-    EventQueue<SynthEvent> _events;
+    SpcResampler _resampler;
+    std::vector<SpcAmplitude> _temp_buf;
+    std::vector<float> _resampler_input;
 
     /// vector<ChipIndex -> unique_ptr<ChipInstance subclass>>
     /// _chip_instances.size() in [1..MAX_NCHIP] inclusive. Derived from Document::chips.
@@ -85,6 +57,10 @@ private:
     /// Last seen/processed command.
     std::atomic<AudioCommand *> _seen_command;
     bool _sequencer_running = false;
+
+    /// If _document.sequencer_options.use_exact_tempo is false,
+    /// must be a multiple of CLOCKS_PER_PHASE (128).
+    ClockT _clocks_per_tick;
 
     using AtomicSequencerTime = std::atomic<MaybeSequencerTime>;
     static_assert(
@@ -108,21 +84,23 @@ public:
         AudioOptions audio_options
     );
 
-private:
-    // blip_buffer uses blip_long AKA signed int for nsamp.
-    using NsampT = uint32_t;
-
-public:
     /// Generates audio to be sent to an audio output (speaker) or WAV file.
     /// The entire output buffer is written to.
     ///
     /// output must have length length of mono_smp_per_block * stereo_nchan.
     /// It is treated as an array of interleaved samples, [smp#, * nchan + chan#] Amplitude.
+    ///
+    /// This function only performs resampling; the actual synthesis is in synthesize_tick_oversampled().
     void synthesize_overall(
         gsl::span<Amplitude> output_buffer,
         size_t const mono_smp_per_block
     );
 
+private:
+    /// lmfao
+    gsl::span<float> synthesize_tick_oversampled();
+
+public:
     /// Called by GUI thread.
     AudioCommand * seen_command() const override {
         // Paired with synthesize_overall() store(release).

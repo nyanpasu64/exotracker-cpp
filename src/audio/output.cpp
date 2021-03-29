@@ -14,10 +14,10 @@ namespace output {
 
 // When changing the output sample format,
 // be sure to change Amplitude (audio_common.h) and AmplitudeFmt at the same time!
-static_assert(std::is_same_v<Amplitude, int16_t>);
-const RtAudioFormat AmplitudeFmt = RTAUDIO_SINT16;
+static_assert(std::is_same_v<Amplitude, float>);
+const RtAudioFormat AmplitudeFmt = RTAUDIO_FLOAT32;
 
-static unsigned int const STEREO_NCHAN = 2;
+using synth::STEREO_NCHAN;
 
 
 /// GUI-only audio synthesis callback.
@@ -52,8 +52,7 @@ public:
 
     // In JACK Audio mode, jackd sets our thread to real-time.
     // In ALSA/etc., RtAudio handles modes.
-    static constexpr RtAudioStreamFlags rtaudio_flags =
-        RTAUDIO_NONINTERLEAVED | RTAUDIO_SCHEDULE_REALTIME;
+    static constexpr RtAudioStreamFlags rtaudio_flags = RTAUDIO_SCHEDULE_REALTIME;
 
     // impl RtAudioCallback
     static int rtaudio_callback(
@@ -67,20 +66,14 @@ public:
         synth::OverallSynth & synth = *self;
 
         // Convert output buffer from raw pointer into GSL span.
-        size_t stereo_smp_per_block = size_t(synth._stereo_nchan) * mono_smp_per_block;
+        size_t stereo_smp_per_block = size_t(STEREO_NCHAN) * mono_smp_per_block;
 
         static_assert(
-            (STEREO_NCHAN == 2) && (rtaudio_flags & RTAUDIO_NONINTERLEAVED),
-            "rtaudio_callback() assumes planar stereo"
+            (STEREO_NCHAN == 2) && !(rtaudio_flags & RTAUDIO_NONINTERLEAVED),
+            "rtaudio_callback() assumes interleaved stereo"
         );
         gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
-        auto left = output.subspan(0, mono_smp_per_block);
-        auto right = output.subspan(mono_smp_per_block, mono_smp_per_block);
-
-        {
-            synth.synthesize_overall(left, mono_smp_per_block);
-        }
-        gsl::copy(left, right);
+        synth.synthesize_overall(output, mono_smp_per_block);
 
         return 0;
     }
@@ -112,7 +105,6 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
     unsigned int sample_rate = 48000;
     unsigned int mono_smp_per_block = MONO_SMP_PER_BLOCK;
     AudioOptions audio_options {
-        .clocks_per_sound_update = 4,
     };
 
     std::unique_ptr<OutputCallback> callback = OutputCallback::make(

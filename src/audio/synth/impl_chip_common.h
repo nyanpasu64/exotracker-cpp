@@ -91,11 +91,10 @@ private:  // called by ChipInstance
     }
 
     NsampWritten synth_run_clocks(
-        ClockT const clk_begin,
         ClockT const nclk,
         WriteTo write_to)
     override {
-        return _synth.run_clocks(clk_begin, nclk, write_to);
+        return _synth.run_clocks(nclk, write_to);
     }
 };
 
