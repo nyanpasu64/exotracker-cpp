@@ -29,9 +29,8 @@ using music_driver::RegisterWriteQueue;
 /// since that would introduce a source of behavioral discrepancies.
 constexpr NsampT SAMPLES_PER_S_IDEAL = 32040;
 
-/// Base class, for a single NES chip's (software driver + sequencers
+/// Base class (interface-ish) for a single SPC-700's (software driver + sequencers
 /// + hardware emulator synth).
-/// Non-NES consoles may use a different base class (SNES) or maybe not (wavetable chips).
 class ChipInstance {
     // Some implementations are self-referential.
     DISABLE_COPY_MOVE(ChipInstance)
