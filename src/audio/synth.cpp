@@ -30,7 +30,9 @@ constexpr uint32_t OVERSAMPLING_FACTOR = 1;
 constexpr uint32_t OVERSAMPLING_FACTOR = 4;
 #endif
 
-SpcResampler::SpcResampler(int stereo_nchan, uint32_t smp_per_s)
+SpcResampler::SpcResampler(
+    int stereo_nchan, uint32_t smp_per_s, AudioOptions const& audio_options
+)
     : _stereo_nchan(stereo_nchan)
     , _output_smp_per_s(smp_per_s)
     , _resampler_args(SRC_DATA {
@@ -44,7 +46,7 @@ SpcResampler::SpcResampler(int stereo_nchan, uint32_t smp_per_s)
         .src_ratio = _output_smp_per_s / (SAMPLES_PER_S_IDEAL * OVERSAMPLING_FACTOR),
     })
 {
-    int resampler_mode = SRC_SINC_MEDIUM_QUALITY;
+    int resampler_mode = audio_options.resampler_quality;
 
     #ifdef DONT_RESAMPLE
     _resampler_args.src_ratio = 1.f;
@@ -146,7 +148,7 @@ OverallSynth::OverallSynth(
     AudioOptions audio_options
 )
     : _document(std::move(document_moved_from))
-    , _resampler((int) stereo_nchan, smp_per_s)
+    , _resampler((int) stereo_nchan, smp_per_s, audio_options)
     , _clocks_per_tick(calc_clocks_per_tick(_document))
 {
     release_assert_equal(stereo_nchan, STEREO_NCHAN);

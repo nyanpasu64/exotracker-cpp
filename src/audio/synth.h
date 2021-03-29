@@ -31,7 +31,9 @@ class SpcResampler {
     SRC_DATA _resampler_args = {};
 
 public:
-    SpcResampler(int stereo_nchan, uint32_t smp_per_s);
+    SpcResampler(
+        int stereo_nchan, uint32_t smp_per_s, AudioOptions const& audio_options
+    );
     ~SpcResampler();
 
     template<typename Fn>
@@ -44,6 +46,7 @@ class OverallSynth : public callback::CallbackInterface {
 
 private:
     doc::Document _document;
+    AudioOptions _audio_options;
 
     // fields
     SpcResampler _resampler;

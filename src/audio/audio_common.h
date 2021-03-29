@@ -4,9 +4,11 @@
 // To avoid circular include, this file should NOT include audio/*.h.
 // See /src/DESIGN.md for naming and inclusion rules to follow.
 
-#include <cstdint>
-
 #include "event_queue.h"
+
+#include <samplerate.h>
+
+#include <cstdint>
 
 namespace audio {
 
@@ -15,6 +17,9 @@ using event_queue::ClockT;
 
 struct AudioOptions {
     // Passed to synth only.
+
+    /// Which quality to use for resampling.
+    int resampler_quality = SRC_SINC_MEDIUM_QUALITY;
 };
 
 }

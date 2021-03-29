@@ -89,6 +89,15 @@ using audio::ClockT;
 using cmd_queue::AudioCommand;
 using cmd_queue::CommandQueue;
 
+/// The majority of the entire exotracker test suite was not spent in driver logic
+/// or S-DSP emulation, but in libsamplerate's sinc interpolation.
+/// Using a faster resampler mode reduces the debug-mode test runtime by over 50%.
+/// And ZOH has the useful property that it preserves the exact amplitudes
+/// coming from the S-DSP.
+constexpr AudioOptions FAST_RESAMPLER = {
+    .resampler_quality = SRC_ZERO_ORDER_HOLD,
+};
+
 CommandQueue play_from_begin() {
     CommandQueue out;
     out.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
@@ -102,9 +111,8 @@ std::vector<Amplitude> run_new_synth(
     doc::Document const & document,
     uint32_t smp_per_s,
     NsampT nsamp,
-    AudioCommand * stub_command,
-    AudioOptions audio_options
-) {
+    AudioCommand * stub_command)
+{
     using audio::synth::STEREO_NCHAN;
 
     CAPTURE(smp_per_s);
@@ -112,7 +120,7 @@ std::vector<Amplitude> run_new_synth(
 
     // (int stereo_nchan, int smp_per_s, locked_doc::GetDocument &/*'a*/ document)
     audio::synth::OverallSynth synth{
-        STEREO_NCHAN, smp_per_s, document.clone(), stub_command, audio_options
+        STEREO_NCHAN, smp_per_s, document.clone(), stub_command, FAST_RESAMPLER
     };
 
     std::vector<Amplitude> buffer;
@@ -156,15 +164,13 @@ PARAMETERIZE(all_channels, Spc700ChannelID, which_channel,
 )
 
 TEST_CASE("Test that not beginning playback produces silence") {
-    AudioOptions audio_options;
-
     MaybeChannelID which_channel = {};
     doc::Note random_note{60};
     doc::Document document{one_note_document(which_channel, random_note)};
     CommandQueue no_command;
 
     std::vector<Amplitude> buffer = run_new_synth(
-        document, 48000, 4 * 1024, no_command.begin(), audio_options
+        document, 48000, 4 * 1024, no_command.begin()
     );
     for (size_t idx = 0; idx < buffer.size(); idx++) {
         Amplitude y = buffer[idx];
@@ -178,7 +184,6 @@ TEST_CASE("Test that not beginning playback produces silence") {
 
 TEST_CASE("Test that playing empty documents produces silence") {
     // This test fails, whereas the one above passes. IDK what's wrong.
-    AudioOptions audio_options;
 
     MaybeChannelID which_channel = {};
     doc::Note random_note{60};
@@ -186,7 +191,7 @@ TEST_CASE("Test that playing empty documents produces silence") {
     CommandQueue play_commands = play_from_begin();
 
     std::vector<Amplitude> buffer = run_new_synth(
-        document, 48000, 4 * 1024, play_commands.begin(), audio_options
+        document, 48000, 4 * 1024, play_commands.begin()
     );
     for (size_t idx = 0; idx < buffer.size(); idx++) {
         Amplitude y = buffer[idx];
@@ -202,7 +207,6 @@ using audio::synth::chip_instance::SAMPLES_PER_S_IDEAL;
 TEST_CASE("Test that notes produce sound") {
 
     Spc700ChannelID which_channel;
-    AudioOptions audio_options;
 
     PICK(all_channels(which_channel));
 
@@ -214,7 +218,7 @@ TEST_CASE("Test that notes produce sound") {
         auto driver = Spc700Driver(SAMPLES_PER_S_IDEAL, document.frequency_table);
 
         std::vector<Amplitude> buffer = run_new_synth(
-            document, 48000, 4 * 1024, play_commands.begin(), audio_options
+            document, 48000, 4 * 1024, play_commands.begin()
         );
         constexpr Amplitude THRESHOLD = 0.04f;
         check_signed_amplitude(buffer, THRESHOLD);
@@ -229,8 +233,6 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
 
     auto driver = Spc700Driver(SAMPLES_PER_S_IDEAL, document.frequency_table);
 
-    AudioOptions audio_options;
-
 #define INCREASE(x)  x = (x) * 3 / 2 + 3
 
     // Setting smp_per_s to small numbers breaks blip_buffer's internal invariants.
@@ -239,15 +241,15 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
     // Not all values fail. As smp_per_s decreases, it becomes more likely to fail.
     for (uint32_t smp_per_s = 1000; smp_per_s <= 250'000; INCREASE(smp_per_s)) {
         // smp_per_s * 0.25 second
-        run_new_synth(document, smp_per_s, smp_per_s / 4, play_commands.begin(), audio_options);
+        run_new_synth(document, smp_per_s, smp_per_s / 4, play_commands.begin());
     }
 
     // 44100Hz, zero samples
-    run_new_synth(document, 44100, 0, play_commands.begin(), audio_options);
+    run_new_synth(document, 44100, 0, play_commands.begin());
 
     // 48000Hz, various durations
     for (uint32_t nsamp = 1; nsamp <= 100'000; INCREASE(nsamp)) {
-        run_new_synth(document, 48000, nsamp, play_commands.begin(), audio_options);
+        run_new_synth(document, 48000, nsamp, play_commands.begin());
     }
 }
 
@@ -258,13 +260,7 @@ TEST_CASE("Send all note pitches into AudioInstance and look for assertion error
         doc::Document document{
             one_note_document(Spc700ChannelID::Channel1, {pitch})
         };
-        run_new_synth(
-            document,
-            32000,
-            1000,
-            play_commands.begin(),
-            AudioOptions{}
-        );
+        run_new_synth(document, 32000, 1000, play_commands.begin());
     }
 }
 
