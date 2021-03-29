@@ -31,7 +31,7 @@ constexpr uint32_t OVERSAMPLING_FACTOR = 4;
 #endif
 
 SpcResampler::SpcResampler(
-    int stereo_nchan, uint32_t smp_per_s, AudioOptions const& audio_options
+    uint32_t stereo_nchan, uint32_t smp_per_s, AudioOptions const& audio_options
 )
     : _stereo_nchan(stereo_nchan)
     , _output_smp_per_s(smp_per_s)
@@ -54,7 +54,7 @@ SpcResampler::SpcResampler(
     #endif
 
     int error;
-    _resampler = src_new(resampler_mode, stereo_nchan, &error);
+    _resampler = src_new(resampler_mode, (int) stereo_nchan, &error);
     if (error) {
         throw std::runtime_error(fmt::format(
             "Failed to create resampler, src_new() error {}", error
@@ -69,7 +69,7 @@ SpcResampler::~SpcResampler() {
 template<typename Fn>
 void SpcResampler::resample(Fn generate_input, gsl::span<float> out) {
     _resampler_args.data_out = out.data();
-    _resampler_args.output_frames = out.size() / _stereo_nchan;
+    _resampler_args.output_frames = long(out.size() / _stereo_nchan);
 
     float * out_end = out.data() + out.size();
 
@@ -82,7 +82,7 @@ void SpcResampler::resample(Fn generate_input, gsl::span<float> out) {
             _input = generate_input();
 
             _resampler_args.data_in = _input.data();
-            _resampler_args.input_frames = _input.size() / _stereo_nchan;
+            _resampler_args.input_frames = long(_input.size() / _stereo_nchan);
         }
 
         error = src_process(_resampler, &_resampler_args);
@@ -148,7 +148,7 @@ OverallSynth::OverallSynth(
     AudioOptions audio_options
 )
     : _document(std::move(document_moved_from))
-    , _resampler((int) stereo_nchan, smp_per_s, audio_options)
+    , _resampler(stereo_nchan, smp_per_s, audio_options)
     , _clocks_per_tick(calc_clocks_per_tick(_document))
 {
     release_assert_equal(stereo_nchan, STEREO_NCHAN);

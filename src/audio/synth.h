@@ -26,13 +26,13 @@ class SpcResampler {
     SRC_STATE * _resampler = nullptr;
     gsl::span<float> _input;  // Points into OverallSynth's members.
 
-    int _stereo_nchan;
+    uint32_t _stereo_nchan;
     double _output_smp_per_s;
     SRC_DATA _resampler_args = {};
 
 public:
     SpcResampler(
-        int stereo_nchan, uint32_t smp_per_s, AudioOptions const& audio_options
+        uint32_t stereo_nchan, uint32_t smp_per_s, AudioOptions const& audio_options
     );
     ~SpcResampler();
 

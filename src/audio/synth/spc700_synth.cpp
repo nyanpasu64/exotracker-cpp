@@ -20,7 +20,7 @@ NsampWritten Spc700Synth::run_clocks(
     ClockT const nclk, WriteTo write_to
 ) {
     _p->chip.set_output(write_to.data(), write_to.size());
-    _p->chip.run(nclk);
+    _p->chip.run((int) nclk);
     return NsampT(_p->chip.out_pos() - write_to.data()) / STEREO_NCHAN;
 }
 
