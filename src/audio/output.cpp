@@ -1,5 +1,6 @@
 #include "output.h"
 
+#include "callback.h"
 #include "synth.h"
 
 #include <gsl/span>
@@ -15,70 +16,42 @@ namespace output {
 // When changing the output sample format,
 // be sure to change Amplitude (audio_common.h) and AmplitudeFmt at the same time!
 static_assert(std::is_same_v<Amplitude, float>);
-const RtAudioFormat AmplitudeFmt = RTAUDIO_FLOAT32;
+static constexpr RtAudioFormat AmplitudeFmt = RTAUDIO_FLOAT32;
 
 using synth::STEREO_NCHAN;
+using synth::OverallSynth;
 
+// interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
+// interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
+// interleaved=false was added to support ASIO's native representation.
 
-/// GUI-only audio synthesis callback.
-/// Uses GetDocument to obtain a document reference every callback.
-/// The document (possibly address too) will change when the user edits the document.
-class OutputCallback : public synth::OverallSynth {
-    // OverallSynth impl CallbackInterface
-public:
-    static std::unique_ptr<OutputCallback> make(
-        uint32_t stereo_nchan,
-        uint32_t smp_per_s,
-        doc::Document document,
-        AudioCommand * stub_command,
-        AudioOptions audio_options
-    ) {
-        // Outlives the return constructor call. Outlives all use of *doc_guard.
-        return std::make_unique<OutputCallback>(
-            stereo_nchan,
-            smp_per_s,
-            std::move(document),
-            stub_command,
-            audio_options
-        );
-    }
+// In JACK Audio mode, jackd sets our thread to real-time.
+// In ALSA/etc., RtAudio handles modes.
+static constexpr RtAudioStreamFlags RTAUDIO_FLAGS = RTAUDIO_SCHEDULE_REALTIME;
 
-    // OutputCallback() constructor
-    using synth::OverallSynth::OverallSynth;
+// impl RtAudioCallback
+static int rtaudio_callback(
+    void * output_buffer,
+    void * input_buffer,
+    unsigned int mono_smp_per_block,
+    double stream_time,
+    RtAudioStreamStatus status,
+    void * synth_void
+) {
+    auto & synth = *static_cast<OverallSynth *>(synth_void);
 
-    // interleaved=true => outputBufferVoid: [smp#, * nchan + chan#] Amplitude
-    // interleaved=false => outputBufferVoid: [chan#][smp#]Amplitude
-    // interleaved=false was added to support ASIO's native representation.
+    // Convert output buffer from raw pointer into GSL span.
+    size_t stereo_smp_per_block = size_t(STEREO_NCHAN) * mono_smp_per_block;
 
-    // In JACK Audio mode, jackd sets our thread to real-time.
-    // In ALSA/etc., RtAudio handles modes.
-    static constexpr RtAudioStreamFlags rtaudio_flags = RTAUDIO_SCHEDULE_REALTIME;
+    static_assert(
+        (STEREO_NCHAN == 2) && !(RTAUDIO_FLAGS & RTAUDIO_NONINTERLEAVED),
+        "rtaudio_callback() assumes interleaved stereo"
+    );
+    gsl::span output{(Amplitude *) output_buffer, stereo_smp_per_block};
+    synth.synthesize_overall(output, mono_smp_per_block);
 
-    // impl RtAudioCallback
-    static int rtaudio_callback(
-        void *outputBufferVoid, void *inputBufferVoid,
-        unsigned int mono_smp_per_block,
-        double streamTime,
-        RtAudioStreamStatus status,
-        void *userData
-    ) {
-        auto self = static_cast<OutputCallback *>(userData);
-        synth::OverallSynth & synth = *self;
-
-        // Convert output buffer from raw pointer into GSL span.
-        size_t stereo_smp_per_block = size_t(STEREO_NCHAN) * mono_smp_per_block;
-
-        static_assert(
-            (STEREO_NCHAN == 2) && !(rtaudio_flags & RTAUDIO_NONINTERLEAVED),
-            "rtaudio_callback() assumes interleaved stereo"
-        );
-        gsl::span output{(Amplitude *) outputBufferVoid, stereo_smp_per_block};
-        synth.synthesize_overall(output, mono_smp_per_block);
-
-        return 0;
-    }
-
-};
+    return 0;
+}
 
 // Any lower latency, and I get audio dropouts on PulseAudio.
 // Not sure if it's because of PulseAudio, exotracker, non-real-time threads,
@@ -100,14 +73,14 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
 
     RtAudio::StreamOptions stream_opt;
     stream_opt.numberOfBuffers = NUM_BLOCKS;
-    stream_opt.flags = OutputCallback::rtaudio_flags;
+    stream_opt.flags = RTAUDIO_FLAGS;
 
     unsigned int sample_rate = 48000;
     unsigned int mono_smp_per_block = MONO_SMP_PER_BLOCK;
     AudioOptions audio_options {
     };
 
-    std::unique_ptr<OutputCallback> callback = OutputCallback::make(
+    auto synth = std::make_unique<OverallSynth>(
         outParams.nChannels, sample_rate, std::move(document), stub_command, audio_options
     );
 
@@ -122,8 +95,8 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
             AmplitudeFmt,
             sample_rate,
             &/*mut*/ mono_smp_per_block,
-            OutputCallback::rtaudio_callback,
-            callback.get(),
+            rtaudio_callback,
+            synth.get(),
             &/*mut*/ stream_opt
         );
         /*
@@ -134,7 +107,9 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
         stream_opt: Only numberOfBuffers is mutated. If flags mutated, would result in garbled audio.
         */
 
-        fmt::print(stderr, "{} smp/block, {} buffers\n", mono_smp_per_block, stream_opt.numberOfBuffers);
+        fmt::print(stderr,
+            "{} smp/block, {} buffers\n", mono_smp_per_block, stream_opt.numberOfBuffers
+        );
 
         rt.startStream();
     } catch (RtAudioError & e) {
@@ -142,7 +117,7 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
         return {};
     }
 
-    return {AudioThreadHandle{rt, std::move(callback)}};
+    return {AudioThreadHandle{rt, std::move(synth)}};
 }
 
 AudioThreadHandle::~AudioThreadHandle() {
