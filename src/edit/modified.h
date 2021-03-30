@@ -17,8 +17,8 @@ enum ModifiedFlags : ModifiedInt {
     TimelineRows = 0x1,
     /// Events within some patterns have changed.
     Patterns = 0x2,
-    /// The song's "ticks per row" value has changed.
-    Tempo = 0x4,
+    /// The song's "ticks per beat" value has changed.
+    TicksPerBeat = 0x4,
 
     /// Sample data has changed, but the memory layout (order and size of samples) has not.
     /// Keep playing existing notes.

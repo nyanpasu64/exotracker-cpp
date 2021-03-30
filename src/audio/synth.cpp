@@ -281,7 +281,7 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
             }
         }
 
-        if (total_modified & ModifiedFlags::Tempo) {
+        if (total_modified & ModifiedFlags::TicksPerBeat) {
             for (auto & chip : _chip_instances) {
                 chip->tempo_changed(_document);
             }

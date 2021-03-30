@@ -51,7 +51,7 @@ EditBox set_ticks_per_beat(int ticks_per_beat) {
     return make_command(Setter<doc::TickT> {
         mut_ticks_per_beat,
         ticks_per_beat,
-        ModifiedFlags::Tempo,
+        ModifiedFlags::TicksPerBeat,
     });
 }
 
