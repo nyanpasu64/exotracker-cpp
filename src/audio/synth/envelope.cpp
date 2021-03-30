@@ -1,3 +1,7 @@
+// Instrument currently has no envelopes (envelopes are not being used),
+// so the tests cannot be run.
+#if 0
+
 #ifdef UNITTEST
 
 #include "envelope.h"
@@ -132,4 +136,5 @@ TEST_CASE("Test EnvelopeIterator on a real document") {
 
 }  // namespace
 
+#endif
 #endif

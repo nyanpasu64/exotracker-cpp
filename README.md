@@ -75,4 +75,4 @@ This program would not be possible without the assistance of:
 - Discord servers: The Fourth Modulator and Rust Audio for discussing audio development
 - [bintracker (by irrlicht project)](https://bintracker.org/) for discussing tracker design
 - konakonaa and [Persune](https://github.com/Gumball2415) ([Twitter](https://twitter.com/Gumball2415)) for discussing tracker design and commenting on prototypes
-
+- KungFuFurby on the N-SPC driver and S-SMP assembly

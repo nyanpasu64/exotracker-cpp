@@ -3,57 +3,51 @@
 #include "doc.h"
 #include "chip_kinds.h"
 #include "doc_util/event_builder.h"
-#include "util/release_assert.h"
+#include "doc_util/sample_instrs.h"
 
+#include <cstdint>
 #include <cmath>
 
 namespace sample_docs {
 
 using namespace doc;
 using namespace doc_util::event_builder;
+using namespace doc_util::sample_instrs;
 using Ev = EventBuilder;
 using std::move;
 using std::nullopt;
-
-static Instrument music_box() {
-    auto volume = [] {
-        std::vector<ByteEnvelope::IntT> volume;
-        for (int i = 0; ; i++) {
-            volume.push_back(ByteEnvelope::IntT(15 * pow(0.5, i / 20.0)));
-            if (volume.back() == 0) {
-                break;
-            }
-        }
-        return volume;
-    };
-
-    return Instrument{
-        .name = "Music Box",
-        .volume = {volume()},
-        .pitch = {{}},
-        .arpeggio = {{7, 0}},
-        .wave_index = {{2, 2}}
-    };
-}
 
 /// Empty document with one grid cell.
 /// Channel 0 has a block/pattern without events, and Channel 1 has no pattern.
 ///
 /// Use as a template for porting other documents.
 static Document empty() {
-    SequencerOptions sequencer_options{.ticks_per_beat = 24};
+    SequencerOptions sequencer_options{.ticks_per_beat = 24, .beats_per_minute = 150};
+
+    constexpr SampleIndex TRIANGLE = 0;
+    constexpr SampleIndex PULSE_25 = 1;
+    constexpr SampleIndex PULSE_50 = 2;
+
+    Samples samples;
+    samples[TRIANGLE] = triangle();
+    samples[PULSE_25] = pulse_25();
+    samples[PULSE_50] = pulse_50();
 
     Instruments instruments;
-    instruments[0] = Instrument{"blank"};
-    instruments[1] = music_box();
-    instruments[2] = Instrument{.name = "25%", .wave_index = {{1}}};
-    instruments[0x10] = Instrument{.name = "50%", .wave_index = {{2}}};
-
-    ChipList chips{ChipKind::Nes};
-
-    ChipChannelSettings chip_channel_settings = {
-        {{}, {}, {}, {}, {}},
+    instruments[0] = Instrument{"blank", {}};
+    instruments[1] = music_box(TRIANGLE);
+    instruments[2] = Instrument{
+        .name = "25%",
+        .keysplit = { InstrumentPatch { .sample_idx = PULSE_25, .adsr = INFINITE }},
     };
+    instruments[0x10] = Instrument{
+        .name = "50%",
+        .keysplit = { InstrumentPatch { .sample_idx = PULSE_50, .adsr = INFINITE }},
+    };
+
+    ChipList chips{ChipKind::Spc700};
+
+    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
 
     Timeline timeline;
 
@@ -78,7 +72,7 @@ static Document empty() {
 
         return TimelineRow{
             .nbeats = 16,
-            .chip_channel_cells = {{move(ch0), move(ch1), move(ch2), move(ch3), {}}},
+            .chip_channel_cells = {{move(ch0), move(ch1), move(ch2), move(ch3), {}, {}, {}, {}}},
         };
     }());
 
@@ -86,6 +80,7 @@ static Document empty() {
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
+        .samples = move(samples),
         .instruments = move(instruments),
         .chips = move(chips),
         .chip_channel_settings = move(chip_channel_settings),
@@ -99,20 +94,20 @@ static Document empty() {
 static Document dream_fragments() {
     // Global options
     SequencerOptions sequencer_options{
-        .ticks_per_beat = 43,
+        .ticks_per_beat = 48,
+        .beats_per_minute = 84,
     };
+
+    Samples samples;
+    samples[0] = triangle();
 
     Instruments instruments;
-    instruments[0] = music_box();
+    instruments[0] = music_box(0);
 
-    // We only have 1 chip.
-    auto const chip_kind = chip_kinds::ChipKind::Apu1;
-    ChipList chips{chip_kind, chip_kind};
+    auto const chip_kind = ChipKind::Spc700;
+    ChipList chips{chip_kind};
 
-    ChipChannelSettings chip_channel_settings = {
-        {{}, {}},
-        {{}, ChannelSettings{.n_effect_col = 2}},
-    };
+    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
 
     Timeline timeline;
 
@@ -140,7 +135,7 @@ static Document dream_fragments() {
         })};
         return TimelineRow{
             .nbeats = 8,
-            .chip_channel_cells = {{move(ch0), move(ch1)}, {{}, {}}},
+            .chip_channel_cells = {{move(ch0), move(ch1), {}, {}, {}, {}, {}, {}}},
         };
     }());
 
@@ -174,7 +169,7 @@ static Document dream_fragments() {
         })};
         return TimelineRow{
             .nbeats = 8,
-            .chip_channel_cells = {{move(ch0), move(ch1)}, {move(ch2), move(ch3)}},
+            .chip_channel_cells = {{move(ch0), move(ch1), move(ch2), move(ch3), {}, {}, {}, {}}},
         };
     }());
 
@@ -182,12 +177,61 @@ static Document dream_fragments() {
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
+        .samples = move(samples),
         .instruments = move(instruments),
         .chips = move(chips),
         .chip_channel_settings = chip_channel_settings,
         .timeline = move(timeline),
     };
 }
+
+/// Test all 8 channels to make sure they play properly.
+static Document all_channels() {
+    // Global options
+    SequencerOptions sequencer_options{
+        .ticks_per_beat = 48,
+        .beats_per_minute = 84,
+    };
+
+    Samples samples;
+    samples[0] = triangle();
+
+    Instruments instruments;
+    instruments[0] = music_box(0);
+
+    auto const chip_kind = ChipKind::Spc700;
+    ChipList chips{chip_kind};
+
+    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
+
+    Timeline timeline;
+
+    timeline.push_back([]() -> TimelineRow {
+        std::vector<TimelineCell> channels;
+        for (int i = 0; i < 8; i++) {
+            channels.push_back({TimelineBlock::from_events({
+                Ev(BeatFraction(i, 4), Note(ChromaticInt(60 + i))).instr(0)
+            })});
+        }
+        return TimelineRow{
+            .nbeats = 8,
+            .chip_channel_cells = {move(channels)},
+        };
+    }());
+
+    return DocumentCopy {
+        .sequencer_options = sequencer_options,
+        .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
+        .samples = move(samples),
+        .instruments = move(instruments),
+        .chips = move(chips),
+        .chip_channel_settings = chip_channel_settings,
+        .timeline = move(timeline),
+    };
+}
+
+#if 0
 
 /// Excerpt from "Chrono Trigger - World Revolution".
 /// This tests multiple sequence entries (patterns) of uneven lengths.
@@ -569,17 +613,19 @@ static Document block_test() {
     };
 }
 
+#endif
 
-std::string const DEFAULT_DOC = "world-revolution";
+std::string const DEFAULT_DOC = "all-channels";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
     std::map<std::string, doc::Document> out;
     out.insert({"empty", empty()});
     out.insert({"dream-fragments", dream_fragments()});
-    out.insert({"world-revolution", world_revolution()});
-    out.insert({"render-test", render_test()});
-    out.insert({"audio-test", audio_test()});
-    out.insert({"block-test", block_test()});
+    out.insert({"all-channels", all_channels()});
+    // out.insert({"world-revolution", world_revolution()});
+    // out.insert({"render-test", render_test()});
+    // out.insert({"audio-test", audio_test()});
+    // out.insert({"block-test", block_test()});
     return out;
 }();
 

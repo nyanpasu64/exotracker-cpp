@@ -1,10 +1,10 @@
 #pragma once
 
-// Do not include synth_common.h, since synth_common.h includes this file.
 #include "audio/event_queue.h"
+#include "sequencer_driver_common.h"
 #include "util/copy_move.h"
+#include "util/release_assert.h"
 
-#include <cassert>
 #include <vector>
 
 namespace audio::synth::music_driver {
@@ -22,7 +22,7 @@ struct TimeRef {
 template<int begin, int end, typename T>
 using Range = T;
 
-using Address = uint16_t;
+using Address = uint8_t;
 using Byte = uint8_t;
 
 struct RegisterWrite {
@@ -75,13 +75,26 @@ public:
 
     // Is this a usable API? I don't know.
     // I think music_driver::TimeRef will make it easier to use.
-    void add_time(ClockT dtime) {
+    void wait(ClockT dtime) {
         input.accum_dtime += dtime;
     }
 
-    void push_write(RegisterWrite val) {
+    void wait_write(ClockT dtime, Address address, Byte value) {
+        wait(dtime);
+        write(address, value);
+    }
+
+    void wait_write(Address address, Byte value) {
+        // zero-page register writes take 4 cycles,
+        // and s-dsp register writes take 2 zero-page writes.
+        // the real driver will be slower because it does real work between register writes.
+        wait(8);
+        write(address, value);
+    }
+
+    void write(Address address, Byte value) {
         assert(!output.pending());
-        RelativeRegisterWrite relative{.write=val, .time_before=input.accum_dtime};
+        RelativeRegisterWrite relative{.write={address, value}, .time_before=input.accum_dtime};
         input.accum_dtime = 0;
 
         vec.push_back(relative);
@@ -103,7 +116,7 @@ public:
     RegisterWrite pop() {
         assert(!input.pending());
 
-        assert(output.index < vec.size());
+        release_assert(output.index < vec.size());
         RelativeRegisterWrite out = vec[output.index++];
         assert(out.time_before == 0);
         return out.write;
@@ -113,6 +126,8 @@ public:
         return vec.size() - output.index;
     }
 };
+
+using sequencer_driver::EventsRef;
 
 // end namespace
 }
