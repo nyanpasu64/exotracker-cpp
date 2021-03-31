@@ -452,7 +452,7 @@ struct MainWindowUi : MainWindow {
 
             // TODO rework settings GUI
             {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("Timeline entry"));
+                c->setTitle(tr("Timeline item"));
 
                 form->addRow(
                     new QLabel(tr("Length (beats)")),
@@ -493,7 +493,7 @@ struct MainWindowUi : MainWindow {
                     w->setRange(0, 256);
                 }
 
-                {form__w(/*tr("Direction"), */QComboBox);
+                {form__w(QComboBox);
                     _step_direction = w;
 
                     auto push = [&w] (StepDirection step, QString item) {
