@@ -49,9 +49,9 @@ struct TimedRowEvent {
 
     events::RowEvent v;
 
-    TickT tick_offset(events::EffColIndex n_effect_col);
+    TickT tick_offset(events::EffColIndex n_effect_col) const;
 
-    TimeInPattern time(events::EffColIndex n_effect_col) {
+    TimeInPattern time(events::EffColIndex n_effect_col) const {
         return {anchor_beat, tick_offset(n_effect_col)};
     }
 

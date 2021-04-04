@@ -38,7 +38,7 @@ COMPARABLE_IMPL(TimeInPattern, (self.anchor_beat, self.tick_offset))
 using namespace events;
 namespace effs = effect_names;
 
-TickT TimedRowEvent::tick_offset(EffColIndex n_effect_col) {
+TickT TimedRowEvent::tick_offset(EffColIndex n_effect_col) const {
     for (EffColIndex i = 0; i < n_effect_col; i++) {
         MaybeEffect const& e = this->v.effects[i];
         if (e && e->name == effs::DELAY) {
