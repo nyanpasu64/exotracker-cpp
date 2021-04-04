@@ -41,21 +41,6 @@ struct TimeInPattern {
     using TickLimits = std::numeric_limits<decltype(tick_offset)>;
 
     COMPARABLE(TimeInPattern)
-
-    // TODO remove, only used for testing purposes
-    static TimeInPattern from_frac(FractionInt num, FractionInt den) {
-        return {{num, den}, 0};
-    }
-
-    /// A timestamp which lies before any notes anchored to the current beat.
-    TimeInPattern begin_of_beat() const {
-        return {this->anchor_beat, TickLimits::min()};
-    }
-
-    /// A timestamp which lies before any notes anchored to the given beat.
-    static TimeInPattern begin_of_beat(BeatFraction anchor_beat) {
-        return {anchor_beat, TickLimits::min()};
-    }
 };
 
 struct TimedRowEvent {
