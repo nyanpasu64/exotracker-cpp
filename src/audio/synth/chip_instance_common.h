@@ -1,10 +1,10 @@
 #pragma once
 
 #include "../synth_common.h"
-
 #include "music_driver_common.h"
-#include "../event_queue.h"
-#include "../audio_common.h"
+#include "audio/event_queue.h"
+#include "audio/audio_common.h"
+#include "audio/tempo_calc.h"
 #include "doc.h"
 #include "chip_common.h"
 #include "timing_common.h"
@@ -23,11 +23,7 @@ using timing::SequencerTime;
 using music_driver::RegisterWrite;
 using music_driver::RegisterWriteQueue;
 
-/// Nominal sampling rate, used when computing tuning tables and tempos.
-/// The user changing the emulated sampling rate rate (and clock rate)
-/// should not affect how the driver computes pitches and timers,
-/// since that would introduce a source of behavioral discrepancies.
-constexpr NsampT SAMPLES_PER_S_IDEAL = 32040;
+using audio::tempo_calc::SAMPLES_PER_S_IDEAL;
 
 /// Base class (interface-ish) for a single SPC-700's (software driver + sequencers
 /// + hardware emulator synth).
@@ -46,13 +42,23 @@ public:
 
     virtual ~ChipInstance() = default;
 
-// # Sequencer methods.
+// # Playback control methods
 
     /// Seek the sequencer to this time in the document (grid cell and beat fraction).
     /// ChipInstance does not know if the song/sequencer is playing or not.
     /// OverallSynth is responsible for calling sequencer_driver_tick() during playback,
     /// and stop_playback() once followed by driver_tick() when not playing.
     virtual void seek(doc::Document const& document, timing::GridAndBeat time) = 0;
+
+    /// Stop the sequencer, and tell the driver to stop all playing notes.
+    /// May/not mutate _register_writes.
+    /// You are required to call driver_tick() afterwards on the same tick,
+    /// or notes may not necessarily stop.
+    virtual void stop_playback() = 0;
+
+// # Sequencer-mutation methods. Ignored when the sequencer is stopped.
+// The sequencer starts out stopped, begins playing when seek() is called,
+// and stops playing when stop_playback() is called.
 
     /// Similar to seek(), but ignores events entirely (only looks at tempo/rounding).
     /// Keeps position in event list, recomputes real time in ticks.
@@ -71,7 +77,8 @@ public:
 
 // # Driver methods
 
-    /// idk anymore
+    /// Reset driver and synth state. Called whenever playback begins.
+    /// You are required to call driver_tick() afterwards on the same tick.
     virtual void reset_state(doc::Document const& document) = 0;
 
     /// Must be called upon construction, or when samples change.
@@ -82,23 +89,32 @@ public:
     /// (construct a mapping table using additional sample allocation/mapping metadata).
     virtual void reload_samples(doc::Document const& document) = 0;
 
-    /// May/not mutate _register_writes.
-    /// You are required to call driver_tick() afterwards on the same tick,
-    /// or notes may not necessarily stop.
-    virtual void stop_playback() = 0;
+// # Tick methods. On every SNES timer, call exactly 1 of these,
+// # followed by run_chip_for().
 
-    /// Ticks sequencer and runs driver.
+    /// Run the sequencer to obtain a list of events, then pass them to the driver.
+    /// Tell the driver that a sequencer tick has occurred.
+    /// This triggers events (notes) and advances both real-time and tempo-driven effects.
+    ///
+    /// This method is only called when the song is playing.
+    /// The rate of it being called is proportional to the current tempo.
     ///
     /// Return: SequencerTime is current tick (just occurred), not next tick.
-    virtual SequencerTime sequencer_driver_tick(doc::Document const& document) = 0;
+    virtual SequencerTime tick_sequencer(doc::Document const& document) = 0;
 
-    /// Runs driver, ignoring sequencer. Called when the song is not playing.
-    virtual void driver_tick(doc::Document const& document) = 0;
+    /// Don't advance the sequencer, and pass the driver an empty list of events.
+    /// Tell it to advance real-time but not tempo-driven effects.
+    ///
+    /// This method is called both when the song is playing and stopped.
+    /// When playing, it is called whenever the SNES timer advances
+    /// but a sequencer tick is not triggered.
+    /// When stopped, this is called on every timer.
+    virtual void run_driver(doc::Document const& document) = 0;
 
 // # Base class methods
 
     /// Call on each tick, before calling any functions which run the driver
-    /// (stop_playback() or [sequencer_]driver_tick()).
+    /// (stop_playback(), tick_sequencer(), or run_driver()).
     void flush_register_writes();
 
     /// Run the chip for 1 tick, applying register writes and generating audio.

@@ -28,8 +28,8 @@ using std::move;
 
 static Document simple_doc() {
     SequencerOptions sequencer_options{
+        .target_tempo = 100,
         .ticks_per_beat = 10,
-        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -274,8 +274,8 @@ static Document parametric_doc(
     uint32_t beat, TickT delay, int peak_delay, MaybeNonZero<uint32_t> loop_length
 ) {
     SequencerOptions sequencer_options{
+        .target_tempo = 100,
         .ticks_per_beat = 10,
-        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -346,8 +346,8 @@ static Document short_doc(
     uint32_t nbeat, TickT delay, MaybeNonZero<uint32_t> loop_length
 ) {
     SequencerOptions sequencer_options{
+        .target_tempo = 100,
         .ticks_per_beat = 10,
-        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -384,8 +384,8 @@ static Document gap_doc(
     uint32_t nbeat, TickT delay, MaybeNonZero<uint32_t> loop_length
 ) {
     SequencerOptions sequencer_options{
+        .target_tempo = 100,
         .ticks_per_beat = 10,
-        .beats_per_minute = 100,
     };
 
     Timeline timeline;

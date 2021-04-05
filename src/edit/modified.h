@@ -17,14 +17,22 @@ enum ModifiedFlags : ModifiedInt {
     TimelineRows = 0x1,
     /// Events within some patterns have changed.
     Patterns = 0x2,
-    /// The song's "ticks per beat" value has changed.
-    TicksPerBeat = 0x4,
+
+    /// SequencerOptions::target_tempo has changed.
+    TargetTempo = 0x10,
+    /// SequencerOptions::.spc_timer_period has changed.
+    SpcTimerPeriod = 0x20,
+    /// SequencerOptions::.ticks_per_beat has changed.
+    TicksPerBeat = 0x40,
+
+    /// Any field in SequencerOptions has changed.
+    SequencerOptions = TargetTempo | SpcTimerPeriod | TicksPerBeat,
 
     /// Sample data has changed, but the memory layout (order and size of samples) has not.
     /// Keep playing existing notes.
-    SamplesEdited = 0x8,
+    SamplesEdited = 0x100,
     /// Repack all samples into RAM, and stop playing notes.
-    SamplesMoved = 0x10,
+    SamplesMoved = 0x200,
 };
 
 }

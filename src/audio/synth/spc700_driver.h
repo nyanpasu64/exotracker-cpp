@@ -44,9 +44,10 @@ class Spc700ChannelDriver {
 public:
     Spc700ChannelDriver(uint8_t channel_id);
 
-    void tick(
+    void run_driver(
         doc::Document const& document,
         Spc700Driver const& chip_driver,
+        bool sequencer_ticked,
         EventsRef events,
         RegisterWriteQueue &/*mut*/ register_writes,
         Spc700ChipFlags & flags);
@@ -87,8 +88,9 @@ public:
 
     void stop_playback(RegisterWriteQueue /*mut*/& register_writes);
 
-    void driver_tick(
+    void run_driver(
         doc::Document const& document,
+        bool tick_tempo,
         EnumMap<ChannelID, EventsRef> const& channel_events,
         RegisterWriteQueue &/*mut*/ register_writes);
 

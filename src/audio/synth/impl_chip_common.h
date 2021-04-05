@@ -58,6 +58,11 @@ public:
         _chip_sequencer.seek(document, time);
     }
 
+    void stop_playback() override {
+        _chip_sequencer.stop_playback();
+        _driver.stop_playback(/*mut*/ _register_writes);
+    }
+
     void ticks_per_beat_changed(doc::Document const& document) override {
         _chip_sequencer.ticks_per_beat_changed(document);
     }
@@ -78,21 +83,16 @@ public:
         _driver.reload_samples(document, /*mut*/ _synth, /*mut*/ _register_writes);
     }
 
-    void stop_playback() override {
-        _chip_sequencer.stop_playback();
-        _driver.stop_playback(/*mut*/ _register_writes);
-    }
-
-    SequencerTime sequencer_driver_tick(doc::Document const& document) override {
+    SequencerTime tick_sequencer(doc::Document const& document) override {
         auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);
 
-        _driver.driver_tick(document, channel_events, /*mut*/ _register_writes);
+        _driver.run_driver(document, true, channel_events, /*mut*/ _register_writes);
 
         return chip_time;
     }
 
-    void driver_tick(doc::Document const& document) override {
-        _driver.driver_tick(document, {}, /*mut*/ _register_writes);
+    void run_driver(doc::Document const& document) override {
+        _driver.run_driver(document, false, {}, /*mut*/ _register_writes);
     }
 
 private:  // called by ChipInstance

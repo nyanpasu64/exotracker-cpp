@@ -84,7 +84,7 @@ static Address calc_voice_reg(size_t channel_id, Address v_reg) {
 constexpr ClockT CLOCKS_PER_TWO_SAMPLES = 64;
 // TODO do any bad consequences happen if we don't wait 2 samples?
 // Is it possible for each tick to be shorter than 2 sample on real hardware?
-// If we set a high enough tempo and tick rate, then we may not wait 2 samples per tick,
+// If we set a high enough timer rate, then we may not wait 2 samples per tick,
 // and ChipInstance::run_chip_for() will truncate our register write
 // to prevent it from overflowing the tick.
 
@@ -285,13 +285,28 @@ void Spc700Driver::stop_playback(RegisterWriteQueue /*mut*/& regs) {
     regs.wait(CLOCKS_PER_TWO_SAMPLES);
 }
 
-void Spc700ChannelDriver::tick(
+void Spc700ChannelDriver::run_driver(
     doc::Document const& document,
     Spc700Driver const& chip_driver,
+    bool tick_tempo,
     EventsRef events,
     RegisterWriteQueue &/*mut*/ regs,
     Spc700ChipFlags & flags)
 {
+    // If the sequencer was not ticked, we should not be receiving note events.
+    // (If I someday add tempo-independent note cuts, they will be emitted
+    // from the driver, not the sequencer's EventsRef.)
+    if (!tick_tempo) {
+        // TODO release_assert?
+        assert(events.empty());
+    }
+
+    if (tick_tempo) {
+        // TODO move note processing into a separate method, and tick volume slides
+        // (crescendos, but not staccatos???) only when the sequencer advances.
+    }
+    // TODO unconditionally tick vibratos (possibly pitch bends, idk).
+
     auto const channel_flag = uint8_t(1 << _channel_id);
 
     auto voice_reg8 = [this, &regs](Address v_reg, uint8_t value) {
@@ -436,8 +451,9 @@ void Spc700ChannelDriver::tick(
     }
 }
 
-void Spc700Driver::driver_tick(
+void Spc700Driver::run_driver(
     doc::Document const& document,
+    bool tick_tempo,
     EnumMap<ChannelID, EventsRef> const& channel_events,
     RegisterWriteQueue &/*mut*/ regs)
 {
@@ -450,7 +466,7 @@ void Spc700Driver::driver_tick(
     for (size_t i = 0; i < enum_count<ChannelID>; i++) {
         auto & driver = _channels[i];
         auto & events = channel_events[i];
-        driver.tick(document, *this, events, regs, flags);
+        driver.run_driver(document, *this, tick_tempo, events, regs, flags);
     }
 
     if (flags.koff != 0) {

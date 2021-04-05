@@ -589,6 +589,10 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
     _ignore_ordering_errors = true;
 }
 
+static bool is_playing(ChannelSequencer const& self) {
+    return self._curr_ticks_per_beat != 0;
+}
+
 /*
 We provide separate APIs for "pattern contents changed" and "document speed changed".
 doc_edited() recomputes event index based on _now
@@ -613,8 +617,10 @@ void ChannelSequencer::ticks_per_beat_changed(doc::Document const & document) {
     // Or else, reassigning _now could erase gridline crossings
     // and break _grid_runahead invariants.
 
-    // Assert that seek() was called earlier.
-    release_assert(_curr_ticks_per_beat != 0);
+    // Ignore mutations when stopped.
+    if (!is_playing(*this)) {
+        return;
+    }
 
     doc::BeatFraction beat{
         _now.next_tick.beat + doc::BeatFraction{
@@ -663,6 +669,11 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
     print_chip_channel(*this);
     fmt::print(stderr, "doc_edited\n");
     #endif
+
+    // Ignore mutations when stopped.
+    if (!is_playing(*this)) {
+        return;
+    }
 
     // Document-level operations, not bound to current channel/grid/pattern.
     auto const nchip = document.chips.size();
@@ -843,6 +854,11 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
 }
 
 void ChannelSequencer::timeline_modified(doc::Document const & document) {
+    // Ignore mutations when stopped.
+    if (!is_playing(*this)) {
+        return;
+    }
+
     // Clamp the grid cell within the document.
     // This MUST be the first operation in this function!
     // TODO supply an API so deleting previous grids moves the cursor backwards,
