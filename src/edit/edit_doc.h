@@ -7,6 +7,8 @@ namespace edit::edit_doc {
 
 [[nodiscard]] EditBox set_ticks_per_beat(int ticks_per_beat);
 
+[[nodiscard]] EditBox set_tempo(int tempo);
+
 // # Timeline operations.
 
 [[nodiscard]] EditBox add_timeline_row(

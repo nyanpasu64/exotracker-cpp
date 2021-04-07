@@ -19,7 +19,7 @@ using GetMutBare = T & (*)(doc::Document &);
 template<typename T>
 struct Setter {
     GetMutBare<T> _field;
-    int _value;
+    T _value;
 
     ModifiedFlags _modified;
 
@@ -52,6 +52,18 @@ EditBox set_ticks_per_beat(int ticks_per_beat) {
         mut_ticks_per_beat,
         ticks_per_beat,
         ModifiedFlags::TicksPerBeat,
+    });
+}
+
+double & mut_tempo(doc::Document & document) {
+    return document.sequencer_options.target_tempo;
+}
+
+EditBox set_tempo(int tempo) {
+    return make_command(Setter<double> {
+        mut_tempo,
+        (double) tempo,
+        ModifiedFlags::TargetTempo,
     });
 }
 

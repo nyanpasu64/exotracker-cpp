@@ -30,6 +30,7 @@ using namespace ::doc::instr;
 using accidental::AccidentalMode;
 
 constexpr TickT MAX_TICKS_PER_BEAT = 127;
+constexpr int MAX_TEMPO = 255;
 
 /// The sound engine is driven by the S-SMP timer, which runs at a high frequency
 /// (8010 Hz / `spc_timer_period`), fixed per-game and not changing with song tempo.
