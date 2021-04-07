@@ -279,6 +279,9 @@ void Spc700Driver::reload_samples(
 
 void Spc700Driver::stop_playback(RegisterWriteQueue /*mut*/& regs) {
     regs.write(SPC_DSP::r_koff, 0xff);
+
+    // This delays future register writes
+    // caused by Spc700ChannelDriver::tick() on the same tick.
     regs.wait(CLOCKS_PER_TWO_SAMPLES);
 }
 
