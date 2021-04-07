@@ -57,7 +57,7 @@ public:
     /// Similar to seek(), but ignores events entirely (only looks at tempo/rounding).
     /// Keeps position in event list, recomputes real time in ticks.
     /// Can be called before doc_edited() if both tempo and events edited.
-    virtual void tempo_changed(doc::Document const & document) = 0;
+    virtual void ticks_per_beat_changed(doc::Document const & document) = 0;
 
     /// Assumes tempo is unchanged, but events are changed.
     /// Keeps real time in ticks, recomputes position in event list.

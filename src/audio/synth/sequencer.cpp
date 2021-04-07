@@ -593,17 +593,19 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
 We provide separate APIs for "pattern contents changed" and "document speed changed".
 doc_edited() recomputes event index based on _now
 (which is correct if pattern contents change).
-tempo_changed() recomputes _now and not event index.
+ticks_per_beat_changed() recomputes _now and not event index.
 
 To recompute _now, we can convert _now to a beat fraction (= dtick / ticks per beat),
 then round down when converting back to a tick
 (to avoid putting events in the past as much as possible).
 */
 
-void ChannelSequencer::tempo_changed(doc::Document const & document) {
+void ChannelSequencer::ticks_per_beat_changed(doc::Document const & document) {
     #ifdef SEQUENCER_DEBUG
     print_chip_channel(*this);
-    fmt::print(stderr, "tempo_changed {}\n", document.sequencer_options.ticks_per_beat);
+    fmt::print(stderr,
+        "ticks_per_beat_changed {}\n", document.sequencer_options.ticks_per_beat
+    );
     #endif
 
     // beat must be based on the current value of _now,
@@ -636,7 +638,7 @@ void ChannelSequencer::tempo_changed(doc::Document const & document) {
       (1/4 rounds up to 1 > _now=0)
     - _now will advance by 1 tick (_now := 1)
 
-    When tempo_changed() is called at ticks/beat = 11:
+    When ticks_per_beat_changed() is called at ticks/beat = 11:
     - _now stays at 1
 
     When next_tick() is called at ticks/beat = 11:

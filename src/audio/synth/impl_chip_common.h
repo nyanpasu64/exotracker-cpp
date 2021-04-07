@@ -58,8 +58,8 @@ public:
         _chip_sequencer.seek(document, time);
     }
 
-    void tempo_changed(doc::Document const & document) override {
-        _chip_sequencer.tempo_changed(document);
+    void ticks_per_beat_changed(doc::Document const & document) override {
+        _chip_sequencer.ticks_per_beat_changed(document);
     }
 
     void doc_edited(doc::Document const & document) override {
