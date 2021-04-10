@@ -265,10 +265,6 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
             if (auto edit_ptr = std::get_if<cmd_queue::EditBox>(msg)) {
                 // Edit synth's copy of the document.
                 auto & edit = **edit_ptr;
-
-                // It's okay to apply edits mid-tick,
-                // since _document is only examined by the sequencer and driver,
-                // not the hardware synth.
                 edit.apply_swap(_document);
 
                 // If not _sequencer_running, edits don't matter. upon playback, we'll seek.
@@ -305,10 +301,10 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
 
     ChipIndex const nchip = (ChipIndex) _chip_instances.size();
 
+    // Optionally tick sequencers, then run drivers.
     for (ChipIndex chip_index = 0; chip_index < nchip; chip_index++) {
         auto & chip = *_chip_instances[chip_index];
 
-        // chip's time passes.
         /// Current tick (just occurred), not next tick.
         if (_sequencer_running) {
             auto chip_time = chip.sequencer_driver_tick(_document);

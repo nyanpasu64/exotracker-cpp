@@ -22,10 +22,10 @@ class ImplChipInstance : public ChipInstance {
 // fields
     using ChannelID = typename DriverT::ChannelID;
 
-    // .sequencer_tick() returns EnumMap<ChannelID, _>.
+    // ChipSequencer::sequencer_tick() returns EnumMap<ChannelID, EventsRef>.
     sequencer::ChipSequencer<ChannelID> _chip_sequencer;
 
-    // .driver_tick() takes EnumMap<ChannelID, _>.
+    // DriverT::run_driver() takes EnumMap<ChannelID, EventsRef>.
     DriverT _driver;
 
     /*
@@ -54,19 +54,19 @@ public:
     {}
 
     // impl ChipInstance
-    void seek(doc::Document const & document, timing::GridAndBeat time) override {
+    void seek(doc::Document const& document, timing::GridAndBeat time) override {
         _chip_sequencer.seek(document, time);
     }
 
-    void ticks_per_beat_changed(doc::Document const & document) override {
+    void ticks_per_beat_changed(doc::Document const& document) override {
         _chip_sequencer.ticks_per_beat_changed(document);
     }
 
-    void doc_edited(doc::Document const & document) override {
+    void doc_edited(doc::Document const& document) override {
         _chip_sequencer.doc_edited(document);
     }
 
-    void timeline_modified(doc::Document const & document) override {
+    void timeline_modified(doc::Document const& document) override {
         _chip_sequencer.timeline_modified(document);
     }
 
@@ -74,7 +74,7 @@ public:
         _driver.reset_state(document, /*mut*/ _synth, /*mut*/ _register_writes);
     }
 
-    void reload_samples(doc::Document const & document) override {
+    void reload_samples(doc::Document const& document) override {
         _driver.reload_samples(document, /*mut*/ _synth, /*mut*/ _register_writes);
     }
 
@@ -83,7 +83,7 @@ public:
         _driver.stop_playback(/*mut*/ _register_writes);
     }
 
-    SequencerTime sequencer_driver_tick(doc::Document const & document) override {
+    SequencerTime sequencer_driver_tick(doc::Document const& document) override {
         auto [chip_time, channel_events] = _chip_sequencer.sequencer_tick(document);
 
         _driver.driver_tick(document, channel_events, /*mut*/ _register_writes);
@@ -91,7 +91,7 @@ public:
         return chip_time;
     }
 
-    void driver_tick(doc::Document const & document) override {
+    void driver_tick(doc::Document const& document) override {
         _driver.driver_tick(document, {}, /*mut*/ _register_writes);
     }
 
