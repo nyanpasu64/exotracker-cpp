@@ -199,7 +199,7 @@ OverallSynth::OverallSynth(
                    chip_index, SAMPLES_PER_S_IDEAL, _document.frequency_table
                 );
 
-                // instance->reload_samples(_document);
+                instance->reload_samples(_document);
 
                 _chip_instances.emplace_back(std::move(instance));
                 break;
