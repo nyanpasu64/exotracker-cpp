@@ -199,9 +199,6 @@ OverallSynth::OverallSynth(
                    chip_index, SAMPLES_PER_S_IDEAL, _document.frequency_table
                 );
 
-                // This results in flush_register_writes() crashing,
-                // for reasons I'm not entirely sure about.
-                // It doesn't matter because reset_state() calls reload_samples().
                 // instance->reload_samples(_document);
 
                 _chip_instances.emplace_back(std::move(instance));
@@ -241,14 +238,6 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
     /// once the audio starts (not finishes) playing.
     /// This is a minor timing discrepancy, but not worth fixing.
     MaybeSequencerTime seq_time = orig_seq_time;
-
-    // Make sure all register writes from the previous frame
-    // have been processed by the synth.
-    // Set both read and write pointers to 0,
-    // so RegisterWriteQueue won't reject further writes.
-    for (auto & chip : _chip_instances) {
-        chip->flush_register_writes();
-    }
 
     AudioCommand * const orig_cmd = _seen_command.load(std::memory_order_relaxed);
     AudioCommand * cmd = orig_cmd;
@@ -388,6 +377,13 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
                 _resampler_input[(i * OVERSAMPLING_FACTOR + j) * STEREO_NCHAN + 1] += in_right;
             }
         }
+    }
+
+    // Make sure all register writes have been processed by the synth.
+    // Set both read and write pointers to 0,
+    // so RegisterWriteQueue won't reject writes on the next tick.
+    for (auto & chip : _chip_instances) {
+        chip->flush_register_writes();
     }
 
     // TODO filter _resampler_input.

@@ -113,17 +113,14 @@ public:
 
 // # Base class methods
 
-    /// Call on each tick, before calling any functions which run the driver
-    /// (stop_playback(), tick_sequencer(), or run_driver()).
-    void flush_register_writes();
-
     /// Run the chip for 1 tick, applying register writes and generating audio.
     /// Can cross register-write boundaries.
     /// Calls synth_write_reg() once per register write,
     /// and synth_run_clocks() in between to advance time.
-    NsampWritten run_chip_for(
-        ClockT const num_clocks,
-        WriteTo write_to);
+    NsampWritten run_chip_for(ClockT const num_clocks, WriteTo write_to);
+
+    /// Call at the end of each tick.
+    void flush_register_writes();
 
 // # Implemented by subclasses, called by base class.
 private:
