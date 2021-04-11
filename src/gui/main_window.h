@@ -276,6 +276,9 @@ public:
     History const& history() const {
         return state().history();
     }
+    /// Don't call directly! History::push() will not send edits to the audio thread!
+    /// Instead delegate to MainWindow::push_edit().
+    /// (Exception: AudioComponent::undo()/redo() call this as well.)
     History & history_mut();
 
     CursorAndSelection & cursor_mut();

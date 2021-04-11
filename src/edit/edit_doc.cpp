@@ -12,60 +12,55 @@ namespace edit::edit_doc {
 
 using edit_impl::make_command;
 
+/// type GetFieldMut<T> = fn(&mut Document) -> &mut T;
 template<typename T>
-using GetMutBare = T & (*)(doc::Document &);
+using GetFieldMut = T & (*)(doc::Document &);
 
 
-template<typename T>
-struct Setter {
-    GetMutBare<T> _field;
+template<typename T, GetFieldMut<T> get_field_mut, ModifiedFlags modified>
+class Setter {
     T _value;
 
-    ModifiedFlags _modified;
+public:
+    static constexpr ModifiedFlags _modified = modified;
+
+    Setter(T new_value)
+        : _value(new_value)
+    {}
 
     void apply_swap(doc::Document & document) {
-        std::swap(_field(document), _value);
+        std::swap(get_field_mut(document), _value);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
-        using ImplPatternEdit = edit_impl::ImplEditCommand<Setter>;
+    bool can_coalesce(BaseEditCommand & prev_edit_command) const {
+        using SelfEditCommand = edit_impl::ImplEditCommand<Setter>;
 
         // Is it really a good idea to coalesce spinbox changes?
         // If you undo to after a spinbox edit, and spin it again,
         // the previous undo state is destroyed!
 
-        if (auto p = typeid_cast<ImplPatternEdit *>(&prev)) {
-            Setter & prev = *p;
-            return prev._field == _field;
-        }
-
-        return false;
+        return typeid(prev_edit_command) == typeid(SelfEditCommand);
     }
 };
 
-doc::TickT & mut_ticks_per_beat(doc::Document & document) {
-    return document.sequencer_options.ticks_per_beat;
-}
-
-EditBox set_ticks_per_beat(int ticks_per_beat) {
-    return make_command(Setter<doc::TickT> {
-        mut_ticks_per_beat,
-        ticks_per_beat,
-        ModifiedFlags::TicksPerBeat,
-    });
-}
-
-double & mut_tempo(doc::Document & document) {
+/// I wanted to turn this function into a local-variable lambda,
+/// but in GCC, local-variable lambdas cannot be used as
+/// non-type template parameters (Setter<GetFieldMut<T>>).
+/// Context: https://docs.google.com/document/d/1D5lKC6eFOv4fptVkUsk8DgeboFSBigSQWef8-rqCzgw/edit
+///
+/// Honestly I'm disappointed you can't pass a "path" (document => document.foo.bar)
+/// as a first-class template parameter.
+/// Though Rust lambdas are quite concise (|d| &mut d.foo.bar).
+static double & get_tempo_mut(doc::Document & document) {
     return document.sequencer_options.target_tempo;
-}
+};
 
 EditBox set_tempo(int tempo) {
-    return make_command(Setter<double> {
-        mut_tempo,
-        (double) tempo,
-        ModifiedFlags::TargetTempo,
-    });
+    return make_command(Setter<double, get_tempo_mut, ModifiedFlags::TargetTempo> (
+        (double) tempo
+    ));
 }
+
 
 // # Timeline operations.
 

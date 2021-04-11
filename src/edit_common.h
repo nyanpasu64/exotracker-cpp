@@ -74,8 +74,6 @@ using MaybeCursor = std::optional<Cursor>;
 struct [[nodiscard]] CursorEdit {
     EditBox edit;
 
-    // TODO mark as optional, to support non-pattern edit commands
-    // that don't move the cursor.
     MaybeCursor before_cursor;
     MaybeCursor after_cursor;
 
