@@ -19,7 +19,7 @@ struct AudioOptions {
     // Passed to synth only.
 
     /// Which quality to use for resampling.
-    int resampler_quality = SRC_SINC_MEDIUM_QUALITY;
+    int resampler_quality = SRC_SINC_FASTEST;
 };
 
 }
