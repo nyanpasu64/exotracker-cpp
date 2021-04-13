@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.8.0)
 cmake_policy(SET CMP0092 NEW)
 project(exotracker)
 
+include(cmake/lib.cmake)
 
 ## Initialize environment
 set(RTAUDIO_BUILD_STATIC_LIBS TRUE)
@@ -101,7 +102,10 @@ add_subdirectory("3rdparty/rtaudio" EXCLUDE_FROM_ALL)
 add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
 add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
 add_subdirectory("3rdparty/snes9x-dsp" EXCLUDE_FROM_ALL)
-add_subdirectory("3rdparty/libsamplerate" EXCLUDE_FROM_ALL)
+
+# libsamplerate in debug mode burns lots of CPU,
+# so build with optimizations on even in debug mode.
+add_subdirectory_optimized("3rdparty/libsamplerate" EXCLUDE_FROM_ALL)
 
 # add_library(lib-3rdparty STATIC
 #     3rdparty/nsfplay/xgm/devices/Sound/nes_apu.cpp
