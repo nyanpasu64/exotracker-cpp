@@ -1,3 +1,5 @@
+*Note that this document is probably out-of-date and no longer useful.*
+
 Dependency graph of .h files. Top-level headers `#include` nested headers.
 
 All paths are relative to src/audio/. Paths starting with / are relative to src.

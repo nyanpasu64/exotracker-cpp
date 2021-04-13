@@ -2,7 +2,7 @@
 
 [![Appveyor build status](https://ci.appveyor.com/api/projects/status/02g6qu9deawagent/branch/master?svg=true)](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/master)
 
-exotracker is an in-development cross-platform tracker targeting the Famicom/NES with expansion audio chips, possibly with other consoles being added later.
+exotracker is an in-development cross-platform music tracker targeting the SNES SPC700 sound chip, possibly with other consoles being added later.
 
 exotracker will not exactly match the tracker paradigm. Like trackers, it will have 1 note per channel, vertical channels, and note/effect columns. Unlike trackers, there is no concept of a row duration. Notes will not "take up" rows, but will be triggered at points in time (consisting of beat fraction + tick offset). This makes it easier, more self-documenting, and less hacky (compared to other trackers) to achieve dense rhythms (over 1 note per row), triplets, and early notes.
 
@@ -12,7 +12,7 @@ I have a [Google Drive folder of exploratory design notes](https://drive.google.
 
 To get the most up-to-date code, checkout and follow the `dev` branch. Note that it may be force-pushed to fix bugs, which complicates `git pull`. `master` will not be force-pushed, but it is pushed infrequently and lags 1-2 weeks behind `dev`.
 
-At the moment, I primarily develop on local HEAD and branches, instead of using pull requests to update the GitHub/GitLab repository. I may switch to pull requests if more users.
+At the moment, I primarily develop on local HEAD and branches, instead of using pull requests to update the GitHub/GitLab repository. I may switch to pull requests to prevent merge conflicts, if more people start contributing to this repository.
 
 ## Download
 
@@ -50,11 +50,9 @@ exotracker-cpp depends on Qt. All other libraries are bundled, compiled, and lin
 	- Mouse input is not implemented yet.
 - Try zooming with Ctrl-±. Unlike previous trackers, rows are merely used for editing, and the document stores an event stream with each event's timestamp as a beat fraction. This means you can use real triplets without hacking with delay effects, and more closely spaced notes when needed.
 - Try passing in names of sample documents as command-line arguments. Listed in order from most to least useful:
-	- Partial songs: `dream-fragments`, `world-revolution` (default song)
+	- Partial songs: `dream-fragments`
+	- `all-channels` (default song) (sounds bad, tests that all audio channels play properly)
 	- `empty` (add your own notes)
-	- `audio-test` (dual APU1) (sounds bad, but useful for finding audio stuttering)
-	- `block-test` (dual APU1) (rendering test for block system, no notes or events)
-	- `render-test` (sounds bad, negative octave text is too wide for the screen)
 - Some sample documents have short and/or looped blocks (the gray rectangles to the left of each channel), intended as a DAW-inspired system of looping and reuse. But right now, users can only create full-grid blocks, and cannot delete blocks.
 	- The block system is powerful, but unfortunately not editable through the UI yet, so you can't try it out to see useful it is.
 	- Pattern reuse is not implemented.

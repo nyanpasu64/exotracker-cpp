@@ -1,18 +1,20 @@
+*Note that this document may not be fully up-to-date.*
+
 ## Code architecture
 
 I have a [Google Drive folder of design notes](https://drive.google.com/drive/u/0/folders/15A1Td92HofO7KQ62QtuEDSmd4X1KKPAZ).
 
 Code is stored in src/, dependencies in 3rdparty/.
 
-Classes have member variables prefixed with a single underscore, like `_var`, to distinguish from locals. Not all classes follow this convention yet (but they should eventually).
+Classes have member variables prefixed with a single underscore, like `_var`, to distinguish from locals.
 
 ## Build notes
 
 ### Windows
 
-MSVC, MinGW, and Clang are supported. Clang compiles main.cpp very slowly because of CLI11 command-line handling. clang-cl is not supported because it doesn't understand all MSVC flags. Clang with GCC ABI is not tested.
+MinGW and Clang are supported (MSVC used to be supported, but has been dropped). Clang compiles main.cpp very slowly because of CLI11 command-line handling. clang-cl is not supported because it doesn't understand all MSVC flags. Clang with GCC ABI is not tested.
 
-If you want .pdb debug symbols, compile under MSVC or Clang under Release configuration.
+If you want an optimized build with .pdb debug symbols, compile under Clang under Release (or RelWithDebInfo) configuration.
 
 ### Does RelWithDebugInfo slow down the binary?
 
@@ -52,7 +54,7 @@ In function signatures, out parameters (mutable references primarily written to,
 
 ## GUI settings and sync
 
-There are two types of persistent settings, saved to disk.
+There are two types of persistent settings, saved to disk. (Neither has been implemented yet.)
 
 - Options are set in the options dialog. Changes from other program instances are not picked up when you open the options dialog, but when you explicitly press the "synchronize settings" button. Changes are written to disk/registry when the dialog is applied or closed.
 - Persistent state items (cursor follows playback, overflow paste) are set in the main window, and written to disk when the program is closed.
@@ -81,9 +83,9 @@ Multi-tab support is not planned at the moment, since the primary purpose of mul
 
 ## How are repaints triggered?
 
-It's complicated, and exotracker used to perform a lot of duplicated repaints (though this is not a major issue because ["calling update() several times normally results in just one paintEvent() call."](https://doc.qt.io/qt-5/qwidget.html#update)). In simplifying the code, I reduced and consolidated repaints, but now update the GUI spinboxes even when not strictly necessary (the updates are ignored).
+Propagating app updates in an imperative program is difficult. After experimenting with several complex ad-hoc repaint systems, I settled on a centralized `StateTransaction` type which is the only way to perform window/document mutations, tracks which GUI elements must be updated, and does so in `~StateTransaction()`.
 
-I traced out how cursor movements, pattern or document edits, and undo/redo trigger repainting at https://docs.google.com/document/d/1KYM8WJCIQc-U-7vUBlLcLzZOnvNdjpgpVQ1CDqz9QxA . This document is quite messy though.
+I have a historical overview of past attempted approaches in a [Google doc](https://docs.google.com/document/d/1KYM8WJCIQc-U-7vUBlLcLzZOnvNdjpgpVQ1CDqz9QxA). This document is quite messy though.
 
 ## GUI drawing
 
@@ -125,11 +127,14 @@ MainWindow and OverallSynth each keep their own copy of the document. Both threa
 
 Whenever the user edits the document, both copies need to be edited in sync. To achieve this, all document mutations are reified as "command objects", or subclasses of `edit::BaseEditCommand`. This exposes a *very* simple interface, summarized below:
 
-    class BaseEditCommand {
-    public:
-        virtual void apply_swap(doc::Document & document) = 0;
-    };
-    using EditBox = std::unique_ptr<BaseEditCommand>;
+```cpp
+class BaseEditCommand {
+public:
+    virtual void apply_swap(doc::Document & document) = 0;
+};
+using EditBox = std::unique_ptr<BaseEditCommand>;
+```
+
 Every time the user performs an edit action, the program (GUI thread) calls a "constructor function" which takes a `Document const&` and parameters describing user input, and returning a `EditBox`.
 
 The returned `EditBox` is copied. One copy is sent from the GUI to audio thread through a lock-free queue, where OverallSynth calls `apply_swap()` to apply the edit to the audio document. The other copy is kept by the GUI thread, which calls `apply_swap()` on the GUI document, then pushes the command onto the undo stack.
@@ -216,22 +221,20 @@ Design notes at https://docs.google.com/document/d/17g5wqgpUPWItvHCY-0eCaqZSNdVK
 
 There is only 1 audio thread, spawned by RtAudio and periodically running our callback. This is how OpenMPT works as well.
 
-The audio system (`OverallSynth`) is driven by sound synthesis callbacks (operates on a pull model). Every time RtAudio calls the audio callback which calls `OverallSynth.synthesize_overall()`, OverallSynth synthesizes a fixed number of samples, using `EventQueue` to know when to trigger new ticks (frame or vblank).
+The audio system (`OverallSynth`) is driven by sound synthesis callbacks (operates on a pull model). Every time RtAudio calls the audio callback which calls `OverallSynth::synthesize_overall()`, `OverallSynth` calls `SpcResampler::resample()` (a wrapper around libsamplerate) to resample SNES-rate audio (oversampled to emulate the DAC and analog filter) to the host rate. `SpcResampler` repeatedly calls `OverallSynth::synthesize_tick_oversampled()` which advances one timer/engine tick at a time, until libsamplerate has enough input to generate the number of samples that RtAudio wants. The remaining input hangs around and is consumed in the next callback.
 
 By contrast, FamiTracker's synth thread pushes to a queue with backpressure.
 
 Alternatives to this design:
 
-- Synthesizing 1 tick of audio at a time from the callback thread is also an acceptable option.
+- exotracker's NES/Blip_Buffer implementation ran `OverallSynth` for partial ticks. That approach was both more complex to implement (required suspending emulation/synthesis midway through a timer tick), and requires asking the resampler for how many input samples are necessary to generate N output samples (which is impossible in resamplers aside from Blip_Buffer). The only "advantage" was the ability to process events midway through a tick, but I ended up not doing so because it could violate driver invariants (my code assumes that all events, like notes previews and settings changes, occur on a timer tick).
 - Synthesizing audio in a separate "synth thread", and splitting into fixed-size chunks queued up and read by the "output thread", is unacceptable since it generates latency. (This is how FamiTracker works.) Even with a length-0 queue, the synth thread can run 1 audio block ahead of the output thread.
 
 ### RtAudio audio output
 
-AudioThreadHandle sends audio to computer speakers, and is intended for GUI mode with concurrent editing of the document during playback. AudioThreadHandle uses doc::GetDocument to handles audio/GUI locking and sends a raw `Document const &` to OverallSynth.
+AudioThreadHandle sends audio to computer speakers, and is intended for GUI mode with concurrent editing of the document during playback. The GUI and audio thread don't share a document or use atomics/mutexes to synchronize access, but instead the audio thread owns its own copy of the document, and receives mutation commands from the GUI (search this doc for `BaseEditCommand` and `AudioCommand`).
 
-In the absence of concurrent editing, you can use OverallSynth directly and avoid locking and unlocking std::mutex.
-
-This has precedent: I believe libopenmpt does not talk directly to an output device, but merely exposes a callback api with no knowledge of locks or an audio library (here, RtAudio). (OpenMPT allows simple edits to patterns without locks! Complex edits require locking though.) libopenmpt can be called via ffmpeg or foobar2000, which have their own non-speaker output mechanisms.
+I believe libopenmpt does not talk directly to an output device, but merely exposes a callback api with no knowledge of locks or an audio library (here, RtAudio). (OpenMPT allows simple edits to patterns without locks! Complex edits require locking though.) libopenmpt can be called via ffmpeg or foobar2000, which have their own non-speaker output mechanisms. IDK how OpenMPT's synth gets informed of structural changes to the document's tick rate or list of patterns or instruments, so it knows to invalidate state.
 
 ### Switching from PortAudio to RtAudio
 
@@ -255,7 +258,7 @@ PortAudio:
 - On all platforms (Windows DirectSound, WASAPI, Linux ALSA), a mono stream plays in both speakers.
 - In portaudio/src/hostapi/wasapi/pa_win_wasapi.c, `GetMonoToStereoMixer()` gets called whenever I open a WASAPI output stream in mono, and `PaWasapiSubStream` `monoMixer` gets called whenever I write to the stream. This means that portaudio has code to broadcast mono to stereo.
 
-I have worked around this issue by upmixing mono to stereo myself in `OutputCallback::rtaudio_callback()`.
+~~I have worked around this issue by upmixing mono to stereo myself in `OutputCallback::rtaudio_callback()`.~~ exotracker-snes outputs stereo audio natively, so this issue no longer affects us.
 
 ### Audio components
 
