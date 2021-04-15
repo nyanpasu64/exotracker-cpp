@@ -70,8 +70,7 @@ static doc::Document one_note_document(MaybeChannelID which_channel, doc::Note p
 
     return DocumentCopy {
         .sequencer_options = SequencerOptions{
-            .ticks_per_beat = 48,
-            .beats_per_minute = 100,
+            .target_tempo = 100,
             },
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,

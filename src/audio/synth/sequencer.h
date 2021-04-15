@@ -220,24 +220,24 @@ public:
     ///
     /// Preconditions:
     /// - playing (_curr_ticks_per_beat != 0)
-    void tempo_changed(doc::Document const & document);
+    void ticks_per_beat_changed(doc::Document const & document);
 
     /// Recompute _next_event based on _now and edited document.
-    /// If tempo has changed, call tempo_changed() beforehand.
+    /// If tempo has changed, call ticks_per_beat_changed() beforehand.
     ///
     /// Preconditions:
     /// - playing (_curr_ticks_per_beat != 0)
-    /// - ticks_per_beat unchanged from previous call to seek/tempo_changed.
+    /// - ticks_per_beat unchanged from previous call to seek/ticks_per_beat_changed.
     /// - number and duration of timeline cells unmodified.
     void doc_edited(doc::Document const & document);
 
     /// Called when number or duration of timeline cells are changed.
     /// Force the cursor in-bounds (grid, then beat+tick), then recompute _next_event.
-    /// If tempo has changed, call tempo_changed() beforehand.
+    /// If tempo has changed, call ticks_per_beat_changed() beforehand.
     ///
     /// Preconditions:
     /// - playing (_curr_ticks_per_beat != 0)
-    /// - ticks_per_beat unchanged from previous call to seek/tempo_changed.
+    /// - ticks_per_beat unchanged from previous call to seek/ticks_per_beat_changed.
     void timeline_modified(doc::Document const & document);
 
     // next_tick() is declared last in the header, but implemented first in the .cpp.
@@ -277,9 +277,9 @@ public:
         }
     }
 
-    void tempo_changed(doc::Document const & document) {
+    void ticks_per_beat_changed(doc::Document const & document) {
         for (ChannelIndex chan = 0; chan < enum_count<ChannelID>; chan++) {
-            _channel_sequencers[chan].tempo_changed(document);
+            _channel_sequencers[chan].ticks_per_beat_changed(document);
         }
     }
 

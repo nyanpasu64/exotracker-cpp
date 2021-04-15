@@ -1,5 +1,6 @@
 #include "synth.h"
 #include "synth/spc700.h"
+#include "tempo_calc.h"
 #include "chip_kinds.h"
 #include "edit/modified.h"
 #include "util/release_assert.h"
@@ -19,7 +20,8 @@ using chip_kinds::ChipKind;
 
 /// Maximum number of sample frames the SNES emulator can generate in one tick.
 /// This amounts to nearly 1/3 of a second, which is absurdly high
-/// considering tick rates are generally in the 100s of Hz.
+/// considering timer rates are generally in the 100s of Hz
+/// and the longest timer period (~8000/256 Hz) is only ~32 ms or 1024 sample frames.
 constexpr size_t MAX_SNES_BLOCK_SIZE = 10'000;
 
 //#define DONT_RESAMPLE
@@ -116,29 +118,52 @@ void SpcResampler::resample(Fn generate_input, gsl::span<float> out) {
     }
 }
 
-/// SPC output runs at 32-ish kHz, clock runs at 1024-ish kHz.
-constexpr uint32_t CLOCKS_PER_SAMPLE = 32;
-constexpr ClockT CLOCKS_PER_S_IDEAL = CLOCKS_PER_SAMPLE * SAMPLES_PER_S_IDEAL;
+using tempo_calc::calc_sequencer_rate;
+using tempo_calc::calc_clocks_per_timer;
 
-/// SPC clock runs at 1024-ish kHz, S-SMP timers {0,1} run at 8-ish kHz.
-constexpr uint32_t CLOCKS_PER_PHASE = 128;
+SequencerTiming::SequencerTiming(doc::SequencerOptions const& options)
+    : _clocks_per_timer(calc_clocks_per_timer(options.spc_timer_period))
+    , _phase_step(calc_sequencer_rate(options))
+    , _phase(DEFAULT_SEQUENCER_PHASE)
+{}
 
-static ClockT calc_clocks_per_tick(doc::Document const& document) {
-    auto const& opt = document.sequencer_options;
+void SequencerTiming::recompute_tempo(const doc::SequencerOptions & options)
+{
+    _clocks_per_timer = calc_clocks_per_timer(options.spc_timer_period);
+    _phase_step = calc_sequencer_rate(options);
+}
 
-    constexpr double SEC_PER_MIN = 60;
-    auto ticks_per_second = double(opt.ticks_per_beat) * opt.beats_per_minute / SEC_PER_MIN;
+void SequencerTiming::play() {
+    _running = true;
 
-    auto clocks_per_tick = double(CLOCKS_PER_S_IDEAL) / ticks_per_second;
+    // Reset _phase for more deterministic playback.
+    _phase = DEFAULT_SEQUENCER_PHASE;
+}
 
-    if (opt.use_exact_tempo) {
-        return (ClockT) round(clocks_per_tick);
+void SequencerTiming::stop() {
+    _running = false;
+    // TODO port back to std::optional.
+    _phase = DEFAULT_SEQUENCER_PHASE;
+}
+
+TimerEvent SequencerTiming::run_timer() {
+    // Halt the timer and do not tick the sequencer if the driver is not running.
+    if (!_running) {
+        return TimerEvent::RunDriver;
+    }
+
+    uint8_t next_phase = _phase + _phase_step;
+    // True if the addition overflowed.
+    bool sequencer_ticked = next_phase < _phase;
+    _phase = next_phase;
+
+    if (sequencer_ticked) {
+        return TimerEvent::TickSequencer;
     } else {
-        return CLOCKS_PER_PHASE * (ClockT) round(clocks_per_tick / CLOCKS_PER_PHASE);
+        return TimerEvent::RunDriver;
     }
 }
 
-// TODO add support for changing _clocks_per_tick.
 
 OverallSynth::OverallSynth(
     uint32_t stereo_nchan,
@@ -149,7 +174,7 @@ OverallSynth::OverallSynth(
 )
     : _document(std::move(document_moved_from))
     , _resampler(stereo_nchan, smp_per_s, audio_options)
-    , _clocks_per_tick(calc_clocks_per_tick(_document))
+    , _sequencer_timing(_document.sequencer_options)
 {
     release_assert_equal(stereo_nchan, STEREO_NCHAN);
 
@@ -248,7 +273,7 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
                 }
 
                 // Begin playback (start ticking sequencers).
-                _sequencer_running = true;
+                _sequencer_timing.play();
                 // If _sequencer_running == true, SynthEvent::Tick unconditionally
                 // overwrites seq_time after calling handle_commands().
             } else
@@ -258,32 +283,38 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
                     chip->stop_playback();
                 }
 
-                // Stop ticking sequencers.
-                _sequencer_running = false;
+                // Stop playback.
+                _sequencer_timing.stop();
                 seq_time = std::nullopt;
             } else
             if (auto edit_ptr = std::get_if<cmd_queue::EditBox>(msg)) {
                 // Edit synth's copy of the document.
                 auto & edit = **edit_ptr;
-
-                // It's okay to apply edits mid-tick,
-                // since _document is only examined by the sequencer and driver,
-                // not the hardware synth.
                 edit.apply_swap(_document);
 
-                // If not _sequencer_running, edits don't matter. upon playback, we'll seek.
-                if (!_sequencer_running) {
-                    continue;
-                }
-
+                // We need to respond to mutations (set flags in total_modified)
+                // whether or not the sequencer is running.
+                //
+                // - Tempo-modifying methods must call SequencerTiming::recompute_tempo()
+                //   regardless if the sequencer is playing, because the SPC timer rate may change.
+                //
+                // - ChipInstance sequencer mutation methods do nothing if the sequencer is stopped.
+                //
+                // - When I get around to implementing note preview and instrument mutation,
+                //   the resulting ChipInstance instrument mutation methods
+                //   must be called even when stopped.
                 auto modified = edit.modified();
                 total_modified |= modified;
             }
         }
 
-        if (total_modified & ModifiedFlags::Tempo) {
+        // Tempo changes
+        if (total_modified & ModifiedFlags::SequencerOptions) {
+            _sequencer_timing.recompute_tempo(_document.sequencer_options);
+        }
+        if (total_modified & ModifiedFlags::TicksPerBeat) {
             for (auto & chip : _chip_instances) {
-                chip->tempo_changed(_document);
+                chip->ticks_per_beat_changed(_document);
             }
         }
 
@@ -301,17 +332,20 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
 
     // TODO Instrument/tuning edits might invalidate driver or cause OOB reads.
 
-    ClockT nclk_to_play = _clocks_per_tick;
+    ClockT nclk_to_play = _sequencer_timing.clocks_per_timer();
+
+    TimerEvent const action = _sequencer_timing.run_timer();
 
     ChipIndex const nchip = (ChipIndex) _chip_instances.size();
 
+    // Optionally tick sequencers, then run drivers.
     for (ChipIndex chip_index = 0; chip_index < nchip; chip_index++) {
         auto & chip = *_chip_instances[chip_index];
 
-        // chip's time passes.
-        /// Current tick (just occurred), not next tick.
-        if (_sequencer_running) {
-            auto chip_time = chip.sequencer_driver_tick(_document);
+        switch (action) {
+        case TimerEvent::TickSequencer: {
+            /// Current tick (just occurred), not next tick.
+            auto chip_time = chip.tick_sequencer(_document);
 
             // Ensure all chip sequencers are running in sync.
             if (chip_index > 0) {
@@ -320,8 +354,11 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
             }
 
             seq_time = chip_time;
-        } else {
-            chip.driver_tick(_document);
+            break;
+        }
+        case TimerEvent::RunDriver:
+            chip.run_driver(_document);
+            break;
         }
     }
 

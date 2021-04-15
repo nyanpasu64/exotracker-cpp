@@ -28,8 +28,8 @@ using std::move;
 
 static Document simple_doc() {
     SequencerOptions sequencer_options{
+        .target_tempo = 100,
         .ticks_per_beat = 10,
-        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -245,7 +245,7 @@ TEST_CASE("Reload tempo on every tick, and ensure it doesn't affect behavior") {
                     normal_loops++;
                 }
 
-                reload.tempo_changed(document);
+                reload.ticks_per_beat_changed(document);
                 auto [reload_time, reload_ev] = reload.next_tick(document);
                 if (
                     reload_time
@@ -274,8 +274,8 @@ static Document parametric_doc(
     uint32_t beat, TickT delay, int peak_delay, MaybeNonZero<uint32_t> loop_length
 ) {
     SequencerOptions sequencer_options{
+        .target_tempo = 100,
         .ticks_per_beat = 10,
-        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -346,8 +346,8 @@ static Document short_doc(
     uint32_t nbeat, TickT delay, MaybeNonZero<uint32_t> loop_length
 ) {
     SequencerOptions sequencer_options{
+        .target_tempo = 100,
         .ticks_per_beat = 10,
-        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -384,8 +384,8 @@ static Document gap_doc(
     uint32_t nbeat, TickT delay, MaybeNonZero<uint32_t> loop_length
 ) {
     SequencerOptions sequencer_options{
+        .target_tempo = 100,
         .ticks_per_beat = 10,
-        .beats_per_minute = 100,
     };
 
     Timeline timeline;
@@ -648,7 +648,7 @@ TEST_CASE("Randomly switch between randomly generated documents of different len
                     curr = move(next);
 
                     if (curr.which_doc != prev_which_doc) {
-                        seq.tempo_changed(curr.document);
+                        seq.ticks_per_beat_changed(curr.document);
                         seq.timeline_modified(curr.document);
                     } else {
                         seq.doc_edited(curr.document);
@@ -674,11 +674,11 @@ TEST_CASE("Deterministically switch between tempos") {
         if (tick == 1) {
             // This frequently causes `release_assert(dbeat <= 1)` to fail.
             document.sequencer_options.ticks_per_beat = 6;
-            seq.tempo_changed(document);
+            seq.ticks_per_beat_changed(document);
         }
         if (tick == 3) {
             document.sequencer_options.ticks_per_beat = 1;
-            seq.tempo_changed(document);
+            seq.ticks_per_beat_changed(document);
         }
 
         seq.next_tick(document);
@@ -689,9 +689,9 @@ TEST_CASE("Switch tempos twice on every tick, and ensure it doesn't affect behav
     // Keep two sequencers and tick both in lockstep.
     // Occasionally, double "ticks per beat" and set it back in a single tick.
 
-    // If ChannelSequencer::tempo_changed() is implemented improperly,
+    // If ChannelSequencer::ticks_per_beat_changed() is implemented improperly,
     // this changes the time of the sequencer.
-    // Unfortunately, the current fix causes each call to tempo_changed()
+    // Unfortunately, the current fix causes each call to ticks_per_beat_changed()
     // to round off _now.next_tick, and the next call to use the rounded value.
     // This is considered acceptable, so doubling "ticks per beat"
     // (instead of a fractional multiplier)
@@ -715,8 +715,8 @@ TEST_CASE("Switch tempos twice on every tick, and ensure it doesn't affect behav
             CAPTURE(tick);
             // Randomly decide whether to switch documents.
 
-            dirty.tempo_changed(slow_doc);
-            dirty.tempo_changed(doc);
+            dirty.ticks_per_beat_changed(slow_doc);
+            dirty.ticks_per_beat_changed(doc);
 
             // Make sure both sequencers agree.
             auto [pure_time, pure_ev] = pure.next_tick(doc);
@@ -791,11 +791,11 @@ TEST_CASE("Randomly switch between random tempos") {
                 if (rand_bool{0.25}(rng)) {
                     // This frequently causes `release_assert(dbeat <= 1)` to fail.
                     document.sequencer_options.ticks_per_beat = 1;
-                    seq.tempo_changed(document);
+                    seq.ticks_per_beat_changed(document);
                 } else {
                     document.sequencer_options.ticks_per_beat =
                         (TickT) rand_u32{2, 10}(rng);
-                    seq.tempo_changed(document);
+                    seq.ticks_per_beat_changed(document);
                 }
             }
 

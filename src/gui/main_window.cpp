@@ -27,6 +27,7 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
+#include <QPushButton>
 #include <QSpinBox>
 #include "gui/lib/icon_toolbar.h"
 #include <QToolButton>
@@ -280,7 +281,8 @@ struct MainWindowUi : MainWindow {
     QSpinBox * _zoom_level;
 
     // Song options
-    QSpinBox * _ticks_per_beat;
+    QPushButton * _edit_tempo;  // TODO non-modal?
+    QSpinBox * _tempo;
     QSpinBox * _beats_per_measure;
     QComboBox * _end_action;
     QSpinBox * _end_jump_to;
@@ -410,15 +412,10 @@ struct MainWindowUi : MainWindow {
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Song"));
 
-                // Large values may cause issues on 8-bit processors.
-                form->addRow(
-                    tr("Ticks/beat"),
-                    [this] {
-                        auto w = _ticks_per_beat = new QSpinBox;
-                        w->setRange(1, doc::MAX_TICKS_PER_BEAT);
-                        return w;
-                    }()
-                );
+                {form__left_right(QPushButton(tr("Tempo..."), this), QSpinBox);
+                    _tempo = right;
+                    right->setRange(1, doc::MAX_TEMPO);
+                }
 
                 // Purely cosmetic, no downside to large values.
                 form->addRow(
@@ -452,7 +449,7 @@ struct MainWindowUi : MainWindow {
 
             // TODO rework settings GUI
             {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("Timeline entry"));
+                c->setTitle(tr("Timeline item"));
 
                 form->addRow(
                     new QLabel(tr("Length (beats)")),
@@ -493,7 +490,7 @@ struct MainWindowUi : MainWindow {
                     w->setRange(0, 256);
                 }
 
-                {form__w(/*tr("Direction"), */QComboBox);
+                {form__w(QComboBox);
                     _step_direction = w;
 
                     auto push = [&w] (StepDirection step, QString item) {
@@ -1003,12 +1000,12 @@ public:
                 FIELD, _pattern_editor, &PatternEditor::set_##METHOD##_int \
             );
 
-        // _ticks_per_beat obtains its value through update_gui_from_doc().
-        connect_spin(_ticks_per_beat, this, [this] (int ticks_per_beat) {
+        // _tempo obtains its value through StateTransaction.
+        connect_spin(_tempo, this, [this] (int tempo) {
             debug_unwrap(edit_state(), [&](auto & tx) {
                 push_edit(
                     tx,
-                    edit_doc::set_ticks_per_beat(ticks_per_beat),
+                    edit_doc::set_tempo(tempo),
                     MoveCursor_::NotPatternEdit{}
                 );
             });
@@ -1378,8 +1375,8 @@ StateTransaction::~StateTransaction() noexcept(false) {
     doc::Document const& doc = state.document();
 
     if (e & E::DocumentEdited) {
-        auto b = QSignalBlocker(_win->_ticks_per_beat);
-        _win->_ticks_per_beat->setValue(doc.sequencer_options.ticks_per_beat);
+        auto b = QSignalBlocker(_win->_tempo);
+        _win->_tempo->setValue(qRound(doc.sequencer_options.target_tempo));
     }
 
     if (e & (E::DocumentEdited | E::CursorMoved)) {

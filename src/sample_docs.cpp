@@ -22,7 +22,7 @@ using std::nullopt;
 ///
 /// Use as a template for porting other documents.
 static Document empty() {
-    SequencerOptions sequencer_options{.ticks_per_beat = 24, .beats_per_minute = 150};
+    SequencerOptions sequencer_options{.target_tempo = 150, .ticks_per_beat = 24};
 
     constexpr SampleIndex TRIANGLE = 0;
     constexpr SampleIndex PULSE_25 = 1;
@@ -94,8 +94,7 @@ static Document empty() {
 static Document dream_fragments() {
     // Global options
     SequencerOptions sequencer_options{
-        .ticks_per_beat = 48,
-        .beats_per_minute = 84,
+        .target_tempo = 84,
     };
 
     Samples samples;
@@ -189,8 +188,7 @@ static Document dream_fragments() {
 static Document all_channels() {
     // Global options
     SequencerOptions sequencer_options{
-        .ticks_per_beat = 48,
-        .beats_per_minute = 84,
+        .target_tempo = 84,
     };
 
     Samples samples;

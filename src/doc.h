@@ -30,19 +30,70 @@ using namespace ::doc::instr;
 using accidental::AccidentalMode;
 
 constexpr TickT MAX_TICKS_PER_BEAT = 127;
+constexpr int MAX_TEMPO = 255;
 
+/// The sound engine is driven by the S-SMP timer, which runs at a high frequency
+/// (8010 Hz / `spc_timer_period`), fixed per-game and not changing with song tempo.
+/// The sequencer only gets ticked (advancing document playback and triggering notes)
+/// on a fraction of these timer events, determined by the "sequencer rate" value
+/// (not saved in document, but computed from tempo).
+///
+/// (Note that the S-SMP timer's base frequency varies between consoles
+/// because it uses a cheap ceramic resonator as a frequency source.
+/// It is nominally 8000 Hz, but is higher in practice, on average 8010 Hz or more.)
+///
+/// The user specifies a `target_tempo` (in BPM), which gets converted into an
+/// "sequencer rate" upon in-tracker playback or SPC export.
+/// The song playback rate (in BPM) is determined by the "sequencer rate",
+/// as well as `spc_timer_period` and `ticks_per_beat` (specified by the user).
+///
+/// What is the conversion formula to calculate the best "sequencer rate"
+/// for a target tempo?
+/// Let t = `target_tempo`, d = `spc_timer_period`, r = "sequencer rate", p = `ticks_per_beat`.
+/// To compute the appropriate "sequencer rate" for a given tempo,
+/// solve for r in terms of t.
+///
+///     t = (8010 timers / d s) * (r ticks / 256 timers) * (1 beat / p ticks) * (60 s / min)
+///     t = (8010*60/256)r/dp beat/min
+///     (dp*256/60/8010)t = r
+///
+/// The default values of d=39 and p=48 results in r = 0.9972...*t.
+/// With these values, "sequencer rate" ≈ `target_tempo` to within 0.5
+/// for all `target_tempo` up to 175 BPM (the exact boundary depends on the
+/// specific console's base frequency error, which varies with age and temperature).
+/// For higher frequencies, "sequencer rate" ≈ `target_tempo` - 1.
+///
+/// The user can change `spc_timer_period` and `ticks_per_beat`,
+/// but this may result in a less straightforward conversion factor
+/// (though not necessarily less accurate).
 struct SequencerOptions {
-    /// Usually 48.
-    TickT ticks_per_beat;
+    /// The target tempo to play the module at, in beats/minute.
+    /// Controls the percentage of timer ticks that trigger sequencer ticks.
+    /// Note that the actual playback tempo will not match this value exactly
+    /// (due to rounding), and note times will jitter slightly as well.
+    double target_tempo;
 
-    /// BPM tempo. The module will play at approximately this tempo,
-    /// with rounding and range dependent on ticks_per_beat.
-    double beats_per_minute;
+    /// Controls the period of the SPC timer, which controls when the engine advances.
+    /// Increasing this value causes the driver to run less often.
+    /// This increases the amount of note timing jitter, but decreases the likelihood
+    /// of driver slowdown (taking too long to run and falling behind).
+    ///
+    /// Valid values range from [1 .. 256] inclusive.
+    /// The value will be written into the SNES S-SMP timer divisor address ($00fa),
+    /// except 256 (0x100) will be written as 0 instead (which acts as 256).
+    ///
+    /// Defaults to 39 (the value used in FF6 by Square),
+    /// resulting in a near-1:1 mapping from sequencer rate to BPM.
+    /// You probably don't need to change this.
+    uint32_t spc_timer_period = 39;
 
-    /// Use the tempo exactly (or a close approximation)
-    /// instead of rounding to the SNES timer precision.
-    /// Turning this on causes in-tracker playback and SPC export to diverge.
-    bool use_exact_tempo = false;
+    /// Controls the number of "sequencer ticks" per beat.
+    /// Switching to a multiple of 9 will make playback slightly more even
+    /// if you subdivide a beat into 9 notes.
+    ///
+    /// Defaults to 48 (the value used in Square's SPC drivers, including FF6).
+    /// You probably don't need to change this.
+    TickT ticks_per_beat = 48;
 };
 
 // Tuning table types

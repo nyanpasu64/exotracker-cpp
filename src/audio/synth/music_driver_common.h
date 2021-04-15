@@ -44,9 +44,6 @@ private:
 
     struct WriteState {
         ClockT accum_dtime = 0;
-        bool pending() const {
-            return accum_dtime != 0;
-        }
     } input;
 
     struct ReadState {
@@ -104,8 +101,6 @@ public:
 
     /// Returns a nullable pointer to a RelativeRegisterWrite.
     RelativeRegisterWrite * peek_mut() {  // -> &'Self mut RelativeRegisterWrite
-        assert(!input.pending());
-
         if (output.index < vec.size()) {
             return &vec[output.index];
         }
@@ -114,8 +109,6 @@ public:
     }
 
     RegisterWrite pop() {
-        assert(!input.pending());
-
         release_assert(output.index < vec.size());
         RelativeRegisterWrite out = vec[output.index++];
         assert(out.time_before == 0);

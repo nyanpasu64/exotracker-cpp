@@ -400,8 +400,7 @@ using doc_util::sample_instrs::spc_chip_channel_settings;
 
 static Document empty_doc(int n_seq_entry) {
     SequencerOptions sequencer_options{
-        .ticks_per_beat = 10,
-        .beats_per_minute = 100,
+        .target_tempo = 100,
     };
 
     Timeline timeline;

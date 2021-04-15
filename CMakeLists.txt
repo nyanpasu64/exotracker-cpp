@@ -121,6 +121,7 @@ add_library(exotracker-core
     src/audio/event_queue.cpp
 
     # Common files (tightly coupled)
+    src/audio/tempo_calc.cpp
     src/audio/audio_common.cpp
     src/audio/synth/chip_instance_common.cpp
     src/audio/synth/envelope.cpp
