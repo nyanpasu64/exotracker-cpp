@@ -15,16 +15,7 @@ enum class ChipEvent {
 }
 
 
-void ChipInstance::flush_register_writes() {
-    // You should not tick the driver before the previous tick finishes playing.
-    release_assert_equal(_register_writes.num_unread(), 0);
-    _register_writes.clear();
-}
-
-NsampWritten ChipInstance::run_chip_for(
-    ClockT num_clocks,
-    WriteTo write_to)
-{
+NsampWritten ChipInstance::run_chip_for(ClockT num_clocks, WriteTo write_to) {
     // The function must end before/equal to the next tick.
     EventQueue<ChipEvent> chip_events;
     chip_events.set_timeout(ChipEvent::EndOfTick, num_clocks);
@@ -89,6 +80,12 @@ NsampWritten ChipInstance::run_chip_for(
     }
     end_while:
     return nsamp_total;
+}
+
+void ChipInstance::flush_register_writes() {
+    // You should not tick the driver before the previous tick finishes playing.
+    release_assert_equal(_register_writes.num_unread(), 0);
+    _register_writes.clear();
 }
 
 // end namespace
