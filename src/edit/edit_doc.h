@@ -5,7 +5,7 @@
 
 namespace edit::edit_doc {
 
-[[nodiscard]] EditBox set_tempo(int tempo);
+[[nodiscard]] EditBox set_tempo(double tempo);
 
 // # Timeline operations.
 

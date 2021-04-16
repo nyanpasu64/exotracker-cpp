@@ -22,6 +22,7 @@
 #include <QAbstractScrollArea>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -282,7 +283,7 @@ struct MainWindowUi : MainWindow {
 
     // Song options
     QPushButton * _edit_tempo;  // TODO non-modal?
-    QSpinBox * _tempo;
+    QDoubleSpinBox * _tempo;
     QSpinBox * _beats_per_measure;
     QComboBox * _end_action;
     QSpinBox * _end_jump_to;
@@ -412,7 +413,7 @@ struct MainWindowUi : MainWindow {
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Song"));
 
-                {form__left_right(QPushButton(tr("Tempo..."), this), QSpinBox);
+                {form__left_right(QPushButton(tr("Tempo..."), this), QDoubleSpinBox);
                     _tempo = right;
                     right->setRange(1, doc::MAX_TEMPO);
                 }
@@ -960,6 +961,14 @@ public:
             );
         };
 
+        auto connect_dspin = [](QDoubleSpinBox * spin, auto * target, auto func) {
+            connect(
+                spin, qOverload<double>(&QDoubleSpinBox::valueChanged),
+                target, func,
+                Qt::UniqueConnection
+            );
+        };
+
         auto connect_check = [](QCheckBox * check, auto * target, auto func) {
             // QCheckBox::clicked is not emitted when state is programmatically changed.
             // idk which is better.
@@ -988,6 +997,12 @@ public:
                 FIELD, _pattern_editor, &PatternEditor::set_##METHOD \
             );
 
+        #define BIND_DSPIN(FIELD, METHOD) \
+            FIELD->setValue(_pattern_editor->METHOD()); \
+            connect_dspin( \
+                FIELD, _pattern_editor, &PatternEditor::set_##METHOD \
+            );
+
         #define BIND_CHECK(FIELD, METHOD) \
             FIELD->setChecked(_pattern_editor->METHOD()); \
             connect_check( \
@@ -1001,7 +1016,7 @@ public:
             );
 
         // _tempo obtains its value through StateTransaction.
-        connect_spin(_tempo, this, [this] (int tempo) {
+        connect_dspin(_tempo, this, [this] (double tempo) {
             debug_unwrap(edit_state(), [&](auto & tx) {
                 push_edit(
                     tx,
@@ -1376,7 +1391,7 @@ StateTransaction::~StateTransaction() noexcept(false) {
 
     if (e & E::DocumentEdited) {
         auto b = QSignalBlocker(_win->_tempo);
-        _win->_tempo->setValue(qRound(doc.sequencer_options.target_tempo));
+        _win->_tempo->setValue(doc.sequencer_options.target_tempo);
     }
 
     if (e & (E::DocumentEdited | E::CursorMoved)) {

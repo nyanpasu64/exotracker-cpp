@@ -55,9 +55,9 @@ static double & get_tempo_mut(doc::Document & document) {
     return document.sequencer_options.target_tempo;
 };
 
-EditBox set_tempo(int tempo) {
+EditBox set_tempo(double tempo) {
     return make_command(Setter<double, get_tempo_mut, ModifiedFlags::TargetTempo> (
-        (double) tempo
+        tempo
     ));
 }
 
