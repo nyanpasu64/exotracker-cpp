@@ -31,7 +31,7 @@ public:
 	// Number of samples written to output since it was last set, always
 	// a multiple of 2. Undefined if more samples were generated than
 	// output buffer could hold.
-	int sample_count() const;
+	size_t sample_count() const;
 
 // Emulation
 
@@ -257,7 +257,7 @@ private:
 
 #include <assert.h>
 
-inline int SPC_DSP::sample_count() const { return m.out - m.out_begin; }
+inline size_t SPC_DSP::sample_count() const { return m.out - m.out_begin; }
 
 inline int SPC_DSP::read( int addr ) const
 {

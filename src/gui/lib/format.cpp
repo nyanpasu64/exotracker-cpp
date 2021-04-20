@@ -65,10 +65,10 @@ std::optional<char> alphanum_from_key(QKeyEvent const& key) {
     ushort c = text[0].toUpper().unicode();
 
     if ('0' <= c && c <= '9') {
-        return c;
+        return (char) c;
     }
     if ('A' <= c && c <= 'Z') {
-        return c;
+        return (char) c;
     }
 
     return {};
