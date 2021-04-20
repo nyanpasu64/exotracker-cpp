@@ -12,9 +12,9 @@ Classes have member variables prefixed with a single underscore, like `_var`, to
 
 ### Windows
 
-MinGW and Clang are supported (MSVC used to be supported, but has been dropped). Clang compiles main.cpp very slowly because of CLI11 command-line handling. clang-cl is not supported because it doesn't understand all MSVC flags. Clang with GCC ABI is not tested.
+MSVC, Clang, and MinGW are supported. Clang compiles main.cpp very slowly because of CLI11 command-line handling. clang-cl is not supported because it doesn't understand all MSVC flags. Clang with GCC ABI works as of 2021-04, but is not regularly tested.
 
-If you want an optimized build with .pdb debug symbols, compile under Clang under Release (or RelWithDebInfo) configuration.
+If you want an optimized build with .pdb debug symbols, compile under MSVC or Clang under Release (or RelWithDebInfo) configuration.
 
 ### Does RelWithDebugInfo slow down the binary?
 
