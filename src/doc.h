@@ -29,9 +29,6 @@ using namespace ::doc::sample;
 using namespace ::doc::instr;
 using accidental::AccidentalMode;
 
-constexpr TickT MAX_TICKS_PER_BEAT = 127;
-constexpr int MAX_TEMPO = 255;
-
 /// The sound engine is driven by the S-SMP timer, which runs at a high frequency
 /// (8010 Hz / `spc_timer_period`), fixed per-game and not changing with song tempo.
 /// The sequencer only gets ticked (advancing document playback and triggering notes)
@@ -95,6 +92,15 @@ struct SequencerOptions {
     /// You probably don't need to change this.
     TickT ticks_per_beat = 48;
 };
+
+constexpr double MIN_TEMPO = 1.;
+constexpr double MAX_TEMPO = 255.;
+
+constexpr uint32_t MIN_TIMER_PERIOD = 1;
+constexpr uint32_t MAX_TIMER_PERIOD = 256;
+
+constexpr TickT MIN_TICKS_PER_BEAT = 1;
+constexpr TickT MAX_TICKS_PER_BEAT = 127;
 
 // Tuning table types
 inline namespace tuning {

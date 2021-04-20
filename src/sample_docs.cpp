@@ -22,7 +22,7 @@ using std::nullopt;
 ///
 /// Use as a template for porting other documents.
 static Document empty() {
-    SequencerOptions sequencer_options{.target_tempo = 150, .ticks_per_beat = 24};
+    SequencerOptions sequencer_options{.target_tempo = 150, .ticks_per_beat = 48};
 
     constexpr SampleIndex TRIANGLE = 0;
     constexpr SampleIndex PULSE_25 = 1;

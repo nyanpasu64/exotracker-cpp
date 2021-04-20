@@ -61,6 +61,50 @@ EditBox set_tempo(double tempo) {
     ));
 }
 
+using doc::Document;
+using doc::SequencerOptions;
+
+class SetSequencerOptions {
+    SequencerOptions _value;
+
+public:
+    ModifiedFlags _modified;
+
+    SetSequencerOptions(SequencerOptions new_value, ModifiedFlags modified)
+        : _value(new_value)
+        , _modified(modified)
+    {}
+
+    void apply_swap(doc::Document & document) {
+        std::swap(document.sequencer_options, _value);
+    }
+
+    bool can_coalesce(BaseEditCommand & /*prev*/) const {
+        return false;
+    }
+};
+
+EditBox set_sequencer_options(
+    Document const& orig_doc, SequencerOptions options
+) {
+    ModifiedInt flags = 0;
+    {
+        auto const& orig_options = orig_doc.sequencer_options;
+
+        if (orig_options.target_tempo != options.target_tempo) {
+            flags |= ModifiedFlags::TargetTempo;
+        }
+        if (orig_options.spc_timer_period != options.spc_timer_period) {
+            flags |= ModifiedFlags::SpcTimerPeriod;
+        }
+        if (orig_options.ticks_per_beat != options.ticks_per_beat) {
+            flags |= ModifiedFlags::TicksPerBeat;
+        }
+    }
+
+    return make_command(SetSequencerOptions(options, ModifiedFlags{flags}));
+}
+
 
 // # Timeline operations.
 

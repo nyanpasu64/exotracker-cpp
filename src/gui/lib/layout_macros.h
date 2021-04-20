@@ -126,6 +126,16 @@
     require_semicolon
 
 
+/// Add QFormLayout to QBoxLayout.
+#define l__form(qformlayout) \
+    auto * parentL = l; \
+    HIDE(l) \
+    auto * form = new qformlayout; \
+    parentL->addLayout(form); \
+    \
+    require_semicolon
+
+
 /// Add left/right to QFormLayout.
 #define form__left_right(_left, _right) \
     auto * left = new _left; \

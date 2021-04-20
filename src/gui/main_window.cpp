@@ -4,6 +4,7 @@
 #include "gui/timeline_editor.h"
 #include "gui/instrument_list.h"
 #include "gui/move_cursor.h"
+#include "gui/tempo_dialog.h"
 #include "lib/layout_macros.h"
 #include "gui_common.h"
 #include "cmd_queue.h"
@@ -414,8 +415,9 @@ struct MainWindowUi : MainWindow {
                 c->setTitle(tr("Song"));
 
                 {form__left_right(QPushButton(tr("Tempo..."), this), QDoubleSpinBox);
+                    _edit_tempo = left;
                     _tempo = right;
-                    right->setRange(1, doc::MAX_TEMPO);
+                    right->setRange(doc::MIN_TEMPO, doc::MAX_TEMPO);
                 }
 
                 // Purely cosmetic, no downside to large values.
@@ -786,6 +788,8 @@ public:
 
 }  // anonymous namespace
 
+using tempo_dialog::TempoDialog;
+
 // module-private
 class MainWindowImpl : public MainWindowUi {
      W_OBJECT(MainWindowImpl)
@@ -1014,6 +1018,10 @@ public:
             connect_combo( \
                 FIELD, _pattern_editor, &PatternEditor::set_##METHOD##_int \
             );
+
+        connect(_edit_tempo, &QPushButton::clicked, this, [this]() {
+            TempoDialog::make(_state.document_getter(), this)->exec();
+        });
 
         // _tempo obtains its value through StateTransaction.
         connect_dspin(_tempo, this, [this] (double tempo) {

@@ -205,6 +205,8 @@ add_executable(exotracker-qt
     src/gui/timeline_editor.cpp
     src/gui/instrument_list.cpp
 
+    src/gui/tempo_dialog.cpp
+
     # Resources
     res/exotracker.qrc
 )

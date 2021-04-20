@@ -7,6 +7,10 @@ namespace edit::edit_doc {
 
 [[nodiscard]] EditBox set_tempo(double tempo);
 
+[[nodiscard]] EditBox set_sequencer_options(
+    doc::Document const& document, doc::SequencerOptions options
+);
+
 // # Timeline operations.
 
 [[nodiscard]] EditBox add_timeline_row(
