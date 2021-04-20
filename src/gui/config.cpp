@@ -1,5 +1,6 @@
 #define gui_config_INTERNAL public
 #include "config.h"
+#include "util/expr.h"
 
 #include <qkeycode/values.h>
 
@@ -73,11 +74,11 @@ inline namespace visual {
             .cell_top_alpha = 96,
             .cell_bottom_alpha = 96,
 
-            .pattern_font = ({
+            .pattern_font = EXPR(
                 QFont out{"dejavu sans mono", 9};
                 out.setStyleHint(QFont::TypeWriter);
-                out;
-            }),
+                return out;
+            ),
 
             .font_tweaks = FontTweaks {
                 .width_adjust = 0,
@@ -162,11 +163,11 @@ inline namespace visual {
     ) const {
         QColor fg = get_subcolumn_color_raw(*this, subcolumn);
 
-        qreal divider_colorize = ({
+        qreal divider_colorize = EXPR(
             qreal bg_colorize = _subcolumn_bg_colorize;
             qreal fg_colorize = 1.;
-            lerp(bg_colorize, fg_colorize, _subcolumn_divider_colorize);
-        });
+            return lerp(bg_colorize, fg_colorize, _subcolumn_divider_colorize);
+        );
         QColor divider = lerp_colors(base_subcolumn_bg, fg, divider_colorize);
 
         return dim_unfocused(*this, divider, focused);

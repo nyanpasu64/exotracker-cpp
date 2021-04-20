@@ -1,6 +1,7 @@
 #define ChannelSequencer_INTERNAL public
 #include "sequencer.h"
 #include "util/compare_impl.h"
+#include "util/expr.h"
 #include "util/format.h"
 #include "util/release_assert.h"
 #include "util/math.h"
@@ -870,13 +871,13 @@ void ChannelSequencer::timeline_modified(doc::Document const & document) {
     _next_event = {.grid = _now.grid};
 
     // Clamp the cursor within the in-bounds grid cell's length.
-    BeatPlusTick const now_grid_len = ({
+    BeatPlusTick const now_grid_len = EXPR(
         doc::SequencerOptions const options = document.sequencer_options;
         TickT const ticks_per_beat = options.ticks_per_beat;
         auto timeline =
             doc::TimelineChannelRef(document.timeline, _chip_index, _chan_index);
-        frac_to_tick(ticks_per_beat, timeline[_now.grid].nbeats);
-    });
+        return frac_to_tick(ticks_per_beat, timeline[_now.grid].nbeats);
+    );
 
     /*
     doc_edited() treats adjacent grid cells as a continuum.
