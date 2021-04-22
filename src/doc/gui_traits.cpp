@@ -1,5 +1,6 @@
 #include "gui_traits.h"
 #include "chip_kinds.h"
+#include "util/constinit.h"
 #include "util/release_assert.h"
 
 namespace doc::gui_traits {

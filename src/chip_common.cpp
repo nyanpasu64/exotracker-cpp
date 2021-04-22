@@ -1,5 +1,6 @@
 #include "chip_kinds.h"
 #include "chip_common.h"
+#include "util/constinit.h"
 
 #include <stdexcept>  // std::logic_error
 

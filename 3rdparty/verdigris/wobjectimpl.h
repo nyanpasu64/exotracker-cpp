@@ -1,4 +1,4 @@
-﻿/****************************************************************************
+/****************************************************************************
  *  Copyright (C) 2016-2018 Woboq GmbH
  *  Olivier Goffart <ogoffart at woboq.com>
  *  https://woboq.com/
@@ -741,7 +741,7 @@ struct DataBuilder {
         for (auto c : s) *stringCharP++ = c;
         *stringCharP++ = '\0';
         *stringOffestP++ = stringOffset;
-        *stringLengthP++ = s.size();
+        *stringLengthP++ = static_cast<int>(s.size());
         *intP++ = stringCount;
 #if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
         stringOffset += 1 + s.size();
@@ -755,7 +755,7 @@ struct DataBuilder {
         for (auto c : s) *stringCharP++ = c;
         *stringCharP++ = '\0';
         *stringOffestP++ = stringOffset;
-        *stringLengthP++ = s.size();
+        *stringLengthP++ = static_cast<int>(s.size());
 #if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
         stringOffset += 1 + s.size();
 #else
@@ -769,7 +769,7 @@ struct DataBuilder {
         for (auto c : s) *stringCharP++ = c;
         *stringCharP++ = '\0';
         *stringOffestP++ = stringOffset;
-        *stringLengthP++ = s.size();
+        *stringLengthP++ = static_cast<int>(s.size());
         *intP++ = Flag | stringCount;
 #if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
         stringOffset += 1 + s.size();
