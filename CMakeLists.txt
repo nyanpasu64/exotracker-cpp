@@ -25,6 +25,15 @@ if(COMMAND target_precompile_headers)
     set(USE_PCH TRUE)
 endif()
 
+# Trim down Cap'n Proto build to reduce binary size and build time.
+option(BUILD_TESTING "Build unit tests and enable CTest 'check' target." OFF)
+# ${EXTERNAL_CAPNP} only affects build if BUILD_TESTING is ON.
+option(
+    CAPNP_LITE
+    "Compile Cap'n Proto in 'lite mode', in which all reflection APIs (schema.h, dynamic.h, etc.) are not included. Produces a smaller library at the cost of features. All programs built against the library must be compiled with -DCAPNP_LITE. Requires EXTERNAL_CAPNP."
+    ON
+)
+
 include(cmake_user_begin.cmake OPTIONAL)
 #End initialize environment
 
@@ -103,6 +112,7 @@ add_subdirectory("3rdparty/rtaudio" EXCLUDE_FROM_ALL)
 add_subdirectory("3rdparty/fmt_" EXCLUDE_FROM_ALL)
 add_subdirectory("3rdparty/qkeycode" EXCLUDE_FROM_ALL)
 add_subdirectory("3rdparty/snes9x-dsp" EXCLUDE_FROM_ALL)
+add_subdirectory("3rdparty/capnproto-c++" EXCLUDE_FROM_ALL)
 
 # libsamplerate in debug mode burns lots of CPU,
 # so build with optimizations on even in debug mode.
@@ -180,6 +190,7 @@ add_library(exotracker-headless
 target_compile_options(exotracker-headless PRIVATE "${options}")
 target_link_libraries(exotracker-headless
     PRIVATE rtaudio
+    PRIVATE capnp kj  # Don't #include Cap'n Proto in the public interface!
     PUBLIC exotracker-core
 )
 if(USE_PCH)
@@ -273,7 +284,10 @@ add_executable(exotracker-tests
 )
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
-target_link_libraries(exotracker-tests PRIVATE exotracker-headless)
+target_link_libraries(exotracker-tests
+    PRIVATE exotracker-headless
+    PRIVATE capnp kj
+)
 target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
 
 if(USE_PCH)
