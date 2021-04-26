@@ -72,6 +72,8 @@ struct InstrumentPatch {
 //    ByteEnvelope wave_index{};
 };
 
+/// The maximum number of keysplits in 1 instrument.
+constexpr size_t MAX_KEYSPLITS = 128;
 struct Instrument {
     std::string name;
 
@@ -83,6 +85,7 @@ struct Instrument {
     /// to ensure the tracker and SPC driver match.)
     std::vector<InstrumentPatch> keysplit;
 };
+using MaybeInstrument = std::optional<Instrument>;
 
 constexpr size_t MAX_INSTRUMENTS = 256;
 struct Instruments {

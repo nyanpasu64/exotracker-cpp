@@ -9,7 +9,9 @@ namespace chip_common {
 using ChipIndex = uint32_t;
 using ChannelIndex = uint32_t;
 
-ChipIndex constexpr MAX_NCHIP = 100;
+/// The maximum number of chips a module can contain.
+/// Documents with more sound chips are rejected.
+ChipIndex constexpr MAX_NCHIP = 255;
 
 using ChipToNchan = ChannelIndex const*;
 
@@ -19,6 +21,10 @@ using ChipToNchan = ChannelIndex const*;
 /// DocumentCopy::chip_index_to_nchan() will handle this case,
 /// while this array will return incorrect results (like 8 channels).
 extern const ChipToNchan CHIP_TO_NCHAN;
+
+/// The maximum number of channels that any future chip will ever contain.
+/// Documents with unrecognized sound chips holding more channels are rejected.
+constexpr size_t MAX_NCHAN_PER_CHIP = 255;
 
 }
 

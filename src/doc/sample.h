@@ -4,6 +4,7 @@
 #include "util/copy_move.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,7 @@ struct Sample {
 
     SampleTuning tuning;
 };
+using MaybeSample = std::optional<Sample>;
 
 constexpr size_t MAX_SAMPLES = 256;
 struct Samples {

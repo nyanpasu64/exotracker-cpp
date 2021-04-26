@@ -60,10 +60,10 @@ using MaybeNonZero = T;
 
 // # Sub-grid pattern types
 
-/// The length of a pattern is determined by its entry in the timeline (PatternUsage).
+/// The length of a pattern is determined by its entry in the timeline (TimelineBlock).
 /// However a Pattern may specify a loop length.
 /// If set, the first `loop_length` beats of the Pattern will loop
-/// for the duration of the PatternUsage.
+/// for the duration of the TimelineBlock.
 struct [[nodiscard]] Pattern {
     event_list::EventList events;
 
@@ -111,12 +111,12 @@ inline std::strong_ordering operator<=>(BeatOrEnd l, BeatFraction r) {
 
 /// Each pattern usage in the timeline has a begin and end time.
 /// To match traditional trackers, these times can align with the global pattern grid.
-/// But you can get creative and offset the pattern by an integer number of beats.
-/// (Maybe I'll allow negative offsets too.)
+/// But you can get creative and offset the pattern by a positive integer
+/// number of beats.
 ///
-/// It is legal to have gaps between `PatternUsage` in the timeline
+/// It is legal to have gaps between `TimelineBlock` in the timeline
 /// where no events are processed.
-/// It is illegal for `PatternUsage` to overlap in the timeline.
+/// It is illegal for `TimelineBlock` to overlap in the timeline.
 struct [[nodiscard]] TimelineBlock {
     /// Invariant: begin_time < end_time
     /// (cannot be equal, since it becomes impossible to select the usage).
@@ -124,7 +124,7 @@ struct [[nodiscard]] TimelineBlock {
     /// Invariant: TimelineBlock cannot cross gridlines.
     /// Long patterns crossing multiple gridlines makes it difficult to compute
     /// the relative time within a pattern when seeking to a (grid, beat) timestamp.
-    BeatIndex begin_time{};
+    BeatIndex begin_time{};  // TODO switch begin_time, perhaps BeatIndex, to uint32_t
     BeatOrEnd end_time{};
 
     /// For now, `TimelineBlock` owns a `Pattern`.
@@ -147,8 +147,10 @@ struct [[nodiscard]] TimelineBlock {
 
 // # Timeline grid types
 
-/// One grid cell, one channel.
-/// Can hold multiple blocks at non-overlapping times.
+/// One timeline item, one channel.
+/// Can hold multiple blocks at non-overlapping increasing times.
+/// Each block *should* have nonzero length, and not extend past
+/// [0, TimelineItem::nbeats]? IDK.
 struct [[nodiscard]] TimelineCell {
     DenseMap<BlockIndex, TimelineBlock> _raw_blocks;
 
@@ -165,7 +167,7 @@ struct [[nodiscard]] TimelineCell {
     }
 };
 
-/// One grid cell, one channel.
+/// One timeline item, all channels. Stores duration of timeline item.
 struct [[nodiscard]] TimelineCellRef {
     BeatFraction const nbeats;
     TimelineCell const& cell;
@@ -177,11 +179,12 @@ struct [[nodiscard]] TimelineCellRefMut {
 };
 
 
+using ChipChannelCells = ChipChannelTo<TimelineCell>;
 /// One grid cell, all channels. Stores duration of grid cell.
 struct [[nodiscard]] TimelineRow {
     BeatFraction nbeats;
 
-    ChipChannelTo<TimelineCell> chip_channel_cells;
+    ChipChannelCells chip_channel_cells;
 };
 
 
