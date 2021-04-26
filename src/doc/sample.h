@@ -4,12 +4,16 @@
 #include "util/copy_move.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace doc::sample {
 
 using events::ChromaticInt;
+
+inline constexpr uint32_t MIN_SAMPLE_RATE = 1;
+inline constexpr uint32_t MAX_SAMPLE_RATE = 1'000'000;
 
 struct SampleTuning {
     // TODO write a way to compute tuning per-note
@@ -20,6 +24,8 @@ struct SampleTuning {
     /// not requiring exp2().
     int16_t detune_cents = 0;
 };
+
+inline constexpr size_t BRR_BLOCK_SIZE = 9;
 
 // TODO copy whatever amktools uses
 struct Sample {
@@ -38,6 +44,7 @@ struct Sample {
 
     SampleTuning tuning;
 };
+using MaybeSample = std::optional<Sample>;
 
 constexpr size_t MAX_SAMPLES = 256;
 struct Samples {

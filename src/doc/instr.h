@@ -38,10 +38,16 @@ template<int begin, int end, typename T = uint8_t>
 using RangeInclusive = T;
 
 struct Adsr {
-    RangeInclusive<0, 0x0f> attack;
-    RangeInclusive<0, 0x07> decay;
-    RangeInclusive<0, 0x07> sustain;
-    RangeInclusive<0, 0x1f> release;
+    uint8_t attack;
+    uint8_t decay;
+    uint8_t sustain;
+    uint8_t release;
+
+// impl
+    static constexpr uint8_t MAX_ATTACK = 0x0f;
+    static constexpr uint8_t MAX_DECAY = 0x07;
+    static constexpr uint8_t MAX_SUSTAIN = 0x07;
+    static constexpr uint8_t MAX_RELEASE = 0x1f;
 
     /// Based on https://nyanpasu64.github.io/AddmusicK/readme_files/hex_command_reference.html#ADSRInfo.
     std::array<uint8_t, 2> to_hex() const {
@@ -72,6 +78,8 @@ struct InstrumentPatch {
 //    ByteEnvelope wave_index{};
 };
 
+/// The maximum number of keysplits in 1 instrument.
+constexpr size_t MAX_KEYSPLITS = 128;
 struct Instrument {
     std::string name;
 
@@ -83,6 +91,7 @@ struct Instrument {
     /// to ensure the tracker and SPC driver match.)
     std::vector<InstrumentPatch> keysplit;
 };
+using MaybeInstrument = std::optional<Instrument>;
 
 constexpr size_t MAX_INSTRUMENTS = 256;
 struct Instruments {

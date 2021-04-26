@@ -109,7 +109,7 @@ inline namespace tuning {
     using RegisterInt = int;
 
     template<typename T>
-    using Owned_ = std::vector<T>;
+    using Owned_ = std::vector<T>;  // size must be CHROMATIC_COUNT
 
     template<typename T>
     using Ref_ = gsl::span<T const, CHROMATIC_COUNT>;
@@ -123,6 +123,9 @@ inline namespace tuning {
     FrequenciesOwned equal_temperament(
         ChromaticInt root_chromatic = 69, FreqDouble root_frequency = 440.
     );
+
+    inline constexpr double MIN_TUNING_FREQ = 0.;
+    inline constexpr double MAX_TUNING_FREQ = 1'000'000.;
 }
 
 using chip_kinds::ChipKind;
