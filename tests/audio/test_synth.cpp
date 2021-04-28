@@ -255,7 +255,7 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
 TEST_CASE("Send all note pitches into AudioInstance and look for assertion errors") {
     // 32000Hz, 4000 samples, various note pitches.
     CommandQueue play_commands = play_from_begin();
-    for (doc::ChromaticInt pitch = 0; pitch < doc::CHROMATIC_COUNT; pitch++) {
+    for (doc::Chromatic pitch = 0; pitch < doc::CHROMATIC_COUNT; pitch++) {
         doc::Document document{
             one_note_document(Spc700ChannelID::Channel1, {pitch})
         };

@@ -32,7 +32,7 @@ inline uint8_t brr_header(uint8_t gain, uint8_t filter, bool end, bool loop) {
     return out;
 }
 
-constexpr ChromaticInt A440_MIDI = 69;
+constexpr Chromatic A440_MIDI = 69;
 
 inline Sample pulse_12_5() {
     return Sample {

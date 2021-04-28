@@ -76,7 +76,9 @@ static BeatFraction at(int start, int num, int den) {
 }
 
 static Note pitch(int octave, int semitone) {
-    return Note{static_cast<ChromaticInt>(12 * octave + semitone)};
+    return Note(Chromatic(
+        std::clamp(12 * octave + semitone, 0, CHROMATIC_COUNT - 1)
+    ));
 }
 
 }

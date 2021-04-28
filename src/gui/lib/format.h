@@ -3,6 +3,7 @@
 #include "gui/config.h"
 #include "doc/events.h"
 #include "doc/accidental_common.h"
+#include "util/release_assert.h"
 
 #include <QString>
 #include <QStringLiteral>
@@ -56,9 +57,19 @@ using doc::events::NOTES_PER_OCTAVE;
     }
 
     auto impl = [&cfg, accidental_mode] (
-        auto & impl, doc::events::ChromaticInt note, QChar accidental
+        auto & impl, int note, QChar accidental
     ) -> QString {
+        // Octave is rounded towards 0, and semitone has the same sign as note.
         auto [octave, semitone] = div(note, NOTES_PER_OCTAVE);
+        // Ensure that octave is correct and semitone is non-negative.
+        // (This can only happen if note < 0, which never happens if
+        // midi_to_note_name() only receives valid MIDI pitches.
+        // So this is just future-proofing.)
+        if (semitone < 0) {
+            semitone += NOTES_PER_OCTAVE;
+            octave -= 1;
+        }
+
         octave += cfg.gui_bottom_octave;
 
         auto maybe_diatonic = detail::semitone_diatonics[semitone];

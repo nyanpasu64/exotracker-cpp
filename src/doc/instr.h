@@ -13,7 +13,7 @@
 /// Instrument format.
 namespace doc::instr {
 
-using events::ChromaticInt;
+using events::Chromatic;
 
 template<class IntT_>
 struct Envelope {
@@ -61,10 +61,10 @@ struct Adsr {
 
 struct InstrumentPatch {
     /// Do not use this patch for pitches below this value.
-    ChromaticInt min_note = 0;
+    Chromatic min_note = 0;
     /// Do not use this patch for pitches above this value.
     /// (TODO what if this is below min_note?)
-    ChromaticInt max_note_inclusive = events::CHROMATIC_COUNT - 1;
+    Chromatic max_note_inclusive = events::CHROMATIC_COUNT - 1;
 
     /// The sample to play. If sample missing, acts as a key-off(???).
     sample::SampleIndex sample_idx;

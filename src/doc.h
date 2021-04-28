@@ -104,7 +104,7 @@ constexpr TickT MAX_TICKS_PER_BEAT = 127;
 
 // Tuning table types
 inline namespace tuning {
-    using ChromaticInt = ChromaticInt;
+    using Chromatic = Chromatic;
     using FreqDouble = double;
     using RegisterInt = int;
 
@@ -121,7 +121,7 @@ inline namespace tuning {
     using TuningRef = Ref_<RegisterInt const>;
 
     FrequenciesOwned equal_temperament(
-        ChromaticInt root_chromatic = 69, FreqDouble root_frequency = 440.
+        Chromatic root_chromatic = 69, FreqDouble root_frequency = 440.
     );
 
     inline constexpr double MIN_TUNING_FREQ = 0.;
