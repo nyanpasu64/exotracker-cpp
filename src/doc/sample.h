@@ -45,6 +45,7 @@ constexpr size_t MAX_SAMPLES = 256;
 struct Samples {
     std::vector<std::optional<Sample>> v;
 
+// impl
     Samples() {
         v.resize(MAX_SAMPLES);
     }

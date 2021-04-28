@@ -21,6 +21,7 @@ struct Envelope {
 
     std::vector<IntT> values;
 
+// impl
     static Envelope new_empty() {
         return Envelope{};
     }
@@ -44,6 +45,7 @@ struct Adsr {
     RangeInclusive<0, 0x07> sustain;
     RangeInclusive<0, 0x1f> release;
 
+// impl
     /// Based on https://nyanpasu64.github.io/AddmusicK/readme_files/hex_command_reference.html#ADSRInfo.
     std::array<uint8_t, 2> to_hex() const {
         return {
@@ -92,6 +94,7 @@ constexpr size_t MAX_INSTRUMENTS = 256;
 struct Instruments {
     std::vector<std::optional<Instrument>> v;
 
+// impl
     Instruments() {
         v.resize(MAX_INSTRUMENTS);
     }
