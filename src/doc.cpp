@@ -14,7 +14,7 @@ namespace doc {
 
 inline namespace tuning {
     FrequenciesOwned equal_temperament(
-        ChromaticInt root_chromatic, FreqDouble root_frequency
+        Chromatic root_chromatic, FreqDouble root_frequency
     ) {
         FrequenciesOwned out;
         out.resize(CHROMATIC_COUNT);

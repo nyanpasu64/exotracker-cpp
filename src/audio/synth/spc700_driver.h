@@ -34,7 +34,7 @@ class Spc700Driver;
 class Spc700ChannelDriver {
     uint8_t _channel_id;
 
-    doc::Note _prev_note = 0;
+    doc::Chromatic _prev_note = 0;
     bool _note_playing = false;
 
     // TODO how to handle "no instrument" state?

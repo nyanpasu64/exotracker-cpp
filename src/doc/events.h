@@ -16,16 +16,25 @@ namespace doc::events {
 // These inline namespaces aren't strictly required, and could be removed if desired.
 // Pick an underscored name so it doesn't clash with names I care about.
 inline namespace note_ {
-    using ChromaticInt = int16_t;
+    /// Note pitch, as expressed as a MIDI note number.
+    /// Valid values are [0..127 (CHROMATIC_COUNT - 1)].
+    using Chromatic = uint8_t;
     constexpr int CHROMATIC_COUNT = 128;
     constexpr int NOTES_PER_OCTAVE = 12;
 
+    // TODO add a "chromatic | microtonal" type or "floating-point pitch" type,
+    // distinct from "note or cut".
+
+    using NoteInt = int16_t;
+
+    /// Represents a "note" value on a tracker pattern.
+    /// Stores either a note pitch, or a note release/cut, or echo buffer, etc.
     struct Note {
-        ChromaticInt value;
+        NoteInt value;
 
         // Implicit conversion constructor.
         // Primarily here for gui::history::dummy_document().
-        constexpr Note(ChromaticInt value) : value(value) {}
+        constexpr Note(NoteInt value) : value(value) {}
 
         // impl
         EQUALABLE_CONSTEXPR(Note, value)

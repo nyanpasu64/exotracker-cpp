@@ -10,12 +10,12 @@
 
 namespace doc::sample {
 
-using events::ChromaticInt;
+using events::Chromatic;
 
 struct SampleTuning {
     // TODO write a way to compute tuning per-note
     uint32_t sample_rate;
-    ChromaticInt root_key;  // ChromaticInt or Note?
+    Chromatic root_key;
 
     /// During .spc compilation, this should be converted into a format
     /// not requiring exp2().
