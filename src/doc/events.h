@@ -72,7 +72,7 @@ using InstrumentIndex = uint8_t;
 /// regardless of the field being changed.
 using Volume = uint8_t;
 
-using EffColIndex = uint32_t;
+using EffColIndex = uint8_t;
 
 inline namespace effects_ {
     constexpr EffColIndex MAX_EFFECTS_PER_EVENT = 8;
