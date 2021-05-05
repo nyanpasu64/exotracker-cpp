@@ -20,15 +20,19 @@ set(kj_sources_lite
   test-helpers.c++
   units.c++
   encoding.c++
-)
-set(kj_sources_heavy
-  refcount.c++
-  string-tree.c++
-  time.c++
+
+  # Moved from kj_sources_heavy.
   filesystem.c++
   filesystem-disk-unix.c++
   filesystem-disk-win32.c++
-  parse/char.c++
+
+  # Dependencies of filesystem.h/c++.
+  refcount.c++
+  time.c++
+)
+set(kj_sources_heavy
+  string-tree.c++
+  parse/char.c++  # Doesn't build on MSVC.
 )
 if(NOT CAPNP_LITE)
   set(kj_sources ${kj_sources_lite} ${kj_sources_heavy})
