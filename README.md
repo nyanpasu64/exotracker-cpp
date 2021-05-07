@@ -35,7 +35,7 @@ exotracker-cpp requires a compiler with C++20 support. MSVC, GCC 10+, and Clang 
 
 - On Linux, I've had good results with GCC 10 and Clang 10 through 12 (older versions lack support for `operator<=>` and defaulting `operator==`).
 - On Windows, I recommend using MSVC or Clang (not clang-cl). MinGW/GCC works, but is not recommended.
-	- MinGW-w64 produces larger binaries, and requires either linking libc statically into the binary (even larger binaries) or bundling glibc DLLs (since unlike Universal CRT, most people don't have mingw-w64 in PATH).
+	- MinGW-w64 links slowly and produces larger binaries, and requires either linking libc statically into the binary (even larger binaries) or bundling glibc DLLs (since unlike Universal CRT, most people don't have mingw-w64 in PATH).
 	- If you plan to use MinGW, I recommend using MSYS2 to install GCC and Qt (`pacman -Syu mingw-w64-x86_64-gcc mingw-w64-x86_64-gdb mingw-w64-x86_64-qt5`).
 	- Using Qt's web installer to install MinGW Qt is discouraged, since installing MinGW Qt also installs MinGW GCC 8.1.0, which is too old to compile exotracker. (If you try uninstalling MinGW, it removes MinGW Qt as well.) You have to keep GCC 8.1.0 around (but avoid using it), then use MSYS2 to install mingw-w64 GCC separately, use MSYS2's compiler to build exotracker, and use MSYS2's DLLs to run exotracker. You're better off installing GCC and Qt through MSYS2, which works by default.
 	- Do not use Win-builds to install MinGW! It ships GCC 4.8.3 and Qt 5.3.1, which were released in 2014 and are far too outdated for exotracker.
