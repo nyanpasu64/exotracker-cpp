@@ -28,7 +28,7 @@ using doc::BeatFraction;
 // Unused for now.
 [[maybe_unused]]
 static TickT time_to_ticks(doc::TimeInPattern time, doc::SequencerOptions options) {
-    return doc::round_to_int(time.anchor_beat * options.ticks_per_beat)
+    return doc::round_to_int(time.anchor_beat * (int) options.ticks_per_beat)
         + time.tick_offset;
 }
 
@@ -242,7 +242,7 @@ std::tuple<SequencerTime, EventsRef> ChannelSequencer::next_tick(
     release_assert(_chan_index < nchan);
 
     doc::SequencerOptions const options = document.sequencer_options;
-    TickT const ticks_per_beat = options.ticks_per_beat;
+    auto const ticks_per_beat = (TickT) options.ticks_per_beat;
     _curr_ticks_per_beat = ticks_per_beat;
 
     // SequencerTime is current tick (just occurred), not next tick.
@@ -476,7 +476,7 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
     release_assert(_chan_index < nchan);
 
     doc::SequencerOptions const options = document.sequencer_options;
-    TickT const ticks_per_beat = options.ticks_per_beat;
+    auto const ticks_per_beat = (TickT) options.ticks_per_beat;
 
     // Set is-playing to true.
     _curr_ticks_per_beat = ticks_per_beat;
@@ -628,7 +628,7 @@ void ChannelSequencer::ticks_per_beat_changed(doc::Document const & document) {
             _now.next_tick.dtick, _curr_ticks_per_beat
         }
     };
-    TickT const ticks_per_beat = document.sequencer_options.ticks_per_beat;
+    auto const ticks_per_beat = (TickT) document.sequencer_options.ticks_per_beat;
 
     // Set real time.
     // Both numerator (_now.next_tick) and denominator (_curr_ticks_per_beat)
@@ -683,7 +683,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
     release_assert(_chan_index < nchan);
 
     doc::SequencerOptions const options = document.sequencer_options;
-    TickT const ticks_per_beat = options.ticks_per_beat;
+    auto const ticks_per_beat = (TickT) options.ticks_per_beat;
 
     // *everything* needs to be overhauled when I add mid-song tempo changes.
     release_assert_equal(_curr_ticks_per_beat, ticks_per_beat);
@@ -873,7 +873,7 @@ void ChannelSequencer::timeline_modified(doc::Document const & document) {
     // Clamp the cursor within the in-bounds grid cell's length.
     BeatPlusTick const now_grid_len = EXPR(
         doc::SequencerOptions const options = document.sequencer_options;
-        TickT const ticks_per_beat = options.ticks_per_beat;
+        auto const ticks_per_beat = (TickT) options.ticks_per_beat;
         auto timeline =
             doc::TimelineChannelRef(document.timeline, _chip_index, _chan_index);
         return frac_to_tick(ticks_per_beat, timeline[_now.grid].nbeats);

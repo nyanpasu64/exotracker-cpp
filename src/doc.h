@@ -90,7 +90,7 @@ struct SequencerOptions {
     ///
     /// Defaults to 48 (the value used in Square's SPC drivers, including FF6).
     /// You probably don't need to change this.
-    TickT ticks_per_beat = 48;
+    uint32_t ticks_per_beat = 48;
 };
 
 constexpr double MIN_TEMPO = 1.;
@@ -99,8 +99,8 @@ constexpr double MAX_TEMPO = 1000.;
 constexpr uint32_t MIN_TIMER_PERIOD = 1;
 constexpr uint32_t MAX_TIMER_PERIOD = 256;
 
-constexpr TickT MIN_TICKS_PER_BEAT = 1;
-constexpr TickT MAX_TICKS_PER_BEAT = 127;
+constexpr uint32_t MIN_TICKS_PER_BEAT = 1;
+constexpr uint32_t MAX_TICKS_PER_BEAT = 127;
 
 // Tuning table types
 inline namespace tuning {

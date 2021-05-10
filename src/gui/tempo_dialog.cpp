@@ -260,7 +260,7 @@ public:
                     {form__label_w(tr("Ticks/beat"), QSpinBox);
                         _ticks_per_beat = w;
                         w->setRange(doc::MIN_TICKS_PER_BEAT, doc::MAX_TICKS_PER_BEAT);
-                        w->setValue(_options.ticks_per_beat);
+                        w->setValue((int) _options.ticks_per_beat);
                     }
                 }
                 {l__w(HLine);
@@ -346,7 +346,7 @@ public:
         // Calculate tempo values.
         _options.target_tempo = _target_beats_per_min->value();
         _options.spc_timer_period = (uint32_t) _spc_timer_period->value();
-        _options.ticks_per_beat = _ticks_per_beat->value();
+        _options.ticks_per_beat = (uint32_t) _ticks_per_beat->value();
 
         uint8_t sequencer_rate = calc_sequencer_rate(_options);
 
