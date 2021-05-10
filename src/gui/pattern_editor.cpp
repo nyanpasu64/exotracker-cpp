@@ -2782,7 +2782,8 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
             for (auto const [semitone, curr_key] : enumerate<int>(key_row)) {
                 if (curr_key == keycode) {
                     int chromatic = octave * lib::format::NOTES_PER_OCTAVE + semitone;
-                    chromatic = std::clamp(chromatic, 0, doc::CHROMATIC_COUNT - 1);
+                    chromatic =
+                        std::clamp(chromatic, 0, (int) doc::CHROMATIC_COUNT - 1);
 
                     auto note = doc::Note{doc::NoteInt(chromatic)};
                     note_pressed(*this, chip, channel, note);

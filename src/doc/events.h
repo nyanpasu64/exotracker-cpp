@@ -19,7 +19,7 @@ inline namespace note_ {
     /// Note pitch, as expressed as a MIDI note number.
     /// Valid values are [0..127 (CHROMATIC_COUNT - 1)].
     using Chromatic = uint8_t;
-    constexpr int CHROMATIC_COUNT = 128;
+    constexpr size_t CHROMATIC_COUNT = 128;
     constexpr int NOTES_PER_OCTAVE = 12;
 
     // TODO add a "chromatic | microtonal" type or "floating-point pitch" type,
