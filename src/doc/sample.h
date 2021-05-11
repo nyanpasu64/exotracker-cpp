@@ -3,6 +3,10 @@
 #include "events.h"
 #include "util/copy_move.h"
 
+#ifdef UNITTEST
+#include "util/compare.h"
+#endif
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -23,6 +27,10 @@ struct SampleTuning {
     /// During .spc compilation, this should be converted into a format
     /// not requiring exp2().
     int16_t detune_cents = 0;
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(SampleTuning)
+#endif
 };
 
 inline constexpr size_t BRR_BLOCK_SIZE = 9;
@@ -43,6 +51,11 @@ struct Sample {
     uint16_t loop_byte;
 
     SampleTuning tuning;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Sample)
+#endif
 };
 using MaybeSample = std::optional<Sample>;
 
@@ -64,6 +77,10 @@ struct Samples {
     std::optional<Sample> & operator[](size_t idx) {
         return v[idx];
     }
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Samples)
+#endif
 };
 
 using SampleIndex = uint8_t;

@@ -14,6 +14,10 @@
 #include "chip_common.h"
 #include "util/copy_move.h"
 
+#ifdef UNITTEST
+#include "util/compare.h"
+#endif
+
 #include <gsl/span>
 
 #include <vector>
@@ -91,6 +95,11 @@ struct SequencerOptions {
     /// Defaults to 48 (the value used in Square's SPC drivers, including FF6).
     /// You probably don't need to change this.
     uint32_t ticks_per_beat = 48;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(SequencerOptions)
+#endif
 };
 
 constexpr double MIN_TEMPO = 1.;
@@ -133,6 +142,11 @@ using ChipList = std::vector<chip_kinds::ChipKind>;
 
 struct ChannelSettings {
     events::EffColIndex n_effect_col = 1;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(ChannelSettings)
+#endif
 };
 
 using ChipChannelSettings = ChipChannelTo<ChannelSettings>;
@@ -179,6 +193,10 @@ struct DocumentCopy {
     [[nodiscard]] chip_common::ChannelIndex chip_index_to_nchan(
         chip_common::ChipIndex chip
     ) const;
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(DocumentCopy)
+#endif
 };
 
 /// Non-copyable version of Document. You must call clone() explicitly.

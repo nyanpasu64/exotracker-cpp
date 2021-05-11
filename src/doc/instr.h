@@ -4,6 +4,10 @@
 #include "events.h"
 #include "util/copy_move.h"
 
+#ifdef UNITTEST
+#include "util/compare.h"
+#endif
+
 #include <array>
 #include <string>
 #include <cstdint>
@@ -58,6 +62,10 @@ struct Adsr {
             (uint8_t) (release | (sustain << 5)),
         };
     }
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Adsr)
+#endif
 };
 
 struct InstrumentPatch {
@@ -78,6 +86,11 @@ struct InstrumentPatch {
 //    ShortEnvelope pitch{};
 //    ByteEnvelope arpeggio{};
 //    ByteEnvelope wave_index{};
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(InstrumentPatch)
+#endif
 };
 
 /// The maximum number of keysplits in 1 instrument.
@@ -92,6 +105,11 @@ struct Instrument {
     /// (Note that this algorithm has edge-cases, and care must be taken
     /// to ensure the tracker and SPC driver match.)
     std::vector<InstrumentPatch> keysplit;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Instrument)
+#endif
 };
 using MaybeInstrument = std::optional<Instrument>;
 
@@ -113,6 +131,10 @@ struct Instruments {
     std::optional<Instrument> & operator[](size_t idx) {
         return v[idx];
     }
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Instruments)
+#endif
 };
 
 }

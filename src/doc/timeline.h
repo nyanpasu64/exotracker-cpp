@@ -9,6 +9,10 @@
 #include "util/compare.h"
 #include "util/safe_typedef.h"
 
+#ifdef UNITTEST
+#include "util/compare.h"
+#endif
+
 #include <coroutine.h>
 #include <gsl/span>
 
@@ -71,9 +75,9 @@ struct [[nodiscard]] Pattern {
     MaybeNonZero<uint32_t> loop_length{};
 
 // impl
-    #ifdef UNITTEST
+#ifdef UNITTEST
     DEFAULT_EQUALABLE(Pattern)
-    #endif
+#endif
 };
 
 
@@ -142,9 +146,9 @@ struct [[nodiscard]] TimelineBlock {
         return TimelineBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}};
     }
 
-    #ifdef UNITTEST
+#ifdef UNITTEST
     DEFAULT_EQUALABLE(TimelineBlock)
-    #endif
+#endif
 };
 
 
@@ -161,9 +165,9 @@ struct [[nodiscard]] TimelineCell {
     // Implicit conversion constructor to simplify sample_docs.cpp.
     TimelineCell(std::initializer_list<TimelineBlock> l) : _raw_blocks(l) {}
 
-    #ifdef UNITTEST
+#ifdef UNITTEST
     DEFAULT_EQUALABLE(TimelineCell)
-    #endif
+#endif
 
     [[nodiscard]] BlockIndex size() const {
         return (BlockIndex) _raw_blocks.size();
@@ -188,6 +192,11 @@ struct [[nodiscard]] TimelineRow {
     BeatFraction nbeats;
 
     ChipChannelCells chip_channel_cells;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(TimelineRow)
+#endif
 };
 
 
