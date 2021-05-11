@@ -70,6 +70,7 @@ struct [[nodiscard]] Pattern {
     /// Loop length in beats. If length is zero, don't loop the pattern.
     MaybeNonZero<uint32_t> loop_length{};
 
+// impl
     #ifdef UNITTEST
     DEFAULT_EQUALABLE(Pattern)
     #endif
@@ -82,6 +83,7 @@ using BeatIndex = timed_events::FractionInt;
 struct BeatOrEnd {
     EXPLICIT_TYPEDEF(uint32_t, BeatOrEnd)
 
+// impl
     template<typename T>
     T value_or(T other) const;
 };
@@ -133,6 +135,7 @@ struct [[nodiscard]] TimelineBlock {
     /// Or maybe a variant of these two.
     Pattern pattern;
 
+// impl
     static TimelineBlock from_events(
         event_list::EventList events, MaybeNonZero<uint32_t> loop_length = {}
     ) {
@@ -154,7 +157,7 @@ struct [[nodiscard]] TimelineBlock {
 struct [[nodiscard]] TimelineCell {
     DenseMap<BlockIndex, TimelineBlock> _raw_blocks;
 
-    // impl
+// impl
     // Implicit conversion constructor to simplify sample_docs.cpp.
     TimelineCell(std::initializer_list<TimelineBlock> l) : _raw_blocks(l) {}
 
@@ -199,7 +202,7 @@ class [[nodiscard]] TimelineChannelRef {
     ChipIndex _chip;
     ChannelIndex _channel;
 
-    // impl
+// impl
 public:
     TimelineChannelRef(TimelineRef timeline, ChipIndex chip, ChannelIndex channel)
         : _timeline(timeline)
@@ -223,7 +226,7 @@ class [[nodiscard]] TimelineChannelRefMut {
     ChipIndex _chip;
     ChannelIndex _channel;
 
-    // impl
+// impl
 public:
     TimelineChannelRefMut(Timeline & timeline, ChipIndex chip, ChannelIndex channel)
         : _timeline(timeline)

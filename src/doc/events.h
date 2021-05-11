@@ -32,6 +32,7 @@ inline namespace note_ {
     struct Note {
         NoteInt value;
 
+    // impl
         // Implicit conversion constructor.
         // Primarily here for gui::history::dummy_document().
         constexpr Note(NoteInt value) : value(value) {}
@@ -89,6 +90,7 @@ inline namespace effects_ {
         EffectName name;
         EffectValue value;
 
+    // impl
         Effect()
             : name{EFFECT_NAME_PLACEHOLDER, EFFECT_NAME_PLACEHOLDER}
             , value{0}
@@ -115,6 +117,7 @@ struct RowEvent {
     std::optional<Volume> volume = {};
     EffectList effects = {};
 
+// impl
     DEFAULT_EQUALABLE(RowEvent)
 };
 

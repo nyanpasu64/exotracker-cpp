@@ -39,6 +39,7 @@ struct TimeInPattern {
     BeatFraction anchor_beat;
     TickT tick_offset;
 
+// impl
     COMPARABLE(TimeInPattern)
 };
 
@@ -48,6 +49,7 @@ struct TimedRowEvent {
 
     events::RowEvent v;
 
+// impl
     TickT tick_offset(events::EffColIndex n_effect_col) const;
 
     TimeInPattern time(events::EffColIndex n_effect_col) const {

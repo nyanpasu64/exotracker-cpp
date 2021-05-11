@@ -21,6 +21,7 @@ struct Envelope {
 
     std::vector<IntT> values;
 
+// impl
     static Envelope new_empty() {
         return Envelope{};
     }
@@ -98,6 +99,7 @@ constexpr size_t MAX_INSTRUMENTS = 256;
 struct Instruments {
     std::vector<std::optional<Instrument>> v;
 
+// impl
     Instruments() {
         v.resize(MAX_INSTRUMENTS);
     }
