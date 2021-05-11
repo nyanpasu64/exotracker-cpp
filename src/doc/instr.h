@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sample.h"
+#include "events.h"
 #include "util/copy_move.h"
 
 #include <array>
