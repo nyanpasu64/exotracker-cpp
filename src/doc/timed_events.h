@@ -38,7 +38,6 @@ using TickT = int32_t;
 struct TimeInPattern {
     BeatFraction anchor_beat;
     TickT tick_offset;
-    using TickLimits = std::numeric_limits<decltype(tick_offset)>;
 
     COMPARABLE(TimeInPattern)
 };
