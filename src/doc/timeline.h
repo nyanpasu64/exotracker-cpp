@@ -24,11 +24,12 @@ namespace doc::timeline {
 // # Constants
 
 /// Type doesn't really matter.
+/// You cannot store more than 256 timeline items,
+/// or valid indices of 0 through 0xff.
 ///
-/// Not sure what MAX_SEQUENCE_LEN means.
-/// Maybe it needs to be split into grid cell limit, pattern usage limit,
-/// and pattern limit.
-constexpr int MAX_GRID_CELLS = 256;
+/// Note that a 256-item-long document's length will not fit in a single byte!
+/// But FamiTracker manages somehow.
+constexpr int MAX_TIMELINE_FRAMES = 256;
 
 
 /// Not strictly enforced. But exceeding this could cause problems

@@ -443,7 +443,8 @@ struct MainWindowUi : MainWindow {
                     {l__w(QSpinBox);
                         _end_jump_to = w;
                         w->setEnabled(false);
-                        w->setRange(0, doc::MAX_GRID_CELLS - 1);
+                        // Must point to a valid timeline index.
+                        // TODO adjust range within [0..current timeline size).
                     }
                 }
             }
@@ -1236,7 +1237,7 @@ public:
 
     void add_timeline_row() {
         auto & document = get_document();
-        if (document.timeline.size() >= doc::MAX_GRID_CELLS) {
+        if (document.timeline.size() >= doc::MAX_TIMELINE_FRAMES) {
             return;
         }
 
@@ -1313,7 +1314,7 @@ public:
 
     void clone_timeline_row() {
         auto & document = get_document();
-        if (document.timeline.size() >= doc::MAX_GRID_CELLS) {
+        if (document.timeline.size() >= doc::MAX_TIMELINE_FRAMES) {
             return;
         }
 
