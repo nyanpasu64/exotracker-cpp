@@ -244,8 +244,6 @@ namespace {
 using cmd_queue::CommandQueue;
 using cmd_queue::AudioCommand;
 
-constexpr int MAX_BEATS_PER_PATTERN = 256;
-
 struct MainWindowUi : MainWindow {
     using MainWindow::MainWindow;
     // Use raw pointers since QObjects automatically destroy children.
@@ -425,7 +423,7 @@ struct MainWindowUi : MainWindow {
                     tr("Beats/measure"),
                     [this] {
                         auto w = _beats_per_measure = new QSpinBox;
-                        w->setRange(1, MAX_BEATS_PER_PATTERN);
+                        w->setRange(1, (int) doc::MAX_BEATS_PER_FRAME);
                         w->setEnabled(false);
                         return w;
                     }()
@@ -458,7 +456,7 @@ struct MainWindowUi : MainWindow {
                     new QLabel(tr("Length (beats)")),
                     [this] {
                         auto w = _length_beats = new QSpinBox;
-                        w->setRange(1, MAX_BEATS_PER_PATTERN);
+                        w->setRange(1, (int) doc::MAX_BEATS_PER_FRAME);
                         w->setValue(16);
                         return w;
                     }()

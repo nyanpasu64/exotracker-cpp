@@ -83,6 +83,13 @@ struct [[nodiscard]] Pattern {
 
 using timed_events::BeatFraction;
 
+/// Very long timeline items and/or patterns with thousands of beats
+/// can cause the UI to slow down.
+/// If people end up actually using huge patterns and encountering slowdown,
+/// the pattern editor may be improved to only draw on-screen items,
+/// and this limit increased.
+constexpr size_t MAX_BEATS_PER_FRAME = 0xfff;
+
 using BeatIndex = timed_events::FractionInt;
 struct BeatOrEnd {
     EXPLICIT_TYPEDEF(uint32_t, BeatOrEnd)
