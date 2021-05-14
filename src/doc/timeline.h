@@ -173,6 +173,12 @@ struct [[nodiscard]] TimelineCell {
     // Implicit conversion constructor to simplify sample_docs.cpp.
     TimelineCell(std::initializer_list<TimelineBlock> l) : _raw_blocks(l) {}
 
+    TimelineCell(std::vector<TimelineBlock> raw_blocks)
+        : _raw_blocks(std::move(raw_blocks))
+    {}
+
+    TimelineCell() = default;
+
 #ifdef UNITTEST
     DEFAULT_EQUALABLE(TimelineCell)
 #endif
