@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/nyanpasu64/rtaudio.git
+	branch = master
+	commit = d2f8edad03a32e5cce5ee14538d58ee11c3a4b9c
+	parent = d33576f87e75c8b2926e61f9e124daab2de0dc90
+	method = rebase
+	cmdver = 0.4.3

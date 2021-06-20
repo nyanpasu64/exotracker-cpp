@@ -507,10 +507,22 @@ Dependencies may originate from Git repositories (either release/tag, or master)
 To import dependencies from Git repositories:
 
 ```sh
-git subrepo clone <remote-url> [<subdir>]
+git subrepo clone -M rebase <remote-url> [<subdir>]
 ```
 
 This will clone the full repository. If you want partial repository clones (either excluding files, or only cloning subdirectories), I haven't figured out the best approach yet.
+
+To update subrepos:
+
+```sh
+git subrepo pull [--force] <subdir>
+```
+
+If you have force-pushed to the remote repository, you will need to pass `--force` into `git subrepo pull`. Otherwise you will get a misleading error, with a suggestion that doesn't work:
+
+> `git-subrepo: Local repository does not contain <hash>. Try to 'git subrepo fetch <subdir>' or add the '-F' flag to always fetch the latest content.`
+
+----
 
 *Older discussion about Git dependencies:*
 
