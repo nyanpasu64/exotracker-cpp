@@ -410,20 +410,9 @@ void RtApi :: openStream( RtAudio::StreamParameters *oParams,
 
 unsigned int RtApi :: getDefaultInputDevice( void )
 {
-  // Should be implemented in subclasses if possible.
-  return 0;
-}
-
-unsigned int RtApi :: getDefaultOutputDevice( void )
-{
-  // Should be implemented in subclasses if possible.
-  return 0;
-}
-
-static unsigned int getDefaultInputDeviceImpl( RtApi & rtapi )
-{
-  for ( unsigned int i = 0; i < rtapi.getDeviceCount(); i++ ) {
-    if ( rtapi.getDeviceInfo( i ).isDefaultInput ) {
+  // Should be reimplemented in subclasses if necessary.
+  for ( unsigned int i = 0; i < getDeviceCount(); i++ ) {
+    if ( getDeviceInfo( i ).isDefaultInput ) {
       return i;
     }
   }
@@ -431,10 +420,11 @@ static unsigned int getDefaultInputDeviceImpl( RtApi & rtapi )
   return 0;
 }
 
-static unsigned int getDefaultOutputDeviceImpl( RtApi & rtapi )
+unsigned int RtApi :: getDefaultOutputDevice( void )
 {
-  for ( unsigned int i = 0; i < rtapi.getDeviceCount(); i++ ) {
-    if ( rtapi.getDeviceInfo( i ).isDefaultOutput ) {
+  // Should be reimplemented in subclasses if necessary.
+  for ( unsigned int i = 0; i < getDeviceCount(); i++ ) {
+    if ( getDeviceInfo( i ).isDefaultOutput ) {
       return i;
     }
   }
@@ -4542,22 +4532,6 @@ Exit:
     error( errorType );
   return info;
 }
-
-//-----------------------------------------------------------------------------
-
-unsigned int RtApiWasapi::getDefaultOutputDevice( void )
-{
-  return getDefaultOutputDeviceImpl(*this);
-}
-
-//-----------------------------------------------------------------------------
-
-unsigned int RtApiWasapi::getDefaultInputDevice( void )
-{
-  return getDefaultInputDeviceImpl(*this);
-}
-
-//-----------------------------------------------------------------------------
 
 void RtApiWasapi::closeStream( void )
 {
@@ -8722,16 +8696,6 @@ RtAudio::DeviceInfo RtApiPulse::getDeviceInfo( unsigned int device )
   if (device < rt_pa_info.dev.size())
     return rt_pa_info.dev[device].info;
   return RtAudio::DeviceInfo();
-}
-
-unsigned int RtApiPulse::getDefaultOutputDevice( void )
-{
-  return getDefaultOutputDeviceImpl(*this);
-}
-
-unsigned int RtApiPulse::getDefaultInputDevice( void )
-{
-  return getDefaultInputDeviceImpl(*this);
 }
 
 static void *pulseaudio_callback( void * user )
