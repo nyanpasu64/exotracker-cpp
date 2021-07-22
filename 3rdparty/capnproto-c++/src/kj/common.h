@@ -25,7 +25,7 @@
 
 #pragma once
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 #define KJ_BEGIN_SYSTEM_HEADER _Pragma("GCC system_header")
 #elif defined(_MSC_VER)
 #define KJ_BEGIN_SYSTEM_HEADER __pragma(warning(push, 0))
