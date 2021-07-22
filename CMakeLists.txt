@@ -89,7 +89,7 @@ if (
 endif()
 
 include_directories(src)
-include_directories(SYSTEM 3rdparty 3rdparty/fmt_/include)
+include_directories(SYSTEM 3rdparty)
 
 
 ## Add dependencies
