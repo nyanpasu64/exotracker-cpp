@@ -62,6 +62,13 @@ struct PatternEdit {
         if (auto edit = std::get_if<edit::EditPattern>(p)) {
             Pattern & doc_pattern = doc_blocks[_block_index].pattern;
 
+            // Reject all edits that create 64k or more events in a single edit.
+            // Don't assert that this never happens,
+            // because a user can perform this through valid inputs only.
+            if (edit->pattern.events.size() > MAX_EVENTS_PER_PATTERN) {
+                return;
+            }
+
             for (auto & ev : edit->pattern.events) {
                 assert(ev.v != doc::RowEvent{});
                 (void) ev;

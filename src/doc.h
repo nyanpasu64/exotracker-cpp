@@ -14,6 +14,10 @@
 #include "chip_common.h"
 #include "util/copy_move.h"
 
+#ifdef UNITTEST
+#include "util/compare.h"
+#endif
+
 #include <gsl/span>
 
 #include <vector>
@@ -90,26 +94,31 @@ struct SequencerOptions {
     ///
     /// Defaults to 48 (the value used in Square's SPC drivers, including FF6).
     /// You probably don't need to change this.
-    TickT ticks_per_beat = 48;
+    uint32_t ticks_per_beat = 48;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(SequencerOptions)
+#endif
 };
 
 constexpr double MIN_TEMPO = 1.;
-constexpr double MAX_TEMPO = 255.;
+constexpr double MAX_TEMPO = 1000.;
 
 constexpr uint32_t MIN_TIMER_PERIOD = 1;
 constexpr uint32_t MAX_TIMER_PERIOD = 256;
 
-constexpr TickT MIN_TICKS_PER_BEAT = 1;
-constexpr TickT MAX_TICKS_PER_BEAT = 127;
+constexpr uint32_t MIN_TICKS_PER_BEAT = 1;
+constexpr uint32_t MAX_TICKS_PER_BEAT = 127;
 
 // Tuning table types
 inline namespace tuning {
-    using ChromaticInt = ChromaticInt;
+    using Chromatic = Chromatic;
     using FreqDouble = double;
     using RegisterInt = int;
 
     template<typename T>
-    using Owned_ = std::vector<T>;
+    using Owned_ = std::vector<T>;  // size must be CHROMATIC_COUNT
 
     template<typename T>
     using Ref_ = gsl::span<T const, CHROMATIC_COUNT>;
@@ -121,8 +130,11 @@ inline namespace tuning {
     using TuningRef = Ref_<RegisterInt const>;
 
     FrequenciesOwned equal_temperament(
-        ChromaticInt root_chromatic = 69, FreqDouble root_frequency = 440.
+        Chromatic root_chromatic = 69, FreqDouble root_frequency = 440.
     );
+
+    inline constexpr double MIN_TUNING_FREQ = 0.;
+    inline constexpr double MAX_TUNING_FREQ = 1'000'000.;
 }
 
 using chip_kinds::ChipKind;
@@ -130,6 +142,11 @@ using ChipList = std::vector<chip_kinds::ChipKind>;
 
 struct ChannelSettings {
     events::EffColIndex n_effect_col = 1;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(ChannelSettings)
+#endif
 };
 
 using ChipChannelSettings = ChipChannelTo<ChannelSettings>;
@@ -148,7 +165,7 @@ struct DocumentCopy {
     /// Whether effect names are 1 or 2 characters wide.
     /// When set to 1, the first digit is hidden if it's 0,
     /// and typing character c will write effect 0c immediately.
-    uint32_t effect_name_chars = 1;
+    uint8_t effect_name_chars = 1;
 
     Samples samples;
     Instruments instruments;
@@ -176,6 +193,10 @@ struct DocumentCopy {
     [[nodiscard]] chip_common::ChannelIndex chip_index_to_nchan(
         chip_common::ChipIndex chip
     ) const;
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(DocumentCopy)
+#endif
 };
 
 /// Non-copyable version of Document. You must call clone() explicitly.

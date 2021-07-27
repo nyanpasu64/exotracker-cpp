@@ -208,7 +208,7 @@ static Document all_channels() {
         std::vector<TimelineCell> channels;
         for (int i = 0; i < 8; i++) {
             channels.push_back({TimelineBlock::from_events({
-                Ev(BeatFraction(i, 4), Note(ChromaticInt(60 + i))).instr(0)
+                Ev(BeatFraction(i, 4), Note(Chromatic(60 + i))).instr(0)
             })});
         }
         return TimelineRow{

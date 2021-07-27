@@ -3,23 +3,37 @@
 #include "events.h"
 #include "util/copy_move.h"
 
+#ifdef UNITTEST
+#include "util/compare.h"
+#endif
+
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace doc::sample {
 
-using events::ChromaticInt;
+using events::Chromatic;
+
+inline constexpr uint32_t MIN_SAMPLE_RATE = 1;
+inline constexpr uint32_t MAX_SAMPLE_RATE = 1'000'000;
 
 struct SampleTuning {
     // TODO write a way to compute tuning per-note
     uint32_t sample_rate;
-    ChromaticInt root_key;  // ChromaticInt or Note?
+    Chromatic root_key;
 
     /// During .spc compilation, this should be converted into a format
     /// not requiring exp2().
     int16_t detune_cents = 0;
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(SampleTuning)
+#endif
 };
+
+inline constexpr size_t BRR_BLOCK_SIZE = 9;
 
 // TODO copy whatever amktools uses
 struct Sample {
@@ -37,12 +51,19 @@ struct Sample {
     uint16_t loop_byte;
 
     SampleTuning tuning;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Sample)
+#endif
 };
+using MaybeSample = std::optional<Sample>;
 
 constexpr size_t MAX_SAMPLES = 256;
 struct Samples {
     std::vector<std::optional<Sample>> v;
 
+// impl
     Samples() {
         v.resize(MAX_SAMPLES);
     }
@@ -56,6 +77,10 @@ struct Samples {
     std::optional<Sample> & operator[](size_t idx) {
         return v[idx];
     }
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Samples)
+#endif
 };
 
 using SampleIndex = uint8_t;

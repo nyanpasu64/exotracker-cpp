@@ -793,8 +793,7 @@ TEST_CASE("Randomly switch between random tempos") {
                     document.sequencer_options.ticks_per_beat = 1;
                     seq.ticks_per_beat_changed(document);
                 } else {
-                    document.sequencer_options.ticks_per_beat =
-                        (TickT) rand_u32{2, 10}(rng);
+                    document.sequencer_options.ticks_per_beat = rand_u32{2, 10}(rng);
                     seq.ticks_per_beat_changed(document);
                 }
             }

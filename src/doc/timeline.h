@@ -9,6 +9,10 @@
 #include "util/compare.h"
 #include "util/safe_typedef.h"
 
+#ifdef UNITTEST
+#include "util/compare.h"
+#endif
+
 #include <coroutine.h>
 #include <gsl/span>
 
@@ -20,11 +24,12 @@ namespace doc::timeline {
 // # Constants
 
 /// Type doesn't really matter.
+/// You cannot store more than 256 timeline items,
+/// or valid indices of 0 through 0xff.
 ///
-/// Not sure what MAX_SEQUENCE_LEN means.
-/// Maybe it needs to be split into grid cell limit, pattern usage limit,
-/// and pattern limit.
-constexpr int MAX_GRID_CELLS = 256;
+/// Note that a 256-item-long document's length will not fit in a single byte!
+/// But FamiTracker manages somehow.
+constexpr int MAX_TIMELINE_FRAMES = 256;
 
 
 /// Not strictly enforced. But exceeding this could cause problems
@@ -60,28 +65,37 @@ using MaybeNonZero = T;
 
 // # Sub-grid pattern types
 
-/// The length of a pattern is determined by its entry in the timeline (PatternUsage).
+/// The length of a pattern is determined by its entry in the timeline (TimelineBlock).
 /// However a Pattern may specify a loop length.
 /// If set, the first `loop_length` beats of the Pattern will loop
-/// for the duration of the PatternUsage.
+/// for the duration of the TimelineBlock.
 struct [[nodiscard]] Pattern {
     event_list::EventList events;
 
     /// Loop length in beats. If length is zero, don't loop the pattern.
     MaybeNonZero<uint32_t> loop_length{};
 
-    #ifdef UNITTEST
+// impl
+#ifdef UNITTEST
     DEFAULT_EQUALABLE(Pattern)
-    #endif
+#endif
 };
 
 
 using timed_events::BeatFraction;
 
+/// Very long timeline items and/or patterns with thousands of beats
+/// can cause the UI to slow down.
+/// If people end up actually using huge patterns and encountering slowdown,
+/// the pattern editor may be improved to only draw on-screen items,
+/// and this limit increased.
+constexpr size_t MAX_BEATS_PER_FRAME = 0xfff;
+
 using BeatIndex = timed_events::FractionInt;
 struct BeatOrEnd {
     EXPLICIT_TYPEDEF(uint32_t, BeatOrEnd)
 
+// impl
     template<typename T>
     T value_or(T other) const;
 };
@@ -111,12 +125,12 @@ inline std::strong_ordering operator<=>(BeatOrEnd l, BeatFraction r) {
 
 /// Each pattern usage in the timeline has a begin and end time.
 /// To match traditional trackers, these times can align with the global pattern grid.
-/// But you can get creative and offset the pattern by an integer number of beats.
-/// (Maybe I'll allow negative offsets too.)
+/// But you can get creative and offset the pattern by a positive integer
+/// number of beats.
 ///
-/// It is legal to have gaps between `PatternUsage` in the timeline
+/// It is legal to have gaps between `TimelineBlock` in the timeline
 /// where no events are processed.
-/// It is illegal for `PatternUsage` to overlap in the timeline.
+/// It is illegal for `TimelineBlock` to overlap in the timeline.
 struct [[nodiscard]] TimelineBlock {
     /// Invariant: begin_time < end_time
     /// (cannot be equal, since it becomes impossible to select the usage).
@@ -124,7 +138,7 @@ struct [[nodiscard]] TimelineBlock {
     /// Invariant: TimelineBlock cannot cross gridlines.
     /// Long patterns crossing multiple gridlines makes it difficult to compute
     /// the relative time within a pattern when seeking to a (grid, beat) timestamp.
-    BeatIndex begin_time{};
+    BeatIndex begin_time{};  // TODO switch begin_time, perhaps BeatIndex, to uint32_t
     BeatOrEnd end_time{};
 
     /// For now, `TimelineBlock` owns a `Pattern`.
@@ -133,39 +147,48 @@ struct [[nodiscard]] TimelineBlock {
     /// Or maybe a variant of these two.
     Pattern pattern;
 
+// impl
     static TimelineBlock from_events(
         event_list::EventList events, MaybeNonZero<uint32_t> loop_length = {}
     ) {
         return TimelineBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}};
     }
 
-    #ifdef UNITTEST
+#ifdef UNITTEST
     DEFAULT_EQUALABLE(TimelineBlock)
-    #endif
+#endif
 };
 
 
 // # Timeline grid types
 
-/// One grid cell, one channel.
-/// Can hold multiple blocks at non-overlapping times.
+/// One timeline item, one channel.
+/// Can hold multiple blocks at non-overlapping increasing times.
+/// Each block *should* have nonzero length, and not extend past
+/// [0, TimelineItem::nbeats]? IDK.
 struct [[nodiscard]] TimelineCell {
     DenseMap<BlockIndex, TimelineBlock> _raw_blocks;
 
-    // impl
+// impl
     // Implicit conversion constructor to simplify sample_docs.cpp.
     TimelineCell(std::initializer_list<TimelineBlock> l) : _raw_blocks(l) {}
 
-    #ifdef UNITTEST
+    TimelineCell(std::vector<TimelineBlock> raw_blocks)
+        : _raw_blocks(std::move(raw_blocks))
+    {}
+
+    TimelineCell() = default;
+
+#ifdef UNITTEST
     DEFAULT_EQUALABLE(TimelineCell)
-    #endif
+#endif
 
     [[nodiscard]] BlockIndex size() const {
         return (BlockIndex) _raw_blocks.size();
     }
 };
 
-/// One grid cell, one channel.
+/// One timeline item, all channels. Stores duration of timeline item.
 struct [[nodiscard]] TimelineCellRef {
     BeatFraction const nbeats;
     TimelineCell const& cell;
@@ -177,11 +200,17 @@ struct [[nodiscard]] TimelineCellRefMut {
 };
 
 
+using ChipChannelCells = ChipChannelTo<TimelineCell>;
 /// One grid cell, all channels. Stores duration of grid cell.
 struct [[nodiscard]] TimelineRow {
     BeatFraction nbeats;
 
-    ChipChannelTo<TimelineCell> chip_channel_cells;
+    ChipChannelCells chip_channel_cells;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(TimelineRow)
+#endif
 };
 
 
@@ -196,7 +225,7 @@ class [[nodiscard]] TimelineChannelRef {
     ChipIndex _chip;
     ChannelIndex _channel;
 
-    // impl
+// impl
 public:
     TimelineChannelRef(TimelineRef timeline, ChipIndex chip, ChannelIndex channel)
         : _timeline(timeline)
@@ -220,7 +249,7 @@ class [[nodiscard]] TimelineChannelRefMut {
     ChipIndex _chip;
     ChannelIndex _channel;
 
-    // impl
+// impl
 public:
     TimelineChannelRefMut(Timeline & timeline, ChipIndex chip, ChannelIndex channel)
         : _timeline(timeline)

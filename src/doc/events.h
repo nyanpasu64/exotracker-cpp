@@ -16,16 +16,26 @@ namespace doc::events {
 // These inline namespaces aren't strictly required, and could be removed if desired.
 // Pick an underscored name so it doesn't clash with names I care about.
 inline namespace note_ {
-    using ChromaticInt = int16_t;
-    constexpr int CHROMATIC_COUNT = 128;
+    /// Note pitch, as expressed as a MIDI note number.
+    /// Valid values are [0..127 (CHROMATIC_COUNT - 1)].
+    using Chromatic = uint8_t;
+    constexpr size_t CHROMATIC_COUNT = 128;
     constexpr int NOTES_PER_OCTAVE = 12;
 
-    struct Note {
-        ChromaticInt value;
+    // TODO add a "chromatic | microtonal" type or "floating-point pitch" type,
+    // distinct from "note or cut".
 
+    using NoteInt = int16_t;
+
+    /// Represents a "note" value on a tracker pattern.
+    /// Stores either a note pitch, or a note release/cut, or echo buffer, etc.
+    struct Note {
+        NoteInt value;
+
+    // impl
         // Implicit conversion constructor.
         // Primarily here for gui::history::dummy_document().
-        constexpr Note(ChromaticInt value) : value(value) {}
+        constexpr Note(NoteInt value) : value(value) {}
 
         // impl
         EQUALABLE_CONSTEXPR(Note, value)
@@ -62,7 +72,7 @@ using InstrumentIndex = uint8_t;
 /// regardless of the field being changed.
 using Volume = uint8_t;
 
-using EffColIndex = uint32_t;
+using EffColIndex = uint8_t;
 
 inline namespace effects_ {
     constexpr EffColIndex MAX_EFFECTS_PER_EVENT = 8;
@@ -80,6 +90,7 @@ inline namespace effects_ {
         EffectName name;
         EffectValue value;
 
+    // impl
         Effect()
             : name{EFFECT_NAME_PLACEHOLDER, EFFECT_NAME_PLACEHOLDER}
             , value{0}
@@ -106,6 +117,7 @@ struct RowEvent {
     std::optional<Volume> volume = {};
     EffectList effects = {};
 
+// impl
     DEFAULT_EQUALABLE(RowEvent)
 };
 

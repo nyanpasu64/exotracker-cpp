@@ -14,7 +14,7 @@ namespace doc {
 
 inline namespace tuning {
     FrequenciesOwned equal_temperament(
-        ChromaticInt root_chromatic, FreqDouble root_frequency
+        Chromatic root_chromatic, FreqDouble root_frequency
     ) {
         FrequenciesOwned out;
         out.resize(CHROMATIC_COUNT);
@@ -58,7 +58,7 @@ void post_init(Document & document) {
     }
 
     // Reserve 256 elements to ensure that insert/delete is bounded-time.
-    document.timeline.reserve(MAX_GRID_CELLS);
+    document.timeline.reserve(MAX_TIMELINE_FRAMES);
 
     // Reserve 32 elements to ensure that adding blocks is bounded-time.
     for (auto & row : document.timeline) {

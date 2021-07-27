@@ -30,7 +30,7 @@ constexpr double CENTS_PER_OCTAVE = 1200.;
 using chip_instance::SAMPLES_PER_S_IDEAL;
 
 static uint16_t calc_tuning(
-    FrequenciesRef freq_table, doc::SampleTuning const& tuning, doc::Note note
+    FrequenciesRef freq_table, doc::SampleTuning const& tuning, doc::Chromatic note
 ) {
     // At pitch 0x1000, samples are played at the SNES's native rate
     // (1 output sample per input sample, around 32000 Hz).
@@ -40,13 +40,12 @@ static uint16_t calc_tuning(
     tuning_reg_f *= exp2(double(tuning.detune_cents) / CENTS_PER_OCTAVE);
 
     // Increase the pitch by the note key relative to the sample's root key.
-    release_assert(note.is_valid_note());
     release_assert(doc::Note(tuning.root_key).is_valid_note());
 
     // Use the tuning table to detune notes. (This allows for custom tuning schemes,
     // though not supporting microtonal music not mapped to the chromatic scale.)
     tuning_reg_f *=
-        freq_table[(size_t) note.value] / freq_table[(size_t) tuning.root_key];
+        freq_table[(size_t) note] / freq_table[(size_t) tuning.root_key];
 
     // Pitch registers are played back modulo 0x4000.
     // Clamp out-of-range registers instead of letting them wrap around.
@@ -61,7 +60,7 @@ static uint16_t calc_tuning(
 }
 
 static doc::InstrumentPatch const* find_patch(
-    gsl::span<doc::InstrumentPatch const> keysplit, doc::ChromaticInt note
+    gsl::span<doc::InstrumentPatch const> keysplit, doc::Chromatic note
 ) {
     for (doc::InstrumentPatch const& patch : keysplit) {
         if (patch.min_note <= note && note <= patch.max_note_inclusive) {
@@ -320,7 +319,7 @@ void Spc700ChannelDriver::run_driver(
     };
 
     using Success = bool;
-    auto try_play_note = [&](doc::Note note) -> Success {
+    auto try_play_note = [&](doc::Chromatic note) -> Success {
         // TODO perhaps return pitch || 0, and don't run voice_reg16(),
         // but instead return a pitch directly and let the caller cache it
         // for pitch bends and vibrato.
@@ -336,7 +335,7 @@ void Spc700ChannelDriver::run_driver(
             return false;
         }
 
-        auto patch = find_patch(document.instruments[*_prev_instr]->keysplit, note.value);
+        auto patch = find_patch(document.instruments[*_prev_instr]->keysplit, note);
         if (!patch) {
             DEBUG_PRINT("    cannot play note, instrument {:02x} does not contain note {}\n",
                 *_prev_instr, note.value
@@ -417,7 +416,7 @@ void Spc700ChannelDriver::run_driver(
 
             if (note.is_valid_note()) {
                 DEBUG_PRINT("channel {}, playing note {}\n", _channel_id, note.value);
-                _prev_note = note;
+                _prev_note = (Chromatic) note.value;
 
                 if (try_play_note(_prev_note)) {
                     flags.kon |= channel_flag;

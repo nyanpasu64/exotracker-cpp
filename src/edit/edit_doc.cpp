@@ -137,7 +137,7 @@ struct EditRow {
     {}
 
     void apply_swap(doc::Document & document) {
-        assert(document.timeline.capacity() >= MAX_GRID_CELLS);
+        assert(document.timeline.capacity() >= MAX_TIMELINE_FRAMES);
 
         auto validate_reserved = [] (TimelineRow & row) {
             for (auto & channel_cells : row.chip_channel_cells) {

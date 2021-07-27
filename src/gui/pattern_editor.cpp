@@ -635,8 +635,9 @@ struct ColumnLayout {
                 // Effect names hold 1 or 2 characters.
                 // Effect values hold 2 characters.
                 subcolumns.push_back(many_cells(
-                    SubColumn_::Effect{effect_col}, document.effect_name_chars + 2
-                ));
+                    SubColumn_::Effect{effect_col},
+                    (CellIndex) document.effect_name_chars + 2)
+                );
             }
 
             // TODO replace off-screen columns with nullopt.
@@ -708,8 +709,9 @@ using ColumnList = std::vector<Column>;
             }
 
             for (uint8_t effect_col = 0; effect_col < n_effect_col; effect_col++) {
-                subcolumns.push_back({
-                    SubColumn_::Effect{effect_col}, document.effect_name_chars + 2
+                subcolumns.push_back(SubColumnCells {
+                    SubColumn_::Effect{effect_col},
+                    (CellIndex) document.effect_name_chars + 2,
                 });
             }
 
@@ -2778,11 +2780,12 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
             }
 
             for (auto const [semitone, curr_key] : enumerate<int>(key_row)) {
-                int chromatic = octave * lib::format::NOTES_PER_OCTAVE + semitone;
-                chromatic = std::clamp(chromatic, 0, doc::CHROMATIC_COUNT - 1);
-
                 if (curr_key == keycode) {
-                    auto note = doc::Note{doc::ChromaticInt(chromatic)};
+                    int chromatic = octave * lib::format::NOTES_PER_OCTAVE + semitone;
+                    chromatic =
+                        std::clamp(chromatic, 0, (int) doc::CHROMATIC_COUNT - 1);
+
+                    auto note = doc::Note{doc::NoteInt(chromatic)};
                     note_pressed(*this, chip, channel, note);
                     update();
                     return;

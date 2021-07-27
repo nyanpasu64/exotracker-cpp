@@ -1,7 +1,12 @@
 #pragma once
 
 #include "sample.h"
+#include "events.h"
 #include "util/copy_move.h"
+
+#ifdef UNITTEST
+#include "util/compare.h"
+#endif
 
 #include <array>
 #include <string>
@@ -12,7 +17,7 @@
 /// Instrument format.
 namespace doc::instr {
 
-using events::ChromaticInt;
+using events::Chromatic;
 
 template<class IntT_>
 struct Envelope {
@@ -20,6 +25,7 @@ struct Envelope {
 
     std::vector<IntT> values;
 
+// impl
     static Envelope new_empty() {
         return Envelope{};
     }
@@ -38,10 +44,16 @@ template<int begin, int end, typename T = uint8_t>
 using RangeInclusive = T;
 
 struct Adsr {
-    RangeInclusive<0, 0x0f> attack;
-    RangeInclusive<0, 0x07> decay;
-    RangeInclusive<0, 0x07> sustain;
-    RangeInclusive<0, 0x1f> release;
+    uint8_t attack;
+    uint8_t decay;
+    uint8_t sustain;
+    uint8_t release;
+
+// impl
+    static constexpr uint8_t MAX_ATTACK = 0x0f;
+    static constexpr uint8_t MAX_DECAY = 0x07;
+    static constexpr uint8_t MAX_SUSTAIN = 0x07;
+    static constexpr uint8_t MAX_RELEASE = 0x1f;
 
     /// Based on https://nyanpasu64.github.io/AddmusicK/readme_files/hex_command_reference.html#ADSRInfo.
     std::array<uint8_t, 2> to_hex() const {
@@ -50,14 +62,18 @@ struct Adsr {
             (uint8_t) (release | (sustain << 5)),
         };
     }
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Adsr)
+#endif
 };
 
 struct InstrumentPatch {
     /// Do not use this patch for pitches below this value.
-    ChromaticInt min_note = 0;
+    Chromatic min_note = 0;
     /// Do not use this patch for pitches above this value.
     /// (TODO what if this is below min_note?)
-    ChromaticInt max_note_inclusive = events::CHROMATIC_COUNT - 1;
+    Chromatic max_note_inclusive = events::CHROMATIC_COUNT - 1;
 
     /// The sample to play. If sample missing, acts as a key-off(???).
     sample::SampleIndex sample_idx;
@@ -70,8 +86,15 @@ struct InstrumentPatch {
 //    ShortEnvelope pitch{};
 //    ByteEnvelope arpeggio{};
 //    ByteEnvelope wave_index{};
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(InstrumentPatch)
+#endif
 };
 
+/// The maximum number of keysplits in 1 instrument.
+constexpr size_t MAX_KEYSPLITS = 128;
 struct Instrument {
     std::string name;
 
@@ -82,12 +105,19 @@ struct Instrument {
     /// (Note that this algorithm has edge-cases, and care must be taken
     /// to ensure the tracker and SPC driver match.)
     std::vector<InstrumentPatch> keysplit;
+
+// impl
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Instrument)
+#endif
 };
+using MaybeInstrument = std::optional<Instrument>;
 
 constexpr size_t MAX_INSTRUMENTS = 256;
 struct Instruments {
     std::vector<std::optional<Instrument>> v;
 
+// impl
     Instruments() {
         v.resize(MAX_INSTRUMENTS);
     }
@@ -101,6 +131,10 @@ struct Instruments {
     std::optional<Instrument> & operator[](size_t idx) {
         return v[idx];
     }
+
+#ifdef UNITTEST
+    DEFAULT_EQUALABLE(Instruments)
+#endif
 };
 
 }
