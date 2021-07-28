@@ -9,6 +9,7 @@
 #include "gui_common.h"
 #include "cmd_queue.h"
 #include "edit/edit_doc.h"
+#include "serialize.h"
 #include "util/defer.h"
 #include "util/math.h"
 #include "util/release_assert.h"
@@ -39,10 +40,14 @@
 // Other
 #include <QAction>
 #include <QDebug>
+#include <QErrorMessage>
+#include <QFileDialog>
 #include <QFlags>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QScreen>
+#include <QTextCursor>
+#include <QTextDocument>
 #include <QTimer>
 
 #include <algorithm>  // std::min/max, std::sort
@@ -225,6 +230,13 @@ void CursorAndSelection::clear_select() {
     }
 }
 
+void setup_error_dialog(QErrorMessage & dialog) {
+    static constexpr int W = 640;
+    static constexpr int H = 360;
+    dialog.resize(W, H);
+    dialog.setModal(true);
+}
+
 // # impl MainWindow
 
 W_OBJECT_IMPL(MainWindow)
@@ -249,6 +261,8 @@ struct MainWindowUi : MainWindow {
     // Use raw pointers since QObjects automatically destroy children.
 
     // File menu
+    QAction * _open;
+    QAction * _save_as;
     QAction * _exit;
 
     // Edit menu
@@ -306,6 +320,9 @@ struct MainWindowUi : MainWindow {
         // Menu
         {main__m();
             {m__m(tr("&File"));
+                _open = m->addAction(tr("&Open"));
+                _save_as = m->addAction(tr("Save &As"));
+                m->addSeparator();
                 _exit = m->addAction(tr("E&xit"));
             }
 
@@ -797,6 +814,7 @@ public:
     // These are non-widget utilities.
     QScreen * _screen;
     QTimer _gui_refresh_timer;
+    QErrorMessage _error_dialog;
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
@@ -879,9 +897,12 @@ public:
     // private methods
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindowUi(std::move(document), parent)
+        , _error_dialog(this)
     {
         // Setup GUI.
         setup_widgets();  // Output: _pattern_editor.
+        setup_error_dialog(_error_dialog);
+
         _pattern_editor->set_history(_state.document_getter());
         _timeline_editor->set_history(_state.document_getter());
         _instrument_list->set_history(_state.document_getter());
@@ -954,6 +975,14 @@ public:
         // Upon application startup, pattern editor panel is focused.
         _pattern_editor->setFocus();
 
+        // TODO look into unifying with reload_shortcuts().
+        _open->setShortcuts(QKeySequence::Open);
+        connect(_open, &QAction::triggered, this, &MainWindowImpl::on_open);
+
+        _save_as->setShortcuts(QKeySequence::SaveAs);
+        connect(_save_as, &QAction::triggered, this, &MainWindowImpl::on_save_as);
+
+        // TODO _exit->setShortcuts(QKeySequence::Quit);
         connect(_exit, &QAction::triggered, this, &QWidget::close);
 
         auto connect_spin = [](QSpinBox * spin, auto * target, auto func) {
@@ -1083,6 +1112,116 @@ public:
 
         // Initialize GUI state.
         edit_unwrap().update_all();
+    }
+
+    void on_open() {
+        using serialize::ErrorType;
+
+        // TODO save recent dirs, using SQLite or QSettings
+        auto path = QFileDialog::getOpenFileName(
+            this,
+            tr("Open File"),
+            QString(),
+            tr("ExoTracker modules (*.etm);;All files (*)"));
+
+        if (path.isEmpty()) {
+            return;
+        }
+
+        // TODO prompt if document dirty.
+
+        auto result = serialize::load_from_path(path.toUtf8());
+        if (result.v) {
+            // If document loaded successfully, load it into the program.
+            auto & [document, metadata] = *result.v;
+
+            // Replace the GUI state with the new file.
+            // Hopefully I didn't miss anything.
+            {
+                StateTransaction tx = edit_unwrap();
+                // Probably redundant, but do it just to be safe.
+                tx.update_all();
+
+                tx.cursor_mut() = {};
+                tx.history_mut() = History(std::move(document));
+                tx.set_instrument(0);
+            }
+
+            _zoom_level->setValue(metadata.zoom_level);
+
+            // Restart the audio thread with the new document.
+            _audio.restart_audio_thread(_state);
+        } else {
+            // Document failed to load. There should be an error message explaining why.
+            assert(!result.errors.empty());
+        }
+
+        // Show warnings or errors.
+        if (!result.v || !result.errors.empty()) {
+            QTextDocument document;
+            auto cursor = QTextCursor(&document);
+            cursor.beginEditBlock();
+
+            if (result.v) {
+                cursor.insertText(tr("File loaded with warnings:"));
+            } else {
+                cursor.insertText(tr("Failed to load file:"));
+            }
+
+            // https://stackoverflow.com/a/51864380
+            QTextList* list = nullptr;
+            QTextBlockFormat non_list_format = cursor.blockFormat();
+            for (auto const& err : result.errors) {
+                if (!list) {
+                    // create list with 1 item
+                    list = cursor.insertList(QTextListFormat::ListDisc);
+                } else {
+                    // append item to list
+                    cursor.insertBlock();
+                }
+
+                QString line = QLatin1String("%1: %2")
+                    .arg((err.type == ErrorType::Error) ? tr("Error") : tr("Warning"))
+                    .arg(QString::fromStdString(err.description));
+                cursor.insertText(line);
+            }
+            // This ends the list.
+            cursor.insertBlock();
+            cursor.setBlockFormat(non_list_format);
+
+            _error_dialog.showMessage(document.toHtml());
+        }
+    }
+
+    void on_save_as() {
+        using serialize::Metadata;
+
+        // TODO save recent dirs, using SQLite or QSettings
+        auto path = QFileDialog::getSaveFileName(
+            this,
+            tr("Open File"),
+            QString(),
+            tr("ExoTracker modules (*.etm);;All files (*)"));
+
+        if (path.isEmpty()) {
+            return;
+        }
+
+        auto result = serialize::save_to_path(
+            get_document(),
+            Metadata {
+                .zoom_level = (uint16_t) _zoom_level->value(),
+            },
+            path.toUtf8());
+
+        if (result) {
+            QTextDocument document;
+            auto cursor = QTextCursor(&document);
+
+            cursor.insertText(tr("Failed to save file:\n"));
+            cursor.insertText(QString::fromStdString(*result));
+            _error_dialog.showMessage(document.toHtml());
+        }
     }
 
     /// Compute the fixed zoom sequence, consisting of powers of 2

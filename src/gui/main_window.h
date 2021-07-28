@@ -249,6 +249,7 @@ main_window_INTERNAL:
 
 // impl
 private:
+    /// Do not call directly; use MainWindow::edit_state() or edit_unwrap() instead.
     StateTransaction(MainWindowImpl * win);
 
 public:

@@ -182,6 +182,9 @@ add_library(exotracker-headless
     src/edit/edit_pattern.cpp
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
+    src/doc/validate.cpp
+    src/serialize.cpp
+    src/serialize/document.capnp.c++
     src/gui/history.cpp
 
     # Pattern editor backend
@@ -277,6 +280,7 @@ add_executable(exotracker-tests
 
     # for #ifdef UNITTEST
     src/doc.cpp
+    src/serialize.cpp
     src/gui/move_cursor.cpp
     # src/audio/synth/envelope.cpp
     src/audio/synth/volume_calc_common.cpp
@@ -295,6 +299,15 @@ if(USE_PCH)
         precompiled_headers/exotracker_lib.h
     )
 endif()
+
+
+add_executable(serialize-main
+    src/serialize_main.cpp
+)
+target_compile_options(serialize-main PRIVATE "${options}")
+target_link_libraries(serialize-main
+    PRIVATE exotracker-headless
+)
 
 
 # This can be used to enable asan (-fsanitize=memory/undefined/leak).
