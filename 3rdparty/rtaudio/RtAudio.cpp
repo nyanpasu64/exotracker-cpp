@@ -267,7 +267,7 @@ RtAudio :: RtAudio( RtAudio::Api api )
   // It should not be possible to get here because the preprocessor
   // definition __RTAUDIO_DUMMY__ is automatically defined if no
   // API-specific definitions are passed to the compiler. But just in
-  // case something weird happens, we'll thow an error.
+  // case something weird happens, we'll throw an error.
   std::string errorText = "\nRtAudio: no compiled API support found ... critical error!!\n\n";
   throw( RtAudioError( errorText, RtAudioError::UNSPECIFIED ) );
 }
@@ -411,7 +411,8 @@ void RtApi :: openStream( RtAudio::StreamParameters *oParams,
 unsigned int RtApi :: getDefaultInputDevice( void )
 {
   // Should be reimplemented in subclasses if necessary.
-  for ( unsigned int i = 0; i < getDeviceCount(); i++ ) {
+  unsigned int nDevices = getDeviceCount();
+  for ( unsigned int i = 0; i < nDevices; i++ ) {
     if ( getDeviceInfo( i ).isDefaultInput ) {
       return i;
     }
@@ -423,7 +424,8 @@ unsigned int RtApi :: getDefaultInputDevice( void )
 unsigned int RtApi :: getDefaultOutputDevice( void )
 {
   // Should be reimplemented in subclasses if necessary.
-  for ( unsigned int i = 0; i < getDeviceCount(); i++ ) {
+  unsigned int nDevices = getDeviceCount();
+  for ( unsigned int i = 0; i < nDevices; i++ ) {
     if ( getDeviceInfo( i ).isDefaultOutput ) {
       return i;
     }
@@ -2829,13 +2831,13 @@ static long asioMessages( long selector, long value, void* message, double* opt 
 
 RtApiAsio :: RtApiAsio()
 {
-  // ASIO cannot run on a multi-threaded appartment. You can call
-  // CoInitialize beforehand, but it must be for appartment threading
+  // ASIO cannot run on a multi-threaded apartment. You can call
+  // CoInitialize beforehand, but it must be for apartment threading
   // (in which case, CoInitilialize will return S_FALSE here).
   coInitialized_ = false;
   HRESULT hr = CoInitialize( NULL ); 
   if ( FAILED(hr) ) {
-    errorText_ = "RtApiAsio::ASIO requires a single-threaded appartment. Call CoInitializeEx(0,COINIT_APARTMENTTHREADED)";
+    errorText_ = "RtApiAsio::ASIO requires a single-threaded apartment. Call CoInitializeEx(0,COINIT_APARTMENTTHREADED)";
     error( RtAudioError::WARNING );
   }
   coInitialized_ = true;
@@ -6878,7 +6880,7 @@ void RtApiDs :: callbackEvent()
     if ( stream_.mode == DUPLEX ) {
       if ( safeReadPointer < endRead ) {
         if ( duplexPrerollBytes <= 0 ) {
-          // Pre-roll time over. Be more agressive.
+          // Pre-roll time over. Be more aggressive.
           int adjustment = endRead-safeReadPointer;
 
           handle->xrun[1] = true;
@@ -8312,7 +8314,7 @@ void RtApiAlsa :: callbackEvent()
     }
 
     if ( result < (int) stream_.bufferSize ) {
-      // Either an error or overrun occured.
+      // Either an error or overrun occurred.
       if ( result == -EPIPE ) {
         snd_pcm_state_t state = snd_pcm_state( handle[1] );
         if ( state == SND_PCM_STATE_XRUN ) {
@@ -8382,7 +8384,7 @@ void RtApiAlsa :: callbackEvent()
     }
 
     if ( result < (int) stream_.bufferSize ) {
-      // Either an error or underrun occured.
+      // Either an error or underrun occurred.
       if ( result == -EPIPE ) {
         snd_pcm_state_t state = snd_pcm_state( handle[0] );
         if ( state == SND_PCM_STATE_XRUN ) {
@@ -8499,24 +8501,25 @@ static void rt_pa_mainloop_api_quit(int ret) {
     rt_pa_mainloop_api->quit(rt_pa_mainloop_api, ret);
 }
 
-static void rt_pa_server_callback(pa_context *context, const pa_server_info *info, void *data){
+static void rt_pa_set_server_info(pa_context *context, const pa_server_info *info, void *data){
   (void)context;
   (void)data;
   pa_sample_spec ss;
 
-  if (!info)
+  if (!info) {
     rt_pa_mainloop_api_quit(1);
+    return;
+  }
 
   ss = info->sample_spec;
 
   rt_pa_info.default_rate = ss.rate;
   rt_pa_info.default_sink_name = info->default_sink_name;
   rt_pa_info.default_source_name = info->default_source_name;
-  rt_pa_mainloop_api_quit(0);
 }
 
-static void rt_pa_sink_info_cb(pa_context * /*c*/, const pa_sink_info *i,
-                               int eol, void * /*userdata*/)
+static void rt_pa_set_sink_info(pa_context * /*c*/, const pa_sink_info *i,
+                                int eol, void * /*userdata*/)
 {
   if (eol) return;
   PaDeviceInfo inf;
@@ -8556,10 +8559,13 @@ static void rt_pa_sink_info_cb(pa_context * /*c*/, const pa_sink_info *i,
     rt_pa_info.dev.push_back(inf);
 }
 
-static void rt_pa_source_info_cb(pa_context * /*c*/, const pa_source_info *i,
-                                 int eol, void * /*userdata*/)
+static void rt_pa_set_source_info_and_quit(pa_context * /*c*/, const pa_source_info *i,
+                                           int eol, void * /*userdata*/)
 {
-  if (eol) return;
+  if (eol) {
+    rt_pa_mainloop_api_quit(0);
+    return;
+  }
   PaDeviceInfo inf;
   inf.info.name = pa_proplist_gets(i->proplist, "device.description");
   inf.info.probed = true;
@@ -8603,7 +8609,8 @@ static void rt_pa_source_info_cb(pa_context * /*c*/, const pa_source_info *i,
 static void rt_pa_context_state_callback(pa_context *context, void *userdata) {
   (void)userdata;
 
-  switch (pa_context_get_state(context)) {
+  auto state = pa_context_get_state(context);
+  switch (state) {
     case PA_CONTEXT_CONNECTING:
     case PA_CONTEXT_AUTHORIZING:
     case PA_CONTEXT_SETTING_NAME:
@@ -8611,9 +8618,9 @@ static void rt_pa_context_state_callback(pa_context *context, void *userdata) {
 
     case PA_CONTEXT_READY:
       rt_pa_info.dev.clear();
-      pa_context_get_server_info(context, rt_pa_server_callback, NULL);
-      pa_context_get_sink_info_list(context, rt_pa_sink_info_cb, NULL);
-      pa_context_get_source_info_list(context, rt_pa_source_info_cb, NULL);
+      pa_context_get_server_info(context, rt_pa_set_server_info, NULL);
+      pa_context_get_sink_info_list(context, rt_pa_set_sink_info, NULL);
+      pa_context_get_source_info_list(context, rt_pa_set_source_info_and_quit, NULL);
       break;
 
     case PA_CONTEXT_TERMINATED:
@@ -8667,6 +8674,13 @@ void RtApiPulse::collectDeviceInfo( void )
 
   if (pa_mainloop_run(m, &ret) < 0) {
     errorStream_ << "pa_mainloop_run() failed.";
+    errorText_ = errorStream_.str();
+    error( RtAudioError::WARNING );
+    goto quit;
+  }
+
+  if (ret != 0) {
+    errorStream_ << "could not get server info.";
     errorText_ = errorStream_.str();
     error( RtAudioError::WARNING );
     goto quit;
