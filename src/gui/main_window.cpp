@@ -814,7 +814,7 @@ public:
     // These are non-widget utilities.
     QScreen * _screen;
     QTimer _gui_refresh_timer;
-    QErrorMessage _error_dialog;
+    QErrorMessage _error_dialog{this};
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
