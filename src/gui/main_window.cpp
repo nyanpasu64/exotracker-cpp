@@ -1478,6 +1478,7 @@ StateTransaction::StateTransaction(MainWindowImpl *win)
     , _uncaught_exceptions(std::uncaught_exceptions())
 {
     assert(!win->_state._during_update);
+    state_mut()._during_update = true;
 }
 
 std::optional<StateTransaction> StateTransaction::make(MainWindowImpl *win) {
@@ -1500,7 +1501,6 @@ StateTransaction::~StateTransaction() noexcept(false) {
         return;
     }
     auto & state = state_mut();
-    state._during_update = true;
     defer {
         state._during_update = false;
     };
