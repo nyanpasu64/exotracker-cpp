@@ -122,6 +122,7 @@ struct PatternEditorShortcuts {
 // and subclassed QWidget to contain an instance of my class?
 
 using main_window::MainWindow;
+using main_window::StateTransaction;
 using history::GetDocument;
 
 class PatternEditor : public QWidget
@@ -211,8 +212,11 @@ pattern_editor_INTERNAL:
     // QShortcut signals are bound to a lambda slot, which calls these methods.
 
     #define X(KEY) \
-        void KEY##_pressed();
+        void KEY##_pressed(StateTransaction & tx);
     SHORTCUT_PAIRS(X, )
+    #undef X
+    #define X(KEY) \
+        void KEY##_pressed();
     SHORTCUTS(X, )
     #undef X
 

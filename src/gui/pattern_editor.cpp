@@ -143,18 +143,27 @@ static void setup_shortcuts(PatternEditor & self) {
     SHORTCUTS(X, )
     #undef X
 
-    // Keystroke handlers have no arguments and don't know if Shift is held or not.
+    // Cursor movement actions clear or extend the selection
+    // based on whether Shift is held.
+    // But to avoid duplicating the movement action handlers
+    // or making them responsible for selections,
+    // on_cursor_move() clears/extends the selection
+    // before calling the movement action handlers,
+    // in the same transaction as moving the cursor.
+    using TxMethod = void (PatternEditor::*)(StateTransaction & tx);
+
+    // Regular actions handle clearing the selection (if necessary) themselves,
+    // so connect_shortcut()'s callback doesn't create and pass in a transaction
+    // to clear/enable the selection.
     using Method = void (PatternEditor::*)();
 
     enum class AlterSelection {
-        None,
         Clear,
         Extend,
     };
 
-    // This code is confusing. Hopefully I can fix it.
-    static auto const on_key_pressed = [] (
-        PatternEditor & self, Method method, AlterSelection alter_selection
+    static auto const on_cursor_move = [] (
+        PatternEditor & self, TxMethod method, AlterSelection alter_selection
     ) {
         auto tx = self._win.edit_unwrap();
         if (alter_selection == AlterSelection::Clear) {
@@ -165,26 +174,19 @@ static void setup_shortcuts(PatternEditor & self) {
             tx.cursor_mut().enable_select(self._zoom_level);
         }
         // Move cursor.
-        std::invoke(method, self);
-
-        // This call is almost unnecessary.
-        // Document edits and cursor motions already trigger redraws.
-        // The only operation that doesn't is toggling edit mode, so keep this call.
-        // Maybe edit mode will eventually be stored in the main window,
-        // so you can toggle it from the toolbar.
-        self.update();
+        std::invoke(method, self, tx);
     };
 
     // Connect cursor-movement keys to cursor-movement functions
     // (with/without shift held).
-    auto connect_shortcut_pair = [&] (ShortcutPair & pair, Method method) {
+    auto connect_shortcut_pair = [&] (ShortcutPair & pair, TxMethod method) {
         // Connect arrow keys to "clear selection and move cursor".
         QObject::connect(
             &pair.key,
             &QShortcut::activated,
             &self,
             [&self, method] () {
-                on_key_pressed(self, method, AlterSelection::Clear);
+                on_cursor_move(self, method, AlterSelection::Clear);
             }
         );
 
@@ -194,7 +196,7 @@ static void setup_shortcuts(PatternEditor & self) {
             &QShortcut::activated,
             &self,
             [&self, method] () {
-                on_key_pressed(self, method, AlterSelection::Extend);
+                on_cursor_move(self, method, AlterSelection::Extend);
             }
         );
     };
@@ -210,9 +212,7 @@ static void setup_shortcuts(PatternEditor & self) {
             &shortcut,
             &QShortcut::activated,
             &self,
-            [&self, method] () {
-                on_key_pressed(self, method, AlterSelection::None);
-            }
+            [&self, method] () { std::invoke(method, self); }
         );
     };
 
@@ -2084,7 +2084,7 @@ void PatternEditor::paintEvent(QPaintEvent * /*event*/) {
 
 // # Cursor movement
 
-void PatternEditor::up_pressed() {
+void PatternEditor::up_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = _zoom_level,
@@ -2094,11 +2094,10 @@ void PatternEditor::up_pressed() {
     auto const& move_cfg = get_app().options().move_cfg;
 
     auto cursor = get_cursor(*this);
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(move_cursor::move_up(document, cursor, args, move_cfg));
 }
 
-void PatternEditor::down_pressed() {
+void PatternEditor::down_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = _zoom_level,
@@ -2108,41 +2107,36 @@ void PatternEditor::down_pressed() {
     auto const& move_cfg = get_app().options().move_cfg;
 
     auto cursor = get_cursor(*this);
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(move_cursor::move_down(document, cursor, args, move_cfg));
 }
 
 
-void PatternEditor::prev_beat_pressed() {
+void PatternEditor::prev_beat_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
     auto cursor_y = get_cursor(*this).y;
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(move_cursor::prev_beat(document, cursor_y, move_cfg));
 }
 
-void PatternEditor::next_beat_pressed() {
+void PatternEditor::next_beat_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
     auto cursor_y = get_cursor(*this).y;
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(move_cursor::next_beat(document, cursor_y, move_cfg));
 }
 
 
-void PatternEditor::prev_event_pressed() {
+void PatternEditor::prev_event_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     auto ev_time = move_cursor::prev_event(document, get_cursor(*this));
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(ev_time);
 }
 
-void PatternEditor::next_event_pressed() {
+void PatternEditor::next_event_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     auto ev_time = move_cursor::next_event(document, get_cursor(*this));
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(ev_time);
 }
 
@@ -2151,7 +2145,7 @@ void PatternEditor::next_event_pressed() {
 /// avoid scrolling more than _ patterns in a single Page Down keystroke.
 constexpr int MAX_PAGEDOWN_SCROLL = 16;
 
-void PatternEditor::scroll_prev_pressed() {
+void PatternEditor::scroll_prev_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
@@ -2170,11 +2164,10 @@ void PatternEditor::scroll_prev_pressed() {
         }
     }
 
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(cursor_y);
 }
 
-void PatternEditor::scroll_next_pressed() {
+void PatternEditor::scroll_next_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     auto const & move_cfg = get_app().options().move_cfg;
 
@@ -2194,11 +2187,10 @@ void PatternEditor::scroll_next_pressed() {
         }
     }
 
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(cursor_y);
 }
 
-void PatternEditor::top_pressed() {
+void PatternEditor::top_pressed(StateTransaction & tx) {
     auto cursor_y = get_cursor(*this).y;
 
     if (get_app().options().move_cfg.home_end_switch_patterns && cursor_y.beat <= 0) {
@@ -2208,11 +2200,10 @@ void PatternEditor::top_pressed() {
     }
 
     cursor_y.beat = 0;
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(cursor_y);
 }
 
-void PatternEditor::bottom_pressed() {
+void PatternEditor::bottom_pressed(StateTransaction & tx) {
     doc::Document const& document = get_document();
     auto raw_select = get_raw_sel(*this);
 
@@ -2257,12 +2248,11 @@ void PatternEditor::bottom_pressed() {
     }
 
     cursor_y.beat = bottom_beat;
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_y(cursor_y);
 }
 
 template<void alter_mod(GridIndex & x, GridIndex den)>
-inline void switch_grid_index(PatternEditor & self) {
+inline void switch_grid_index(PatternEditor & self, StateTransaction & tx) {
     doc::Document const & document = self.get_document();
     auto cursor_y = get_cursor(self).y;
 
@@ -2277,15 +2267,14 @@ inline void switch_grid_index(PatternEditor & self) {
         cursor_y.beat = BeatFraction{prev_row, self._zoom_level};
     }
 
-    auto tx = self._win.edit_unwrap();
     tx.cursor_mut().set_y(cursor_y);
 }
 
-void PatternEditor::prev_pattern_pressed() {
-    switch_grid_index<decrement_mod>(*this);
+void PatternEditor::prev_pattern_pressed(StateTransaction & tx) {
+    switch_grid_index<decrement_mod>(*this, tx);
 }
-void PatternEditor::next_pattern_pressed() {
-    switch_grid_index<increment_mod>(*this);
+void PatternEditor::next_pattern_pressed(StateTransaction & tx) {
+    switch_grid_index<increment_mod>(*this, tx);
 }
 
 ColumnIndex ncol(ColumnList const& cols) {
@@ -2357,19 +2346,17 @@ static CursorX move_right(PatternEditor const& self, CursorX cursor_x) {
     return cursor_x;
 }
 
-void PatternEditor::left_pressed() {
+void PatternEditor::left_pressed(StateTransaction & tx) {
     auto cursor_x = get_cursor(*this).x;
     cursor_x = move_left(*this, cursor_x);
 
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_x(cursor_x);
 }
 
-void PatternEditor::right_pressed() {
+void PatternEditor::right_pressed(StateTransaction & tx) {
     auto cursor_x = get_cursor(*this).x;
     cursor_x = move_right(*this, cursor_x);
 
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_x(cursor_x);
 }
 
@@ -2401,7 +2388,7 @@ CursorX cursor_clamp_subcol(ColumnList const& cols, CursorX cursor_x) {
     return cursor_x;
 }
 
-void PatternEditor::scroll_left_pressed() {
+void PatternEditor::scroll_left_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
@@ -2414,11 +2401,10 @@ void PatternEditor::scroll_left_pressed() {
 
     cursor_x = cursor_clamp_subcol(cols, cursor_x);
 
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_x(cursor_x);
 }
 
-void PatternEditor::scroll_right_pressed() {
+void PatternEditor::scroll_right_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
@@ -2431,7 +2417,6 @@ void PatternEditor::scroll_right_pressed() {
 
     cursor_x = cursor_clamp_subcol(cols, cursor_x);
 
-    auto tx = _win.edit_unwrap();
     tx.cursor_mut().set_x(cursor_x);
 }
 
@@ -2442,6 +2427,13 @@ void PatternEditor::escape_pressed() {
 
 void PatternEditor::toggle_edit_pressed() {
     _edit_mode = !_edit_mode;
+
+    // Set the "cursor moved" flag
+    // to redraw the pattern editor with the new cursor color.
+    // We technically didn't move the cursor,
+    // but this approach is less complex than adding an "edit mode changed" flag.
+    auto tx = _win.edit_unwrap();
+    tx.cursor_mut();
 }
 
 // Begin document mutation
