@@ -59,6 +59,8 @@ struct Sample {
 };
 using MaybeSample = std::optional<Sample>;
 
+/// The number of slots is MAX_SAMPLES. (It is an error to resize v.)
+/// SampleIndex < Samples.v.size() == MAX_SAMPLES
 constexpr size_t MAX_SAMPLES = 256;
 struct Samples {
     std::vector<std::optional<Sample>> v;
