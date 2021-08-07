@@ -1,8 +1,8 @@
 #pragma once
 
-#define require_semicolon //do {} while (0)
+#define VA_COMMA(...)  __VA_OPT__(,) __VA_ARGS__
 
-// unexplored C++20 idea: `addWidget/addLayout(w __VA_OPT__(,) __VA_ARGS__)`.
+#define require_semicolon //do {} while (0)
 
 // https://doc.qt.io/qt-5/layout.html#laying-out-widg(ets-in-code
 // Apparently setting the parent of a layout
@@ -76,9 +76,9 @@
 
 
 /// Add container and QBoxLayout to QBoxLayout.
-#define l__c_l(qwidget, qlayout) \
+#define l__c_l(qwidget, qlayout, ...) \
     auto * c = new qwidget; \
-    l->addWidget(c); \
+    l->addWidget(c VA_COMMA(__VA_ARGS__)); \
     \
     auto * l = new qlayout; \
     c->setLayout(l); \
@@ -88,9 +88,9 @@
 
 
 /// Add container and QFormLayout to QBoxLayout.
-#define l__c_form(qwidget, qlayout) \
+#define l__c_form(qwidget, qlayout, ...) \
     auto * c = new qwidget; \
-    l->addWidget(c); \
+    l->addWidget(c VA_COMMA(__VA_ARGS__)); \
     HIDE(l) \
     \
     auto * form = new qlayout; \
@@ -100,9 +100,9 @@
 
 
 /// Add leaf widget to QBoxLayout.
-#define l__w(qwidget) \
+#define l__w(qwidget, ...) \
     auto * w = new qwidget; \
-    l->addWidget(w); \
+    l->addWidget(w VA_COMMA(__VA_ARGS__)); \
     HIDE(l) \
     \
     require_semicolon
@@ -110,28 +110,28 @@
 
 
 /// Add leaf widget to QBoxLayout.
-#define l__w_factory(qwidget_make) \
+#define l__w_factory(qwidget_make, ...) \
     auto * w = qwidget_make; \
-    l->addWidget(w); \
+    l->addWidget(w VA_COMMA(__VA_ARGS__)); \
     HIDE(l) \
     \
     require_semicolon
 
 /// Add QBoxLayout to QBoxLayout.
-#define l__l(qlayout) \
+#define l__l(qlayout, ...) \
     auto * parentL = l; \
     auto * l = new qlayout; \
-    parentL->addLayout(l); \
+    parentL->addLayout(l VA_COMMA(__VA_ARGS__)); \
     \
     require_semicolon
 
 
 /// Add QFormLayout to QBoxLayout.
-#define l__form(qformlayout) \
+#define l__form(qformlayout, ...) \
     auto * parentL = l; \
     HIDE(l) \
     auto * form = new qformlayout; \
-    parentL->addLayout(form); \
+    parentL->addLayout(form VA_COMMA(__VA_ARGS__)); \
     \
     require_semicolon
 
@@ -174,5 +174,5 @@
     require_semicolon
 
 
-#define append_stretch() \
-    l->addStretch()
+#define append_stretch(...) \
+    l->addStretch(__VA_ARGS__)
