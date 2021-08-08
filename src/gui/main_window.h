@@ -228,9 +228,10 @@ public:
 enum class StateUpdateFlag : uint32_t {
     None = 0,
     All = ~(uint32_t)0,
-    DocumentEdited = 0x1,
-    CursorMoved = 0x2,
-    InstrumentSwitched = 0x4,
+    DocumentReplaced = 0x1,
+    DocumentEdited = 0x2,
+    CursorMoved = 0x4,
+    InstrumentSwitched = 0x8,
 };
 Q_DECLARE_FLAGS(StateUpdateFlags, StateUpdateFlag)
 Q_DECLARE_OPERATORS_FOR_FLAGS(StateUpdateFlags)
@@ -281,6 +282,8 @@ public:
     /// Instead delegate to MainWindow::push_edit().
     /// (Exception: AudioComponent::undo()/redo() call this as well.)
     History & history_mut();
+
+    void set_document(doc::Document document);
 
     CursorAndSelection & cursor_mut();
 
