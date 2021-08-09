@@ -180,6 +180,7 @@ add_library(exotracker-headless
     # Document editing code
     src/sample_docs.cpp
     src/edit/edit_doc.cpp
+    src/edit/edit_instr.cpp
     src/edit/edit_pattern.cpp
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
