@@ -43,6 +43,15 @@ namespace detail {
 using gui::config::NoteNameConfig;
 using doc::accidental::AccidentalMode;
 using doc::events::Note;
+using doc::events::Chromatic;
+
+/// Produces a variable-width string for running text,
+/// with format "note, accidental (if present), octave".
+/// The result will be used as the lower/upper bounds of a keysplit,
+/// so pitches 0 and 127 (min/max) are not displayed as notes for clarity.
+[[nodiscard]] QString format_note_keysplit(
+    NoteNameConfig cfg, AccidentalMode accidental_mode, Chromatic pitch
+);
 
 /// Produces a 3-character string for the pattern editor,
 /// with format "note, accidental, octave" (eg. C·4).
