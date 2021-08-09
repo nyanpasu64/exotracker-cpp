@@ -25,7 +25,8 @@ const magicNumber :Data = "EXO-MODU";
 using Version = UInt32;
 struct Versions {
   const unknown :Version = 0;
-  const current :Version = 1;
+  const minimum :Version = 2;
+  const current :Version = 2;
 }
 
 ### doc/events.h
@@ -155,13 +156,11 @@ struct Adsr {
 struct InstrumentPatch {
   minNote @0 :UInt8 = 0;
   # Do not use this patch for pitches below this value.
-  maxNoteInclusive @1 :UInt8 = 127;
-  # Do not use this patch for pitches above this value.
 
-  sampleIdx @2 :UInt8;
+  sampleIdx @1 :UInt8;
   # The sample to play. If sample missing, acts as a key-off(???).
 
-  adsr @3 :Adsr;
+  adsr @2 :Adsr;
   # If I add GAIN support (either global GAIN, or upon instrument release?),
   # I may add more fields or turn adsr into a union.
 }

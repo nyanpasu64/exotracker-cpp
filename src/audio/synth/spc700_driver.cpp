@@ -62,12 +62,26 @@ static uint16_t calc_tuning(
 static doc::InstrumentPatch const* find_patch(
     gsl::span<doc::InstrumentPatch const> keysplit, doc::Chromatic note
 ) {
+    int curr_min_note = -1;
+    doc::InstrumentPatch const* matching = nullptr;
+
+    // Assumption: keysplit[].min_note is strictly increasing.
+    // We skip all patches where this is not the case.
     for (doc::InstrumentPatch const& patch : keysplit) {
-        if (patch.min_note <= note && note <= patch.max_note_inclusive) {
-            return &patch;
+        if ((int) patch.min_note <= curr_min_note) {
+            continue;
+        }
+        curr_min_note = patch.min_note;
+
+        // Return the last matching patch (stop when the next patch's min_note
+        // exceeds the current note).
+        if (note < patch.min_note) {
+            return matching;
+        } else {
+            matching = &patch;
         }
     }
-    return nullptr;
+    return matching;
 }
 
 /// Compute the address of per-voice registers, given our current channel number.
@@ -482,3 +496,70 @@ void Spc700Driver::run_driver(
 }
 
 }
+
+#ifdef UNITTEST
+#include <doctest.h>
+
+namespace audio::synth::spc700_driver {
+
+using namespace doc;
+
+TEST_CASE("Test that keysplits are resolved correctly.") {
+    std::vector<InstrumentPatch> keysplit = {
+        InstrumentPatch { .min_note = 0 },
+        InstrumentPatch { .min_note = 60 },
+        InstrumentPatch { .min_note = 72 },
+    };
+
+    CHECK_EQ(find_patch(keysplit, 0), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 59), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 60), &keysplit[1]);
+    CHECK_EQ(find_patch(keysplit, 71), &keysplit[1]);
+    CHECK_EQ(find_patch(keysplit, 72), &keysplit[2]);
+    CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), &keysplit[2]);
+}
+
+TEST_CASE("Test that keysplits with holes are resolved correctly.") {
+    std::vector<InstrumentPatch> keysplit = {
+        InstrumentPatch { .min_note = 60 },
+        InstrumentPatch { .min_note = 72 },
+    };
+
+    CHECK_EQ(find_patch(keysplit, 0), nullptr);
+    CHECK_EQ(find_patch(keysplit, 59), nullptr);
+    CHECK_EQ(find_patch(keysplit, 60), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 71), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 72), &keysplit[1]);
+    CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), &keysplit[1]);
+}
+
+TEST_CASE("Test that empty keysplits return nullptr.") {
+    std::vector<InstrumentPatch> keysplit;
+
+    CHECK_EQ(find_patch(keysplit, 0), nullptr);
+    CHECK_EQ(find_patch(keysplit, 60), nullptr);
+    CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), nullptr);
+}
+
+TEST_CASE("Test that keysplits with out-of-order patches prefer earlier patches.") {
+    std::vector<InstrumentPatch> keysplit = {
+        InstrumentPatch { .min_note = 60 },
+        InstrumentPatch { .min_note = 72 },
+        InstrumentPatch { .min_note = 48 },
+    };
+
+    CHECK_EQ(find_patch(keysplit, 0), nullptr);
+
+    // Is this really the behavior we want?
+    CHECK_EQ(find_patch(keysplit, 48), nullptr);
+    CHECK_EQ(find_patch(keysplit, 59), nullptr);
+
+    CHECK_EQ(find_patch(keysplit, 60), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 71), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 72), &keysplit[1]);
+    CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), &keysplit[1]);
+}
+
+}
+
+#endif

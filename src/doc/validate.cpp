@@ -153,13 +153,6 @@ size_t truncate_samples(ErrorState & state, size_t gen_nsamp) {
 
 InstrumentPatch validate_patch(ErrorState & state, InstrumentPatch patch) {
     VALIDATE_CHROMATIC(patch, min_note, 0, state);
-    VALIDATE_CHROMATIC(patch, max_note_inclusive, CHROMATIC_COUNT - 1, state);
-    if (patch.min_note > patch.max_note_inclusive) {
-        PUSH_WARNING(state,
-            ".min_note={} > max_note_inclusive={}, patch will never trigger",
-            patch.min_note, patch.max_note_inclusive
-        );
-    }
 
     // See https://nyanpasu64.github.io/AddmusicK/readme_files/hex_command_reference.html#ADSRInfo.
     // I chose to default to a "generic" ADSR curve.
