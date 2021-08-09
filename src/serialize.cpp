@@ -156,7 +156,6 @@ void serialize_instrument(
                 gen::InstrumentPatch::Builder gen_patch)
             {
                 gen_patch.setMinNote(patch.min_note);
-                gen_patch.setMaxNoteInclusive(patch.max_note_inclusive);
                 gen_patch.setSampleIdx(patch.sample_idx);
 
                 auto gen_adsr = gen_patch.initAdsr();
@@ -709,7 +708,6 @@ InstrumentPatch load_patch(ErrorState & state, gen::InstrumentPatch::Reader gen_
 
     return validate_patch(state, InstrumentPatch {
         .min_note = gen_patch.getMinNote(),
-        .max_note_inclusive = gen_patch.getMaxNoteInclusive(),
         .sample_idx = gen_patch.getSampleIdx(),
         .adsr = Adsr {
             gen_adsr.getAttack(),
@@ -1200,9 +1198,15 @@ LoadDocumentResult load_impl(kj::InputStream & stream, ErrorState & state) {
     auto prefix = ErrorPrefixer(state);
 
     uint32_t gen_version = gen_doc.getVersion();
+    if (gen_version < gen::Versions::MINIMUM) {
+        PUSH_WARNING(state,
+            "file version {} is older than minimum supported version {}, file may not load properly",
+            gen_version, gen::Versions::MINIMUM
+        );
+    }
     if (gen_version > gen::Versions::CURRENT) {
         PUSH_WARNING(state,
-            "file version {} is newer than latest supported format version {}, file may not load properly",
+            "file version {} is newer than latest supported version {}, file may not load properly",
             gen_version, gen::Versions::CURRENT
         );
     }
