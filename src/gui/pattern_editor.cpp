@@ -2673,6 +2673,10 @@ static void add_digit(
 
     // Update saved instrument number.
     if (std::holds_alternative<SubColumn_::Instrument>(field.type)) {
+        // TODO if doc::MAX_INSTRUMENTS is reduced below 0x100,
+        // we need to either clamp instrument numbers in the pattern data to MAX_INSTRUMENTS - 1,
+        // or when setting the current instrument number,
+        // or when the instrument dialog fetches the current instrument.
         tx.set_instrument(number);
     }
 
