@@ -180,6 +180,7 @@ add_library(exotracker-headless
     # Document editing code
     src/sample_docs.cpp
     src/edit/edit_doc.cpp
+    src/edit/edit_instr.cpp
     src/edit/edit_pattern.cpp
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
@@ -222,6 +223,7 @@ add_executable(exotracker-qt
     src/gui/instrument_list.cpp
 
     src/gui/tempo_dialog.cpp
+    src/gui/instrument_dialog.cpp
 
     # Resources
     res/exotracker.qrc

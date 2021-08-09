@@ -68,6 +68,9 @@ struct Adsr {
 #endif
 };
 
+constexpr Adsr DEFAULT_ADSR = {0x0f, 0x00, 0x05, 0x07};
+
+
 struct InstrumentPatch {
     /// Do not use this patch for pitches below this value.
     Chromatic min_note = 0;
@@ -76,11 +79,11 @@ struct InstrumentPatch {
     Chromatic max_note_inclusive = events::CHROMATIC_COUNT - 1;
 
     /// The sample to play. If sample missing, acts as a key-off(???).
-    sample::SampleIndex sample_idx;
+    sample::SampleIndex sample_idx = 0;
 
     /// The hardware envelope to use when playing this sample.
     // TODO add GAIN support (either global GAIN, or upon instrument release?)
-    Adsr adsr;
+    Adsr adsr = DEFAULT_ADSR;
 
 //    ByteEnvelope volume{};
 //    ShortEnvelope pitch{};

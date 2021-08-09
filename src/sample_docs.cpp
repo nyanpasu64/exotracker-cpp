@@ -40,6 +40,29 @@ static Document empty() {
         .name = "25%",
         .keysplit = { InstrumentPatch { .sample_idx = PULSE_25, .adsr = INFINITE }},
     };
+    instruments[3] = Instrument{
+        .name = "Keysplit",
+        .keysplit = {
+            InstrumentPatch {
+                .min_note = 0,
+                .max_note_inclusive = 59,
+                .sample_idx = PULSE_25,
+                .adsr = INFINITE,
+            },
+            InstrumentPatch {
+                .min_note = 60,
+                .max_note_inclusive = 71,
+                .sample_idx = PULSE_50,
+                .adsr = INFINITE,
+            },
+            InstrumentPatch {
+                .min_note = 72,
+                .max_note_inclusive = CHROMATIC_COUNT - 1,
+                .sample_idx = TRIANGLE,
+                .adsr = INFINITE,
+            },
+        },
+    };
     instruments[0x10] = Instrument{
         .name = "50%",
         .keysplit = { InstrumentPatch { .sample_idx = PULSE_50, .adsr = INFINITE }},

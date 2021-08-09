@@ -76,6 +76,50 @@ std::optional<char> alphanum_from_key(QKeyEvent const& key) {
 
 using doc::events::NOTES_PER_OCTAVE;
 
+QString format_note_keysplit(
+    NoteNameConfig cfg, AccidentalMode accidental_mode, Chromatic pitch
+) {
+    if (!Note(pitch).is_valid_note()) {
+        return QStringLiteral("%1?").arg(pitch);
+    }
+    if (pitch == 0) {
+        return QStringLiteral("0");
+    }
+    if (pitch == doc::events::CHROMATIC_COUNT - 1) {
+        return QStringLiteral("127");
+    }
+
+    auto impl = [&cfg, accidental_mode] (
+        auto & impl, int pitch, QString accidental
+    ) -> QString {
+        // Octave is rounded towards 0, and semitone has the same sign as note.
+        auto [octave, semitone] = div(pitch, NOTES_PER_OCTAVE);
+        // Ensure that octave is correct and semitone is non-negative.
+        // (This can only happen if note < 0, which never happens if
+        // midi_to_note_name() only receives valid MIDI pitches.
+        // So this is just future-proofing.)
+        if (semitone < 0) {
+            semitone += NOTES_PER_OCTAVE;
+            octave -= 1;
+        }
+
+        octave += cfg.gui_bottom_octave;
+
+        auto maybe_diatonic = detail::semitone_diatonics[semitone];
+        if (maybe_diatonic >= 0) {
+            return detail::diatonic_names[maybe_diatonic]
+                + accidental
+                + QString::number(octave);
+        } else if (accidental_mode == AccidentalMode::Sharp) {
+            return impl(impl, pitch - 1, cfg.sharp_char);
+        } else {
+            return impl(impl, pitch + 1, cfg.flat_char);
+        }
+    };
+
+    return impl(impl, pitch, QString());
+}
+
 QString format_pattern_note(
     NoteNameConfig cfg, AccidentalMode accidental_mode, Note note
 ) {

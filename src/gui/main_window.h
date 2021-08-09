@@ -298,6 +298,10 @@ class MainWindow : public QMainWindow {
 public:
     StateComponent _state;
 
+    StateComponent const& state() {
+        return _state;
+    }
+
 // interface
     static MainWindow & get_instance();
 
@@ -317,6 +321,8 @@ public:
     /// MoveCursor determines whether to save and move the cursor (for pattern edits)
     /// or not (for non-pattern edits).
     virtual void push_edit(StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move) = 0;
+
+    virtual void show_instr_dialog() = 0;
 
 // constructors
     static std::unique_ptr<MainWindow> make(
