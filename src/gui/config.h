@@ -258,6 +258,7 @@ inline namespace visual {
         /// MIDI pitch 0 lies in this octave.
         int gui_bottom_octave;
 
+        // TODO switch to char32_t?
         QChar sharp_char;
         QChar flat_char;
         QChar natural_char;
