@@ -27,11 +27,14 @@ static Document empty() {
     constexpr SampleIndex TRIANGLE = 0;
     constexpr SampleIndex PULSE_25 = 1;
     constexpr SampleIndex PULSE_50 = 2;
+    constexpr SampleIndex LONG = 3;
 
     Samples samples;
     samples[TRIANGLE] = triangle();
     samples[PULSE_25] = pulse_25();
     samples[PULSE_50] = pulse_50();
+    samples[LONG] = pulse_50();
+    samples[LONG]->name = "looooooooooooooooooooooooooooooong";
 
     Instruments instruments;
     instruments[0] = Instrument{"blank", {}};
@@ -39,6 +42,46 @@ static Document empty() {
     instruments[2] = Instrument{
         .name = "25%",
         .keysplit = { InstrumentPatch { .sample_idx = PULSE_25, .adsr = INFINITE }},
+    };
+    instruments[3] = Instrument{
+        .name = "Keysplit",
+        .keysplit = {
+            InstrumentPatch {
+                .min_note = 0,
+                .sample_idx = PULSE_25,
+                .adsr = DEMO,
+            },
+            InstrumentPatch {
+                .min_note = 60,
+                .sample_idx = PULSE_50,
+                .adsr = MUSIC_BOX,
+            },
+            InstrumentPatch {
+                .min_note = 72,
+                .sample_idx = TRIANGLE,
+                .adsr = INFINITE,
+            },
+        },
+    };
+    instruments[4] = Instrument {
+        .name = "Invalid",
+        .keysplit = {
+            InstrumentPatch {
+                .min_note = 0,
+                .sample_idx = PULSE_25,
+                .adsr = DEMO,
+            },
+            InstrumentPatch {
+                .min_note = 60,
+                .sample_idx = 0x10,
+                .adsr = MUSIC_BOX,
+            },
+            InstrumentPatch {
+                .min_note = 48,
+                .sample_idx = TRIANGLE,
+                .adsr = INFINITE,
+            },
+        },
     };
     instruments[0x10] = Instrument{
         .name = "50%",
@@ -613,7 +656,7 @@ static Document block_test() {
 
 #endif
 
-std::string const DEFAULT_DOC = "all-channels";
+std::string const DEFAULT_DOC = "empty";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
     std::map<std::string, doc::Document> out;
