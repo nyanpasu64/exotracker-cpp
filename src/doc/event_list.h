@@ -22,6 +22,8 @@ using EventIndex = uint32_t;
 /// entire classical movement in a single pattern without breaks).
 ///
 /// 65535 events is more than sufficient to store even pathological monophonic tracks.
+///
+/// EventIndex < EventList.size() <= MAX_EVENTS_PER_PATTERN.
 constexpr int MAX_EVENTS_PER_PATTERN = 0xffff;
 
 using EventList = std::vector<TimedRowEvent>;

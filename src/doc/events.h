@@ -18,6 +18,7 @@ namespace doc::events {
 inline namespace note_ {
     /// Note pitch, as expressed as a MIDI note number.
     /// Valid values are [0..127 (CHROMATIC_COUNT - 1)].
+    /// Chromatic < FrequenciesOwned.size() == CHROMATIC_COUNT.
     using Chromatic = uint8_t;
     constexpr size_t CHROMATIC_COUNT = 128;
     constexpr int NOTES_PER_OCTAVE = 12;
@@ -75,6 +76,7 @@ using Volume = uint8_t;
 using EffColIndex = uint8_t;
 
 inline namespace effects_ {
+    /// EffColIndex < MAX_EFFECTS_PER_EVENT. n_effect_col <= MAX_EFFECTS_PER_EVENT.
     constexpr EffColIndex MAX_EFFECTS_PER_EVENT = 8;
     constexpr char EFFECT_NAME_PLACEHOLDER = '0';
 

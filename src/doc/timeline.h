@@ -21,7 +21,12 @@
 
 namespace doc::timeline {
 
-// # Constants
+// # Indexing and bounds
+
+struct GridIndex {
+    EXPLICIT_TYPEDEF(uint32_t, GridIndex)
+};
+using MaybeGridIndex = std::optional<GridIndex>;
 
 /// Type doesn't really matter.
 /// You cannot store more than 256 timeline items,
@@ -29,12 +34,21 @@ namespace doc::timeline {
 ///
 /// Note that a 256-item-long document's length will not fit in a single byte!
 /// But FamiTracker manages somehow.
-constexpr int MAX_TIMELINE_FRAMES = 256;
+///
+/// GridIndex < Timeline.size() <= MAX_TIMELINE_FRAMES.
+constexpr size_t MAX_TIMELINE_FRAMES = 256;
 
+
+struct BlockIndex {
+    EXPLICIT_TYPEDEF(uint32_t, BlockIndex)
+};
+using MaybeBlockIndex = std::optional<BlockIndex>;
 
 /// Not strictly enforced. But exceeding this could cause problems
 /// with the hardware driver, or skips in the audio.
-constexpr int MAX_BLOCKS_PER_CELL = 32;
+///
+/// BlockIndex < TimelineCell._raw_blocks.size() <= MAX_BLOCKS_PER_CELL.
+constexpr size_t MAX_BLOCKS_PER_CELL = 32;
 
 
 // # Utility types
@@ -47,16 +61,6 @@ using ChipChannelTo = DenseMap<ChipIndex, DenseMap<ChannelIndex, V>>;
 
 template<typename V>
 using ChannelTo = DenseMap<ChannelIndex, V>;
-
-struct GridIndex {
-    EXPLICIT_TYPEDEF(uint32_t, GridIndex)
-};
-using MaybeGridIndex = std::optional<GridIndex>;
-
-struct BlockIndex {
-    EXPLICIT_TYPEDEF(uint32_t, BlockIndex)
-};
-using MaybeBlockIndex = std::optional<BlockIndex>;
 
 /// i tried
 template<typename T>

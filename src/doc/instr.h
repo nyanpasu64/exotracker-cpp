@@ -94,6 +94,7 @@ struct InstrumentPatch {
 };
 
 /// The maximum number of keysplits in 1 instrument.
+/// idx < keysplit.size() <= MAX_KEYSPLITS.
 constexpr size_t MAX_KEYSPLITS = 128;
 struct Instrument {
     std::string name;
@@ -113,6 +114,8 @@ struct Instrument {
 };
 using MaybeInstrument = std::optional<Instrument>;
 
+/// The number of slots is MAX_INSTRUMENTS. (It is an error to resize v.)
+/// idx < Instruments.v.size() == MAX_INSTRUMENTS.
 constexpr size_t MAX_INSTRUMENTS = 256;
 struct Instruments {
     std::vector<std::optional<Instrument>> v;

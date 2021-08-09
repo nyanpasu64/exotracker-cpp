@@ -117,8 +117,9 @@ inline namespace tuning {
     using FreqDouble = double;
     using RegisterInt = int;
 
+    /// .size() must be CHROMATIC_COUNT.
     template<typename T>
-    using Owned_ = std::vector<T>;  // size must be CHROMATIC_COUNT
+    using Owned_ = std::vector<T>;
 
     template<typename T>
     using Ref_ = gsl::span<T const, CHROMATIC_COUNT>;
