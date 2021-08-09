@@ -22,6 +22,9 @@ class BaseEditCommand;
 /// Is this a good design? I don't know.
 using EditBox = std::unique_ptr<BaseEditCommand>;
 
+// Nullable pointer.
+using MaybeEditBox = std::unique_ptr<BaseEditCommand>;
+
 using modified::ModifiedInt;
 using modified::ModifiedFlags;
 

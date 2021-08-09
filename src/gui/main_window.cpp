@@ -2,6 +2,7 @@
 #include "main_window.h"
 #include "gui/pattern_editor.h"
 #include "gui/timeline_editor.h"
+#include "gui/instrument_dialog.h"
 #include "gui/instrument_list.h"
 #include "gui/move_cursor.h"
 #include "gui/tempo_dialog.h"
@@ -45,6 +46,7 @@
 #include <QFlags>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QPointer>
 #include <QScreen>
 #include <QTextCursor>
 #include <QTextDocument>
@@ -805,6 +807,7 @@ public:
 }  // anonymous namespace
 
 using tempo_dialog::TempoDialog;
+using instrument_dialog::InstrumentDialog;
 
 // module-private
 class MainWindowImpl : public MainWindowUi {
@@ -815,6 +818,7 @@ public:
     QScreen * _screen;
     QTimer _gui_refresh_timer;
     QErrorMessage _error_dialog{this};
+    QPointer<InstrumentDialog> _maybe_instr_dialog;
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
@@ -892,6 +896,15 @@ public:
     ) override {
         _audio.push_edit(tx, std::move(command), cursor_move);
         clamp_cursor(tx);
+    }
+
+    void show_instr_dialog() override {
+        if (!_maybe_instr_dialog) {
+            _maybe_instr_dialog = InstrumentDialog::make(this);
+            _maybe_instr_dialog->show();
+        } else {
+            _maybe_instr_dialog->activateWindow();
+        }
     }
 
     // private methods
@@ -1542,6 +1555,19 @@ StateTransaction::~StateTransaction() noexcept(false) {
         _win->_instrument_list->set_history(state.document_getter());
     } else if (e & E::InstrumentSwitched) {
         _win->_instrument_list->update_selection();
+    }
+
+    // Synchronizing InstrumentDialog with the document and active instrument
+    // is tricky.
+    // https://docs.google.com/document/d/1xSXmtB4-9Wa11Bo9jWp3cpMvIWSbl6DNN3gojpW-NhE/edit#heading=h.68ro9bhgsp2w
+    if (_win->_maybe_instr_dialog) {
+        if (e & E::DocumentReplaced) {
+            // closes dialog, nulls out pointer later on.
+            _win->_maybe_instr_dialog->close();
+        } else if (e & (E::DocumentEdited | E::InstrumentSwitched)) {
+            // may close dialog and null out pointer later on.
+            _win->_maybe_instr_dialog->reload_state();
+        }
     }
 
     doc::Document const& doc = state.document();
