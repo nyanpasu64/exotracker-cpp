@@ -96,6 +96,10 @@ struct PatternEdit {
     bool can_coalesce(BaseEditCommand & prev) const {
         return false;
     }
+
+    void const* get_impl(std::type_info const&) const {
+        return nullptr;
+    }
 };
 
 /// Erase all empty elements of an entire EventList (not a slice).

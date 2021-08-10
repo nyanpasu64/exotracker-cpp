@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <typeinfo>
 
 namespace edit {
 
@@ -66,6 +67,16 @@ public:
     ///
     /// (This could be a base-class field instead, I guess.)
     [[nodiscard]] virtual ModifiedFlags modified() const = 0;
+
+    /// Type-erased mechanism for querying metadata. Returns a nullable pointer.
+    /// For unknown type_info, return nullptr.
+    [[nodiscard]] virtual void const* get_impl(std::type_info const& type) const = 0;
+
+    /// look i'm oh-so-clever
+    template<typename T>
+    T const* get() const {
+        return (T const*) get_impl(typeid(T));
+    }
 };
 
 using gui::cursor::Cursor;

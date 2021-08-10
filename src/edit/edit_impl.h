@@ -31,6 +31,10 @@ struct ImplEditCommand : BaseEditCommand, Body {
     [[nodiscard]] ModifiedFlags modified() const override {
         return Body::_modified;
     }
+
+    [[nodiscard]] void const* get_impl(std::type_info const& type) const override {
+        return Body::get_impl(type);
+    }
 };
 
 template<typename Body>
@@ -50,6 +54,10 @@ struct NullEditCommand {
     }
 
     constexpr static ModifiedFlags _modified = (ModifiedFlags) 0;
+
+    void const* get_impl(std::type_info const&) const {
+        return nullptr;
+    }
 };
 
 }

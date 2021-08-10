@@ -41,6 +41,10 @@ public:
 
         return typeid(prev_edit_command) == typeid(SelfEditCommand);
     }
+
+    void const* get_impl(std::type_info const&) const {
+        return nullptr;
+    }
 };
 
 /// I wanted to turn this function into a local-variable lambda,
@@ -81,6 +85,10 @@ public:
 
     bool can_coalesce(BaseEditCommand &) const {
         return false;
+    }
+
+    void const* get_impl(std::type_info const&) const {
+        return nullptr;
     }
 };
 
@@ -172,6 +180,10 @@ struct EditRow {
     }
 
     constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
+
+    void const* get_impl(std::type_info const&) const {
+        return nullptr;
+    }
 };
 
 // Exported via headers.
@@ -234,6 +246,10 @@ struct SetGridLength {
     }
 
     constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
+
+    void const* get_impl(std::type_info const&) const {
+        return nullptr;
+    }
 };
 
 EditBox set_grid_length(doc::GridIndex grid_pos, doc::BeatFraction nbeats) {
@@ -254,6 +270,10 @@ struct MoveGridDown {
     }
 
     constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
+
+    void const* get_impl(std::type_info const&) const {
+        return nullptr;
+    }
 };
 
 EditBox move_grid_up(doc::GridIndex grid_pos) {
