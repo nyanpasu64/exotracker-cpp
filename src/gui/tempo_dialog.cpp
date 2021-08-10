@@ -245,7 +245,8 @@ public:
         constexpr int HORIZONTAL_SPACING = 8;
 
         {l__l(QVBoxLayout);
-            {l__c_l(QGroupBox(tr("Basic")), QVBoxLayout);
+            {l__c_l(QWidget, QVBoxLayout);
+                l->setContentsMargins(0, 0, 0, 0);
                 {l__form(QFormLayout);
                     form->setHorizontalSpacing(HORIZONTAL_SPACING);
                     {form__label_w(tr("Target tempo"), QDoubleSpinBox);
@@ -272,8 +273,10 @@ public:
                 _show_advanced = w;
                 // TODO fetch state from app options
             }
-            {l__c_l(QGroupBox(tr("Advanced")), QVBoxLayout);
+            {l__c_l(QWidget, QVBoxLayout);
                 _advanced_widget = c;
+                // Remove left/right/bottom margins, keep top margin for spacing.
+                l->setContentsMargins(0, -1, 0, 0);
 
                 {l__form(QFormLayout);
                     form->setHorizontalSpacing(HORIZONTAL_SPACING);
