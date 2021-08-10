@@ -394,6 +394,7 @@ struct MainWindowUi : MainWindow {
         {l__c_l(QGroupBox, QVBoxLayout)
             c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
             c->setTitle(tr("Timeline"));
+            c->setFlat(true);
             {l__w_factory(TimelineEditor::make(this))
                 _timeline_editor = w;
             }
@@ -428,6 +429,7 @@ struct MainWindowUi : MainWindow {
             // Song settings
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Song"));
+                c->setFlat(true);
 
                 {form__left_right(QPushButton(tr("Tempo..."), this), QDoubleSpinBox);
                     _edit_tempo = left;
@@ -469,6 +471,7 @@ struct MainWindowUi : MainWindow {
             // TODO rework settings GUI
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Timeline item"));
+                c->setFlat(true);
 
                 form->addRow(
                     new QLabel(tr("Length (beats)")),
@@ -487,6 +490,7 @@ struct MainWindowUi : MainWindow {
         {l__l(QVBoxLayout);
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Note entry"));
+                c->setFlat(true);
 
                 {form__label_w(tr("Octave"), QSpinBox);
                     _octave = w;
@@ -504,6 +508,7 @@ struct MainWindowUi : MainWindow {
             }
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Step"));
+                c->setFlat(true);
                 {form__label_w(tr("Rows"), QSpinBox);
                     _step = w;
                     w->setRange(0, 256);
