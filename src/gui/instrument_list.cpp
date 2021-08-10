@@ -1,5 +1,6 @@
 #include "instrument_list.h"
 #include "doc.h"
+#include "gui/lib/format.h"
 #include "gui/lib/layout_macros.h"
 #include "util/unwrap.h"
 
@@ -25,6 +26,8 @@ enum : int {
     IsEnabled = Qt::UserRole,  // bool
 };
 }
+
+using gui::lib::format::format_hex_2;
 
 namespace {
 class InstrumentListModel : public QAbstractListModel {
@@ -64,11 +67,11 @@ public:
 
         if (role == Qt::DisplayRole) {
             if (x[row].has_value()) {
-                return QStringLiteral("%1 - %2")
-                    .arg(row, 2, 16, QLatin1Char('0'))
-                    .arg(QString::fromStdString(x[row]->name));
+                return QStringLiteral("%1 - %2").arg(
+                    format_hex_2(row), QString::fromStdString(x[row]->name)
+                );
             } else {
-                return QStringLiteral("%1").arg(row, 2, 16, QLatin1Char('0'));
+                return format_hex_2(row);
             }
         }
         if (role == InstrumentListRole::IsEnabled) {
