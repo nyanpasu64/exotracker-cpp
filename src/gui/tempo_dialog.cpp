@@ -150,10 +150,35 @@ public:
 protected:
     /// Recompute sizeHint() when font settings change.
     void changeEvent(QEvent * event) override {
-        // Copied from QAbstractSpinBox::event(), hopefully this is enough.
+        // Copied from QAbstractSpinBox::event(...), hopefully this is enough.
         switch (event->type()) {
         case QEvent::FontChange:
         case QEvent::StyleChange:
+        // case QEvent::LocaleChange?
+        // QAbstractSpinBox::event(...) doesn't recompute the size hint (or text)
+        // on QEvent::LocaleChange, but QSpinBox::textFromValue(...) "depends" on locale.
+        // However I think it's *technically* not a bug for Q[Double]SpinBox:
+        //
+        // - I don't know if changing the locale of a running app or login session
+        //   is possible on any OS.
+        //
+        // - The size hint of a Q[Double]SpinBox depends on
+        //   Q[Double]SpinBox::textFromValue(), which uses locale.toString(...)
+        //   with OmitGroupSeparator enabled.
+        //
+        // - QLocale::toString(qlonglong i) with OmitGroupSeparator calls
+        //   QLocaleData::longLongToString(...) with flags of 0.
+        //   This calls qulltoa() (locale-independent) and looks at flags.
+        //   Since flags == 0, and QLocaleData::longLongToString
+        //   doesn't seem to look at member variables,
+        //   the output is independent of the current locale.
+        //
+        // - QLocale::toString(double f, 'c') manages to escape locale-dependence
+        //   but only because of format 'c'.
+        //
+        // I think QDateTimeEdit is wrong to not recompute on locale change,
+        // but luckily we don't have a DateTimeViewer so it doesn't affect us ;)
+
             reload_size_hint();
             break;
         default:
