@@ -103,7 +103,7 @@ struct SequencerOptions {
 };
 
 constexpr double MIN_TEMPO = 1.;
-constexpr double MAX_TEMPO = 1000.;
+constexpr double MAX_TEMPO = 999.;
 
 constexpr uint32_t MIN_TIMER_PERIOD = 1;
 constexpr uint32_t MAX_TIMER_PERIOD = 256;
