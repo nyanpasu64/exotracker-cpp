@@ -1143,7 +1143,18 @@ public:
                 tx.update_all();
 
                 tx.cursor_mut() = {};
-                tx.history_mut() = History(std::move(document));
+
+                // This *technically* doesn't result in the audio thread accessing freed memory,
+                // since this only overwrites _state._history
+                // and the audio thread only reads from _command_queue.
+                //
+                // However this is still easy to get wrong,
+                // since the GUI is operating on the new document
+                // and the audio thread is still operating on the old one.
+                // If you fail to reload the audio thread with the new document
+                // (_audio.restart_audio_thread()),
+                // you end up in an inconsistent state upon editing or playback.
+                tx.set_document(std::move(document));
                 tx.set_instrument(0);
             }
 
@@ -1555,18 +1566,25 @@ StateComponent & StateTransaction::state_mut() {
     return _win->_state;
 }
 
+using E = StateUpdateFlag;
+
 history::History & StateTransaction::history_mut() {
-    _queued_updates |= StateUpdateFlag::DocumentEdited;
+    _queued_updates |= E::DocumentEdited;
     return state_mut()._history;
 }
 
+void StateTransaction::set_document(doc::Document document) {
+    state_mut()._history = History(std::move(document));
+    _queued_updates |= E::DocumentReplaced | E::DocumentEdited;
+}
+
 CursorAndSelection & StateTransaction::cursor_mut() {
-    _queued_updates |= StateUpdateFlag::CursorMoved;
+    _queued_updates |= E::CursorMoved;
     return state_mut()._cursor;
 }
 
 void StateTransaction::set_instrument(int instrument) {
-    _queued_updates |= StateUpdateFlag::InstrumentSwitched;
+    _queued_updates |= E::InstrumentSwitched;
     state_mut()._instrument = instrument;
 }
 
