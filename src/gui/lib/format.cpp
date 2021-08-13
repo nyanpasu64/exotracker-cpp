@@ -74,4 +74,64 @@ std::optional<char> alphanum_from_key(QKeyEvent const& key) {
     return {};
 }
 
+using doc::events::NOTES_PER_OCTAVE;
+
+QString format_pattern_note(
+    NoteNameConfig cfg, AccidentalMode accidental_mode, Note note
+) {
+    if (note.is_cut()) {
+        return QStringLiteral("---");
+    }
+    if (note.is_release()) {
+        return QStringLiteral("===");
+    }
+    if (!note.is_valid_note()) {
+        return QStringLiteral("%1?").arg(note.value);
+    }
+
+    auto impl = [&cfg, accidental_mode] (
+        auto & impl, int note, QChar accidental
+    ) -> QString {
+        // Octave is rounded towards 0, and semitone has the same sign as note.
+        auto [octave, semitone] = div(note, NOTES_PER_OCTAVE);
+        // Ensure that octave is correct and semitone is non-negative.
+        // (This can only happen if note < 0, which never happens if
+        // midi_to_note_name() only receives valid MIDI pitches.
+        // So this is just future-proofing.)
+        if (semitone < 0) {
+            semitone += NOTES_PER_OCTAVE;
+            octave -= 1;
+        }
+
+        octave += cfg.gui_bottom_octave;
+
+        auto maybe_diatonic = detail::semitone_diatonics[semitone];
+        if (maybe_diatonic >= 0) {
+            return detail::diatonic_names[maybe_diatonic]
+                + accidental
+                + (octave < 0 ? QStringLiteral("-") : format_hex_1(octave & 0xf));
+        } else if (accidental_mode == AccidentalMode::Sharp) {
+            return impl(impl, note - 1, cfg.sharp_char);
+        } else {
+            return impl(impl, note + 1, cfg.flat_char);
+        }
+    };
+
+    return impl(impl, note.value, cfg.natural_char);
+}
+
+[[nodiscard]] QString format_pattern_noise(Note note) {
+    if (note.is_cut()) {
+        return QStringLiteral("---");
+    }
+    if (note.is_release()) {
+        return QStringLiteral("===");
+    }
+    if (!note.is_valid_note()) {
+        return QStringLiteral("%1?").arg(note.value);
+    }
+
+    return QStringLiteral("$%1").arg(format_hex_2((uint8_t) note.value));
+}
+
 }

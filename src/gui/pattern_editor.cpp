@@ -1841,8 +1841,8 @@ static void draw_pattern_foreground(
                             painter.setPen(note_color);
 
                             QString s = is_noise(document, column.chip, column.channel)
-                                ? format::midi_to_noise_name(note)
-                                : format::midi_to_note_name(
+                                ? format::format_pattern_noise(note)
+                                : format::format_pattern_note(
                                     note_cfg, document.accidental_mode, note
                                 );
 
@@ -2773,7 +2773,7 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
 
             for (auto const [semitone, curr_key] : enumerate<int>(key_row)) {
                 if (curr_key == keycode) {
-                    int chromatic = octave * lib::format::NOTES_PER_OCTAVE + semitone;
+                    int chromatic = octave * doc::NOTES_PER_OCTAVE + semitone;
                     chromatic =
                         std::clamp(chromatic, 0, (int) doc::CHROMATIC_COUNT - 1);
 
