@@ -79,7 +79,7 @@ public:
         std::swap(document.sequencer_options, _value);
     }
 
-    bool can_coalesce(BaseEditCommand & /*prev*/) const {
+    bool can_coalesce(BaseEditCommand &) const {
         return false;
     }
 };
@@ -167,8 +167,7 @@ struct EditRow {
         }
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
-        (void) prev;
+    bool can_coalesce(BaseEditCommand &) const {
         return false;
     }
 
