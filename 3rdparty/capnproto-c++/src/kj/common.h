@@ -233,7 +233,10 @@ KJ_NORETURN(void unreachable());
 }  // namespace _ (private)
 
 #ifdef KJ_DEBUG
-#if _MSC_VER
+#ifndef _MSVC_TRADITIONAL
+#define _MSVC_TRADITIONAL 1
+#endif
+#if _MSC_VER && _MSVC_TRADITIONAL
 #define KJ_IREQUIRE(condition, ...) \
     if (KJ_LIKELY(condition)); else ::kj::_::inlineRequireFailure( \
         __FILE__, __LINE__, #condition, "" #__VA_ARGS__, __VA_ARGS__)
