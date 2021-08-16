@@ -3,6 +3,7 @@
 #include "chip_instance_common.h"
 #include "doc.h"
 #include "util/release_assert.h"
+#include "util/reverse.h"
 
 #include <SPC_DSP.h>  // for register enums
 #include <gsl/span>
@@ -59,11 +60,13 @@ static uint16_t calc_tuning(
     return out;
 }
 
+using util::reverse::reverse;
+
 static doc::InstrumentPatch const* find_patch(
     gsl::span<doc::InstrumentPatch const> keysplit, doc::Chromatic note
 ) {
-    for (doc::InstrumentPatch const& patch : keysplit) {
-        if (patch.min_note <= note && note <= patch.max_note_inclusive) {
+    for (doc::InstrumentPatch const& patch : reverse(keysplit)) {
+        if (patch.min_note <= note) {
             return &patch;
         }
     }

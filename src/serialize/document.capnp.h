@@ -17,6 +17,7 @@ namespace schemas {
 CAPNP_DECLARE_SCHEMA(f638d18cb9d8f2fd);
 CAPNP_DECLARE_SCHEMA(b9fec0afa09d2253);
 CAPNP_DECLARE_SCHEMA(807bfcbdaa351b91);
+CAPNP_DECLARE_SCHEMA(851e4f52598f1e94);
 CAPNP_DECLARE_SCHEMA(84edce2a246ba21e);
 CAPNP_DECLARE_SCHEMA(ea4dcf6fcffaec80);
 CAPNP_DECLARE_SCHEMA(b6b53975f04d0698);
@@ -64,7 +65,8 @@ struct Versions {
   class Builder;
   class Pipeline;
   static constexpr  ::uint32_t UNKNOWN = 0u;
-  static constexpr  ::uint32_t CURRENT = 1u;
+  static constexpr  ::uint32_t MINIMUM = 2u;
+  static constexpr  ::uint32_t CURRENT = 2u;
 
   struct _capnpPrivate {
     CAPNP_DECLARE_STRUCT_HEADER(b9fec0afa09d2253, 0, 0)
@@ -1659,8 +1661,6 @@ public:
 
   inline  ::uint8_t getMinNote() const;
 
-  inline  ::uint8_t getMaxNoteInclusive() const;
-
   inline  ::uint8_t getSampleIdx() const;
 
   inline bool hasAdsr() const;
@@ -1696,9 +1696,6 @@ public:
 
   inline  ::uint8_t getMinNote();
   inline void setMinNote( ::uint8_t value);
-
-  inline  ::uint8_t getMaxNoteInclusive();
-  inline void setMaxNoteInclusive( ::uint8_t value);
 
   inline  ::uint8_t getSampleIdx();
   inline void setSampleIdx( ::uint8_t value);
@@ -3091,32 +3088,18 @@ inline void InstrumentPatch::Builder::setMinNote( ::uint8_t value) {
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
-inline  ::uint8_t InstrumentPatch::Reader::getMaxNoteInclusive() const {
-  return _reader.getDataField< ::uint8_t>(
-      ::capnp::bounded<1>() * ::capnp::ELEMENTS, 127u);
-}
-
-inline  ::uint8_t InstrumentPatch::Builder::getMaxNoteInclusive() {
-  return _builder.getDataField< ::uint8_t>(
-      ::capnp::bounded<1>() * ::capnp::ELEMENTS, 127u);
-}
-inline void InstrumentPatch::Builder::setMaxNoteInclusive( ::uint8_t value) {
-  _builder.setDataField< ::uint8_t>(
-      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value, 127u);
-}
-
 inline  ::uint8_t InstrumentPatch::Reader::getSampleIdx() const {
   return _reader.getDataField< ::uint8_t>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
 }
 
 inline  ::uint8_t InstrumentPatch::Builder::getSampleIdx() {
   return _builder.getDataField< ::uint8_t>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
 }
 inline void InstrumentPatch::Builder::setSampleIdx( ::uint8_t value) {
   _builder.setDataField< ::uint8_t>(
-      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool InstrumentPatch::Reader::hasAdsr() const {

@@ -38,10 +38,6 @@ namespace edit::edit_instr {
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::Chromatic value
 );
 
-[[nodiscard]] EditBox edit_max_key(
-    doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::Chromatic value
-);
-
 [[nodiscard]] EditBox edit_sample_idx(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::SampleIndex value
 );

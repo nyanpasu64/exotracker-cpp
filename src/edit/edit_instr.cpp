@@ -194,14 +194,6 @@ EditBox edit_min_key(
     return make_command(PatchSetter(instr_idx, patch_idx, patch));
 }
 
-EditBox edit_max_key(
-    doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::Chromatic value
-) {
-    auto patch = get_patch(doc, instr_idx, patch_idx);
-    patch.max_note_inclusive = value;
-    return make_command(PatchSetter(instr_idx, patch_idx, patch));
-}
-
 EditBox edit_sample_idx(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::SampleIndex value
 ) {

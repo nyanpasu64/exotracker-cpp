@@ -343,7 +343,6 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     QCheckBox * _note_names;
 
     QSpinBox * _min_key;
-    QSpinBox * _max_key;
     QComboBox * _sample;
     Slider _attack;
     Slider _decay;
@@ -421,18 +420,8 @@ public:
                     w->setMaximum(doc::CHROMATIC_COUNT - 1);
                 }
 
-                {l__w_factory(qlabel(tr("Max Key"))); }
-                {l__w(NoteSpinBox(this));
-                    _max_key = w;
-                    w->setMaximum(doc::CHROMATIC_COUNT - 1);
-                }
-
-                append_stretch();
-            }
-
-            {l__l(QHBoxLayout);
                 {l__w_factory(qlabel(tr("Sample"))); }
-                {l__w(QComboBox);
+                {l__w(QComboBox, 1);
                     _sample = w;
                 }
             }
@@ -660,7 +649,6 @@ public:
             this, &InstrumentDialogImpl::reload_current_patch);
 
         connect_spin(_min_key, edit_instr::edit_min_key);
-        connect_spin(_max_key, edit_instr::edit_max_key);
         connect_combo(_sample, edit_instr::edit_sample_idx);
         connect_pair(_attack, edit_instr::edit_attack);
         connect_pair(_decay, edit_instr::edit_decay);
@@ -720,11 +708,8 @@ public:
             doc::InstrumentPatch const& patch = keysplit[patch_idx];
             QString name = sample_text(samples, patch.sample_idx);
 
-            auto text = QString("%1-%2: %3")
-                .arg(
-                    format_note_name(patch.min_note),
-                    format_note_name(patch.max_note_inclusive),
-                    name);
+            auto text = QString("%1+: %3")
+                .arg(format_note_name(patch.min_note), name);
 
             new QListWidgetItem(text, &list);
             // TODO compute and show list of errors
@@ -758,7 +743,6 @@ public:
         }
 
         set_value(_min_key, patch.min_note);
-        set_value(_max_key, patch.max_note_inclusive);
 
         reload_samples(_sample, doc, patch);
 

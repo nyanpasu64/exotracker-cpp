@@ -74,9 +74,6 @@ constexpr Adsr DEFAULT_ADSR = {0x0f, 0x00, 0x05, 0x07};
 struct InstrumentPatch {
     /// Do not use this patch for pitches below this value.
     Chromatic min_note = 0;
-    /// Do not use this patch for pitches above this value.
-    /// (TODO what if this is below min_note?)
-    Chromatic max_note_inclusive = events::CHROMATIC_COUNT - 1;
 
     /// The sample to play. If sample missing, acts as a key-off(???).
     sample::SampleIndex sample_idx = 0;
@@ -102,12 +99,18 @@ constexpr size_t MAX_KEYSPLITS = 128;
 struct Instrument {
     std::string name;
 
-    /// A collection of different samples and ADSR values, along with associated ranges of keys.
-    /// Whenever a note plays, the driver scans the array
-    /// and picks the first patch including the note.
+    /// A collection of different samples and ADSR values,
+    /// along with associated ranges of keys.
+    /// Whenever a note plays, the driver scans the vector backwards
+    /// and picks the first patch where InstrumentPatch::min_note <= note.
     /// If none match, each note acts as a key-off(???).
+    ///
     /// (Note that this algorithm has edge-cases, and care must be taken
     /// to ensure the tracker and SPC driver match.)
+    ///
+    /// In the future, single-note samples/patches will be introduced.
+    /// The driver plays the note as usual if min_note == note.
+    /// If min_note < note, the driver instead acts like no patches match.
     std::vector<InstrumentPatch> keysplit;
 
 // impl
