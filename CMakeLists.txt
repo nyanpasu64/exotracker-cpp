@@ -70,6 +70,7 @@ set(
         -Werror=return-type
     >
     $<$<CXX_COMPILER_ID:MSVC>:
+        /Zc:preprocessor
 #        /W3
         /W4
         /wd4100  # allow unused parameters
