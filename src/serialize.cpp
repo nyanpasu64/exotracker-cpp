@@ -419,31 +419,16 @@ namespace _ {
 using namespace kj;
 
 /// Shim allowing Cap'n Proto to write to a kj::File.
-class AppendableFileRef final: public AppendableFile {
+class FileOutputStream final: public OutputStream {
 private:
     // non-null, non-owning pointer
     File const* _file;
     size_t _cursor = 0;
 
 public:
-    AppendableFileRef(File const& fileParam)
+    FileOutputStream(File const& fileParam)
         : _file(&fileParam)
     {}
-
-    Own<const FsNode> cloneFsNode() const override {
-        throw std::logic_error("AppendableFileRef cannot be cloned");
-    }
-
-    Maybe<int> getFd() const override {
-        return nullptr;
-    }
-
-    Metadata stat() const override {
-        return _file->stat();
-    }
-
-    void sync() const override { _file->sync(); }
-    void datasync() const override { _file->datasync(); }
 
     void write(const void* buffer, size_t size) override {
         _file->write(_cursor, arrayPtr(reinterpret_cast<const byte*>(buffer), size));
@@ -451,17 +436,17 @@ public:
     }
 };
 }
-using _::AppendableFileRef;
+using _::FileOutputStream;
 
 void write_to_file(kj::File const& file, MallocMessageBuilder & builder) {
     file.truncate(0);
-    auto append = AppendableFileRef(file);
+    auto stream = FileOutputStream(file);
 
     // Write the magic number to the front of the file.
     auto magic_number = gen::MAGIC_NUMBER.get();
-    append.write(magic_number.begin(), magic_number.size());
+    stream.write(magic_number.begin(), magic_number.size());
 
-    capnp::writePackedMessage(append, builder);
+    capnp::writePackedMessage(stream, builder);
 }
 
 std::string_view string_view(kj::StringPtr str) {
@@ -1374,8 +1359,8 @@ LoadDocumentResult load_from_path(char const* path) {
         });
     }
 
-    auto file_wrapper = FileInputStream(*file);
-    return load(file_wrapper);
+    auto stream = FileInputStream(*file);
+    return load(stream);
 }
 
 LoadDocumentResult LoadDocumentResult::ok(
