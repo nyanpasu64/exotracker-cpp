@@ -426,45 +426,52 @@ public:
                 }
             }
 
-            {l__l(QGridLayout);
-                // Make grid tighter on Breeze. dpi switching? lolnope
-                l->setVerticalSpacing(6);
-                l->setHorizontalSpacing(6);
+            {l__l(QHBoxLayout);
+                {l__c_l(QWidget, QGridLayout, 0, Qt::AlignVCenter);
+                    l->setContentsMargins(0, 0, 0, -1);
 
-                int column = 0;
-                _attack = build_slider(
-                    l, column, qlabel(tr("A")), doc::Adsr::MAX_ATTACK
-                ).no_label();
-                _decay = build_slider(
-                    l, column, qlabel(tr("D")), doc::Adsr::MAX_DECAY
-                ).no_label();
-                _sustain = build_slider(
-                    l, column, qlabel(tr("S")), doc::Adsr::MAX_SUSTAIN
-                ).no_label();
-                _decay2 = build_slider(
-                    l, column, qlabel(tr("D2")), doc::Adsr::MAX_RELEASE
-                ).no_label();
+                    // Make grid tighter on Breeze. dpi switching? lolnope
+//                    l->setVerticalSpacing(6);
+                    l->setHorizontalSpacing(6);
 
-                // TODO add exponential release GAIN
-                // (used for note cuts, not note changes)
-                {
-                    auto release = build_slider(
-                        l, column, new QCheckBox(tr("R")), doc::Adsr::MAX_RELEASE
-                    );
-                    release.label->setDisabled(true);
-                    release.slider->setDisabled(true);
-                    release.number->setDisabled(true);
+                    int column = 0;
+                    _attack = build_slider(
+                        l, column, qlabel(tr("A")), doc::Adsr::MAX_ATTACK
+                    ).no_label();
+                    _decay = build_slider(
+                        l, column, qlabel(tr("D")), doc::Adsr::MAX_DECAY
+                    ).no_label();
+                    _sustain = build_slider(
+                        l, column, qlabel(tr("S")), doc::Adsr::MAX_SUSTAIN
+                    ).no_label();
+                    _decay2 = build_slider(
+                        l, column, qlabel(tr("D2")), doc::Adsr::MAX_RELEASE
+                    ).no_label();
 
-                    _release_enable = release.label;
-                    _release = release.no_label();
+                    // TODO add exponential release GAIN
+                    // (used for note cuts, not note changes)
+                    {
+                        auto release = build_slider(
+                            l, column, new QCheckBox(tr("R")), doc::Adsr::MAX_RELEASE
+                        );
+                        release.label->setDisabled(true);
+                        release.slider->setDisabled(true);
+                        release.number->setDisabled(true);
+
+                        _release_enable = release.label;
+                        _release = release.no_label();
+                    }
+
+                    // Switch tab order so you can tab from one slider to the next,
+                    // then from one spinbox to the next. I find it more intuitive.
+                    tab_by_row(*l);
                 }
 
-                // Switch tab order so you can tab from one slider to the next,
-                // then from one spinbox to the next. I find it more intuitive.
-                tab_by_row(*l);
-
-                l->setColumnStretch(column, 1);
-                column++;
+                {l__w(QLabel("\nTODO add graph\n"), 1);
+                    w->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+                    w->setStyleSheet("border: 1px solid black;");
+                    w->setAlignment(Qt::AlignCenter);
+                }
             }
         }
     }
@@ -481,6 +488,7 @@ public:
         {l__w(TallSlider, 1, column, Qt::AlignHCenter);
             slider = w;
             w->setMaximum(max);
+            w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
         }
         {l__w(NumericEditor(99), 2, column, Qt::AlignHCenter);
             text = w;
