@@ -12,6 +12,33 @@ namespace edit::edit_instr {
 using namespace doc;
 using edit_impl::make_command;
 
+/*
+TODO the current SetKeysplit/PatchSetter division
+screws with the ability to coalesce undo commands.
+Currently all PatchSetter to the same instrument and patch coalesce,
+while all SetKeysplit to the same instrument with _can_coalesce=true coalesce.
+
+Additionally, coalescing is a footgun because it's easy to accidentally return true
+to two edits of the same type to different indexes in the document.
+Perhaps each coalescable edit command
+should supply a *key function* rather than a *comparison function*,
+and ImplEditCommand is monomorphized on a constexpr bool
+for whether coalescing is enabled, plus the key type.
+
+An alternative is for each coalescable command to store its "path" in a separate struct,
+and to try coalescing with a previous command by requesting the same struct by typeid,
+then if a non-null pointer is returned, checking for equality.
+
+Hopefully, we can decide on a better way of deciding
+which undo commands to merge or not,
+and decouple the type of edit command from whether it can be coalesced.
+Perhaps this involves a "compound edit command"
+which applies multiple commands in series,
+whether or not they edit the same location.
+However this uses more memory,
+which is wasteful if a user is just twiddling a spinbox back and forth.
+*/
+
 // Keysplit edits which add, remove, or reorder patches.
 // They do not coalesce with other operations.
 
@@ -29,14 +56,20 @@ using edit_impl::make_command;
 struct SetKeysplit {
     InstrumentIndex _instr_idx;
     std::vector<InstrumentPatch> _keysplit;
+    bool _can_coalesce;
 
 // impl
     /// If the command holds a row to be inserted, reserve memory for each cell.
     /// Once a cell gets swapped into the document,
     /// adding blocks must not allocate memory, to prevent blocking the audio thread.
-    SetKeysplit(InstrumentIndex instr_idx, std::vector<InstrumentPatch> keysplit)
-        : _instr_idx(instr_idx)
+    SetKeysplit(
+        InstrumentIndex instr_idx,
+        std::vector<InstrumentPatch> keysplit,
+        bool can_coalesce = false)
+    :
+        _instr_idx(instr_idx)
         , _keysplit(std::move(keysplit))
+        , _can_coalesce(can_coalesce)
     {}
 
     void apply_swap(doc::Document & doc) {
@@ -45,7 +78,14 @@ struct SetKeysplit {
         std::swap(maybe_instr->keysplit, _keysplit);
     }
 
-    bool can_coalesce(BaseEditCommand &) const {
+    bool can_coalesce(BaseEditCommand & prev_edit_command) const {
+        using SelfEditCommand = edit_impl::ImplEditCommand<SetKeysplit>;
+
+        if (auto prev = typeid_cast<SelfEditCommand *>(&prev_edit_command)) {
+            return prev->_instr_idx == _instr_idx
+                && prev->_can_coalesce
+                && _can_coalesce;
+        }
         return false;
     }
 
@@ -151,7 +191,9 @@ std::tuple<EditBox, size_t> edit_min_key(
     }
 
     return {
-        make_command(SetKeysplit((InstrumentIndex) instr_idx, std::move(keysplit))),
+        make_command(SetKeysplit(
+            (InstrumentIndex) instr_idx, std::move(keysplit), true
+        )),
         patch_idx,
     };
 }
