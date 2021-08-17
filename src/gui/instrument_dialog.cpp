@@ -531,6 +531,28 @@ public:
         _win->push_edit(tx, std::move(cmd), MoveCursor::NotPatternEdit{});
     }
 
+    void on_set_min_key(int value) {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+
+        if (!doc.instruments[instr_idx]) {
+            return;
+        }
+        if (doc.instruments[instr_idx]->keysplit.empty()) {
+            return;
+        }
+
+        auto [cmd, new_patch_idx] =
+            edit_instr::edit_min_key(doc, instr_idx, curr_patch_idx(), Narrow(value));
+
+        {
+            auto b = QSignalBlocker(_min_key);
+            auto tx = _win->edit_unwrap();
+            _win->push_edit(tx, std::move(cmd), MoveCursor::NotPatternEdit{});
+        }
+        _keysplit->setCurrentRow((int) new_patch_idx);
+    }
+
     void on_add_patch() {
         // if keysplit is empty, currentRow() is -1.
         // auto patch_idx = (size_t) (_keysplit->currentRow() + 1);
@@ -648,7 +670,10 @@ public:
             _keysplit, &QListWidget::currentItemChanged,
             this, &InstrumentDialogImpl::reload_current_patch);
 
-        connect_spin(_min_key, edit_instr::edit_min_key);
+        connect(
+            _min_key, qOverload<int>(&QSpinBox::valueChanged),
+            this, &InstrumentDialogImpl::on_set_min_key);
+
         connect_combo(_sample, edit_instr::edit_sample_idx);
         connect_pair(_attack, edit_instr::edit_attack);
         connect_pair(_decay, edit_instr::edit_decay);

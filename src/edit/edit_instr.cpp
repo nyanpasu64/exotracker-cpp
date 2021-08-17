@@ -120,6 +120,42 @@ MaybeEditBox try_move_patch_up(
     return try_move_patch_down(doc, instr_idx, patch_idx - 1);
 }
 
+std::tuple<EditBox, size_t> edit_min_key(
+    doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::Chromatic value
+) {
+    release_assert(instr_idx < doc.instruments.v.size());
+    auto & maybe_instr = doc.instruments[instr_idx];
+
+    release_assert(maybe_instr);
+    // copy
+    auto keysplit = maybe_instr->keysplit;
+
+    size_t npatch = keysplit.size();
+    release_assert(patch_idx < npatch);
+    keysplit[patch_idx].min_note = value;
+
+    auto get_note = [&keysplit](size_t patch_idx) -> Chromatic {
+        return keysplit[patch_idx].min_note;
+    };
+
+    // bubble sort lmao
+    // This will probably behave oddly if patches other than patch_idx are out of order.
+    // But I don't care too much. TODO add a "sort patches" button?
+    while (patch_idx >= 1 && !(get_note(patch_idx - 1) <= get_note(patch_idx))) {
+        std::swap(keysplit[patch_idx - 1], keysplit[patch_idx]);
+        patch_idx--;
+    }
+    while (patch_idx + 1 < npatch && !(get_note(patch_idx) <= get_note(patch_idx + 1))) {
+        std::swap(keysplit[patch_idx], keysplit[patch_idx + 1]);
+        patch_idx++;
+    }
+
+    return {
+        make_command(SetKeysplit((InstrumentIndex) instr_idx, std::move(keysplit))),
+        patch_idx,
+    };
+}
+
 // Single-patch edits. All replace the entire patch,
 // and coalesce with other edits of the same instrument and patch index.
 
@@ -185,14 +221,6 @@ public:
 #define FIELD(PATH) \
     decltype(std::declval<doc::InstrumentPatch>().PATH), \
     offsetof(doc::InstrumentPatch, PATH)
-
-EditBox edit_min_key(
-    doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::Chromatic value
-) {
-    auto patch = get_patch(doc, instr_idx, patch_idx);
-    patch.min_note = value;
-    return make_command(PatchSetter(instr_idx, patch_idx, patch));
-}
 
 EditBox edit_sample_idx(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::SampleIndex value

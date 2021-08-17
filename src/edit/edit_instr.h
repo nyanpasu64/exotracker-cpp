@@ -4,6 +4,7 @@
 #include "doc.h"
 
 #include <optional>
+#include <tuple>
 
 namespace edit::edit_instr {
 
@@ -31,12 +32,15 @@ namespace edit::edit_instr {
     doc::Document const& doc, size_t instr_idx, size_t patch_idx
 );
 
-// Single-patch edits. All replace the entire patch,
-// and coalesce with other edits of the same instrument and patch index.
-
-[[nodiscard]] EditBox edit_min_key(
+/// Sets the minimum key of the active patch,
+/// and moves it into sorted order by minimum key relative to other patches.
+/// Returns the edit and the new index of the active patch.
+[[nodiscard]] std::tuple<EditBox, size_t> edit_min_key(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::Chromatic value
 );
+
+// Single-patch edits. All replace the entire patch,
+// and coalesce with other edits of the same instrument and patch index.
 
 [[nodiscard]] EditBox edit_sample_idx(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::SampleIndex value
