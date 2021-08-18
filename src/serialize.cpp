@@ -1340,8 +1340,14 @@ using _::FileInputStream;
 }  // anonymous namespace
 
 LoadDocumentResult load_from_path(char const* path) {
-    // On Windows, while this object exists, C:/ and the working directory are locked.
-    // I would *not* keep it around, despite what the docs say.
+    // On Windows, while a kj::Filesystem exists,
+    // C:/ and the initial working directory are locked,
+    // making it undesirable to keep it around for long periods of time...
+    //
+    // Though perhaps it doesn't matter as much,
+    // since all processes lock the current working directory
+    // (though kj::Filesystem continues locking the initial directory
+    // even after the process changes working directories).
     kj::Own<kj::Filesystem> fs = kj::newDiskFilesystem();
     kj::Path abs_path = fs->getCurrentPath().evalNative(path);
 
