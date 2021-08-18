@@ -246,7 +246,7 @@ public:
 
         {l__l(QVBoxLayout);
             {l__c_l(QWidget, QVBoxLayout);
-                l->setContentsMargins(0, 0, 0, 0);
+                l->setContentsMargins(4, 4, 4, 4);
                 {l__form(QFormLayout);
                     form->setHorizontalSpacing(HORIZONTAL_SPACING);
                     {form__label_w(tr("Target tempo"), QDoubleSpinBox);
@@ -255,8 +255,6 @@ public:
                         w->setValue(_options.target_tempo);
                         w->setSuffix(tr(" BPM"));
                     }
-                }
-                {l__w(HLine);
                 }
                 {l__form(QFormLayout);
                     form->setHorizontalSpacing(HORIZONTAL_SPACING);
@@ -268,15 +266,17 @@ public:
                         w->setSuffix(tr(" BPM"));
                     }
                 }
-            }
-            {l__w(QCheckBox(tr("Show advanced options")));
-                _show_advanced = w;
-                // TODO fetch state from app options
+                {l__w(QCheckBox(tr("Show advanced options")));
+                    _show_advanced = w;
+                    // TODO fetch state from app options
+                }
             }
             {l__c_l(QWidget, QVBoxLayout);
                 _advanced_widget = c;
-                // Remove left/right/bottom margins, keep top margin for spacing.
-                l->setContentsMargins(0, -1, 0, 0);
+                l->setContentsMargins(4, 0, 4, 4);
+
+                {l__w(HLine);
+                }
 
                 {l__form(QFormLayout);
                     form->setHorizontalSpacing(HORIZONTAL_SPACING);
@@ -290,8 +290,6 @@ public:
                         w->setRange(doc::MIN_TICKS_PER_BEAT, doc::MAX_TICKS_PER_BEAT);
                         w->setValue((int) _options.ticks_per_beat);
                     }
-                }
-                {l__w(HLine);
                 }
                 {l__form(QFormLayout);
                     form->setHorizontalSpacing(HORIZONTAL_SPACING);
