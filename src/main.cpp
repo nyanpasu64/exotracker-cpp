@@ -62,6 +62,9 @@ struct Arguments {
 
 int main(int argc, char *argv[])
 {
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
+        Qt::HighDpiScaleFactorRoundingPolicy::RoundPreferFloor
+    );
     gui::app::GuiApp a(argc, argv);
 
     // Parse command-line arguments.
