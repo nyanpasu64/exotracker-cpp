@@ -44,22 +44,22 @@ template<int begin, int end, typename T = uint8_t>
 using RangeInclusive = T;
 
 struct Adsr {
-    uint8_t attack;
-    uint8_t decay;
-    uint8_t sustain;
-    uint8_t release;
+    uint8_t attack_rate;
+    uint8_t decay_rate;
+    uint8_t sustain_level;
+    uint8_t decay_2;
 
 // impl
-    static constexpr uint8_t MAX_ATTACK = 0x0f;
-    static constexpr uint8_t MAX_DECAY = 0x07;
-    static constexpr uint8_t MAX_SUSTAIN = 0x07;
-    static constexpr uint8_t MAX_RELEASE = 0x1f;
+    static constexpr uint8_t MAX_ATTACK_RATE = 0x0f;
+    static constexpr uint8_t MAX_DECAY_RATE = 0x07;
+    static constexpr uint8_t MAX_SUSTAIN_LEVEL = 0x07;
+    static constexpr uint8_t MAX_DECAY_2 = 0x1f;
 
     /// Based on https://nyanpasu64.github.io/AddmusicK/readme_files/hex_command_reference.html#ADSRInfo.
     std::array<uint8_t, 2> to_hex() const {
         return {
-            (uint8_t) (attack | (decay << 4) | 0x80),
-            (uint8_t) (release | (sustain << 5)),
+            (uint8_t) (attack_rate | (decay_rate << 4) | 0x80),
+            (uint8_t) (decay_2 | (sustain_level << 5)),
         };
     }
 

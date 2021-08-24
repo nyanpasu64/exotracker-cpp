@@ -161,10 +161,10 @@ void serialize_instrument(
                 auto gen_adsr = gen_patch.initAdsr();
                 Adsr const& adsr = patch.adsr;
 
-                gen_adsr.setAttack(adsr.attack);
-                gen_adsr.setDecay(adsr.decay);
-                gen_adsr.setSustain(adsr.sustain);
-                gen_adsr.setRelease(adsr.release);
+                gen_adsr.setAttack(adsr.attack_rate);
+                gen_adsr.setDecay(adsr.decay_rate);
+                gen_adsr.setSustain(adsr.sustain_level);
+                gen_adsr.setRelease(adsr.decay_2);
             };
 
             auto num_patches = instr->keysplit.size();

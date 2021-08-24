@@ -436,23 +436,23 @@ public:
 
                     int column = 0;
                     _attack = build_slider(
-                        l, column, qlabel(tr("A")), doc::Adsr::MAX_ATTACK
+                        l, column, qlabel(tr("A")), doc::Adsr::MAX_ATTACK_RATE
                     ).no_label();
                     _decay = build_slider(
-                        l, column, qlabel(tr("D")), doc::Adsr::MAX_DECAY
+                        l, column, qlabel(tr("D")), doc::Adsr::MAX_DECAY_RATE
                     ).no_label();
                     _sustain = build_slider(
-                        l, column, qlabel(tr("S")), doc::Adsr::MAX_SUSTAIN
+                        l, column, qlabel(tr("S")), doc::Adsr::MAX_SUSTAIN_LEVEL
                     ).no_label();
                     _decay2 = build_slider(
-                        l, column, qlabel(tr("D2")), doc::Adsr::MAX_RELEASE
+                        l, column, qlabel(tr("D2")), doc::Adsr::MAX_DECAY_2
                     ).no_label();
 
                     // TODO add exponential release GAIN
                     // (used for note cuts, not note changes)
                     {
                         auto release = build_slider(
-                            l, column, new QCheckBox(tr("R")), doc::Adsr::MAX_RELEASE
+                            l, column, new QCheckBox(tr("R")), doc::Adsr::MAX_DECAY_2
                         );
                         release.label->setDisabled(true);
                         release.slider->setDisabled(true);
@@ -779,10 +779,10 @@ public:
 
         reload_samples(_sample, doc, patch);
 
-        _attack.set_value(patch.adsr.attack);
-        _decay.set_value(patch.adsr.decay);
-        _sustain.set_value(patch.adsr.sustain);
-        _decay2.set_value(patch.adsr.release);
+        _attack.set_value(patch.adsr.attack_rate);
+        _decay.set_value(patch.adsr.decay_rate);
+        _sustain.set_value(patch.adsr.sustain_level);
+        _decay2.set_value(patch.adsr.decay_2);
 
     }
 };

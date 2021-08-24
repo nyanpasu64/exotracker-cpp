@@ -157,10 +157,10 @@ InstrumentPatch validate_patch(ErrorState & state, InstrumentPatch patch) {
     // See https://nyanpasu64.github.io/AddmusicK/readme_files/hex_command_reference.html#ADSRInfo.
     // I chose to default to a "generic" ADSR curve.
     // TODO pick default ADSR parameters for new instruments, and use those?
-    CLAMP_UNSIGNED_DEFAULT(patch, adsr.attack, Adsr::MAX_ATTACK, 0x0f, state);
-    CLAMP_UNSIGNED_DEFAULT(patch, adsr.decay, Adsr::MAX_DECAY, 0x00, state);
-    CLAMP_UNSIGNED_DEFAULT(patch, adsr.sustain, Adsr::MAX_SUSTAIN, 0x05, state);
-    CLAMP_UNSIGNED_DEFAULT(patch, adsr.release, Adsr::MAX_RELEASE, 0x07, state);
+    CLAMP_UNSIGNED_DEFAULT(patch, adsr.attack_rate, Adsr::MAX_ATTACK_RATE, 0x0f, state);
+    CLAMP_UNSIGNED_DEFAULT(patch, adsr.decay_rate, Adsr::MAX_DECAY_RATE, 0x00, state);
+    CLAMP_UNSIGNED_DEFAULT(patch, adsr.sustain_level, Adsr::MAX_SUSTAIN_LEVEL, 0x05, state);
+    CLAMP_UNSIGNED_DEFAULT(patch, adsr.decay_2, Adsr::MAX_DECAY_2, 0x07, state);
 
     return patch;
 }

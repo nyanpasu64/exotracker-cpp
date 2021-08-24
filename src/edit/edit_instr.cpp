@@ -276,7 +276,7 @@ EditBox edit_attack(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, uint8_t value
 ) {
     auto patch = get_patch(doc, instr_idx, patch_idx);
-    patch.adsr.attack = value;
+    patch.adsr.attack_rate = value;
     return make_command(PatchSetter(instr_idx, patch_idx, patch));
 }
 
@@ -284,7 +284,7 @@ EditBox edit_decay(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, uint8_t value
 ) {
     auto patch = get_patch(doc, instr_idx, patch_idx);
-    patch.adsr.decay = value;
+    patch.adsr.decay_rate = value;
     return make_command(PatchSetter(instr_idx, patch_idx, patch));
 }
 
@@ -292,7 +292,7 @@ EditBox edit_sustain(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, uint8_t value
 ) {
     auto patch = get_patch(doc, instr_idx, patch_idx);
-    patch.adsr.sustain = value;
+    patch.adsr.sustain_level = value;
     return make_command(PatchSetter(instr_idx, patch_idx, patch));
 }
 
@@ -300,7 +300,7 @@ EditBox edit_decay2(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, uint8_t value
 ) {
     auto patch = get_patch(doc, instr_idx, patch_idx);
-    patch.adsr.release = value;
+    patch.adsr.decay_2 = value;
     return make_command(PatchSetter(instr_idx, patch_idx, patch));
 }
 
