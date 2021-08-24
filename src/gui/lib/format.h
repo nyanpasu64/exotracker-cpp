@@ -14,8 +14,6 @@
 
 namespace gui::lib::format {
 
-using doc::accidental::AccidentalMode;
-
 namespace detail {
     extern const QString hex_digits[16];
 
@@ -28,12 +26,13 @@ namespace detail {
 }
 
 /// Converts a nybble into a single hex character.
-[[nodiscard]] inline QString format_hex_1(uint8_t num) {
+[[nodiscard]] inline QString format_hex_1(size_t num) {
     return detail::hex_digits[num & 0x0F];
 }
 
 /// Converts a byte into 2 hex characters.
-[[nodiscard]] inline QString format_hex_2(uint8_t num) {
+[[nodiscard]] inline QString format_hex_2(size_t wnum) {
+    auto num = (uint8_t) wnum;
     return detail::hex_digits[num >> 4] + detail::hex_digits[num & 0x0F];
 }
 
@@ -41,64 +40,21 @@ namespace detail {
 
 [[nodiscard]] std::optional<char> alphanum_from_key(QKeyEvent const& key);
 
-using doc::events::NOTES_PER_OCTAVE;
+using gui::config::NoteNameConfig;
+using doc::accidental::AccidentalMode;
+using doc::events::Note;
 
-[[nodiscard]] inline QString midi_to_note_name(
-    config::NoteNameConfig cfg, AccidentalMode accidental_mode, doc::events::Note note
-) {
-    if (note.is_cut()) {
-        return QStringLiteral("---");
-    }
-    if (note.is_release()) {
-        return QStringLiteral("===");
-    }
-    if (!note.is_valid_note()) {
-        return QStringLiteral("%1?").arg(note.value);
-    }
+/// Produces a 3-character string for the pattern editor,
+/// with format "note, accidental, octave" (eg. C·4).
+/// Natural/missing accidentals are rendered with a spacer.
+/// Octave -1 is rendered as '-', and octave 10+ is rendered in hex ('A').
+/// This is unintuitive and subject to change.
+[[nodiscard]] QString format_pattern_note(
+    NoteNameConfig cfg, AccidentalMode accidental_mode, Note note
+);
 
-    auto impl = [&cfg, accidental_mode] (
-        auto & impl, int note, QChar accidental
-    ) -> QString {
-        // Octave is rounded towards 0, and semitone has the same sign as note.
-        auto [octave, semitone] = div(note, NOTES_PER_OCTAVE);
-        // Ensure that octave is correct and semitone is non-negative.
-        // (This can only happen if note < 0, which never happens if
-        // midi_to_note_name() only receives valid MIDI pitches.
-        // So this is just future-proofing.)
-        if (semitone < 0) {
-            semitone += NOTES_PER_OCTAVE;
-            octave -= 1;
-        }
-
-        octave += cfg.gui_bottom_octave;
-
-        auto maybe_diatonic = detail::semitone_diatonics[semitone];
-        if (maybe_diatonic >= 0) {
-            return detail::diatonic_names[maybe_diatonic]
-                + accidental
-                + (octave < 0 ? QStringLiteral("-") : format_hex_1(octave & 0xf));
-        } else if (accidental_mode == AccidentalMode::Sharp) {
-            return impl(impl, note - 1, cfg.sharp_char);
-        } else {
-            return impl(impl, note + 1, cfg.flat_char);
-        }
-    };
-
-    return impl(impl, note.value, cfg.natural_char);
-}
-
-[[nodiscard]] inline QString midi_to_noise_name(doc::events::Note note) {
-    if (note.is_cut()) {
-        return QStringLiteral("---");
-    }
-    if (note.is_release()) {
-        return QStringLiteral("===");
-    }
-    if (!note.is_valid_note()) {
-        return QStringLiteral("%1?").arg(note.value);
-    }
-
-    return QStringLiteral("$%1").arg(format_hex_2((uint8_t) note.value));
-}
+/// Produces a 3-character string for the pattern editor,
+/// with format "$XX", showing the note's value in hex.
+[[nodiscard]] QString format_pattern_noise(Note note);
 
 }
