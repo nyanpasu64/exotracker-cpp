@@ -218,6 +218,10 @@ public:
         _descent = metrics.descent();
     }
 
+    /// `align` can be any combination of Qt::AlignmentFlag and Qt::TextFlag
+    /// accepted by QPainter::drawText().
+    /// If no vertical alignment flag is passed,
+    /// it's treated as baseline alignment.
     void draw_text(
         QPainter & painter,
         qreal const x,
