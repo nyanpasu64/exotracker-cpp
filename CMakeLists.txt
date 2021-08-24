@@ -224,6 +224,7 @@ add_executable(exotracker-qt
 
     src/gui/tempo_dialog.cpp
     src/gui/instrument_dialog.cpp
+    src/gui/instrument_dialog/adsr_graph.cpp
 
     # Resources
     res/exotracker.qrc

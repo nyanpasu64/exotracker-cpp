@@ -1,3 +1,4 @@
+#include "instrument_dialog/adsr_graph.h"
 #include "instrument_dialog.h"
 #include "gui_common.h"
 #include "gui/lib/format.h"
@@ -330,6 +331,7 @@ public:
 
 namespace edit_instr = edit::edit_instr;
 namespace MoveCursor = gui::main_window::MoveCursor_;
+using adsr_graph::AdsrGraph;
 
 class InstrumentDialogImpl final : public InstrumentDialog {
     MainWindow * _win;
@@ -350,6 +352,8 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     Slider _decay2;
     QCheckBox * _release_enable;
     Slider _release;
+
+    AdsrGraph * _adsr_graph;
 
 public:
     InstrumentDialogImpl(MainWindow * parent_win)
