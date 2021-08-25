@@ -3,6 +3,7 @@
 #include "gui/lib/format.h"
 #include "gui/lib/layout_macros.h"
 #include "edit/edit_instr.h"
+#include "util/defer.h"
 #include "util/release_assert.h"
 
 #include <QCheckBox>
@@ -22,6 +23,7 @@
 #include <QProxyStyle>
 #include <QScreen>
 #include <QSignalBlocker>
+#include <QStyleHints>
 #include <QWheelEvent>
 
 #include <utility>  // std::move
@@ -285,6 +287,25 @@ public:
 
     QSize minimumSizeHint() const override {
         return QSlider::sizeHint();
+    }
+
+// override QSlider
+protected:
+    void wheelEvent(QWheelEvent * e) override {
+        QStyleHints * sh = QApplication::styleHints();
+
+        // Block QStyleHints::wheelScrollLinesChanged().
+        auto b = QSignalBlocker(sh);
+
+        // Set QApplication::wheelScrollLines(),
+        // which controls "steps per click" for QAbstractSlider,
+        // not just "lines per click" for scrollable regions.
+        int lines = sh->wheelScrollLines();
+        defer { sh->setWheelScrollLines(lines); };
+        sh->setWheelScrollLines(2);
+
+        // Scroll by 2 lines at a time.
+        return QSlider::wheelEvent(e);
     }
 };
 
