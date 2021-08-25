@@ -570,6 +570,7 @@ public:
             slider = w;
             w->setStyle(&_slider_snap);
             w->setMaximum(max);
+            w->setPageStep((max + 1) / 4);
             w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
         }
         {l__w(SmallSpinBox(99), 2, column, Qt::AlignHCenter);
