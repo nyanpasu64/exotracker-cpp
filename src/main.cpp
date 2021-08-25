@@ -1,6 +1,6 @@
 #include "gui/main_window.h"
 #include "gui/history.h"
-#include "gui_common.h"
+#include "gui/app.h"
 #include "sample_docs.h"
 
 #include <CLI/CLI.hpp>
