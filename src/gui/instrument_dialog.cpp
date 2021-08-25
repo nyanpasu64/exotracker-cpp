@@ -19,6 +19,7 @@
 
 #include <QDebug>
 #include <QEvent>
+#include <QProxyStyle>
 #include <QScreen>
 #include <QSignalBlocker>
 #include <QWheelEvent>
@@ -238,6 +239,33 @@ QToolButton * small_button(const QString &text, QWidget *parent = nullptr) {
     return w;
 }
 
+/// Make the slider jump to the point of click,
+/// instead of stepping up/down by increments.
+class SliderSnapStyle : public QProxyStyle {
+public:
+    // Do not pass a borrowed QStyle* to the QProxyStyle constructor.
+    // QProxyStyle takes ownership of the QStyle and automatically deletes it.
+    // Instead don't pass an argument at all. This makes it use the app style.
+    SliderSnapStyle()
+        : QProxyStyle()
+    {}
+
+    int styleHint(
+        QStyle::StyleHint hint,
+        const QStyleOption* option = 0,
+        const QWidget* widget = 0,
+        QStyleHintReturn* returnData = 0) const override
+    {
+        if (hint == QStyle::SH_Slider_AbsoluteSetButtons)
+            return Qt::LeftButton;
+        if (hint == QStyle::SH_Slider_PageSetButtons)
+            return Qt::MiddleButton | Qt::RightButton;
+        if (hint == QStyle::SH_Slider_SloppyKeyEvents)
+            return true;
+        return QProxyStyle::styleHint(hint, option, widget, returnData);
+    }
+};
+
 class AdsrSlider : public QSlider {
 public:
     explicit AdsrSlider(QWidget * parent = nullptr)
@@ -367,6 +395,7 @@ namespace MoveCursor = gui::main_window::MoveCursor_;
 
 class InstrumentDialogImpl final : public InstrumentDialog {
     MainWindow * _win;
+    SliderSnapStyle _slider_snap;
 
     // widgets
     QToolButton * _add_patch;
@@ -529,7 +558,7 @@ public:
     }
 
     template<typename Label>
-    static LabeledControl<Label> build_control(
+    LabeledControl<Label> build_control(
         QGridLayout * l, int & column, Label * label, int max
     ) {
         AdsrSlider * slider;
@@ -539,6 +568,7 @@ public:
         }
         {l__w(AdsrSlider, 1, column, Qt::AlignHCenter);
             slider = w;
+            w->setStyle(&_slider_snap);
             w->setMaximum(max);
             w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
         }
