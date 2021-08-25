@@ -376,6 +376,7 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     QListWidget * _keysplit;
     QCheckBox * _note_names;
 
+    QWidget * _patch_panel;
     QSpinBox * _min_key;
     QComboBox * _sample;
     Control _attack;
@@ -446,7 +447,9 @@ public:
 
     void build_patch_editor(QBoxLayout * l) {
         // TODO add tabs
-        {l__l(QVBoxLayout, 1);
+        {l__c_l(QWidget, QVBoxLayout, 1);
+            _patch_panel = c;
+            l->setContentsMargins(0, 0, 0, 0);
             // Top row.
             {l__l(QHBoxLayout);
                 {l__w_factory(qlabel(tr("Min Key"))); }
@@ -818,10 +821,17 @@ public:
         patch.adsr = {0, 0, 0, 0};
 
         auto patch_idx = curr_patch_idx();
+        if (!instr->keysplit.empty()) {
+            assert(patch_idx < instr->keysplit.size());
+        }
+
         // out-of-bounds patch_idx should only happen in blank instruments,
         // which should either be prohibited or treated as a no-op.
         if (patch_idx < instr->keysplit.size()) {
             patch = instr->keysplit[patch_idx];
+            _patch_panel->setDisabled(false);
+        } else {
+            _patch_panel->setDisabled(true);
         }
 
         set_value(_min_key, patch.min_note);
