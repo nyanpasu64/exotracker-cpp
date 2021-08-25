@@ -19,8 +19,10 @@
 
 #include <QDebug>
 #include <QEvent>
+#include <QProxyStyle>
 #include <QScreen>
 #include <QSignalBlocker>
+#include <QStyleHints>
 #include <QWheelEvent>
 
 #include <utility>  // std::move
@@ -146,6 +148,33 @@ QToolButton * small_button(const QString &text, QWidget *parent = nullptr) {
     return w;
 }
 
+/// Make the slider jump to the point of click,
+/// instead of stepping up/down by increments.
+class SliderSnapStyle : public QProxyStyle {
+public:
+    // Do not pass a borrowed QStyle* to the QProxyStyle constructor.
+    // QProxyStyle takes ownership of the QStyle and automatically deletes it.
+    // Instead don't pass an argument at all. This makes it use the app style.
+    SliderSnapStyle()
+        : QProxyStyle()
+    {}
+
+    int styleHint(
+        QStyle::StyleHint hint,
+        const QStyleOption* option = 0,
+        const QWidget* widget = 0,
+        QStyleHintReturn* returnData = 0) const override
+    {
+        if (hint == QStyle::SH_Slider_AbsoluteSetButtons)
+            return Qt::LeftButton;
+        if (hint == QStyle::SH_Slider_PageSetButtons)
+            return Qt::MiddleButton | Qt::RightButton;
+        if (hint == QStyle::SH_Slider_SloppyKeyEvents)
+            return true;
+        return QProxyStyle::styleHint(hint, option, widget, returnData);
+    }
+};
+
 class AdsrSlider : public QSlider {
 public:
     explicit AdsrSlider(QWidget * parent = nullptr)
@@ -154,17 +183,53 @@ public:
 
 // impl QWidget
     QSize sizeHint() const override {
+        // A wider sizeHint() or sizePolicy() causes vertical sliders to render
+        // off-center (left-aligned) in Breeze style. This does not affect Fusion.
+
         // Note that QSlider::sizeHint() does not scale with DPI.
         auto size = QSlider::sizeHint();
         // devicePixelRatio() is always 1.
         qreal dpi_scale = logicalDpiY() / qreal(96);
 
+        size.setWidth(std::max(size.width(), int(20 * dpi_scale)));
         size.setHeight(std::max(size.height(), int(80 * dpi_scale)));
         return size;
     }
 
     QSize minimumSizeHint() const override {
         return QSlider::sizeHint();
+    }
+
+// override QSlider
+protected:
+    void wheelEvent(QWheelEvent * e) override {
+        QStyleHints * sh = QApplication::styleHints();
+
+        // Block QStyleHints::wheelScrollLinesChanged().
+        auto b = QSignalBlocker(sh);
+
+        // Set QApplication::wheelScrollLines(),
+        // which controls "steps per click" for QAbstractSlider,
+        // not just "lines per click" for scrollable regions.
+        int lines = sh->wheelScrollLines();
+        defer { sh->setWheelScrollLines(lines); };
+        sh->setWheelScrollLines(2);
+
+        // Scroll by 2 lines at a time.
+        return QSlider::wheelEvent(e);
+    }
+};
+
+/// On KDE Plasma's Breeze theme, this prevents dragging the *window body*
+/// from moving the window like dragging the title bar.
+class NoDragContainer : public QWidget {
+public:
+    // NoDragContainer()
+    using QWidget::QWidget;
+
+// impl QWidget
+    void mousePressEvent(QMouseEvent *event) override {
+        event->accept();
     }
 };
 
@@ -276,6 +341,7 @@ namespace MoveCursor = gui::main_window::MoveCursor_;
 
 class InstrumentDialogImpl final : public InstrumentDialog {
     MainWindow * _win;
+    SliderSnapStyle _slider_snap;
 
     // widgets
     QToolButton * _add_patch;
@@ -285,6 +351,7 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     QListWidget * _keysplit;
     QCheckBox * _note_names;
 
+    QWidget * _patch_panel;
     QSpinBox * _min_key;
     QComboBox * _sample;
     Control _attack;
@@ -355,7 +422,9 @@ public:
 
     void build_patch_editor(QBoxLayout * l) {
         // TODO add tabs
-        {l__l(QVBoxLayout, 1);
+        {l__c_l(QWidget, QVBoxLayout, 1);
+            _patch_panel = c;
+            l->setContentsMargins(0, 0, 0, 0);
             // Top row.
             {l__l(QHBoxLayout);
                 {l__w_factory(qlabel(tr("Min Key"))); }
@@ -373,7 +442,9 @@ public:
             // Bottom.
             {l__l(QHBoxLayout);
                 // Keysplit editor.
-                {l__c_l(QWidget, QGridLayout, 0, Qt::AlignVCenter);
+                // NoDragContainer is used so if you try to drag a slider but drag
+                // the background instead, KDE/Breeze won't move the dialog.
+                {l__c_l(NoDragContainer, QGridLayout, 0, Qt::AlignVCenter);
                     l->setContentsMargins(0, 0, 0, -1);
 
                     // Make grid tighter on Breeze. dpi switching? lolnope
@@ -435,7 +506,7 @@ public:
     }
 
     template<typename Label>
-    static LabeledControl<Label> build_control(
+    LabeledControl<Label> build_control(
         QGridLayout * l, int & column, Label * label, int max
     ) {
         AdsrSlider * slider;
@@ -443,10 +514,12 @@ public:
         {l__w_factory(label, 0, column, Qt::AlignHCenter);
             w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         }
-        {l__w(AdsrSlider, 1, column, Qt::AlignHCenter);
+        {l__w(AdsrSlider, 1, column);
             slider = w;
+            w->setStyle(&_slider_snap);
             w->setMaximum(max);
-            w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
+            w->setPageStep((max + 1) / 4);
+            w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
         }
         {l__w(SmallSpinBox(99), 2, column, Qt::AlignHCenter);
             text = w;
@@ -726,10 +799,17 @@ public:
         patch.adsr = {0, 0, 0, 0};
 
         auto patch_idx = curr_patch_idx();
+        if (!instr->keysplit.empty()) {
+            assert(patch_idx < instr->keysplit.size());
+        }
+
         // out-of-bounds patch_idx should only happen in blank instruments,
         // which should either be prohibited or treated as a no-op.
         if (patch_idx < instr->keysplit.size()) {
             patch = instr->keysplit[patch_idx];
+            _patch_panel->setDisabled(false);
+        } else {
+            _patch_panel->setDisabled(true);
         }
 
         set_value(_min_key, patch.min_note);
