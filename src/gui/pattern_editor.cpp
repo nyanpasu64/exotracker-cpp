@@ -54,7 +54,6 @@ namespace gui::pattern_editor {
 
 using gui::lib::color::lerp;
 using gui::lib::color::lerp_colors;
-using gui::lib::color::lerp_srgb;
 
 using gui::lib::format::format_hex_1;
 using gui::lib::format::format_hex_2;

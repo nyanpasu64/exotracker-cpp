@@ -13,6 +13,8 @@ inline qreal lerp(qreal x, qreal y, qreal position) {
 /// than integer blending (which is too dark).
 QColor lerp_colors(QColor c1, QColor c2, qreal position);
 
+/// Blends two colors numerically by their RGB values in gamma space.
+/// Not recommended.
 QColor lerp_srgb(QColor c1, QColor c2, qreal position);
 
 }
