@@ -284,6 +284,7 @@ public:
         // devicePixelRatio() is always 1.
         qreal dpi_scale = logicalDpiY() / qreal(96);
 
+        size.setWidth(std::max(size.width(), int(20 * dpi_scale)));
         size.setHeight(std::max(size.height(), int(80 * dpi_scale)));
         return size;
     }
@@ -610,13 +611,13 @@ public:
         {l__w_factory(label, 0, column, Qt::AlignHCenter);
             w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         }
-        {l__w(AdsrSlider, 1, column, Qt::AlignHCenter);
+        {l__w(AdsrSlider, 1, column);
             slider = w;
             set_slider_color(w, color);
             w->setStyle(&_slider_snap);
             w->setMaximum(max);
             w->setPageStep((max + 1) / 4);
-            w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
+            w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
         }
         {l__w(SmallSpinBox(99), 2, column, Qt::AlignHCenter);
             text = w;
