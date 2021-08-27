@@ -272,12 +272,51 @@ public:
 };
 
 class AdsrSlider : public QSlider {
+    QPalette _orig_palette;
+    QColor _bg_color;
+    bool _hovered = false;
+
 public:
-    explicit AdsrSlider(QWidget * parent = nullptr)
+    explicit AdsrSlider(
+        SliderSnapStyle * style, QColor bg_color, QWidget * parent = nullptr
+    )
         : QSlider(Qt::Vertical, parent)
-    {}
+        , _orig_palette(palette())
+        , _bg_color(bg_color)
+    {
+        setStyle(style);
+        update_color();
+    }
+
+private:
+    void update_color() {
+        if (!isEnabled()) {
+            setPalette(_orig_palette);
+            return;
+        }
+
+        QPalette p = _orig_palette;
+
+        QColor fg_and_groove, active_groove;
+        if (_hovered) {
+            fg_and_groove = adsr_graph::relight_resaturate(_bg_color, 0.85, 1.);
+            active_groove = adsr_graph::with_hsl(
+                p.color(QPalette::Highlight), _bg_color.hueF(), 0.6, -1
+            );
+        } else {
+            fg_and_groove = adsr_graph::relight_resaturate(_bg_color, 0.9, 0.7);
+            active_groove = adsr_graph::with_hsl(
+                p.color(QPalette::Highlight), _bg_color.hueF(), 0.4, -1
+            );
+        }
+
+        p.setColor(QPalette::Button, fg_and_groove);
+        p.setColor(QPalette::Highlight, active_groove);
+        setPalette(p);
+    }
 
 // impl QWidget
+public:
     QSize sizeHint() const override {
         // Note that QSlider::sizeHint() does not scale with DPI.
         auto size = QSlider::sizeHint();
@@ -291,6 +330,29 @@ public:
 
     QSize minimumSizeHint() const override {
         return QSlider::sizeHint();
+    }
+
+protected:
+    void changeEvent(QEvent * event) override {
+        if (event->type() == QEvent::EnabledChange) {
+            update_color();
+        }
+    }
+
+    void enterEvent(QEvent * event) override {
+        if (event->type() == QEvent::Enter) {
+            _hovered = true;
+            update_color();
+        }
+        QWidget::enterEvent(event);
+    }
+
+    void leaveEvent(QEvent * event) override {
+        if (event->type() == QEvent::Leave) {
+            _hovered = false;
+            update_color();
+        }
+        QWidget::leaveEvent(event);
     }
 
 // override QSlider
@@ -325,18 +387,6 @@ public:
         event->accept();
     }
 };
-
-void set_slider_color(QWidget * w, QColor const& c) {
-    QPalette p = w->palette();
-
-    auto fg_and_groove = adsr_graph::relight_resaturate(c, 0.9, 0.7);
-    auto active_groove =
-        adsr_graph::with_hsl(p.color(QPalette::Highlight), c.hueF(), 0.5, -1);
-
-    p.setColor(QPalette::Button, fg_and_groove);
-    p.setColor(QPalette::Highlight, active_groove);
-    w->setPalette(p);
-}
 
 static int current_row(QListWidget const& view) {
     int selection = view.currentRow();
@@ -626,10 +676,8 @@ public:
         {l__w_factory(label, 0, column, Qt::AlignHCenter);
             w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         }
-        {l__w(AdsrSlider, 1, column);
+        {l__w(AdsrSlider(&_slider_snap, color), 1, column);
             slider = w;
-            set_slider_color(w, color);
-            w->setStyle(&_slider_snap);
             w->setMaximum(max);
             w->setPageStep((max + 1) / 4);
             w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
