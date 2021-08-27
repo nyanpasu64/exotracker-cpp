@@ -303,9 +303,9 @@ QSize AdsrGraph::minimumSizeHint() const{
 
 static constexpr qreal SMP_PER_S = (qreal) audio::tempo_calc::SAMPLES_PER_S_IDEAL;
 
-static constexpr int TOP_PAD = 4;
+static constexpr int TOP_PAD = 12;
 static constexpr int BOTTOM_PAD = 0;
-static constexpr int LEFT_PAD = 1;
+static constexpr int LEFT_PAD = 2;
 static constexpr int RIGHT_PAD = 0;
 
 static constexpr qreal LINE_WIDTH = 1.5;
@@ -316,15 +316,14 @@ static constexpr int X_TICK_HEIGHT = 6;
 static constexpr int X_TICK_STEP_MIN = 32;
 static constexpr int NUMBER_MARGIN = 12;
 
-/// Darken a color while preserving its HSL saturation.
-/// Properly darkening a pastel color blended with white
-/// turns it into a fully saturated color.
-static QColor darken(QColor bg, qreal factor = 4.) {
-    qreal h, s, l, a;
-    bg.getHslF(&h, &s, &l, &a);
-    // in HSL, the saturation of a color including at least one 255 is 1.
+static QPointF with_x(QPointF p, qreal x) {
+    p.setX(x);
+    return p;
+}
 
-    return QColor::fromHslF(h, s, l / factor, a);
+static QPointF with_y(QPointF p, qreal y) {
+    p.setY(y);
+    return p;
 }
 
 void AdsrGraph::paintEvent(QPaintEvent *event) {
@@ -369,38 +368,46 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
         return QPointF(scale_x(p.time), scale_y(p.new_level));
     };
 
+    QPointF const decay_begin = point_to_qpointf(env.decay_begin);
+    QPointF const sustain_point = point_to_qpointf(env.sustain_point);
+
     // Draw background colors and vertical lines.
     {
+        // Draw red background.
         auto bg_rect = QRectF(-LEFT_PAD, -TOP_PAD, full_w, full_h);
         painter.fillRect(bg_rect, BG_ATTACK);
 
-        auto draw_region = [](QPainter & painter, QRectF & rect, QColor color) {
-            if (rect.isValid()) {
-                painter.fillRect(rect, color);
-            }
-            painter.setPen(QPen(darken(color), BG_LINE_WIDTH));
-            painter.drawLine(rect.topLeft(), rect.bottomLeft());
-        };
-
-        if (env.decay_begin.time != 0) {
-            bg_rect.setLeft(scale_x(env.decay_begin.time));
-            draw_region(painter, bg_rect, BG_DECAY);
+        // Draw green background.
+        bg_rect.setLeft(decay_begin.x());
+        if (bg_rect.isValid()) {
+            painter.fillRect(bg_rect, BG_DECAY);
         }
 
-        if (env.sustain_point.time != 0) {
-            bg_rect.setLeft(scale_x(env.sustain_point.time));
-            draw_region(painter, bg_rect, BG_DECAY2);
+        // Draw blue background.
+        bg_rect.setLeft(sustain_point.x());
+        if (bg_rect.isValid()) {
+            painter.fillRect(bg_rect, BG_DECAY2);
         }
-    }
 
-    // Draw sustain level line.
-    {
-        painter.setPen(QPen(darken(BG_SUSTAIN, 3.), LINE_WIDTH));
+        // Draw upper half of green line.
+        bg_rect.setLeft(sustain_point.x());
+        painter.setPen(QPen(relight_resaturate(BG_DECAY, 0.7, 0.6), BG_LINE_WIDTH));
+        painter.drawLine(bg_rect.topLeft(), sustain_point);
 
-        QPointF left = point_to_qpointf(env.sustain_point);
-        QPointF right = left;
-        right.setX(w + RIGHT_PAD);
-        painter.drawLine(left, right);
+        // Draw red line.
+        bg_rect.setLeft(decay_begin.x());
+        painter.setPen(QPen(relight_resaturate(BG_ATTACK, 0.8, 0.8), BG_LINE_WIDTH));
+        painter.drawLine(bg_rect.topLeft(), bg_rect.bottomLeft());
+
+        // Draw lower half of yellow line, and yellow horizontal line.
+        bg_rect.setLeft(sustain_point.x());
+        painter.setPen(QPen(relight(BG_SUSTAIN, 0.42), BG_LINE_WIDTH));
+        {
+            QPointF right = with_x(sustain_point, w + RIGHT_PAD);
+            painter.drawLine(sustain_point, bg_rect.bottomLeft());
+            painter.drawLine(sustain_point, right);
+        }
+
     }
 
     // Draw envelope line.
