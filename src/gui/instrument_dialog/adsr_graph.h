@@ -26,6 +26,19 @@ constexpr QColor BG_DECAY2 = QColor(LO, MID, HI);
 constexpr QColor BG_RELEASE = QColor(MID, LO, HI);
 
 /// If h/s/l >= 0, set it.
+inline QColor with_hsv(QColor color, qreal h, qreal s, qreal v) {
+    // Original colors.
+    qreal h0, s0, v0, a;
+    color.getHsvF(&h0, &s0, &v0, &a);
+
+    if (h < 0) h = h0;
+    if (s < 0) s = s0;
+    if (v < 0) v = v0;
+
+    return QColor::fromHsvF(h, s, v, a);
+}
+
+/// If h/s/l >= 0, set it.
 inline QColor with_hsl(QColor color, qreal h, qreal s, qreal l) {
     // Original colors.
     qreal h0, s0, l0, a;
