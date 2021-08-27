@@ -313,6 +313,19 @@ protected:
     }
 };
 
+/// On KDE Plasma's Breeze theme, this prevents dragging the *window body*
+/// from moving the window like dragging the title bar.
+class NoDragContainer : public QWidget {
+public:
+    // NoDragContainer()
+    using QWidget::QWidget;
+
+// impl QWidget
+    void mousePressEvent(QMouseEvent *event) override {
+        event->accept();
+    }
+};
+
 void set_slider_color(QWidget * w, QColor const& c) {
     QPalette p = w->palette();
 
@@ -538,7 +551,9 @@ public:
             // Bottom.
             {l__l(QHBoxLayout);
                 // Keysplit editor.
-                {l__c_l(QWidget, QGridLayout, 0, Qt::AlignVCenter);
+                // NoDragContainer is used so if you try to drag a slider but drag
+                // the background instead, KDE/Breeze won't move the dialog.
+                {l__c_l(NoDragContainer, QGridLayout, 0, Qt::AlignVCenter);
                     l->setContentsMargins(0, 0, 0, -1);
 
                     // Make grid tighter on Breeze. dpi switching? lolnope
