@@ -251,7 +251,8 @@ public:
     // QProxyStyle takes ownership of the QStyle and automatically deletes it.
     // Instead don't pass an argument at all. This makes it use the app style.
     SliderSnapStyle()
-        : QProxyStyle()
+        // Ensure a consistent appearance across platforms, for recoloring sliders.
+        : QProxyStyle("fusion")
     {}
 
     int styleHint(
@@ -310,6 +311,18 @@ protected:
         return QSlider::wheelEvent(e);
     }
 };
+
+void set_slider_color(QWidget * w, QColor const& c) {
+    QPalette p = w->palette();
+
+    auto fg_and_groove = adsr_graph::relight_resaturate(c, 0.9, 0.7);
+    auto active_groove =
+        adsr_graph::with_hsl(p.color(QPalette::Highlight), c.hueF(), 0.5, -1);
+
+    p.setColor(QPalette::Button, fg_and_groove);
+    p.setColor(QPalette::Highlight, active_groove);
+    w->setPalette(p);
+}
 
 static int current_row(QListWidget const& view) {
     int selection = view.currentRow();
@@ -501,6 +514,8 @@ public:
     }
 
     void build_patch_editor(QBoxLayout * l) {
+        using doc::Adsr;
+
         // TODO add tabs
         {l__c_l(QWidget, QVBoxLayout, 1);
             _patch_panel = c;
@@ -530,24 +545,24 @@ public:
                     l->setHorizontalSpacing(6);
 
                     int column = 0;
-                    _attack = build_control(
-                        l, column, qlabel(tr("A")), doc::Adsr::MAX_ATTACK_RATE
+                    _attack = build_control(l, column,
+                        qlabel(tr("AR")), adsr_graph::BG_ATTACK, Adsr::MAX_ATTACK_RATE
                     ).no_label();
-                    _decay = build_control(
-                        l, column, qlabel(tr("D")), doc::Adsr::MAX_DECAY_RATE
+                    _decay = build_control(l, column,
+                        qlabel(tr("DR")), adsr_graph::BG_DECAY, Adsr::MAX_DECAY_RATE
                     ).no_label();
-                    _sustain = build_control(
-                        l, column, qlabel(tr("S")), doc::Adsr::MAX_SUSTAIN_LEVEL
+                    _sustain = build_control(l, column,
+                        qlabel(tr("SL")), adsr_graph::BG_SUSTAIN, Adsr::MAX_SUSTAIN_LEVEL
                     ).no_label();
-                    _decay2 = build_control(
-                        l, column, qlabel(tr("D2")), doc::Adsr::MAX_DECAY_2
+                    _decay2 = build_control(l, column,
+                        qlabel(tr("D2")), adsr_graph::BG_DECAY2, Adsr::MAX_DECAY_2
                     ).no_label();
 
                     // TODO add exponential release GAIN
                     // (used for note cuts, not note changes)
                     {
-                        auto release = build_control(
-                            l, column, new QCheckBox(tr("R")), doc::Adsr::MAX_DECAY_2
+                        auto release = build_control(l, column,
+                            new QCheckBox(tr("RR")), adsr_graph::BG_RELEASE, Adsr::MAX_DECAY_2
                         );
                         release.label->setDisabled(true);
                         release.slider->setDisabled(true);
@@ -588,7 +603,7 @@ public:
 
     template<typename Label>
     LabeledControl<Label> build_control(
-        QGridLayout * l, int & column, Label * label, int max
+        QGridLayout * l, int & column, Label * label, QColor const& color, int max
     ) {
         AdsrSlider * slider;
         SmallSpinBox * text;
@@ -597,6 +612,7 @@ public:
         }
         {l__w(AdsrSlider, 1, column, Qt::AlignHCenter);
             slider = w;
+            set_slider_color(w, color);
             w->setStyle(&_slider_snap);
             w->setMaximum(max);
             w->setPageStep((max + 1) / 4);
