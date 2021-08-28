@@ -684,8 +684,9 @@ public:
                 auto tx = _win->edit_unwrap();
                 _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
                 // TODO move ~StateTransaction() logic to StateTransaction::commit()
-                _keysplit->setCurrentRow((int) patch_idx);
             }
+            // Regenerate _keysplit before setting row.
+            _keysplit->setCurrentRow((int) patch_idx);
         }
     }
 
