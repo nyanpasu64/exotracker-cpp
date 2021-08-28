@@ -106,8 +106,15 @@ MaybeEditBox try_add_patch(
         return nullptr;
     }
 
+    Chromatic min_note = 0;
+    if (keysplit.size()) {
+        min_note = keysplit.back().min_note;
+    }
+
     release_assert(patch_idx <= keysplit.size());
-    keysplit.insert(keysplit.begin() + (ptrdiff_t) patch_idx, InstrumentPatch{});
+    keysplit.insert(keysplit.begin() + (ptrdiff_t) patch_idx, InstrumentPatch{
+        .min_note = min_note,
+    });
 
     return make_command(SetKeysplit((InstrumentIndex) instr_idx, std::move(keysplit)));
 }
