@@ -218,13 +218,12 @@ private:
         QPalette p = _orig_palette;
 
         QColor fg_and_groove, active_groove;
-        if (_hovered) {
-            fg_and_groove = pal::get_color(_hue, 5);
-            active_groove = pal::get_color(_hue, 4.5, 0.75);
+        if (!_hovered) {
+            fg_and_groove = pal::get_color(_hue, 6, 1.5);
         } else {
-            fg_and_groove = pal::get_color(_hue, 5.5, 0.75);
-            active_groove = pal::get_color(_hue, 5, 0.75);
+            fg_and_groove = pal::get_color(_hue, 5.25);
         }
+        active_groove = pal::get_color(_hue, 4.5);
 
         p.setColor(QPalette::Button, fg_and_groove);
         p.setColor(QPalette::Highlight, active_groove);
