@@ -2,7 +2,10 @@
 #include "gui/lib/layout_macros.h"
 #include "gui/lib/painter_ext.h"
 #include "audio/tempo_calc.h"
+#include "util/release_assert.h"
 #include "util/expr.h"
+
+#include <gsl/span>
 
 #include <QDebug>
 #include <QFontMetrics>
@@ -47,6 +50,8 @@ static constexpr uint32_t MAX_LEVEL = 0x7ff;
 
 struct AdsrResult {
     std::vector<Point> envelope;
+    size_t decay_idx;
+    size_t sustain_idx;
     Point decay_begin;
     Point sustain_point;
 };
@@ -171,10 +176,14 @@ static void iterate_adsr(Adsr adsr, auto & cb) {
 /// - Only the last element's time is >= max_time.
 ///   (If the amplitude reaches 0 before max_time,
 ///   the last element's time may be < max_time.)
-static AdsrResult adsr(Adsr adsr, NsampT end_time) {
+static AdsrResult get_adsr(Adsr adsr, NsampT end_time) {
     struct {
         NsampT _end_time;
         std::vector<Point> _envelope = {Point{0, 0}};
+
+        size_t _decay_idx{};
+        size_t _sustain_idx{};
+
         Point _decay_begin{};
         Point _sustain_point{};
 
@@ -193,19 +202,21 @@ static AdsrResult adsr(Adsr adsr, NsampT end_time) {
         }
 
     public:
+        void decay_begin(Point p) {
+            _decay_begin = p;
+            _decay_idx = _envelope.size();
+        }
+
+        void sustain_point(Point p) {
+            _sustain_point = p;
+            _sustain_idx = _envelope.size();
+        }
+
         bool point(Point p) {
             if (!envelope_done()) {
                 _envelope.push_back(p);
             }
             return !all_done();
-        }
-
-        void decay_begin(Point p) {
-            _decay_begin = p;
-        }
-
-        void sustain_point(Point p) {
-            _sustain_point = p;
         }
 
         void end() {
@@ -222,6 +233,8 @@ static AdsrResult adsr(Adsr adsr, NsampT end_time) {
 
     return AdsrResult {
         std::move(cb._envelope),
+        cb._decay_idx,
+        cb._sustain_idx,
         cb._decay_begin,
         cb._sustain_point,
     };
@@ -303,18 +316,30 @@ QSize AdsrGraph::minimumSizeHint() const{
 
 static constexpr qreal SMP_PER_S = (qreal) audio::tempo_calc::SAMPLES_PER_S_IDEAL;
 
-static constexpr int TOP_PAD = 12;
-static constexpr int BOTTOM_PAD = 0;
-static constexpr int LEFT_PAD = 2;
-static constexpr int RIGHT_PAD = 0;
-
 static constexpr qreal LINE_WIDTH = 1.5;
 static constexpr qreal BG_LINE_WIDTH = LINE_WIDTH;
 
+static constexpr qreal TOP_PAD = 12;
+static constexpr qreal BOTTOM_PAD = BG_LINE_WIDTH / 2;
+static constexpr qreal LEFT_PAD = 2;
+static constexpr qreal RIGHT_PAD = 0;
+
 static constexpr qreal X_TICK_WIDTH = 1.0;
-static constexpr int X_TICK_HEIGHT = 6;
+static constexpr qreal X_TICK_HEIGHT = 6;
 static constexpr int X_TICK_STEP_MIN = 32;
-static constexpr int NUMBER_MARGIN = 12;
+static constexpr qreal NUMBER_MARGIN = 12;
+
+using gui::lib::docs_palette::Hue;
+using gui::lib::docs_palette::Shade;
+using gui::lib::docs_palette::get_color;
+
+static QColor bg_line_color(Hue hue) {
+    return get_color(hue, 5);
+}
+
+static QColor fg_color(Hue hue) {
+    return get_color(hue, 2);
+}
 
 static QPointF with_x(QPointF p, qreal x) {
     p.setX(x);
@@ -324,6 +349,11 @@ static QPointF with_x(QPointF p, qreal x) {
 static QPointF with_y(QPointF p, qreal y) {
     p.setY(y);
     return p;
+}
+
+template<typename T>
+gsl::span<T> slice(gsl::span<T> span, size_t begin, size_t end) {
+    return span.subspan(begin, end - begin);
 }
 
 void AdsrGraph::paintEvent(QPaintEvent *event) {
@@ -341,8 +371,8 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
     painter.setRenderHint(QPainter::Antialiasing);
 
     painter.translate(LEFT_PAD, TOP_PAD);
-    int w = full_w - LEFT_PAD + RIGHT_PAD;
-    int h = full_h - TOP_PAD + BOTTOM_PAD;
+    qreal const w = full_w - LEFT_PAD - RIGHT_PAD;
+    qreal const h = full_h - TOP_PAD - BOTTOM_PAD;
 
     // The line covers the entire width.
     // (w: px) / (_zoom: px/s) * (32000 smp/s) : smp
@@ -350,7 +380,7 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
         NsampT(ceil(qreal(w) / qreal(_px_per_s) * SMP_PER_S));
 
     // Compute the envelope.
-    auto env = adsr(_adsr, max_time);
+    auto adsr = get_adsr(_adsr, max_time);
 
     auto scale_x = [&](NsampT time) -> qreal {
         // Position the line relative to x=0.
@@ -368,64 +398,58 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
         return QPointF(scale_x(p.time), scale_y(p.new_level));
     };
 
-    QPointF const decay_begin = point_to_qpointf(env.decay_begin);
-    QPointF const sustain_point = point_to_qpointf(env.sustain_point);
+    QPointF const sustain_point = point_to_qpointf(adsr.sustain_point);
 
-    // Draw background colors and vertical lines.
+    // Draw background lines.
     using gui::lib::docs_palette::get_color;
     using gui::lib::docs_palette::Shade;
     using namespace colors;
     {
-        // Draw AR background.
         auto bg_rect = QRectF(-LEFT_PAD, -TOP_PAD, full_w, full_h);
-        painter.fillRect(bg_rect, bg_color(ATTACK));
-
-        // Draw DR background.
-        bg_rect.setLeft(decay_begin.x());
-        if (bg_rect.isValid()) {
-            painter.fillRect(bg_rect, bg_color(DECAY));
-        }
-
-        // Draw D2 background.
-        bg_rect.setLeft(sustain_point.x());
-        if (bg_rect.isValid()) {
-            painter.fillRect(bg_rect, bg_color(DECAY2));
-        }
-
-        // Draw DR upper line.
-        bg_rect.setLeft(sustain_point.x());
-        painter.setPen(QPen(get_color(DECAY, 4.5), BG_LINE_WIDTH));
-        painter.drawLine(bg_rect.topLeft(), sustain_point);
-
-        // Draw AR vertical line, covering DR line.
-        bg_rect.setLeft(decay_begin.x());
-        painter.setPen(QPen(get_color(ATTACK, 4.5), BG_LINE_WIDTH));
-        painter.drawLine(bg_rect.topLeft(), bg_rect.bottomLeft());
-
-        // Draw SL horizontal/lower line, covering AR line.
-        bg_rect.setLeft(sustain_point.x());
-        painter.setPen(QPen(get_color(SUSTAIN, 4.5), BG_LINE_WIDTH));
-        {
-            QPointF right = with_x(sustain_point, w + RIGHT_PAD);
-            painter.drawLine(sustain_point, bg_rect.bottomLeft());
-            painter.drawLine(sustain_point, right);
-        }
-
+        painter.fillRect(bg_rect, Qt::white);
     }
+
+    // Draw baseline.
+    auto plot_baseline = [&painter, &scale_x, h](NsampT left, NsampT right, Hue hue) {
+        painter.setPen(QPen(bg_line_color(hue), BG_LINE_WIDTH));
+        painter.drawLine(QPointF(scale_x(left), h), QPointF(scale_x(right), h));
+    };
+    plot_baseline(0, adsr.decay_begin.time, colors::ATTACK);
+    plot_baseline(adsr.decay_begin.time, adsr.sustain_point.time, colors::DECAY);
+    plot_baseline(adsr.sustain_point.time, max_time, colors::DECAY2);
+
+    // Draw SL horizontal/lower line.
+    painter.setPen(QPen(bg_line_color(SUSTAIN), BG_LINE_WIDTH));
+    painter.drawLine(sustain_point, with_x(sustain_point, w + RIGHT_PAD));
+    painter.drawLine(sustain_point, with_y(sustain_point, h));
 
     // Draw envelope line.
     // Strictly speaking this is wrong, the line should hold the old level
     // until reaching the new point's time, then jump to the new level (ZOH).
     // In practice it looks close enough.
-    {
+    auto plot_line = [&painter, &point_to_qpointf](
+        gsl::span<Point const> points, Hue hue
+    ) {
+        if (points.size() <= 1) {
+            return;
+        }
         std::vector<QPointF> path;
         std::transform(
-            env.envelope.begin(), env.envelope.end(),
+            points.begin(), points.end(),
             back_inserter(path),
             point_to_qpointf);
-        painter.setPen(QPen(Qt::black, LINE_WIDTH));
+        painter.setPen(QPen(fg_color(hue), LINE_WIDTH));
         painter.drawPolyline(path.data(), (int) path.size());
-    }
+    };
+
+    // Ensure [0..=decay_idx] and [decay_idx..=sustain_idx] are in-bounds.
+    release_assert(adsr.decay_idx <= adsr.sustain_idx);
+    release_assert(adsr.sustain_idx < adsr.envelope.size());
+
+    auto envelope = gsl::span(adsr.envelope.data(), adsr.envelope.size());
+    plot_line(slice(envelope, 0, adsr.decay_idx + 1), colors::ATTACK);
+    plot_line(slice(envelope, adsr.decay_idx, adsr.sustain_idx + 1), colors::DECAY);
+    plot_line(slice(envelope, adsr.sustain_idx, envelope.size()), colors::DECAY2);
 
     // Draw ticks and labels.
     {
@@ -452,8 +476,8 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
             else
                 align = Qt::AlignHCenter;
 
-            painter.drawLine(x, h, x, h - X_TICK_HEIGHT);
-            auto text = QString::number(x / qreal(_px_per_s), 'g', 3);
+            painter.drawLine(QPointF(x, h), QPointF(x, h - X_TICK_HEIGHT));
+            auto text = QString::number(x / _px_per_s, 'g', 3);
             draw_text.draw_text(painter, x, h - NUMBER_MARGIN, (int) align, text);
         }
     }
