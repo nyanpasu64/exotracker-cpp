@@ -23,5 +23,6 @@
         <file>icons/tools-wizard-22.png</file>
         <file>icons/tools-wizard-32.png</file>
         <file>icons/tools-wizard-scalable.svg</file>
+        <file>icons/warning-sign.svg</file>
     </qresource>
 </RCC>

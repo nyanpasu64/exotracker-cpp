@@ -1,6 +1,7 @@
 #include "instrument_dialog.h"
 #include "instrument_dialog/adsr_graph.h"
 #include "gui_common.h"
+#include "gui/lib/color.h"
 #include "gui/lib/format.h"
 #include "gui/lib/parse_note.h"
 #include "gui/lib/layout_macros.h"
@@ -28,6 +29,7 @@
 #include <QScreen>
 #include <QSignalBlocker>
 #include <QStyleHints>
+#include <QTextDocument>
 #include <QWheelEvent>
 
 #include <utility>  // std::move
@@ -833,6 +835,8 @@ public:
         doc::Samples const& samples,
         bool keep_selection)
     {
+        using gui::lib::color::lerp_colors;
+
         auto b = QSignalBlocker(&list);
 
         // TODO ensure we always have exactly 1 element selected.
@@ -844,8 +848,11 @@ public:
         list.clear();
 
         auto & keysplit = instr.keysplit;
+        QColor error_color = pal::get_color(pal::Hue::Yellow, pal::Shade::Light1);
+        error_color.setAlphaF(0.4);
 
         size_t n = keysplit.size();
+        int curr_min_note = -1;
         for (size_t patch_idx = 0; patch_idx < n; patch_idx++) {
             doc::InstrumentPatch const& patch = keysplit[patch_idx];
             QString name = sample_text(samples, patch.sample_idx);
@@ -854,9 +861,53 @@ public:
                 .arg(format_note_name(patch.min_note), name);
             // TODO for single-key drum patch, print "=%1: %2"
 
-            new QListWidgetItem(text, &list);
+            auto item = new QListWidgetItem(text, &list);
             // TODO compute and show list of errors
             // (eg. missing sample, empty or overshadowed key range...)
+
+            std::vector<QString> warnings;
+
+            if (!samples[patch.sample_idx].has_value()) {
+                warnings.push_back(
+                    tr("Sample %1 not found; keysplit will not play")
+                        .arg(patch.sample_idx)
+                );
+            }
+            if ((int) patch.min_note <= curr_min_note) {
+                warnings.push_back(
+                    tr("Min note %1 out of order, breaks previous keysplits")
+                        .arg(patch.min_note)
+                );
+            } else {
+                curr_min_note = patch.min_note;
+            }
+
+            if (!warnings.empty()) {
+                QTextDocument document;
+                auto cursor = QTextCursor(&document);
+                cursor.beginEditBlock();
+                cursor.insertText(tr("Warnings:"));
+
+                // https://stackoverflow.com/a/51864380
+                QTextList* bullets = nullptr;
+                QTextBlockFormat non_list_format = cursor.blockFormat();
+                for (auto const& w : warnings) {
+                    if (!bullets) {
+                        // create list with 1 item
+                        bullets = cursor.insertList(QTextListFormat::ListDisc);
+                    } else {
+                        // append item to list
+                        cursor.insertBlock();
+                    }
+
+                    cursor.insertText(w);
+                }
+
+                item->setToolTip(document.toHtml());
+                item->setIcon(QIcon(QStringLiteral("://icons/warning-sign.svg")));
+
+                item->setBackground(error_color);
+            }
         }
 
         if (n > 0) {
