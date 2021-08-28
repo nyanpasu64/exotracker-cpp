@@ -372,36 +372,39 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
     QPointF const sustain_point = point_to_qpointf(env.sustain_point);
 
     // Draw background colors and vertical lines.
+    using gui::lib::docs_palette::get_color;
+    using gui::lib::docs_palette::Shade;
+    using namespace colors;
     {
         // Draw red background.
         auto bg_rect = QRectF(-LEFT_PAD, -TOP_PAD, full_w, full_h);
-        painter.fillRect(bg_rect, BG_ATTACK);
+        painter.fillRect(bg_rect, bg_color(ATTACK));
 
         // Draw green background.
         bg_rect.setLeft(decay_begin.x());
         if (bg_rect.isValid()) {
-            painter.fillRect(bg_rect, BG_DECAY);
+            painter.fillRect(bg_rect, bg_color(DECAY));
         }
 
         // Draw blue background.
         bg_rect.setLeft(sustain_point.x());
         if (bg_rect.isValid()) {
-            painter.fillRect(bg_rect, BG_DECAY2);
+            painter.fillRect(bg_rect, bg_color(DECAY2));
         }
 
         // Draw upper half of green line.
         bg_rect.setLeft(sustain_point.x());
-        painter.setPen(QPen(relight_resaturate(BG_DECAY, 0.7, 0.6), BG_LINE_WIDTH));
+        painter.setPen(QPen(get_color(DECAY, 4), BG_LINE_WIDTH));
         painter.drawLine(bg_rect.topLeft(), sustain_point);
 
         // Draw red line.
         bg_rect.setLeft(decay_begin.x());
-        painter.setPen(QPen(relight_resaturate(BG_ATTACK, 0.8, 0.8), BG_LINE_WIDTH));
+        painter.setPen(QPen(get_color(ATTACK, 4), BG_LINE_WIDTH));
         painter.drawLine(bg_rect.topLeft(), bg_rect.bottomLeft());
 
         // Draw lower half of yellow line, and yellow horizontal line.
         bg_rect.setLeft(sustain_point.x());
-        painter.setPen(QPen(relight(BG_SUSTAIN, 0.42), BG_LINE_WIDTH));
+        painter.setPen(QPen(get_color(SUSTAIN, 3), BG_LINE_WIDTH));
         {
             QPointF right = with_x(sustain_point, w + RIGHT_PAD);
             painter.drawLine(sustain_point, bg_rect.bottomLeft());

@@ -216,6 +216,7 @@ add_executable(exotracker-qt
     src/gui/lib/icon_toolbar.cpp
 
     src/gui/lib/color.cpp
+    src/gui/lib/docs_palette.cpp
     src/gui/lib/format.cpp  # Unfortunately tied to QString.
     src/gui/lib/parse_note.cpp
     src/gui/lib/painter_ext.cpp

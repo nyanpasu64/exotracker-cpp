@@ -4,6 +4,7 @@
 #include "gui/lib/format.h"
 #include "gui/lib/parse_note.h"
 #include "gui/lib/layout_macros.h"
+#include "gui/lib/docs_palette.h"
 #include "edit/edit_instr.h"
 #include "util/defer.h"
 #include "util/release_assert.h"
@@ -283,18 +284,21 @@ public:
     }
 };
 
+namespace pal = gui::lib::docs_palette;
+using pal::Shade;
+
 class AdsrSlider : public QSlider {
     QPalette _orig_palette;
-    QColor _bg_color;
+    pal::Hue _hue;
     bool _hovered = false;
 
 public:
     explicit AdsrSlider(
-        SliderSnapStyle * style, QColor bg_color, QWidget * parent = nullptr
+        SliderSnapStyle * style, pal::Hue hue, QWidget * parent = nullptr
     )
         : QSlider(Qt::Vertical, parent)
         , _orig_palette(palette())
-        , _bg_color(bg_color)
+        , _hue(hue)
     {
         setStyle(style);
         update_color();
@@ -311,15 +315,11 @@ private:
 
         QColor fg_and_groove, active_groove;
         if (_hovered) {
-            fg_and_groove = adsr_graph::relight_resaturate(_bg_color, 0.85, 1.);
-            active_groove = adsr_graph::with_hsl(
-                p.color(QPalette::Highlight), _bg_color.hueF(), 0.6, -1
-            );
+            fg_and_groove = pal::get_color(_hue, 5);
+            active_groove = pal::get_color(_hue, 4.5, 0.75);
         } else {
-            fg_and_groove = adsr_graph::relight_resaturate(_bg_color, 0.9, 0.7);
-            active_groove = adsr_graph::with_hsl(
-                p.color(QPalette::Highlight), _bg_color.hueF(), 0.4, -1
-            );
+            fg_and_groove = pal::get_color(_hue, 5.5, 0.75);
+            active_groove = pal::get_color(_hue, 5, 0.75);
         }
 
         p.setColor(QPalette::Button, fg_and_groove);
@@ -622,25 +622,27 @@ public:
 //                    l->setVerticalSpacing(6);
                     l->setHorizontalSpacing(6);
 
+                    namespace colors = adsr_graph::colors;
+
                     int column = 0;
                     _attack = build_control(l, column,
-                        qlabel(tr("AR")), adsr_graph::BG_ATTACK, Adsr::MAX_ATTACK_RATE
+                        qlabel(tr("AR")), colors::ATTACK, Adsr::MAX_ATTACK_RATE
                     ).no_label();
                     _decay = build_control(l, column,
-                        qlabel(tr("DR")), adsr_graph::BG_DECAY, Adsr::MAX_DECAY_RATE
+                        qlabel(tr("DR")), colors::DECAY, Adsr::MAX_DECAY_RATE
                     ).no_label();
                     _sustain = build_control(l, column,
-                        qlabel(tr("SL")), adsr_graph::BG_SUSTAIN, Adsr::MAX_SUSTAIN_LEVEL
+                        qlabel(tr("SL")), colors::SUSTAIN, Adsr::MAX_SUSTAIN_LEVEL
                     ).no_label();
                     _decay2 = build_control(l, column,
-                        qlabel(tr("D2")), adsr_graph::BG_DECAY2, Adsr::MAX_DECAY_2
+                        qlabel(tr("D2")), colors::DECAY2, Adsr::MAX_DECAY_2
                     ).no_label();
 
                     // TODO add exponential release GAIN
                     // (used for note cuts, not note changes)
                     {
                         auto release = build_control(l, column,
-                            new QCheckBox(tr("RR")), adsr_graph::BG_RELEASE, Adsr::MAX_DECAY_2
+                            new QCheckBox(tr("RR")), colors::RELEASE, Adsr::MAX_DECAY_2
                         );
                         release.label->setDisabled(true);
                         release.slider->setDisabled(true);
@@ -681,7 +683,7 @@ public:
 
     template<typename Label>
     LabeledControl<Label> build_control(
-        QGridLayout * l, int & column, Label * label, QColor const& color, int max
+        QGridLayout * l, int & column, Label * label, pal::Hue color, int max
     ) {
         AdsrSlider * slider;
         SmallSpinBox * text;
