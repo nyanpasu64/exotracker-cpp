@@ -14,9 +14,9 @@
 #include <QFrame>
 #include <QGroupBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QSpinBox>
-#include <QtWidgets/private/qabstractspinbox_p.h>
 #include <QToolButton>
 
 #include <QBoxLayout>
@@ -42,12 +42,6 @@ class ListWidget : public QListWidget {
     }
 };
 
-#define D_FUNC(Class) \
-    inline Class##Private* d_func() \
-    { Q_CAST_IGNORE_ALIGN(return reinterpret_cast<Class##Private *>(qGetPtrHelper(d_ptr));) } \
-    inline const Class##Private* d_func() const \
-    { Q_CAST_IGNORE_ALIGN(return reinterpret_cast<const Class##Private *>(qGetPtrHelper(d_ptr));) }
-
 using gui::lib::parse_note::ParseIntState;
 
 class InstrumentDialogImpl;
@@ -58,16 +52,12 @@ class NoteSpinBox final : public QSpinBox {
     // We *can* use window(), but that is risky.
     InstrumentDialogImpl * _dlg;
 
+    mutable bool _show_longest_str = false;
     mutable QString _prev_text;
     mutable ParseIntState _prev_state{};
 
 public:
     explicit NoteSpinBox(InstrumentDialogImpl * parent);
-
-private:
-    D_FUNC(QAbstractSpinBox)
-
-    ParseIntState validate_and_interpret(QString &input, int &pos) const;
 
 // impl QSpinBox
 protected:
@@ -78,66 +68,22 @@ protected:
     static inline const QLatin1String LONGEST_STR = QLatin1String("C#-1");
 
     QSize sizeHint() const override {
-        Q_D(const QAbstractSpinBox);
-        if (d->cachedSizeHint.isEmpty()) {
-            ensurePolished();
-
-            const QFontMetrics fm(fontMetrics());
-            int h = d->edit->sizeHint().height();
-            int w = 0;
-            QString s = LONGEST_STR;
-            QString fixedContent =  d->prefix + d->suffix + QLatin1Char(' ');
-            s += fixedContent;
-            w = qMax(w, fm.horizontalAdvance(s));
-
-            if (d->specialValueText.size()) {
-                s = d->specialValueText;
-                w = qMax(w, fm.horizontalAdvance(s));
-            }
-            w += 2; // cursor blinking space
-
-            QStyleOptionSpinBox opt;
-            initStyleOption(&opt);
-            QSize hint(w, h);
-            d->cachedSizeHint = style()->sizeFromContents(QStyle::CT_SpinBox, &opt, hint, this);
-        }
-        return d->cachedSizeHint;
+        _show_longest_str = true;
+        defer { _show_longest_str = false; };
+        return QSpinBox::sizeHint();
     }
 
     QSize minimumSizeHint() const override {
-        Q_D(const QAbstractSpinBox);
-        if (d->cachedMinimumSizeHint.isEmpty()) {
-            //Use the prefix and range to calculate the minimumSizeHint
-            ensurePolished();
-
-            const QFontMetrics fm(fontMetrics());
-            int h = d->edit->minimumSizeHint().height();
-            int w = 0;
-
-            QString s = LONGEST_STR;
-            QString fixedContent =  d->prefix + QLatin1Char(' ');
-            s += fixedContent;
-            w = qMax(w, fm.horizontalAdvance(s));
-
-            if (d->specialValueText.size()) {
-                s = d->specialValueText;
-                w = qMax(w, fm.horizontalAdvance(s));
-            }
-            w += 2; // cursor blinking space
-
-            QStyleOptionSpinBox opt;
-            initStyleOption(&opt);
-            QSize hint(w, h);
-
-            d->cachedMinimumSizeHint = style()->sizeFromContents(QStyle::CT_SpinBox, &opt, hint, this);
-        }
-        return d->cachedMinimumSizeHint;
+        _show_longest_str = true;
+        defer { _show_longest_str = false; };
+        return QSpinBox::minimumSizeHint();
     }
 };
 
 class SmallSpinBox final : public QSpinBox {
     /// The longest possible value this widget can display without overflowing.
     int _longest_value;
+    mutable bool _show_longest_value = false;
 
     /// The size of the longest possible value this widget is expected to display.
     /// Used as the minimum on-screen size of this NumericViewer.
@@ -160,74 +106,32 @@ public:
     }
 
 // impl QWidget
-private:
-    D_FUNC(QAbstractSpinBox)
-
 public:
-    // please don't change QAbstractSpinBoxPrivate in kde/5.15
     QSize sizeHint() const override {
-        Q_D(const QAbstractSpinBox);
-        if (d->cachedSizeHint.isEmpty()) {
-            ensurePolished();
-
-            const QFontMetrics fm(fontMetrics());
-            int h = d->edit->sizeHint().height();
-            int w = 0;
-            QString s;
-            QString fixedContent =  d->prefix + d->suffix + QLatin1Char(' ');
-            s = d->textFromValue(_longest_value);
-            s.truncate(18);
-            s += fixedContent;
-            w = qMax(w, fm.horizontalAdvance(s));
-
-            if (d->specialValueText.size()) {
-                s = d->specialValueText;
-                w = qMax(w, fm.horizontalAdvance(s));
-            }
-            w += 2; // cursor blinking space
-
-            QStyleOptionSpinBox opt;
-            initStyleOption(&opt);
-            QSize hint(w, h);
-            d->cachedSizeHint = style()->sizeFromContents(QStyle::CT_SpinBox, &opt, hint, this);
-        }
-        return d->cachedSizeHint;
+        _show_longest_value = true;
+        defer { _show_longest_value = false; };
+        return QSpinBox::sizeHint();
     }
 
     QSize minimumSizeHint() const override {
-        Q_D(const QAbstractSpinBox);
-        if (d->cachedMinimumSizeHint.isEmpty()) {
-            //Use the prefix and range to calculate the minimumSizeHint
-            ensurePolished();
-
-            const QFontMetrics fm(fontMetrics());
-            int h = d->edit->minimumSizeHint().height();
-            int w = 0;
-
-            QString s;
-            QString fixedContent =  d->prefix + QLatin1Char(' ');
-            s = d->textFromValue(_longest_value);
-            s.truncate(18);
-            s += fixedContent;
-            w = qMax(w, fm.horizontalAdvance(s));
-
-            if (d->specialValueText.size()) {
-                s = d->specialValueText;
-                w = qMax(w, fm.horizontalAdvance(s));
-            }
-            w += 2; // cursor blinking space
-
-            QStyleOptionSpinBox opt;
-            initStyleOption(&opt);
-            QSize hint(w, h);
-
-            d->cachedMinimumSizeHint = style()->sizeFromContents(QStyle::CT_SpinBox, &opt, hint, this);
-        }
-        return d->cachedMinimumSizeHint;
+        _show_longest_value = true;
+        defer { _show_longest_value = false; };
+        return QSpinBox::minimumSizeHint();
     }
 
 // override QSpinBox
 protected:
+    QString textFromValue(int value) const override {
+        // It's OK (for now) to return different values during sizeHint(),
+        // because Q[Abstract]SpinBox doesn't cache textFromValue()'s return value...
+        // yay fragile base classes
+        if (_show_longest_value) {
+            return QSpinBox::textFromValue(_longest_value);
+        } else {
+            return QSpinBox::textFromValue(value);
+        }
+    }
+
     StepEnabled stepEnabled() const override {
         StepEnabled orig = QSpinBox::stepEnabled();
         if (_inverted) {
@@ -1008,6 +912,13 @@ NoteSpinBox::NoteSpinBox(InstrumentDialogImpl * parent)
 {}
 
 QString NoteSpinBox::textFromValue(int value) const {
+    // It's OK (for now) to return different values during sizeHint(),
+    // because Q[Abstract]SpinBox doesn't cache textFromValue()'s return value...
+    // yay fragile base classes
+    if (_show_longest_str) {
+        return LONGEST_STR;
+    }
+
     return _dlg->format_note_name((doc::Chromatic) value);
 }
 
