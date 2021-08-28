@@ -27,10 +27,10 @@ namespace colors {
     }
 
     constexpr Hue ATTACK = Hue::Red;
-    constexpr Hue DECAY = Hue::Yellow;
-    constexpr Hue SUSTAIN = Hue::Green;
-    constexpr Hue DECAY2 = Hue::Blue;
-    constexpr Hue RELEASE = Hue::Magenta;
+    constexpr Hue DECAY = Hue::Green;
+    constexpr Hue SUSTAIN = Hue::Blue;
+    constexpr Hue DECAY2 = Hue::Purple;
+    constexpr Hue RELEASE = Hue::Yellow;
 }
 
 class AdsrGraph final : public QWidget {
