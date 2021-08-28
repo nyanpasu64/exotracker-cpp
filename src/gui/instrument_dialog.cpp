@@ -945,8 +945,9 @@ public:
             doc::InstrumentPatch const& patch = keysplit[patch_idx];
             QString name = sample_text(samples, patch.sample_idx);
 
-            auto text = QString("%1+: %3")
+            auto text = QString("%1: %2")
                 .arg(format_note_name(patch.min_note), name);
+            // TODO for single-key drum patch, print "=%1: %2"
 
             new QListWidgetItem(text, &list);
             // TODO compute and show list of errors
