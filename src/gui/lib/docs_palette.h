@@ -14,17 +14,6 @@
 
 namespace gui::lib::docs_palette {
 
-//namespace Gray_ {
-//enum Gray : uint32_t {
-//    Black, Dark4, Dark3, Dark2, Dark1, Gray, Light1, Light2, Light3, White,
-//    COUNT,
-//    MAX = COUNT - 1,
-//};
-//}
-//using Gray_::Gray;
-//constexpr size_t GRAY_COUNT = Gray::COUNT;  // 10
-//constexpr size_t GRAY_MAX = Gray::MAX;  // 9
-
 namespace Shade_ {
 enum Shade : uint32_t {
     Black,  // 0
@@ -94,42 +83,6 @@ namespace detail {
             );
         }
     }
-
-//    template<typename Hue, typename Shade>
-//    constexpr QColor int_none(Hue hue, Shade shade) {
-//        if constexpr (std::is_floating_point_v<Hue>) {
-//            // Catch NaN.
-//            if (hue != hue) {
-//                return BLACK;
-//            }
-//        }
-
-//        if constexpr (std::is_integral_v<Hue>) {
-//            Hue modulo = hue % Hue(HUE_COUNT);
-//            if constexpr (std::is_signed_v<Hue>) {
-//                if (modulo < 0) {
-//                    modulo += HUE_COUNT;
-//                }
-//            }
-//            return int_hue((size_t) modulo, shade);
-//        } else {
-//            static_assert(
-//                std::is_floating_point_v<Hue>,
-//                "invalid hue type, must be integral or floating");
-//            auto hue_floor = (ptrdiff_t) std::floor(hue) % (ptrdiff_t) HUE_COUNT;
-//            if (hue_floor < 0) {
-//                hue_floor += HUE_COUNT;
-//            }
-
-//            auto hue_next = ((size_t) hue_floor + 1) % HUE_COUNT;
-
-//            auto hue_frac = hue - hue_floor;
-
-//            return lerp_colors(
-//                int_none(hue, hue_floor), int_none(hue, hue_next), hue_frac
-//            );
-//        }
-//    }
 }
 
 QColor get_gray(auto shade) {
