@@ -642,7 +642,7 @@ public:
                     // (used for note cuts, not note changes)
                     {
                         auto release = build_control(l, column,
-                            new QCheckBox(tr("RR")), colors::RELEASE, Adsr::MAX_DECAY_2
+                            new QCheckBox(tr("R")), colors::RELEASE, Adsr::MAX_DECAY_2
                         );
                         release.label->setDisabled(true);
                         release.slider->setDisabled(true);
