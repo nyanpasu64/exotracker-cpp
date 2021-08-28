@@ -394,12 +394,12 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
 
         // Draw DR upper line.
         bg_rect.setLeft(sustain_point.x());
-        painter.setPen(QPen(get_color(DECAY, 3), BG_LINE_WIDTH));
+        painter.setPen(QPen(get_color(DECAY, 4.5), BG_LINE_WIDTH));
         painter.drawLine(bg_rect.topLeft(), sustain_point);
 
         // Draw AR vertical line, covering DR line.
         bg_rect.setLeft(decay_begin.x());
-        painter.setPen(QPen(get_color(ATTACK, 4), BG_LINE_WIDTH));
+        painter.setPen(QPen(get_color(ATTACK, 4.5), BG_LINE_WIDTH));
         painter.drawLine(bg_rect.topLeft(), bg_rect.bottomLeft());
 
         // Draw SL horizontal/lower line, covering AR line.
