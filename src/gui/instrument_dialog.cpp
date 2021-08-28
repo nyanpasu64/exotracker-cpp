@@ -761,8 +761,8 @@ public:
             auto b = QSignalBlocker(_min_key);
             auto tx = _win->edit_unwrap();
             _win->push_edit(tx, std::move(cmd), MoveCursor::NotPatternEdit{});
+            _keysplit->setCurrentRow((int) new_patch_idx);
         }
-        _keysplit->setCurrentRow((int) new_patch_idx);
     }
 
     void on_add_patch() {
@@ -777,8 +777,8 @@ public:
                 auto tx = _win->edit_unwrap();
                 _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
                 // TODO move ~StateTransaction() logic to StateTransaction::commit()
+                _keysplit->setCurrentRow((int) patch_idx);
             }
-            _keysplit->setCurrentRow((int) patch_idx);
         }
     }
 
@@ -800,8 +800,8 @@ public:
             {
                 auto tx = _win->edit_unwrap();
                 _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+                _keysplit->setCurrentRow((int) (patch_idx - 1));
             }
-            _keysplit->setCurrentRow((int) (patch_idx - 1));
         }
     }
 
@@ -813,8 +813,8 @@ public:
             {
                 auto tx = _win->edit_unwrap();
                 _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+                _keysplit->setCurrentRow((int) (patch_idx + 1));
             }
-            _keysplit->setCurrentRow((int) (patch_idx + 1));
         }
     }
 
