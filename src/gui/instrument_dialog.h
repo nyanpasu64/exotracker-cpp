@@ -28,7 +28,7 @@ public:
     using QDialog::QDialog;
 
     /// May close the dialog and delete the object!
-    virtual void reload_state() = 0;
+    virtual void reload_state(bool instrument_switched) = 0;
 };
 
 } // namespace

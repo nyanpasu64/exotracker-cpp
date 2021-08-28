@@ -447,7 +447,7 @@ public:
 
         build_ui();
         connect_ui();
-        reload_state();
+        reload_state(true);
     }
 
     void build_ui() {
@@ -668,61 +668,60 @@ public:
             auto b = QSignalBlocker(_min_key);
             auto tx = _win->edit_unwrap();
             _win->push_edit(tx, std::move(cmd), MoveCursor::NotPatternEdit{});
-            _keysplit->setCurrentRow((int) new_patch_idx);
+            reload_keysplit(*doc.instruments[instr_idx], (int) new_patch_idx);
         }
     }
 
     void on_add_patch() {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+
         // if keysplit is empty, currentRow() is -1.
         // auto patch_idx = (size_t) (_keysplit->currentRow() + 1);
         auto patch_idx = (size_t) _keysplit->model()->rowCount();
 
-        if (auto edit = edit_instr::try_add_patch(
-            document(), curr_instr_idx(), patch_idx
-        )) {
-            {
-                auto tx = _win->edit_unwrap();
-                _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
-                // TODO move ~StateTransaction() logic to StateTransaction::commit()
-            }
-            // Regenerate _keysplit before setting row.
-            _keysplit->setCurrentRow((int) patch_idx);
+        if (auto edit = edit_instr::try_add_patch(doc, instr_idx, patch_idx)) {
+            auto tx = _win->edit_unwrap();
+            _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+            reload_keysplit(*doc.instruments[instr_idx], (int) patch_idx);
+            // TODO move ~StateTransaction() logic to StateTransaction::commit()
         }
     }
 
     void on_remove_patch() {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+
         if (auto edit = edit_instr::try_remove_patch(
-            document(), curr_instr_idx(), curr_patch_idx()
+            doc, instr_idx, curr_patch_idx()
         )) {
             auto tx = _win->edit_unwrap();
             _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
-            // leave current row unchanged
+            // leave current row unchanged, let reload_keysplit() truncate it
         }
     }
 
     void on_move_patch_up() {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
         auto patch_idx = curr_patch_idx();
-        if (auto edit = edit_instr::try_move_patch_up(
-            document(), curr_instr_idx(), patch_idx
-        )) {
-            {
-                auto tx = _win->edit_unwrap();
-                _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
-                _keysplit->setCurrentRow((int) (patch_idx - 1));
-            }
+
+        if (auto edit = edit_instr::try_move_patch_up(doc, instr_idx, patch_idx)) {
+            auto tx = _win->edit_unwrap();
+            _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+            reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx - 1));
         }
     }
 
     void on_move_patch_down() {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
         auto patch_idx = curr_patch_idx();
-        if (auto edit = edit_instr::try_move_patch_down(
-            document(), curr_instr_idx(), patch_idx
-        )) {
-            {
-                auto tx = _win->edit_unwrap();
-                _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
-                _keysplit->setCurrentRow((int) (patch_idx + 1));
-            }
+
+        if (auto edit = edit_instr::try_move_patch_down(doc, instr_idx, patch_idx)) {
+            auto tx = _win->edit_unwrap();
+            _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+            reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx + 1));
         }
     }
 
@@ -801,7 +800,7 @@ public:
         connect_pair(_decay2, edit_instr::edit_decay2);
     }
 
-    void reload_state() override {
+    void reload_state(bool instrument_switched) override {
         auto const& state = _win->state();
         auto const& doc = state.document();
 
@@ -823,28 +822,26 @@ public:
         );
 
         // TODO keep selection iff instrument id unchanged
-        reload_keysplit(*_keysplit, *instr, doc.samples, true);
+        reload_keysplit(*instr, instrument_switched ? 0 : -1);
         reload_current_patch();
     }
 
     /// does not emit change signals (which would invoke reload_current_patch()).
     /// this should be fine, since when update_keysplit() is called by reload_state(),
     /// reload_state subsequently calls reload_current_patch().
-    void reload_keysplit(
-        QListWidget & list,
-        doc::Instrument const& instr,
-        doc::Samples const& samples,
-        bool keep_selection)
-    {
+    ///
+    /// If new_selection == -1, keeps old selection.
+    void reload_keysplit(doc::Instrument const& instr, int new_selection) {
         using gui::lib::color::lerp_colors;
 
+        QListWidget & list = *_keysplit;
         auto b = QSignalBlocker(&list);
+        doc::Samples const& samples = _win->state().document().samples;
 
         // TODO ensure we always have exactly 1 element selected.
         // TODO how to handle 0 keysplits? create a dummy keysplit pointing to sample 0?
-        int selection = 0;
-        if (keep_selection) {
-            selection = current_row(list);
+        if (new_selection < 0) {
+            new_selection = current_row(list);
         }
         list.clear();
 
@@ -912,7 +909,7 @@ public:
         }
 
         if (n > 0) {
-            list.setCurrentRow(std::min(selection, int(n) - 1));
+            list.setCurrentRow(std::min(new_selection, int(n) - 1));
         }
     }
 

@@ -1566,7 +1566,7 @@ StateTransaction::~StateTransaction() noexcept(false) {
             _win->_maybe_instr_dialog->close();
         } else if (e & (E::DocumentEdited | E::InstrumentSwitched)) {
             // may close dialog and null out pointer later on.
-            _win->_maybe_instr_dialog->reload_state();
+            _win->_maybe_instr_dialog->reload_state(e & E::InstrumentSwitched);
         }
     }
 

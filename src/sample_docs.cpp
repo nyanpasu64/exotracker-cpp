@@ -60,6 +60,7 @@ static Document empty() {
             },
         },
     };
+    instruments[4] = instruments[3];
     instruments[0x10] = Instrument{
         .name = "50%",
         .keysplit = { InstrumentPatch { .sample_idx = PULSE_50, .adsr = INFINITE }},
