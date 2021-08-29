@@ -46,12 +46,12 @@ static Document empty() {
             InstrumentPatch {
                 .min_note = 0,
                 .sample_idx = PULSE_25,
-                .adsr = INFINITE,
+                .adsr = DEMO,
             },
             InstrumentPatch {
                 .min_note = 60,
                 .sample_idx = PULSE_50,
-                .adsr = INFINITE,
+                .adsr = MUSIC_BOX,
             },
             InstrumentPatch {
                 .min_note = 72,
@@ -60,7 +60,26 @@ static Document empty() {
             },
         },
     };
-    instruments[4] = instruments[3];
+    instruments[4] = Instrument {
+        .name = "Invalid",
+        .keysplit = {
+            InstrumentPatch {
+                .min_note = 0,
+                .sample_idx = PULSE_25,
+                .adsr = DEMO,
+            },
+            InstrumentPatch {
+                .min_note = 60,
+                .sample_idx = 0x10,
+                .adsr = MUSIC_BOX,
+            },
+            InstrumentPatch {
+                .min_note = 48,
+                .sample_idx = TRIANGLE,
+                .adsr = INFINITE,
+            },
+        },
+    };
     instruments[0x10] = Instrument{
         .name = "50%",
         .keysplit = { InstrumentPatch { .sample_idx = PULSE_50, .adsr = INFINITE }},
@@ -634,7 +653,7 @@ static Document block_test() {
 
 #endif
 
-std::string const DEFAULT_DOC = "all-channels";
+std::string const DEFAULT_DOC = "empty";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
     std::map<std::string, doc::Document> out;

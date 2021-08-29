@@ -107,14 +107,21 @@ inline Sample saw() {
     };
 }
 
+/// Fast attack, no decay, lasts forever.
 constexpr Adsr INFINITE = { 0xf, 0x0, 0x7, 0x00 };
+
+/// Looks good on ADSR graphs.
+constexpr Adsr DEMO = { 0x4, 0x0, 0x2, 0x0d };
+
+/// Fast attack, no decay, long decay2.
+constexpr Adsr MUSIC_BOX = { 0xf, 0x0, 0x7, 0x0d };
 
 inline Instrument music_box(SampleIndex sample_idx) {
     return Instrument {
         .name = "Music Box",
         .keysplit = {InstrumentPatch {
             .sample_idx = sample_idx,
-            .adsr = Adsr { 0xf, 0x0, 0x7, 0x0d },
+            .adsr = MUSIC_BOX,
         }},
     };
 }

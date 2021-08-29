@@ -868,7 +868,7 @@ public:
             if (!samples[patch.sample_idx].has_value()) {
                 warnings.push_back(
                     tr("Sample %1 not found; keysplit will not play")
-                        .arg(patch.sample_idx)
+                        .arg(format_hex_2(patch.sample_idx))
                 );
             }
             if ((int) patch.min_note <= curr_min_note) {
