@@ -13,10 +13,14 @@ namespace edit::edit_doc {
 
 // # Timeline operations.
 
+/// It's the responsibility of the caller to avoid exceeding MAX_TIMELINE_FRAMES.
+/// This may change.
 [[nodiscard]] EditBox add_timeline_row(
     doc::Document const& document, doc::GridIndex grid_pos, doc::BeatFraction nbeats
 );
 
+/// It's the responsibility of the caller to avoid removing the last row.
+/// This may change.
 [[nodiscard]] EditBox remove_timeline_row(doc::GridIndex grid_pos);
 
 [[nodiscard]]

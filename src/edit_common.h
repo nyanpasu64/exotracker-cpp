@@ -55,10 +55,13 @@ public:
     /// Upon initially pushing an operation `curr` into undo history,
     /// History calls curr.can_coalesce(prev) *after* calling curr.apply_swap().
     ///
-    /// Only true if:
-    /// - prev and this should be combined in undo history.
-    /// - prev and this mutate the same state,
-    ///   so History can discard this entirely after calling apply_swap().
+    /// It's only safe to coalesce multiple edits
+    /// if the first edit edits the same location as or dominates the second,
+    /// meaning that undoing the first edit produces the same document
+    /// whether the second edit was undone or not.
+    ///
+    /// If you want two edit operations to coalesce,
+    /// both must entirely replace the same section of the document.
     virtual bool can_coalesce(BaseEditCommand & prev) const = 0;
 
     /// Returns a bitflag specifying which parts of the document are modified.
