@@ -8,6 +8,7 @@
 #include "gui/lib/docs_palette.h"
 #include "edit/edit_instr.h"
 #include "util/defer.h"
+#include "util/expr.h"
 #include "util/release_assert.h"
 
 #include <QCheckBox>
@@ -849,6 +850,8 @@ public:
         auto & keysplit = instr.keysplit;
         QColor error_color = pal::get_color(pal::Hue::Yellow, pal::Shade::Light1);
         error_color.setAlphaF(0.4);
+        // TODO fix DPI switching
+        list.setIconSize(QSize(16, 16) * logicalDpiX() / qreal(96));
 
         size_t n = keysplit.size();
         int curr_min_note = -1;
