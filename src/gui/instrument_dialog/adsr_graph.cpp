@@ -356,7 +356,9 @@ static QPointF with_y(QPointF p, qreal y) {
 }
 
 template<typename T>
-gsl::span<T> slice(gsl::span<T> span, size_t begin, size_t end) {
+gsl::span<T> safe_slice(gsl::span<T> span, size_t begin, size_t end) {
+    begin = std::min(begin, span.size());
+    end = std::clamp(end, begin, span.size());
     return span.subspan(begin, end - begin);
 }
 
@@ -478,14 +480,10 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
             painter.drawPolyline(path.data(), (int) path.size());
         };
 
-        // Ensure [0..=decay_idx] and [decay_idx..=sustain_idx] are in-bounds.
-        release_assert(adsr.decay_idx <= adsr.sustain_idx);
-        release_assert(adsr.sustain_idx < adsr.envelope.size());
-
         auto path = gsl::span(path_vec.data(), adsr.envelope.size());
-        plot_line(slice(path, 0, adsr.decay_idx + 1), colors::ATTACK);
-        plot_line(slice(path, adsr.decay_idx, adsr.sustain_idx + 1), colors::DECAY);
-        plot_line(slice(path, adsr.sustain_idx, path.size()), colors::DECAY2);
+        plot_line(safe_slice(path, 0, adsr.decay_idx + 1), colors::ATTACK);
+        plot_line(safe_slice(path, adsr.decay_idx, adsr.sustain_idx + 1), colors::DECAY);
+        plot_line(safe_slice(path, adsr.sustain_idx, path.size()), colors::DECAY2);
     }
 
     // Draw ticks and labels.
