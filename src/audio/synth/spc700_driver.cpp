@@ -496,3 +496,70 @@ void Spc700Driver::run_driver(
 }
 
 }
+
+#ifdef UNITTEST
+#include <doctest.h>
+
+namespace audio::synth::spc700_driver {
+
+using namespace doc;
+
+TEST_CASE("Test that keysplits are resolved correctly.") {
+    std::vector<InstrumentPatch> keysplit = {
+        InstrumentPatch { .min_note = 0 },
+        InstrumentPatch { .min_note = 60 },
+        InstrumentPatch { .min_note = 72 },
+    };
+
+    CHECK_EQ(find_patch(keysplit, 0), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 59), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 60), &keysplit[1]);
+    CHECK_EQ(find_patch(keysplit, 71), &keysplit[1]);
+    CHECK_EQ(find_patch(keysplit, 72), &keysplit[2]);
+    CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), &keysplit[2]);
+}
+
+TEST_CASE("Test that keysplits with holes are resolved correctly.") {
+    std::vector<InstrumentPatch> keysplit = {
+        InstrumentPatch { .min_note = 60 },
+        InstrumentPatch { .min_note = 72 },
+    };
+
+    CHECK_EQ(find_patch(keysplit, 0), nullptr);
+    CHECK_EQ(find_patch(keysplit, 59), nullptr);
+    CHECK_EQ(find_patch(keysplit, 60), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 71), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 72), &keysplit[1]);
+    CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), &keysplit[1]);
+}
+
+TEST_CASE("Test that empty keysplits return nullptr.") {
+    std::vector<InstrumentPatch> keysplit;
+
+    CHECK_EQ(find_patch(keysplit, 0), nullptr);
+    CHECK_EQ(find_patch(keysplit, 60), nullptr);
+    CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), nullptr);
+}
+
+TEST_CASE("Test that keysplits with out-of-order patches prefer earlier patches.") {
+    std::vector<InstrumentPatch> keysplit = {
+        InstrumentPatch { .min_note = 60 },
+        InstrumentPatch { .min_note = 72 },
+        InstrumentPatch { .min_note = 48 },
+    };
+
+    CHECK_EQ(find_patch(keysplit, 0), nullptr);
+
+    // Is this really the behavior we want?
+    CHECK_EQ(find_patch(keysplit, 48), nullptr);
+    CHECK_EQ(find_patch(keysplit, 59), nullptr);
+
+    CHECK_EQ(find_patch(keysplit, 60), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 71), &keysplit[0]);
+    CHECK_EQ(find_patch(keysplit, 72), &keysplit[1]);
+    CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), &keysplit[1]);
+}
+
+}
+
+#endif
