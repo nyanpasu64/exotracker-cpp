@@ -162,7 +162,7 @@ pattern_editor_INTERNAL:
     int _zoom_level = 4;
     int _octave = 5;
     int _step = 1;  // can't remember if it will be saved on close, or defaulted via settings dialog
-    StepDirection _step_direction = StepDirection::Down;
+    StepDirection _step_direction = StepDirection::RightEffect;
     bool _step_to_event = false;
     // TODO add speed-1 zoom
 
