@@ -7,7 +7,7 @@
 #include <map>
 #include <type_traits>
 
-#include "doctest.h"
+#include <doctest.h>
 
 TEST_CASE("Test that TimeInPattern comparisons work properly.") {
 

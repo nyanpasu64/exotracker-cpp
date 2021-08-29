@@ -17,7 +17,7 @@
 #include <vector>
 #include <utility>  // std::move
 
-#include "doctest.h"
+#include <doctest.h>
 
 using audio::synth::NsampT;
 using audio::synth::spc700_driver::Spc700Driver;
