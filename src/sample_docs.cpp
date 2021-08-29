@@ -27,11 +27,14 @@ static Document empty() {
     constexpr SampleIndex TRIANGLE = 0;
     constexpr SampleIndex PULSE_25 = 1;
     constexpr SampleIndex PULSE_50 = 2;
+    constexpr SampleIndex LONG = 3;
 
     Samples samples;
     samples[TRIANGLE] = triangle();
     samples[PULSE_25] = pulse_25();
     samples[PULSE_50] = pulse_50();
+    samples[LONG] = pulse_50();
+    samples[LONG]->name = "looooooooooooooooooooooooooooooong";
 
     Instruments instruments;
     instruments[0] = Instrument{"blank", {}};
