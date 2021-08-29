@@ -101,12 +101,15 @@ struct Instrument {
 
     /// A collection of different samples and ADSR values,
     /// along with associated ranges of keys.
-    /// Whenever a note plays, the driver scans the vector backwards
-    /// and picks the first patch where InstrumentPatch::min_note <= note.
+    /// Whenever a note plays, the driver scans the vector forwards,
+    /// skipping patches whose min key isn't strictly increasing,
+    /// and picks the last patch where InstrumentPatch::min_note <= note.
     /// If none match, each note acts as a key-off(???).
     ///
     /// (Note that this algorithm has edge-cases, and care must be taken
-    /// to ensure the tracker and SPC driver match.)
+    /// to ensure the tracker and SPC driver match.
+    /// .spc export will likely remove all out-of-order keysplits ahead of time,
+    /// simplifying the hardware driver.)
     ///
     /// In the future, single-note samples/patches will be introduced.
     /// The driver plays the note as usual if min_note == note.

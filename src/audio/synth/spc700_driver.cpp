@@ -3,7 +3,6 @@
 #include "chip_instance_common.h"
 #include "doc.h"
 #include "util/release_assert.h"
-#include "util/reverse.h"
 
 #include <SPC_DSP.h>  // for register enums
 #include <gsl/span>
@@ -60,17 +59,29 @@ static uint16_t calc_tuning(
     return out;
 }
 
-using util::reverse::reverse;
-
 static doc::InstrumentPatch const* find_patch(
     gsl::span<doc::InstrumentPatch const> keysplit, doc::Chromatic note
 ) {
-    for (doc::InstrumentPatch const& patch : reverse(keysplit)) {
-        if (patch.min_note <= note) {
-            return &patch;
+    int curr_min_note = -1;
+    doc::InstrumentPatch const* matching = nullptr;
+
+    // Assumption: keysplit[].min_note is strictly increasing.
+    // We skip all patches where this is not the case.
+    for (doc::InstrumentPatch const& patch : keysplit) {
+        if ((int) patch.min_note <= curr_min_note) {
+            continue;
+        }
+        curr_min_note = patch.min_note;
+
+        // Return the last matching patch (stop when the next patch's min_note
+        // exceeds the current note).
+        if (note < patch.min_note) {
+            return matching;
+        } else {
+            matching = &patch;
         }
     }
-    return nullptr;
+    return matching;
 }
 
 /// Compute the address of per-voice registers, given our current channel number.

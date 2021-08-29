@@ -873,7 +873,7 @@ public:
             }
             if ((int) patch.min_note <= curr_min_note) {
                 warnings.push_back(
-                    tr("Min note %1 out of order, breaks previous keysplits")
+                    tr("Min key %1 out of order; keysplit will not play")
                         .arg(patch.min_note)
                 );
             } else {
