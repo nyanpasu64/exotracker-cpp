@@ -456,7 +456,12 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
     ));
     painter.drawPolygon(path_vec.data(), (int) path_vec.size());
 
+    QPointF const decay_begin = point_to_qpointf(adsr.decay_begin);
     QPointF const sustain_point = point_to_qpointf(adsr.sustain_point);
+
+    // Draw attack vertical line.
+    painter.setPen(QPen(get_color(colors::ATTACK, 5.5), BG_LINE_WIDTH));
+    painter.drawLine(decay_begin, with_y(decay_begin, h));
 
     // Draw SL horizontal/lower line.
     painter.setPen(QPen(bg_line_color(SUSTAIN), BG_LINE_WIDTH));
