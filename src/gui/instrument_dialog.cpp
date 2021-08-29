@@ -323,7 +323,8 @@ static QString sample_text(doc::Samples const& samples, size_t sample_idx) {
         QString name = QString::fromStdString(maybe_sample->name);
         return QLatin1String("%1 - %2").arg(format_hex_2(sample_idx), name);
     } else {
-        return QLatin1String("%1").arg(format_hex_2(sample_idx));
+        return InstrumentDialog::tr("%1 (none)")
+            .arg(format_hex_2(sample_idx));
     }
 }
 
