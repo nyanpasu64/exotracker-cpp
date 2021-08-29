@@ -320,7 +320,7 @@ static constexpr qreal LINE_WIDTH = 1.5;
 static constexpr qreal BG_LINE_WIDTH = LINE_WIDTH;
 
 static constexpr qreal TOP_PAD = 12;
-static constexpr qreal BOTTOM_PAD = BG_LINE_WIDTH / 2;
+static constexpr qreal BOTTOM_PAD = 0;
 static constexpr qreal LEFT_PAD = 2;
 static constexpr qreal RIGHT_PAD = 0;
 
@@ -332,6 +332,10 @@ static constexpr qreal NUMBER_MARGIN = 12;
 using gui::lib::docs_palette::Hue;
 using gui::lib::docs_palette::Shade;
 using gui::lib::docs_palette::get_color;
+
+static QColor bg_color(Hue hue) {
+    return get_color(hue, qreal(Shade::White) - 0.5);
+}
 
 static QColor bg_line_color(Hue hue) {
     return get_color(hue, 5);
@@ -360,6 +364,13 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
     if (!isEnabled()) {
         return;
     }
+
+    auto image_size = size() * devicePixelRatio();
+    image_size.setHeight(1);
+    if (_bg_colors.size() != image_size) {
+        _bg_colors = QImage(image_size, QImage::Format_RGB32);
+    }
+    _bg_colors.setDevicePixelRatio(devicePixelRatio());
 
     using gui::lib::painter_ext::DrawText;
 
@@ -398,8 +409,6 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
         return QPointF(scale_x(p.time), scale_y(p.new_level));
     };
 
-    QPointF const sustain_point = point_to_qpointf(adsr.sustain_point);
-
     // Draw background lines.
     using gui::lib::docs_palette::get_color;
     using gui::lib::docs_palette::Shade;
@@ -409,47 +418,70 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
         painter.fillRect(bg_rect, Qt::white);
     }
 
-    // Draw baseline.
-    auto plot_baseline = [&painter, &scale_x, h](NsampT left, NsampT right, Hue hue) {
-        painter.setPen(QPen(bg_line_color(hue), BG_LINE_WIDTH));
-        painter.drawLine(QPointF(scale_x(left), h), QPointF(scale_x(right), h));
-    };
-    plot_baseline(0, adsr.decay_begin.time, colors::ATTACK);
-    plot_baseline(adsr.decay_begin.time, adsr.sustain_point.time, colors::DECAY);
-    plot_baseline(adsr.sustain_point.time, max_time, colors::DECAY2);
+    // Compute envelope line.
+    // Strictly speaking this is wrong, the line should hold the old level
+    // until reaching the new point's time, then jump to the new level (ZOH).
+    // In practice it looks close enough.
+    std::vector<QPointF> path_vec;
+    std::transform(
+        adsr.envelope.begin(), adsr.envelope.end(),
+        std::back_inserter(path_vec),
+        point_to_qpointf);
+
+    // Fill envelope background, adding an extra point at the bottom right.
+    {
+        // Fill image with color of background.
+        _bg_colors.fill(bg_color(colors::ATTACK));
+
+        auto painter = QPainter(&_bg_colors);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.translate(LEFT_PAD, 0);
+
+        // Add extra width, to prevent rounding errors when setting left
+        // from causing gaps on the right.
+        auto bg_rect = QRectF(0, 0, w + 100, 1);
+
+        bg_rect.setLeft(scale_x(adsr.decay_begin.time));
+        painter.fillRect(bg_rect, bg_color(colors::DECAY));
+
+        bg_rect.setLeft(scale_x(adsr.sustain_point.time));
+        painter.fillRect(bg_rect, bg_color(colors::DECAY2));
+    }
+    path_vec.push_back(QPointF(w, h));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(EXPR(
+        auto bg_colors = QBrush(_bg_colors);
+        bg_colors.setTransform(painter.transform().inverted());
+        return bg_colors;
+    ));
+    painter.drawPolygon(path_vec.data(), (int) path_vec.size());
+
+    QPointF const sustain_point = point_to_qpointf(adsr.sustain_point);
 
     // Draw SL horizontal/lower line.
     painter.setPen(QPen(bg_line_color(SUSTAIN), BG_LINE_WIDTH));
     painter.drawLine(sustain_point, with_x(sustain_point, w + RIGHT_PAD));
     painter.drawLine(sustain_point, with_y(sustain_point, h));
 
-    // Draw envelope line.
-    // Strictly speaking this is wrong, the line should hold the old level
-    // until reaching the new point's time, then jump to the new level (ZOH).
-    // In practice it looks close enough.
-    auto plot_line = [&painter, &point_to_qpointf](
-        gsl::span<Point const> points, Hue hue
-    ) {
-        if (points.size() <= 1) {
-            return;
-        }
-        std::vector<QPointF> path;
-        std::transform(
-            points.begin(), points.end(),
-            back_inserter(path),
-            point_to_qpointf);
-        painter.setPen(QPen(fg_color(hue), LINE_WIDTH));
-        painter.drawPolyline(path.data(), (int) path.size());
-    };
+    // Draw envelope line, excluding extra point.
+    {
+        auto plot_line = [&painter](gsl::span<QPointF const> path, Hue hue) {
+            if (path.size() <= 1) {
+                return;
+            }
+            painter.setPen(QPen(fg_color(hue), LINE_WIDTH));
+            painter.drawPolyline(path.data(), (int) path.size());
+        };
 
-    // Ensure [0..=decay_idx] and [decay_idx..=sustain_idx] are in-bounds.
-    release_assert(adsr.decay_idx <= adsr.sustain_idx);
-    release_assert(adsr.sustain_idx < adsr.envelope.size());
+        // Ensure [0..=decay_idx] and [decay_idx..=sustain_idx] are in-bounds.
+        release_assert(adsr.decay_idx <= adsr.sustain_idx);
+        release_assert(adsr.sustain_idx < adsr.envelope.size());
 
-    auto envelope = gsl::span(adsr.envelope.data(), adsr.envelope.size());
-    plot_line(slice(envelope, 0, adsr.decay_idx + 1), colors::ATTACK);
-    plot_line(slice(envelope, adsr.decay_idx, adsr.sustain_idx + 1), colors::DECAY);
-    plot_line(slice(envelope, adsr.sustain_idx, envelope.size()), colors::DECAY2);
+        auto path = gsl::span(path_vec.data(), adsr.envelope.size());
+        plot_line(slice(path, 0, adsr.decay_idx + 1), colors::ATTACK);
+        plot_line(slice(path, adsr.decay_idx, adsr.sustain_idx + 1), colors::DECAY);
+        plot_line(slice(path, adsr.sustain_idx, path.size()), colors::DECAY2);
+    }
 
     // Draw ticks and labels.
     {

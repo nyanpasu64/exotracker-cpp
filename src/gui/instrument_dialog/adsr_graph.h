@@ -3,6 +3,7 @@
 #include "doc/instr.h"
 #include "gui/lib/docs_palette.h"
 
+#include <QImage>
 #include <QWidget>
 #include <QToolButton>
 
@@ -19,13 +20,6 @@ using doc::Adsr;
 namespace colors {
     using gui::lib::docs_palette::Hue;
 
-    inline QColor bg_color(Hue hue) {
-        using gui::lib::docs_palette::Shade;
-        using gui::lib::docs_palette::get_color;
-
-        return get_color(hue, qreal(Shade::White) - 0.15);
-    }
-
     constexpr Hue ATTACK = Hue::Red;
     constexpr Hue DECAY = Hue::Green;
     constexpr Hue SUSTAIN = Hue::Blue;
@@ -34,6 +28,9 @@ namespace colors {
 }
 
 class AdsrGraph final : public QWidget {
+    /// 1 pixel tall image, mapping x-coordinates to background colors.
+    QImage _bg_colors;
+
     /// Pixels drawn, per second of envelope.
     qreal _px_per_s;
     Adsr _adsr;
