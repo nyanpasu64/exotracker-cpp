@@ -1003,3 +1003,10 @@ InstrumentDialog * InstrumentDialog::make(MainWindow * parent_win) {
 }
 
 } // namespace
+
+#ifdef UNITTEST
+
+// Deferred. See
+// https://docs.google.com/document/d/1_0h2W-zxDFv1CzCnTvq8LuwILqddfonjhkc8SJPvH4M/edit#
+
+#endif

@@ -285,6 +285,7 @@ add_executable(exotracker-tests
     # for #ifdef UNITTEST
     src/doc.cpp
     src/serialize.cpp
+    src/gui/instrument_dialog.cpp
     src/gui/move_cursor.cpp
     # src/audio/synth/envelope.cpp
     src/audio/synth/spc700_driver.cpp
