@@ -332,6 +332,7 @@ static constexpr qreal NUMBER_MARGIN = 12;
 using gui::lib::docs_palette::Hue;
 using gui::lib::docs_palette::Shade;
 using gui::lib::docs_palette::get_color;
+using gui::lib::docs_palette::get_gray;
 
 static QColor bg_color(Hue hue) {
     return get_color(hue, qreal(Shade::White) - 0.5);
@@ -462,13 +463,13 @@ void AdsrGraph::paintEvent(QPaintEvent *event) {
     QPointF const sustain_point = point_to_qpointf(adsr.sustain_point);
 
     // Draw attack vertical line.
-    painter.setPen(QPen(get_color(colors::ATTACK, 5.5), BG_LINE_WIDTH));
+    painter.setPen(QPen(get_gray(4), BG_LINE_WIDTH));
     painter.drawLine(decay_begin, with_y(decay_begin, h));
 
-    // Draw SL horizontal/lower line.
+    // Draw SL vertical/horizontal line.
     painter.setPen(QPen(bg_line_color(SUSTAIN), BG_LINE_WIDTH));
-    painter.drawLine(sustain_point, with_x(sustain_point, w + RIGHT_PAD));
     painter.drawLine(sustain_point, with_y(sustain_point, h));
+    painter.drawLine(sustain_point, with_x(sustain_point, w + RIGHT_PAD));
 
     // Draw envelope line, excluding extra point.
     {
