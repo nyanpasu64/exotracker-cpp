@@ -171,8 +171,8 @@ if(USE_PCH)
 endif()
 
 
-## Qt-independent GUI libraries, used/tested by GUI and unit tests
-add_library(exotracker-headless
+## The rest of the code, used/tested by GUI and unit tests
+add_library(exotracker-qt-lib
     # GUI/audio communication
     src/audio/output.cpp
     src/cmd_queue.cpp
@@ -191,24 +191,8 @@ add_library(exotracker-headless
 
     # Pattern editor backend
     src/gui/move_cursor.cpp
-)
-target_compile_options(exotracker-headless PRIVATE "${options}")
-target_link_libraries(exotracker-headless
-    PRIVATE rtaudio
-    PRIVATE capnp kj  # Don't #include Cap'n Proto in the public interface!
-    PUBLIC exotracker-core
-)
-if(USE_PCH)
-    target_precompile_headers(exotracker-headless PRIVATE
-        precompiled_headers/exotracker_lib.h
-    )
-endif()
 
-
-## GUI editor, uses Qt
-add_executable(exotracker-qt
     # GUI
-    src/main.cpp
     src/gui/app.cpp
     src/gui/main_window.cpp
     src/gui/config.cpp
@@ -227,19 +211,33 @@ add_executable(exotracker-qt
     src/gui/tempo_dialog.cpp
     src/gui/instrument_dialog.cpp
     src/gui/instrument_dialog/adsr_graph.cpp
+)
+target_compile_options(exotracker-qt-lib PRIVATE "${options}")
+target_link_libraries(exotracker-qt-lib
+    PUBLIC exotracker-core
+    PUBLIC Qt5::Widgets qkeycode
+    PRIVATE rtaudio
+    PRIVATE capnp kj  # Don't #include Cap'n Proto in the public interface!
+)
+
+if(USE_PCH)
+    target_precompile_headers(exotracker-qt-lib PRIVATE
+        precompiled_headers/exotracker_lib.h
+        precompiled_headers/exotracker_bin.h
+    )
+endif()
+
+
+## Binary only
+add_executable(exotracker-qt
+    # GUI
+    src/main.cpp
 
     # Resources
     res/exotracker.qrc
 )
 target_compile_options(exotracker-qt PRIVATE "${options}")
-target_link_libraries(exotracker-qt PRIVATE exotracker-headless rtaudio Qt5::Widgets qkeycode)
-
-if(USE_PCH)
-    target_precompile_headers(exotracker-qt PRIVATE
-        precompiled_headers/exotracker_lib.h
-        precompiled_headers/exotracker_bin.h
-    )
-endif()
+target_link_libraries(exotracker-qt PRIVATE exotracker-qt-lib)
 
 # Generate .pdb files for release builds (https://stackoverflow.com/a/57479289)
 # The majority of end-user crashes happen in release builds,
@@ -296,7 +294,7 @@ add_executable(exotracker-tests
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests
-    PRIVATE exotracker-headless
+    PRIVATE exotracker-qt-lib
     PRIVATE capnp kj snes9x-dsp
 )
 target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
@@ -313,7 +311,7 @@ add_executable(serialize-main
 )
 target_compile_options(serialize-main PRIVATE "${options}")
 target_link_libraries(serialize-main
-    PRIVATE exotracker-headless
+    PRIVATE exotracker-qt-lib
 )
 
 
