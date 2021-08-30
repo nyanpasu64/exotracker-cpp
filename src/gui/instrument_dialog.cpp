@@ -2,6 +2,7 @@
 #include "instrument_dialog/adsr_graph.h"
 #include "gui_common.h"
 #include "gui/lib/format.h"
+#include "gui/lib/parse_note.h"
 #include "gui/lib/layout_macros.h"
 #include "gui/lib/docs_palette.h"
 #include "edit/edit_instr.h"
@@ -13,6 +14,7 @@
 #include <QFrame>
 #include <QGroupBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QSpinBox>
 #include <QToolButton>
@@ -39,6 +41,8 @@ class ListWidget : public QListWidget {
     }
 };
 
+using gui::lib::parse_note::ParseIntState;
+
 class InstrumentDialogImpl;
 class NoteSpinBox final : public QSpinBox {
     // We cannot use parent(), because placing NoteSpinBox in a widget
@@ -48,6 +52,8 @@ class NoteSpinBox final : public QSpinBox {
     InstrumentDialogImpl * _dlg;
 
     mutable bool _show_longest_str = false;
+    mutable QString _prev_text;
+    mutable ParseIntState _prev_state{};
 
 public:
     explicit NoteSpinBox(InstrumentDialogImpl * parent);
@@ -55,6 +61,8 @@ public:
 // impl QSpinBox
 protected:
     QString textFromValue(int value) const override;
+    QValidator::State validate(QString &text, int &pos) const override;
+    int valueFromText(const QString &text) const override;
 
     static inline const QLatin1String LONGEST_STR = QLatin1String("C#-1");
 
@@ -914,6 +922,29 @@ QString NoteSpinBox::textFromValue(int value) const {
     return _dlg->format_note_name((doc::Chromatic) value);
 }
 
+using gui::lib::parse_note::parse_note_name;
+
+QValidator::State NoteSpinBox::validate(QString & text, int & pos) const  {
+    if (_prev_text == text && !text.isEmpty()) {
+        return _prev_state.state;
+    }
+
+    _prev_text = text;
+    _prev_state = parse_note_name(get_app().options().note_names, text, pos);
+    return _prev_state.state;
+}
+
+int NoteSpinBox::valueFromText(const QString & text) const {
+    if (_prev_text == text && !text.isEmpty()) {
+        return _prev_state.value;
+    }
+
+    QString copy = text;
+    int pos = lineEdit()->cursorPosition();
+    _prev_text = copy;
+    _prev_state = parse_note_name(get_app().options().note_names, copy, pos);
+    return _prev_state.value;
+}
 
 InstrumentDialog * InstrumentDialog::make(MainWindow * parent_win) {
     return new InstrumentDialogImpl(parent_win);
