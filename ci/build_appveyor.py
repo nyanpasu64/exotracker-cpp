@@ -127,14 +127,16 @@ def archive():
     shutil.rmtree(ARCHIVE_ROOT, ignore_errors=True)
     os.mkdir(ARCHIVE_ROOT)
 
-    def move_to_cwd(in_file: str):
-        """Moves a file to the current directory without renaming it."""
-        (build_dir / in_file).rename(Path(in_file).name)
+    def copy_to_cwd(in_file: str):
+        """Copies a file to the current directory without renaming it.
+        Copying instead of renaming makes archive() idempotent
+        and simplifies local testing."""
+        shutil.copy(str(build_dir / in_file), Path(in_file).name)
 
     with pushd(ARCHIVE_ROOT):
         # TODO branch on OS
 
-        move_to_cwd(f"{EXE_NAME}.exe")
+        copy_to_cwd(f"{EXE_NAME}.exe")
 
         # Archive Qt DLLs.
         run(
@@ -142,11 +144,13 @@ def archive():
             f"{EXE_NAME}.exe",
             # "--verbose 2",
             # Reduce file size.
-            "--no-compiler-runtime --no-svg --no-angle --no-opengl-sw",
+            "--no-compiler-runtime --no-angle --no-opengl-sw",
         )
 
         # Remove unnecessary Qt code.
-        shutil.rmtree("imageformats")
+        for path in Path("imageformats").iterdir():
+            if not path.name.startswith("qsvg"):
+                path.unlink()
 
         # Create archive (CI artifact).
         run("7z a -mx=3", shlex.quote(archive_name + ".7z"), ".")
