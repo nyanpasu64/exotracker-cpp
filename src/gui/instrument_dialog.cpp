@@ -28,6 +28,7 @@
 #include <QScreen>
 #include <QSignalBlocker>
 #include <QStyleHints>
+#include <QTextDocument>
 #include <QWheelEvent>
 
 #include <utility>  // std::move
@@ -415,6 +416,7 @@ using adsr_graph::AdsrGraph;
 class InstrumentDialogImpl final : public InstrumentDialog {
     MainWindow * _win;
     SliderSnapStyle _slider_snap;
+    QIcon _error_icon;
 
     // widgets
     QToolButton * _add_patch;
@@ -445,6 +447,8 @@ public:
 
         // Hide contextual-help button in the title bar.
         setWindowFlags(windowFlags().setFlag(Qt::WindowContextHelpButtonHint, false));
+
+        _error_icon = QIcon(QStringLiteral("://icons/warning-sign.svg"));
 
         build_ui();
         connect_ui();
@@ -845,8 +849,16 @@ public:
         list.clear();
 
         auto & keysplit = instr.keysplit;
+        QColor error_color = pal::get_color(pal::Hue::Yellow, pal::Shade::Light1);
+        error_color.setAlphaF(0.4);
+
+        // Fractional DPI scaling would be nice, but it's hard to subscribe to
+        // font/DPI changes (good luck getting a QWindow), and Qt's regular toolbars
+        // don't have fractionally scaled icons either.
+        list.setIconSize(QSize(16, 16));
 
         size_t n = keysplit.size();
+        int curr_min_note = -1;
         for (size_t patch_idx = 0; patch_idx < n; patch_idx++) {
             doc::InstrumentPatch const& patch = keysplit[patch_idx];
             QString name = sample_text(samples, patch.sample_idx);
@@ -855,9 +867,53 @@ public:
                 .arg(format_note_name(patch.min_note), name);
             // TODO for single-key drum patch, print "=%1: %2"
 
-            new QListWidgetItem(text, &list);
+            auto item = new QListWidgetItem(text, &list);
             // TODO compute and show list of errors
             // (eg. missing sample, empty or overshadowed key range...)
+
+            std::vector<QString> warnings;
+
+            if (!samples[patch.sample_idx].has_value()) {
+                warnings.push_back(
+                    tr("Sample %1 not found; keysplit will not play")
+                        .arg(format_hex_2(patch.sample_idx))
+                );
+            }
+            if ((int) patch.min_note <= curr_min_note) {
+                warnings.push_back(
+                    tr("Min key %1 out of order; keysplit will not play")
+                        .arg(patch.min_note)
+                );
+            } else {
+                curr_min_note = patch.min_note;
+            }
+
+            if (!warnings.empty()) {
+                QTextDocument document;
+                auto cursor = QTextCursor(&document);
+                cursor.beginEditBlock();
+                cursor.insertText(tr("Warnings:"));
+
+                // https://stackoverflow.com/a/51864380
+                QTextList* bullets = nullptr;
+                QTextBlockFormat non_list_format = cursor.blockFormat();
+                for (auto const& w : warnings) {
+                    if (!bullets) {
+                        // create list with 1 item
+                        bullets = cursor.insertList(QTextListFormat::ListDisc);
+                    } else {
+                        // append item to list
+                        cursor.insertBlock();
+                    }
+
+                    cursor.insertText(w);
+                }
+
+                item->setToolTip(document.toHtml());
+                item->setIcon(_error_icon);
+
+                item->setBackground(error_color);
+            }
         }
 
         if (n > 0) {
