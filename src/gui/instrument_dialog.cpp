@@ -3,6 +3,7 @@
 #include "gui_common.h"
 #include "gui/lib/format.h"
 #include "gui/lib/layout_macros.h"
+#include "gui/lib/docs_palette.h"
 #include "edit/edit_instr.h"
 #include "util/defer.h"
 #include "util/release_assert.h"
@@ -158,7 +159,8 @@ public:
     // QProxyStyle takes ownership of the QStyle and automatically deletes it.
     // Instead don't pass an argument at all. This makes it use the app style.
     SliderSnapStyle()
-        : QProxyStyle()
+        // Ensure a consistent appearance across platforms, for recoloring sliders.
+        : QProxyStyle("fusion")
     {}
 
     int styleHint(
@@ -177,13 +179,50 @@ public:
     }
 };
 
+namespace pal = gui::lib::docs_palette;
+using pal::Shade;
+
 class AdsrSlider : public QSlider {
+    QPalette _orig_palette;
+    pal::Hue _hue;
+    bool _hovered = false;
+
 public:
-    explicit AdsrSlider(QWidget * parent = nullptr)
+    explicit AdsrSlider(
+        SliderSnapStyle * style, pal::Hue hue, QWidget * parent = nullptr
+    )
         : QSlider(Qt::Vertical, parent)
-    {}
+        , _orig_palette(palette())
+        , _hue(hue)
+    {
+        setStyle(style);
+        update_color();
+    }
+
+private:
+    void update_color() {
+        if (!isEnabled()) {
+            setPalette(_orig_palette);
+            return;
+        }
+
+        QPalette p = _orig_palette;
+
+        QColor fg_and_groove, active_groove;
+        if (!_hovered) {
+            fg_and_groove = pal::get_color(_hue, 6, 1.5);
+        } else {
+            fg_and_groove = pal::get_color(_hue, 5.25);
+        }
+        active_groove = pal::get_color(_hue, 4.5);
+
+        p.setColor(QPalette::Button, fg_and_groove);
+        p.setColor(QPalette::Highlight, active_groove);
+        setPalette(p);
+    }
 
 // impl QWidget
+public:
     QSize sizeHint() const override {
         // A wider sizeHint() or sizePolicy() causes vertical sliders to render
         // off-center (left-aligned) in Breeze style. This does not affect Fusion.
@@ -200,6 +239,29 @@ public:
 
     QSize minimumSizeHint() const override {
         return QSlider::sizeHint();
+    }
+
+protected:
+    void changeEvent(QEvent * event) override {
+        if (event->type() == QEvent::EnabledChange) {
+            update_color();
+        }
+    }
+
+    void enterEvent(QEvent * event) override {
+        if (event->type() == QEvent::Enter) {
+            _hovered = true;
+            update_color();
+        }
+        QWidget::enterEvent(event);
+    }
+
+    void leaveEvent(QEvent * event) override {
+        if (event->type() == QEvent::Leave) {
+            _hovered = false;
+            update_color();
+        }
+        QWidget::leaveEvent(event);
     }
 
 // override QSlider
@@ -426,6 +488,8 @@ public:
     }
 
     void build_patch_editor(QBoxLayout * l) {
+        using doc::Adsr;
+
         // TODO add tabs
         {l__c_l(QWidget, QVBoxLayout, 1);
             _patch_panel = c;
@@ -456,25 +520,27 @@ public:
 //                    l->setVerticalSpacing(6);
                     l->setHorizontalSpacing(6);
 
+                    namespace colors = adsr_graph::colors;
+
                     int column = 0;
-                    _attack = build_control(
-                        l, column, qlabel(tr("A")), doc::Adsr::MAX_ATTACK_RATE
+                    _attack = build_control(l, column,
+                        qlabel(tr("AR")), colors::ATTACK, Adsr::MAX_ATTACK_RATE
                     ).no_label();
-                    _decay = build_control(
-                        l, column, qlabel(tr("D")), doc::Adsr::MAX_DECAY_RATE
+                    _decay = build_control(l, column,
+                        qlabel(tr("DR")), colors::DECAY, Adsr::MAX_DECAY_RATE
                     ).no_label();
-                    _sustain = build_control(
-                        l, column, qlabel(tr("S")), doc::Adsr::MAX_SUSTAIN_LEVEL
+                    _sustain = build_control(l, column,
+                        qlabel(tr("SL")), colors::SUSTAIN, Adsr::MAX_SUSTAIN_LEVEL
                     ).no_label();
-                    _decay2 = build_control(
-                        l, column, qlabel(tr("D2")), doc::Adsr::MAX_DECAY_2
+                    _decay2 = build_control(l, column,
+                        qlabel(tr("D2")), colors::DECAY2, Adsr::MAX_DECAY_2
                     ).no_label();
 
                     // TODO add exponential release GAIN
                     // (used for note cuts, not note changes)
                     {
-                        auto release = build_control(
-                            l, column, new QCheckBox(tr("R")), doc::Adsr::MAX_DECAY_2
+                        auto release = build_control(l, column,
+                            new QCheckBox(tr("R")), colors::RELEASE, Adsr::MAX_DECAY_2
                         );
                         release.label->setDisabled(true);
                         release.slider->setDisabled(true);
@@ -515,16 +581,15 @@ public:
 
     template<typename Label>
     LabeledControl<Label> build_control(
-        QGridLayout * l, int & column, Label * label, int max
+        QGridLayout * l, int & column, Label * label, pal::Hue color, int max
     ) {
         AdsrSlider * slider;
         SmallSpinBox * text;
         {l__w_factory(label, 0, column, Qt::AlignHCenter);
             w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         }
-        {l__w(AdsrSlider, 1, column);
+        {l__w(AdsrSlider(&_slider_snap, color), 1, column);
             slider = w;
-            w->setStyle(&_slider_snap);
             w->setMaximum(max);
             w->setPageStep((max + 1) / 4);
             w->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
