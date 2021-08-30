@@ -1,4 +1,5 @@
 #include "instrument_dialog.h"
+#include "instrument_dialog/adsr_graph.h"
 #include "gui_common.h"
 #include "gui/lib/format.h"
 #include "gui/lib/layout_macros.h"
@@ -8,6 +9,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFrame>
 #include <QGroupBox>
 #include <QLabel>
 #include <QListWidget>
@@ -338,6 +340,7 @@ public:
 
 namespace edit_instr = edit::edit_instr;
 namespace MoveCursor = gui::main_window::MoveCursor_;
+using adsr_graph::AdsrGraph;
 
 class InstrumentDialogImpl final : public InstrumentDialog {
     MainWindow * _win;
@@ -360,6 +363,8 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     Control _decay2;
     QCheckBox * _release_enable;
     Control _release;
+
+    AdsrGraph * _adsr_graph;
 
 public:
     InstrumentDialogImpl(MainWindow * parent_win)
@@ -496,10 +501,13 @@ public:
                     tab_by_row(*l);
                 }
 
-                {l__w(QLabel("\nTODO add graph\n"), 1);
-                    w->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-                    w->setStyleSheet("border: 1px solid black;");
-                    w->setAlignment(Qt::AlignCenter);
+                // ADSR graph.
+                {l__c_l(QFrame, QVBoxLayout);
+                    c->setFrameStyle(int(QFrame::StyledPanel) | QFrame::Sunken);
+                    l->setContentsMargins(0, 0, 0, 0);
+                    {l__w(AdsrGraph);
+                        _adsr_graph = w;
+                    }
                 }
             }
         }
@@ -821,6 +829,7 @@ public:
         _sustain.set_value(patch.adsr.sustain_level);
         _decay2.set_value(patch.adsr.decay_2);
 
+        _adsr_graph->set_adsr(patch.adsr);
     }
 };
 
