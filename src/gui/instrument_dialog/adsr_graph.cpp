@@ -185,10 +185,11 @@ static void iterate_adsr(Adsr adsr, auto & cb) {
 
 /// Simulates the ADSR of a note.
 ///
-/// Returns a vector of (timestamp, new amplitude at that time), plus metadata:
-/// (The real S-DSP envelope is stair-stepped.)
+/// Returns a vector of (timestamp, amplitude), plus metadata:
 ///
 /// - The first element is (0, amplitude).
+/// - Each change in level produces two points, (time, old amplitude)
+///   and (time, new amplitude), so stairsteps are plotted properly.
 /// - The last element's time is >= end_time. (Earlier elements might be >= end_time.)
 static AdsrResult get_adsr(Adsr adsr, NsampT end_time) {
     struct {
@@ -218,6 +219,11 @@ static AdsrResult get_adsr(Adsr adsr, NsampT end_time) {
     public:
         bool point(Point p) {
             if (!envelope_done()) {
+                // TODO make stairsteps toggleable
+                _envelope.push_back(Point {
+                    .time = p.time,
+                    .level = _envelope.back().level,
+                });
                 _envelope.push_back(p);
             }
             return !all_done();
@@ -518,9 +524,6 @@ void AdsrGraph::paintEvent(QPaintEvent *) {
     }
 
     // Compute envelope line.
-    // Strictly speaking this is wrong, the line should hold the old level
-    // until reaching the new point's time, then jump to the new level (ZOH).
-    // In practice it looks close enough.
     std::vector<QPointF> path_vec;
     std::transform(
         adsr.envelope.begin(), adsr.envelope.end(),
