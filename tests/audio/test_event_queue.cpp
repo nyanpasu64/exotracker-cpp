@@ -1,6 +1,6 @@
 #include "audio/event_queue.h"
 
-#include "doctest.h"
+#include <doctest.h>
 
 namespace EventEnum_ {
 enum EventEnum {

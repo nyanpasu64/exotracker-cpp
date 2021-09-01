@@ -8,7 +8,7 @@
 #include <utility>  // std::move
 
 #include <ostream>
-#include "doctest.h"
+#include <doctest.h>
 
 using SubcaseName = std::string;
 using SubcaseNameMaybe = SubcaseName;

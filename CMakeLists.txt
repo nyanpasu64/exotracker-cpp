@@ -160,7 +160,7 @@ add_library(exotracker-core
     src/util/format.cpp
 )
 target_compile_options(exotracker-core PRIVATE "${options}")
-target_link_libraries(exotracker-core PRIVATE snes9x-dsp rtaudio)
+target_link_libraries(exotracker-core PRIVATE snes9x-dsp)
 target_link_libraries(exotracker-core PUBLIC fmt::fmt samplerate)
 
 if(USE_PCH)
