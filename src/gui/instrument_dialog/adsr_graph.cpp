@@ -469,7 +469,7 @@ void AdsrGraph::paintEvent(QPaintEvent *) {
         return;
     }
 
-    auto image_size = size() * devicePixelRatio();
+    auto image_size = size() * devicePixelRatioF();
     image_size.setHeight(1);
     if (_bg_colors.size() != image_size) {
         _bg_colors = QImage(image_size, QImage::Format_RGB32);
