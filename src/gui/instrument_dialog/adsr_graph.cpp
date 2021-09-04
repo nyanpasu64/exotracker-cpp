@@ -464,6 +464,7 @@ TickSpacing get_tick_spacing(qreal range) {
 }
 
 void AdsrGraph::paintEvent(QPaintEvent *) {
+    // Based off https://github.com/nyanpasu64/AddmusicK/blob/master/docs/readme_files/hex_command_reference.html
     if (!isEnabled()) {
         return;
     }
