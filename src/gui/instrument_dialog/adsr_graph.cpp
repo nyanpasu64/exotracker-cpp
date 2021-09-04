@@ -474,7 +474,7 @@ void AdsrGraph::paintEvent(QPaintEvent *) {
     if (_bg_colors.size() != image_size) {
         _bg_colors = QImage(image_size, QImage::Format_RGB32);
     }
-    _bg_colors.setDevicePixelRatio(devicePixelRatio());
+    _bg_colors.setDevicePixelRatio(devicePixelRatioF());
 
     using gui::lib::painter_ext::DrawText;
 
