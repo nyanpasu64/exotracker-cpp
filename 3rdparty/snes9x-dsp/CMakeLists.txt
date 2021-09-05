@@ -8,3 +8,4 @@ add_library(snes9x-dsp STATIC
 target_include_directories(snes9x-dsp
     PUBLIC .
 )
+target_link_libraries(snes9x-dsp PRIVATE fmt::fmt)

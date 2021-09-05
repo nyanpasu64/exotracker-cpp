@@ -4,6 +4,7 @@
 
 #include "blargg_endian.h"
 #include <string.h>
+#include <fmt/core.h>
 
 /* Copyright (C) 2007 Shay Green. This module is free software; you
 can redistribute it and/or modify it under the terms of the GNU Lesser
@@ -622,8 +623,10 @@ inline void SPC_DSP::run_envelope( voice_t* const v )
 		}
 
 		// Sustain level
-		if ( (env >> 8) == (env_data >> 5) && v->env_mode == env_decay )
+		if ( (env >> 8) == (env_data >> 5) && v->env_mode == env_decay ) {
+			fmt::print(stderr, "Decay2\n");
 			v->env_mode = env_sustain;
+		}
 
 		v->hidden_env = env;
 
@@ -631,12 +634,18 @@ inline void SPC_DSP::run_envelope( voice_t* const v )
 		if ( (unsigned) env > 0x7FF )
 		{
 			env = (env < 0 ? 0 : 0x7FF);
-			if ( v->env_mode == env_attack )
+			if ( v->env_mode == env_attack ) {
+				fmt::print(stderr, "Decay\n");
 				v->env_mode = env_decay;
+			}
 		}
 
-		if ( !read_counter( rate ) )
+		if ( !read_counter( rate ) ) {
+			if (env != v->env) {
+				fmt::print(stderr, "{} -> {}\n", v->env, env);
+			}
 			v->env = env; // nothing else is controlled by the counter
+		}
 	}
 }
 
