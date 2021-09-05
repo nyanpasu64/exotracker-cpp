@@ -159,15 +159,13 @@ static void iterate_adsr(Adsr const adsr, auto & cb) {
         /*
         The SNES switches phases based on calculated envelope levels on every sample,
         but only commits the calculated envelope level on timer ticks.
-        When an attack timer tick (with attack rate != 0xf) occurs
-        and sets the level to 0x7E0,
-        the very next sample the SNES will calculate level = 0x800,
-        switch envelopes to decay, but *not* commit level = 0x800
-        (because with attack rate != 0xF,
-        consecutive samples never both have attack ticks),
-        instead starting decay at 0x7E0.
-        The exception is attack rate 0xF, where every sample is an attack timer tick
-        (and the SNES increases by 0x400 per step rather than 0x20).
+        When an attack timer tick (with attack rate != 0xf) occurs and sets the level
+        to 0x7E0, the very next sample the SNES will calculate level = 0x800,
+        switch envelopes to decay, but *not* commit level = 0x800 (because with
+        attack rate != 0xF, consecutive samples never both have attack ticks),
+        instead starting decay at 0x7E0. The exception is attack rate 0xF,
+        where every sample is an attack timer tick (and the SNES increases by 0x400
+        per step rather than 0x20). I have emulated this behavior.
 
         ----
 
@@ -179,20 +177,32 @@ static void iterate_adsr(Adsr const adsr, auto & cb) {
         This Decay sample will sometimes line up with a Decay timer tick,
         stepping the envelope even if DR2 is 0 (meaning Decay2 would never step).
 
-        (Note that this doesn't happen in reality in bsnes-plus. More investigation
-        is needed.)
+        Whether the Decay sample and timer tick always, never, or sometimes line up
+        depends on the frequencies and phases of the attack and decay timers,
+        their phase relative to notes which can only trigger "every_other_sample"
+        (which I'm not sure if Blargg and higan gets right), and possibly the frequency
+        your driver runs at. I do know that with attack rate 0xF, the Decay tick
+        will never trigger (due to the phase of every_other_sample relative to the
+        Decay timers, all of which have even periods).
 
-        This cannot be accurately emulated the way I've written this function.
-        If we checked for Decay2 before checking for Decay, we'd spend 1 loop iteration
-        in Decay, which would execute an envelope step one Decay period long,
-        which is wrong.
-
-        We avoid this using a hack: we check for Decay2 *after* checking for Decay.
-        On sustain level 0x7, we advance from Attack to Decay2
-        in a single sample/iteration.
-        However this doesn't capture the erroneous step
-        that the real SNES *randomly* experiences.
+        Luckily, my current code just so happens to avoid this bug.
+        During the single loop iteration where env_mode == Decay, the resulting
+        dt isn't 1, so when switching to Decay2, the code schedules a switch to Decay2
+        after 1 tick, with no change in level (under the not-true-here assumption
+        that the previous Decay step was triggered by a Decay timer tick, so the next
+        Decay timer tick won't happen in a single sample). As a result, the Decay timer
+        is ignored entirely.
         */
+
+        if (env_mode == EnvMode::Decay && (level >> 8) == adsr.sustain_level) {
+            if (dt != 1) {
+                // No-op step, don't change level, only switch EnvMode.
+                dt = 1;
+                level = old_level;
+            }
+            env_mode = EnvMode::Decay2;
+            sustain_point = Point{t + dt, sustain_level(adsr)};
+        }
 
         if (env_mode == EnvMode::Attack && level > 0x7FF) {
             level = 0x7FF;
@@ -203,16 +213,6 @@ static void iterate_adsr(Adsr const adsr, auto & cb) {
             }
             env_mode = EnvMode::Decay;
             decay_begin = Point{t + dt, level};
-        }
-
-        if (env_mode == EnvMode::Decay && (level >> 8) == adsr.sustain_level) {
-            if (dt != 1) {
-                // No-op step, don't change level, only switch EnvMode.
-                dt = 1;
-                level = old_level;
-            }
-            env_mode = EnvMode::Decay2;
-            sustain_point = Point{t + dt, sustain_level(adsr)};
         }
         t += dt;
 
