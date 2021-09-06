@@ -36,8 +36,14 @@ inline namespace keys {
         // (eg. US QWERTY).
         // Eventually these will be user-configurable.
         //
-        // Maybe zoom_in_triplet and zoom_out_triplet should be getter methods,
-        // automatically adding SHIFT to zoom_in/out.
+        // KeyInt is fed into QKeySequence.
+        // Unfortunately you cannot define one QKeySequence
+        // containing multiple shortcuts bound to the same action;
+        // passing multiple ints (or a string with commas) to QKeySequence
+        // and QShortcut results in a key chord rather than multiple shortcuts.
+        //
+        // Maybe zoom_*_half and zoom_*_triplet could be getter methods,
+        // automatically adding modifiers to zoom_in/out.
         // That would break layouts where + and - are shifted versions of each other
         // (if they exist).
         // It would also reduce user configurability.
