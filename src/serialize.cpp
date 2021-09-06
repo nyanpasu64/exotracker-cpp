@@ -96,7 +96,7 @@ inline void serialize_all(
     gsl::span<Element const> items, ListBuilder gen_items, F func
 ) {
     uint num_to_write = gen_items.size();
-    release_assert(num_to_write == items.size());
+    release_assert_equal(num_to_write, items.size());
 
     for (uint i = 0; i < num_to_write; i++) {
         func(items[i], MUT gen_items[i]);
