@@ -70,6 +70,7 @@ set(
         -Werror=return-type
     >
     $<$<CXX_COMPILER_ID:MSVC>:
+        /Zc:preprocessor
 #        /W3
         /W4
         /wd4100  # allow unused parameters
@@ -179,6 +180,7 @@ add_library(exotracker-headless
     # Document editing code
     src/sample_docs.cpp
     src/edit/edit_doc.cpp
+    src/edit/edit_instr.cpp
     src/edit/edit_pattern.cpp
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
@@ -214,13 +216,17 @@ add_executable(exotracker-qt
     src/gui/lib/icon_toolbar.cpp
 
     src/gui/lib/color.cpp
+    src/gui/lib/docs_palette.cpp
     src/gui/lib/format.cpp  # Unfortunately tied to QString.
+    src/gui/lib/parse_note.cpp
     src/gui/lib/painter_ext.cpp
     src/gui/pattern_editor.cpp
     src/gui/timeline_editor.cpp
     src/gui/instrument_list.cpp
 
     src/gui/tempo_dialog.cpp
+    src/gui/instrument_dialog.cpp
+    src/gui/instrument_dialog/adsr_graph.cpp
 
     # Resources
     res/exotracker.qrc
@@ -283,6 +289,7 @@ add_executable(exotracker-tests
     src/serialize.cpp
     src/gui/move_cursor.cpp
     # src/audio/synth/envelope.cpp
+    src/audio/synth/spc700_driver.cpp
     src/audio/synth/volume_calc_common.cpp
     src/doc/timeline.cpp
 )
@@ -290,7 +297,7 @@ target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
 target_link_libraries(exotracker-tests
     PRIVATE exotracker-headless
-    PRIVATE capnp kj
+    PRIVATE capnp kj snes9x-dsp
 )
 target_compile_definitions(exotracker-tests PRIVATE UNITTEST)
 

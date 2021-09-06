@@ -33,6 +33,10 @@ enum ModifiedFlags : ModifiedInt {
     SamplesEdited = 0x100,
     /// Repack all samples into RAM, and stop playing notes.
     SamplesMoved = 0x200,
+
+    /// Instruments edited. Nothing checks for this so far,
+    /// but include it for completeness.
+    InstrumentsEdited = 0x1000,
 };
 
 }

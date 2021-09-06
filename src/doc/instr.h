@@ -68,19 +68,19 @@ struct Adsr {
 #endif
 };
 
+constexpr Adsr DEFAULT_ADSR = {0x0f, 0x00, 0x05, 0x07};
+
+
 struct InstrumentPatch {
     /// Do not use this patch for pitches below this value.
     Chromatic min_note = 0;
-    /// Do not use this patch for pitches above this value.
-    /// (TODO what if this is below min_note?)
-    Chromatic max_note_inclusive = events::CHROMATIC_COUNT - 1;
 
     /// The sample to play. If sample missing, acts as a key-off(???).
-    sample::SampleIndex sample_idx;
+    sample::SampleIndex sample_idx = 0;
 
     /// The hardware envelope to use when playing this sample.
     // TODO add GAIN support (either global GAIN, or upon instrument release?)
-    Adsr adsr;
+    Adsr adsr = DEFAULT_ADSR;
 
 //    ByteEnvelope volume{};
 //    ShortEnvelope pitch{};
@@ -99,12 +99,25 @@ constexpr size_t MAX_KEYSPLITS = 128;
 struct Instrument {
     std::string name;
 
-    /// A collection of different samples and ADSR values, along with associated ranges of keys.
-    /// Whenever a note plays, the driver scans the array
-    /// and picks the first patch including the note.
+    /// A collection of different samples and ADSR values,
+    /// along with associated ranges of keys.
+    /// Whenever a note plays, the driver scans the vector forwards,
+    /// skipping patches whose min key isn't strictly increasing,
+    /// and picks the last patch where InstrumentPatch::min_note <= note.
     /// If none match, each note acts as a key-off(???).
+    ///
+    /// Skipping out-of-order patches is more complex to implement than
+    /// allowing them to overshadow earlier patches,
+    /// but the error messages and behavior is more intuitive for users (I hope).
+    ///
     /// (Note that this algorithm has edge-cases, and care must be taken
-    /// to ensure the tracker and SPC driver match.)
+    /// to ensure the tracker and SPC driver match.
+    /// .spc export will likely remove all out-of-order keysplits ahead of time,
+    /// simplifying the hardware driver.)
+    ///
+    /// In the future, single-note samples/patches will be introduced.
+    /// The driver plays the note as usual if min_note == note.
+    /// If min_note < note, the driver instead acts like no patches match.
     std::vector<InstrumentPatch> keysplit;
 
 // impl

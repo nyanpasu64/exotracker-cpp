@@ -156,6 +156,10 @@ public:
                     });
                 }
             });
+
+        connect(
+            _widget, &QListView::doubleClicked,
+            this, &InstrumentListImpl::on_double_click);
     }
 
     void set_history(GetDocument get_document) override {
@@ -182,6 +186,10 @@ public:
         if (isVisible()) {
             _widget->scrollTo(filter_idx);
         }
+    }
+
+    void on_double_click(QModelIndex const& filter_idx) {
+        _win.show_instr_dialog();
     }
 };
 W_OBJECT_IMPL(InstrumentListImpl)
