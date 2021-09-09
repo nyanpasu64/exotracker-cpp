@@ -22,6 +22,7 @@ void destroy_all(CommandQueue & self) {
         delete destroy;
     }
 
+    // release_assert_equal() doesn't support non-void pointers.
     release_assert(self._begin == self._end);
     delete self._begin;
     self._begin = self._end = nullptr;

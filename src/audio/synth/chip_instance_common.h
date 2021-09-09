@@ -10,7 +10,6 @@
 #include "timing_common.h"
 #include "util/enum_map.h"
 #include "util/copy_move.h"
-#include "util/release_assert.h"
 
 #include <gsl/span>
 
