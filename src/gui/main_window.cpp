@@ -253,6 +253,30 @@ MainWindow::MainWindow(doc::Document document, QWidget *parent)
 {}
 
 namespace {
+
+template<typename SpinBox>
+class WheelSpinBoxT : public SpinBox {
+public:
+    explicit WheelSpinBoxT(QWidget * parent = nullptr)
+        : SpinBox(parent)
+    {
+        // Prevent mouse scrolling from focusing the spinbox.
+        SpinBox::setFocusPolicy(Qt::StrongFocus);
+    }
+
+    void stepBy(int steps) override {
+        SpinBox::stepBy(steps);
+
+        // Prevent mouse scrolling from permanently selecting the spinbox.
+        if (!SpinBox::hasFocus()) {
+            SpinBox::lineEdit()->deselect();
+        }
+    }
+};
+
+using WheelSpinBox = WheelSpinBoxT<QSpinBox>;
+using WheelDoubleSpinBox = WheelSpinBoxT<QDoubleSpinBox>;
+
 // # MainWindow components
 
 using cmd_queue::CommandQueue;
@@ -294,23 +318,23 @@ struct MainWindowUi : MainWindow {
 
     // Control panel
     // Per-song ephemeral state
-    QSpinBox * _zoom_level;
+    WheelSpinBox * _zoom_level;
 
     // Song options
     QPushButton * _edit_tempo;  // TODO non-modal?
-    QDoubleSpinBox * _tempo;
-    QSpinBox * _beats_per_measure;
+    WheelDoubleSpinBox * _tempo;
+    WheelSpinBox * _beats_per_measure;
     QComboBox * _end_action;
-    QSpinBox * _end_jump_to;
+    WheelSpinBox * _end_jump_to;
 
     // TODO rework settings GUI
-    QSpinBox * _length_beats;
+    WheelSpinBox * _length_beats;
 
     // Global state (editing)
-    QSpinBox * _octave;
+    WheelSpinBox * _octave;
 
     // Step
-    QSpinBox * _step;
+    WheelSpinBox * _step;
     QComboBox * _step_direction;
     QCheckBox * _step_to_event;
 
@@ -431,7 +455,9 @@ struct MainWindowUi : MainWindow {
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Song"));
 
-                {form__left_right(QPushButton(tr("Tempo..."), this), QDoubleSpinBox);
+                {form__left_right(
+                    QPushButton(tr("Tempo..."), this), WheelDoubleSpinBox
+                );
                     _edit_tempo = left;
                     _tempo = right;
                     right->setRange(doc::MIN_TEMPO, doc::MAX_TEMPO);
@@ -441,7 +467,7 @@ struct MainWindowUi : MainWindow {
                 form->addRow(
                     tr("Beats/measure"),
                     [this] {
-                        auto w = _beats_per_measure = new QSpinBox;
+                        auto w = _beats_per_measure = new WheelSpinBox;
                         w->setRange(1, (int) doc::MAX_BEATS_PER_FRAME);
                         w->setEnabled(false);
                         return w;
@@ -459,7 +485,7 @@ struct MainWindowUi : MainWindow {
                         w->addItem(tr("Jump to"));
                     }
 
-                    {l__w(QSpinBox);
+                    {l__w(WheelSpinBox);
                         _end_jump_to = w;
                         w->setEnabled(false);
                         // Must point to a valid timeline index.
@@ -475,7 +501,7 @@ struct MainWindowUi : MainWindow {
                 form->addRow(
                     new QLabel(tr("Length (beats)")),
                     [this] {
-                        auto w = _length_beats = new QSpinBox;
+                        auto w = _length_beats = new WheelSpinBox;
                         w->setRange(1, (int) doc::MAX_BEATS_PER_FRAME);
                         w->setValue(16);
                         return w;
@@ -490,7 +516,7 @@ struct MainWindowUi : MainWindow {
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Note entry"));
 
-                {form__label_w(tr("Octave"), QSpinBox);
+                {form__label_w(tr("Octave"), WheelSpinBox);
                     _octave = w;
 
                     int gui_bottom_octave =
@@ -499,14 +525,14 @@ struct MainWindowUi : MainWindow {
                     w->setRange(gui_bottom_octave, gui_bottom_octave + peak_octave);
                 }
 
-                {form__label_w(tr("Zoom"), QSpinBox);
+                {form__label_w(tr("Zoom"), WheelSpinBox);
                     _zoom_level = w;
                     w->setRange(1, MAX_ZOOM_LEVEL);
                 }
             }
             {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Step"));
-                {form__label_w(tr("Rows"), QSpinBox);
+                {form__label_w(tr("Rows"), WheelSpinBox);
                     _step = w;
                     w->setRange(0, 256);
                 }
