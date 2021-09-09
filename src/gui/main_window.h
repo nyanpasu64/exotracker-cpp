@@ -260,7 +260,14 @@ public:
     StateTransaction & operator=(StateTransaction &&) = delete;
     StateTransaction(StateTransaction && other) noexcept;
 
-    /// Uses the destructor to update the GUI in response to changes,
+    /// Updates the GUI in response to changes.
+    /// It is unsafe to access the StateTransaction afterwards,
+    /// aside from calling the destructor (which calls commit() again, a no-op).
+    /// If you don't call commit() yourself, it's automatically
+    /// called by the destructor.
+    void commit();
+
+    /// The destructor updates the GUI in response to changes,
     /// so does nontrivial work and could throw exceptions
     /// (no clue if exceptions propagate through Qt).
     ~StateTransaction() noexcept(false);

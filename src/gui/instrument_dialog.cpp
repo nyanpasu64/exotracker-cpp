@@ -689,7 +689,6 @@ public:
             auto tx = _win->edit_unwrap();
             _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
             reload_keysplit(*doc.instruments[instr_idx], (int) patch_idx);
-            // TODO move ~StateTransaction() logic to StateTransaction::commit()
         }
     }
 

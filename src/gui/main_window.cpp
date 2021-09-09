@@ -1546,13 +1546,14 @@ StateTransaction::StateTransaction(StateTransaction && other) noexcept
     other._win = nullptr;
 }
 
-StateTransaction::~StateTransaction() noexcept(false) {
+void StateTransaction::commit() {
     if (_win == nullptr) {
         return;
     }
     auto & state = state_mut();
     defer {
         state._during_update = false;
+        _win = nullptr;
     };
 
     // If unwinding, skip updating the GUI; we don't want to do work during unwinding.
@@ -1608,6 +1609,11 @@ StateTransaction::~StateTransaction() noexcept(false) {
         auto nbeats = frac_floor(doc.timeline[state.cursor().y.grid].nbeats);
         _win->_length_beats->setValue(nbeats);
     }
+}
+
+StateTransaction::~StateTransaction() noexcept(false) {
+    // If already committed and _win == nullptr, commit() is a no-op.
+    commit();
 }
 
 StateComponent const& StateTransaction::state() const {
