@@ -281,9 +281,14 @@ public:
         return state().history();
     }
     /// Don't call directly! History::push() will not send edits to the audio thread!
-    /// Instead delegate to MainWindow::push_edit().
+    /// Instead call StateTransaction::push_edit().
     /// (Exception: AudioComponent::undo()/redo() call this as well.)
     History & history_mut();
+
+    /// move_to() or move_to_here() saves and moves the cursor (for pattern edits).
+    /// MoveCursor_::IGNORE_CURSOR doesn't move the cursor on undo/redo (for
+    /// non-pattern edits).
+    void push_edit(edit::EditBox command, MoveCursor cursor_move);
 
     void set_document(doc::Document document);
 
@@ -319,10 +324,6 @@ public:
     virtual std::optional<StateTransaction> edit_state() = 0;
 
     virtual StateTransaction edit_unwrap() = 0;
-
-    /// MoveCursor determines whether to save and move the cursor (for pattern edits)
-    /// or not (for non-pattern edits).
-    virtual void push_edit(StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move) = 0;
 
     virtual void show_instr_dialog() = 0;
 

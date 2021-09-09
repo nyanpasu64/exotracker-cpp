@@ -407,7 +407,7 @@ public:
         auto const& doc = _get_document.get_document();
 
         auto tx = win().edit_unwrap();
-        win().push_edit(tx, set_sequencer_options(doc, _options), IGNORE_CURSOR);
+        tx.push_edit(set_sequencer_options(doc, _options), IGNORE_CURSOR);
     }
 
     MainWindow & win() {
