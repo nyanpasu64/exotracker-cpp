@@ -147,13 +147,15 @@ public:
 using CursorOrHere = std::optional<Cursor>;
 
 namespace MoveCursor_ {
-    struct NotPatternEdit {};
+    struct IgnoreCursor {};
     struct MoveFrom {
         CursorOrHere before_or_here;
         CursorOrHere after_or_here;
     };
 
-    using MoveCursor = std::variant<NotPatternEdit, MoveFrom>;
+    using MoveCursor = std::variant<IgnoreCursor, MoveFrom>;
+
+    inline constexpr MoveCursor IGNORE_CURSOR = IgnoreCursor{};
 }
 
 using MoveCursor_::MoveCursor;
@@ -162,7 +164,7 @@ inline MoveCursor move_to(Cursor cursor) {
     return MoveCursor_::MoveFrom{{}, cursor};
 }
 
-inline MoveCursor keep_cursor() {
+inline MoveCursor move_to_here() {
     return MoveCursor_::MoveFrom{{}, {}};
 }
 

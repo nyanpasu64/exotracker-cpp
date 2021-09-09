@@ -787,7 +787,7 @@ public:
         edit::Cursor const here = tx.state().cursor();
 
         auto p = &cursor_move;
-        if (std::get_if<MoveCursor_::NotPatternEdit>(p)) {
+        if (std::get_if<MoveCursor_::IgnoreCursor>(p)) {
             before_cursor = std::nullopt;
             after_cursor = std::nullopt;
         } else
@@ -1096,7 +1096,7 @@ public:
                 push_edit(
                     tx,
                     edit_doc::set_tempo(tempo),
-                    MoveCursor_::NotPatternEdit{}
+                    MoveCursor_::IGNORE_CURSOR
                 );
             });
         });
@@ -1106,7 +1106,7 @@ public:
                 push_edit(
                     tx,
                     edit_doc::set_grid_length(_state.cursor().y.grid, grid_length_beats),
-                    MoveCursor_::NotPatternEdit{}
+                    MoveCursor_::IGNORE_CURSOR
                 );
             });
         });
@@ -1515,7 +1515,7 @@ public:
         push_edit(
             tx,
             edit_doc::clone_timeline_row(document, _state.cursor().y.grid),
-            keep_cursor());
+            move_to_here());
     }
 };
 W_OBJECT_IMPL(MainWindowImpl)
