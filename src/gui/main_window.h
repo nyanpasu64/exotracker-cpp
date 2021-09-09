@@ -240,7 +240,7 @@ class MainWindow;
 class MainWindowImpl;
 
 class [[nodiscard]] StateTransaction {
-main_window_INTERNAL:
+private:
     MainWindowImpl * _win;
 
     int _uncaught_exceptions;
