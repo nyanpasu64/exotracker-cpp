@@ -3,6 +3,7 @@
 #include "gui/lib/format.h"
 #include "gui/lib/layout_macros.h"
 #include "util/unwrap.h"
+#include "edit/edit_instr_list.h"
 
 #include <verdigris/wobjectimpl.h>
 
@@ -35,13 +36,16 @@ enum class DragAction {
 class InstrumentListModel final : public QAbstractListModel {
     W_OBJECT(InstrumentListModel)
 private:
+    // TODO ...?
+    MainWindow * _win;
     GetDocument _get_document;
     DragAction _drag_action = DragAction::Swap;
 
 // impl
 public:
-    InstrumentListModel(GetDocument get_document)
-        : _get_document(get_document)
+    InstrumentListModel(MainWindow * win, GetDocument get_document)
+        : _win(win)
+        , _get_document(get_document)
     {}
 
     [[nodiscard]] doc::Document const & get_document() const {
@@ -165,6 +169,11 @@ public:
         int insert_column,
         QModelIndex const& replace_index)
     override {
+        using doc::InstrumentIndex;
+        using edit::edit_instr_list::swap_instruments;
+        using edit::edit_instr_list::swap_instruments_cached;
+        using main_window::MoveCursor_::IGNORE_CURSOR;
+
         // Based off QAbstractListModel::dropMimeData().
         if (!data || !(action == Qt::CopyAction || action == Qt::MoveAction))
             return false;
@@ -182,19 +191,32 @@ public:
         // if the drop is on an item, swap the dragged and dropped items.
         if (replace_index.isValid() && insert_row == -1 && insert_column == -1) {
             int drag_row;
-            int drag_column;
-            stream >> drag_row >> drag_column;
+            stream >> drag_row;
 
-            // TODO create an EditBox to swap the items.
-            qDebug() << drag_row << replace_index.row();
+            int replace_row = replace_index.row();
+
+            assert((size_t) drag_row < doc::MAX_INSTRUMENTS);
+            assert((size_t) replace_row < doc::MAX_INSTRUMENTS);
+            if ((size_t) drag_row >= doc::MAX_INSTRUMENTS) {
+                return false;
+            }
+            if ((size_t) replace_row >= doc::MAX_INSTRUMENTS) {
+                return false;
+            }
+
+            {
+                auto tx = _win->edit_unwrap();
+                tx.push_edit(
+                    swap_instruments(
+                        InstrumentIndex(drag_row), InstrumentIndex(replace_row)
+                    ),
+                    IGNORE_CURSOR);
+                tx.set_instrument(replace_row);
+            }
             return true;
         }
 
-        if (insert_row == -1)
-            insert_row = rowCount(replace_index);
-
-        // otherwise insert new rows for the data
-        return decodeData(insert_row, insert_column, replace_index, stream);
+        return false;
     }
 
     /// removeRows() is called by QAbstractItemView::startDrag() when the user drags
@@ -219,7 +241,7 @@ public:
     explicit InstrumentListImpl(MainWindow * win, QWidget * parent)
         : InstrumentList(parent)
         , _win(*win)
-        , _model(GetDocument::empty())
+        , _model(win, GetDocument::empty())
     {
         auto c = this;
         auto l = new QVBoxLayout(c);
