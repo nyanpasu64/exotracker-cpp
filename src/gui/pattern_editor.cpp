@@ -2573,8 +2573,7 @@ void PatternEditor::delete_key_pressed() {
 
     auto [chip, channel, subcolumn, _cell] = calc_cursor_x(*this);
     auto tx = _win.edit_unwrap();
-    _win.push_edit(
-        tx,
+    tx.push_edit(
         ed::delete_cell(document, chip, channel, subcolumn.type, abs_time),
         main_window::move_to(step_down_only(*this, get_cursor(*this)))
     );
@@ -2595,8 +2594,7 @@ void note_pressed(
     auto abs_time = get_cursor(self).y;
 
     auto tx = self._win.edit_unwrap();
-    self._win.push_edit(
-        tx,
+    tx.push_edit(
         ed::insert_note(
             self.get_document(), chip, channel, abs_time, note, instrument
         ),
@@ -2692,7 +2690,7 @@ static void add_digit(
     );
 
     auto tx = self._win.edit_unwrap();
-    self._win.push_edit(tx, std::move(box), move_cursor);
+    tx.push_edit(std::move(box), move_cursor);
 
     // Update saved instrument number.
     if (std::holds_alternative<SubColumn_::Instrument>(field.type)) {
@@ -2753,7 +2751,7 @@ static void add_effect_char(
         document, chip, channel, abs_time, field.type, effect_action
     );
     auto tx = self._win.edit_unwrap();
-    self._win.push_edit(tx, std::move(box), move_cursor);
+    tx.push_edit(std::move(box), move_cursor);
 }
 
 /// Handles events based on physical layout rather than shortcuts.
