@@ -8,13 +8,17 @@
 #include <verdigris/wobjectimpl.h>
 
 // Widgets
+#include <QLineEdit>
 #include <QListView>
+#include <QToolBar>
+#include <QToolButton>
 
 // Layouts
 #include <QVBoxLayout>
 
 // Other
 #include <QAbstractListModel>
+#include <QAction>
 #include <QDebug>
 #include <QMimeData>
 #include <QSignalBlocker>
@@ -228,6 +232,17 @@ public:
 };
 W_OBJECT_IMPL(InstrumentListModel)
 
+static void enable_button_borders(QToolBar * tb) {
+    auto actions = tb->actions();
+    for (QAction * action : qAsConst(actions)) {
+        // Ignore widgets other than tool buttons (like the rename field).
+        if (auto * button = qobject_cast<QToolButton *>(tb->widgetForAction(action))) {
+            // autoRaise() == true hides the button borders.
+            button->setAutoRaise(false);
+        }
+    }
+}
+
 class InstrumentListImpl final : public InstrumentList {
     W_OBJECT(InstrumentListImpl)
 public:
@@ -237,6 +252,16 @@ public:
 
     // Widgets
     QListView * _list;
+    QToolBar * _tb;
+    QLineEdit * _rename;
+
+    // Actions
+    QAction * _add;
+    QAction * _remove;
+    QAction * _edit;
+    QAction * _export;
+    QAction * _import;
+    QAction * _show_empty;
 
     explicit InstrumentListImpl(MainWindow * win, QWidget * parent)
         : InstrumentList(parent)
@@ -253,6 +278,22 @@ public:
             _list = w;
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
             w->setWrapping(true);
+        }
+        {l__w(QToolBar);
+            _tb = w;
+
+            _add = w->addAction("+");
+            _remove = w->addAction("x");
+            _edit = w->addAction("E");
+            _export = w->addAction("S");
+            _import = w->addAction("L");
+            _show_empty = w->addAction("_");
+            _show_empty->setCheckable(true);
+
+            _rename = new QLineEdit;
+            w->addWidget(_rename);
+
+            enable_button_borders(w);
         }
 
         // Widget holds a reference, does *not* take ownership.
