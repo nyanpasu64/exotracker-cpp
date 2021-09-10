@@ -2088,7 +2088,6 @@ void PatternEditor::up_pressed(StateTransaction & tx) {
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = _zoom_level,
         .step = _step,
-        .step_to_event = _step_to_event,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
@@ -2101,7 +2100,31 @@ void PatternEditor::down_pressed(StateTransaction & tx) {
     move_cursor::MoveCursorYArgs args{
         .rows_per_beat = _zoom_level,
         .step = _step,
-        .step_to_event = _step_to_event,
+    };
+    auto const& move_cfg = get_app().options().move_cfg;
+
+    auto cursor = get_cursor(*this);
+    tx.cursor_mut().set_y(move_cursor::move_down(document, cursor, args, move_cfg));
+}
+
+
+void PatternEditor::up_row_pressed(StateTransaction & tx) {
+    doc::Document const & document = get_document();
+    move_cursor::MoveCursorYArgs args{
+        .rows_per_beat = _zoom_level,
+        .step = 1,
+    };
+    auto const& move_cfg = get_app().options().move_cfg;
+
+    auto cursor = get_cursor(*this);
+    tx.cursor_mut().set_y(move_cursor::move_up(document, cursor, args, move_cfg));
+}
+
+void PatternEditor::down_row_pressed(StateTransaction & tx) {
+    doc::Document const & document = get_document();
+    move_cursor::MoveCursorYArgs args{
+        .rows_per_beat = _zoom_level,
+        .step = 1,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
@@ -2439,7 +2462,7 @@ void PatternEditor::toggle_edit_pressed() {
 
 static Cursor step_down_only(PatternEditor const& self, Cursor cursor) {
     doc::Document const & document = self.get_document();
-    move_cursor::MoveCursorYArgs args{
+    move_cursor::CursorStepArgs args{
         .rows_per_beat = self._zoom_level,
         .step = self._step,
         .step_to_event = self._step_to_event,

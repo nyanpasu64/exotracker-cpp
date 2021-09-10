@@ -58,7 +58,6 @@ using config::cursor_config::MovementConfig;
 struct MoveCursorYArgs {
     int rows_per_beat;
     int step;
-    bool step_to_event;
 };
 
 /// - If step > 1 and we follow step, move to nearest row above `step` times.
@@ -86,6 +85,15 @@ struct MoveCursorYArgs {
 );
 
 
+struct CursorStepArgs {
+    int rows_per_beat;
+    int step;
+    bool step_to_event;
+};
+
+/// Called when the user types into an event and steps to a new location.
+/// Returns the new vertical location of the cursor.
+///
 /// - If "step to event" enabled, move to the next event.
 /// - If step = 1, sub-row movement is enabled,
 ///   and next_event() doesn't wrap and is closer than the nearest row below,
@@ -94,7 +102,7 @@ struct MoveCursorYArgs {
 [[nodiscard]] GridAndBeat cursor_step(
     doc::Document const& document,
     cursor::Cursor cursor,
-    MoveCursorYArgs const& args,
+    CursorStepArgs const& args,
     MovementConfig const& move_cfg
 );
 

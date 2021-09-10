@@ -354,7 +354,7 @@ GridAndBeat move_down(
 GridAndBeat cursor_step(
     doc::Document const& document,
     cursor::Cursor cursor,
-    MoveCursorYArgs const& args,
+    CursorStepArgs const& args,
     MovementConfig const& move_cfg
 ) {
     // See doc comment in header for more docs.
