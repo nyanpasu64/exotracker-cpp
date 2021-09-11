@@ -261,8 +261,9 @@ public:
     QAction * _add;
     QAction * _remove;
     QAction * _edit;
-    QAction * _export;
-    QAction * _import;
+    QAction * _clone;
+//    QAction * _export;
+//    QAction * _import;
     QAction * _show_empty;
 
     explicit InstrumentListImpl(MainWindow * win, QWidget * parent)
@@ -287,12 +288,11 @@ public:
             _add = w->addAction("+");
             _remove = w->addAction("x");
             _edit = w->addAction("✏️");
-            _export = w->addAction("S");
-            _import = w->addAction("L");
+            _clone = w->addAction("⎘");
+//            _export = w->addAction("S");
+//            _import = w->addAction("L");
             _show_empty = w->addAction("_");
 
-            _export->setDisabled(true);
-            _import->setDisabled(true);
             _show_empty->setCheckable(true);
 
             _rename = new QLineEdit;
@@ -332,6 +332,9 @@ public:
         connect(
             _edit, &QAction::triggered,
             this, &InstrumentListImpl::on_edit_instrument);
+        connect(
+            _clone, &QAction::triggered,
+            this, &InstrumentListImpl::on_clone);
         connect(
             _show_empty, &QAction::toggled,
             this, &InstrumentListImpl::show_empty);
@@ -394,14 +397,11 @@ public:
         _win.show_instr_dialog();
     }
 
-    doc::Document const& get_document() {
-        return _win.state().document();
-    }
-
     void on_add() {
         using edit::edit_instr_list::try_add_instrument;
 
         StateComponent const& state = _win.state();
+
         auto [maybe_edit, new_instr] = try_add_instrument(state.document());
         if (!maybe_edit) {
             return;
@@ -416,8 +416,25 @@ public:
         using edit::edit_instr_list::try_remove_instrument;
 
         StateComponent const& state = _win.state();
+
         auto [maybe_edit, new_instr] =
             try_remove_instrument(state.document(), state.instrument());
+        if (!maybe_edit) {
+            return;
+        }
+
+        auto tx = _win.edit_unwrap();
+        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
+        tx.set_instrument(new_instr);
+    }
+
+    void on_clone() {
+        using edit::edit_instr_list::try_clone_instrument;
+
+        StateComponent const& state = _win.state();
+
+        auto [maybe_edit, new_instr] =
+            try_clone_instrument(state.document(), state.instrument());
         if (!maybe_edit) {
             return;
         }

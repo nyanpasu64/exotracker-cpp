@@ -30,6 +30,16 @@ std::tuple<MaybeEditBox, InstrumentIndex> try_remove_instrument(
     Document const& doc, InstrumentIndex instr_idx
 );
 
+/// Tries to clone an instrument into the first empty slot.
+/// Returns {command, new instrument index}.
+/// If the slot has no instrument or all slots are full, returns nullptr.
+[[nodiscard]]
+std::tuple<MaybeEditBox, InstrumentIndex> try_clone_instrument(
+    Document const& doc, InstrumentIndex instr_idx
+);
+
+// TODO try_clone_to()
+
 
 // Reordering instruments.
 

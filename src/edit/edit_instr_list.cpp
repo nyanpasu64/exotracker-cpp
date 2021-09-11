@@ -34,6 +34,15 @@ struct AddRemoveInstrument {
     static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
 };
 
+static std::optional<InstrumentIndex> get_empty_idx(Instruments const& instruments) {
+    for (size_t i = 0; i < MAX_INSTRUMENTS; i++) {
+        if (!instruments[i]) {
+            return (InstrumentIndex) i;
+        }
+    }
+    return {};
+}
+
 static Instrument new_instrument() {
     return doc::Instrument {
         .name = "New Instrument",
@@ -44,19 +53,11 @@ static Instrument new_instrument() {
 }
 
 std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(Document const& doc) {
-    bool found = false;
-    InstrumentIndex empty_idx;
-
-    for (size_t i = 0; i < MAX_INSTRUMENTS; i++) {
-        if (!doc.instruments[i]) {
-            found = true;
-            empty_idx = (InstrumentIndex) i;
-            break;
-        }
-    }
-    if (!found) {
+    auto maybe_empty_idx = get_empty_idx(doc.instruments);
+    if (!maybe_empty_idx) {
         return {nullptr, 0};
     }
+    InstrumentIndex empty_idx = *maybe_empty_idx;
 
     return {
         make_command(AddRemoveInstrument {empty_idx, new_instrument()}),
@@ -99,6 +100,26 @@ std::tuple<MaybeEditBox, InstrumentIndex> try_remove_instrument(
     return {
         make_command(AddRemoveInstrument {instr_idx, {}}),
         new_idx,
+    };
+}
+
+std::tuple<MaybeEditBox, InstrumentIndex> try_clone_instrument(
+    Document const& doc, InstrumentIndex instr_idx
+) {
+    if (!doc.instruments[instr_idx]) {
+        return {nullptr, 0};
+    }
+
+    auto maybe_empty_idx = get_empty_idx(doc.instruments);
+    if (!maybe_empty_idx) {
+        return {nullptr, 0};
+    }
+    InstrumentIndex empty_idx = *maybe_empty_idx;
+
+    return {
+        // make a copy of doc.instruments[instr_idx]
+        make_command(AddRemoveInstrument {empty_idx, doc.instruments[instr_idx]}),
+        empty_idx,
     };
 }
 
