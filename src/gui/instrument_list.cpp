@@ -286,7 +286,7 @@ public:
 
             _add = w->addAction("+");
             _remove = w->addAction("x");
-            _edit = w->addAction("E");
+            _edit = w->addAction("✏️");
             _export = w->addAction("S");
             _import = w->addAction("L");
             _show_empty = w->addAction("_");
@@ -317,10 +317,13 @@ public:
 
         connect(
             _list, &QListView::doubleClicked,
-            this, &InstrumentListImpl::on_double_click);
+            this, &InstrumentListImpl::on_edit_instrument);
 
         connect(_add, &QAction::triggered, this, &InstrumentListImpl::on_add);
         connect(_remove, &QAction::triggered, this, &InstrumentListImpl::on_remove);
+        connect(
+            _edit, &QAction::triggered,
+            this, &InstrumentListImpl::on_edit_instrument);
     }
 
     // it's a nasty hack that we set history to reload changes from a StateTransaction,
@@ -376,7 +379,7 @@ public:
         }
     }
 
-    void on_double_click(QModelIndex const& /*idx*/) {
+    void on_edit_instrument() {
         _win.show_instr_dialog();
     }
 
