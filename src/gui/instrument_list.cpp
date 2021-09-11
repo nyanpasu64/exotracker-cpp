@@ -290,6 +290,9 @@ public:
             _export = w->addAction("S");
             _import = w->addAction("L");
             _show_empty = w->addAction("_");
+
+            _export->setDisabled(true);
+            _import->setDisabled(true);
             _show_empty->setCheckable(true);
 
             _rename = new QLineEdit;
@@ -311,19 +314,27 @@ public:
         _list->setDragDropOverwriteMode(true);
         _list->setDropIndicatorShown(true);
 
+        // Connect instrument list.
         connect(
             _list->selectionModel(), &QItemSelectionModel::selectionChanged,
             this, &InstrumentListImpl::on_selection_changed);
-
         connect(
             _list, &QListView::doubleClicked,
             this, &InstrumentListImpl::on_edit_instrument);
 
-        connect(_add, &QAction::triggered, this, &InstrumentListImpl::on_add);
-        connect(_remove, &QAction::triggered, this, &InstrumentListImpl::on_remove);
+        // Connect toolbar.
+        connect(
+            _add, &QAction::triggered,
+            this, &InstrumentListImpl::on_add);
+        connect(
+            _remove, &QAction::triggered,
+            this, &InstrumentListImpl::on_remove);
         connect(
             _edit, &QAction::triggered,
             this, &InstrumentListImpl::on_edit_instrument);
+        connect(
+            _show_empty, &QAction::toggled,
+            this, &InstrumentListImpl::show_empty);
     }
 
     // it's a nasty hack that we set history to reload changes from a StateTransaction,
@@ -414,6 +425,11 @@ public:
         auto tx = _win.edit_unwrap();
         tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
         tx.set_instrument(new_instr);
+    }
+
+    void show_empty(bool show) {
+        _show_empty_slots = show;
+        recompute_visible_slots();
     }
 };
 W_OBJECT_IMPL(InstrumentListImpl)
