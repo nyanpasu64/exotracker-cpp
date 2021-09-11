@@ -3,14 +3,105 @@
 #include "modified.h"
 #include "doc.h"
 #include "util/release_assert.h"
+#include "util/expr.h"
 
 #include <limits>
+#include <optional>
 #include <utility>  // std::move
 
 namespace edit::edit_instr_list {
 
 using namespace doc;
 using edit_impl::make_command;
+
+struct AddRemoveInstrument {
+    InstrumentIndex index;
+    std::optional<Instrument> instr;
+
+    void apply_swap(Document & doc) {
+        if (instr.has_value()) {
+            release_assert(!doc.instruments[index].has_value());
+        } else {
+            release_assert(doc.instruments[index].has_value());
+        }
+        std::swap(instr, doc.instruments[index]);
+    }
+
+    bool can_coalesce(BaseEditCommand & prev) const {
+        return false;
+    }
+
+    static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
+};
+
+static Instrument new_instrument() {
+    return doc::Instrument {
+        .name = "New Instrument",
+        .keysplit = {
+            InstrumentPatch {},
+        },
+    };
+}
+
+std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(Document const& doc) {
+    bool found = false;
+    InstrumentIndex empty_idx;
+
+    for (size_t i = 0; i < MAX_INSTRUMENTS; i++) {
+        if (!doc.instruments[i]) {
+            found = true;
+            empty_idx = (InstrumentIndex) i;
+            break;
+        }
+    }
+    if (!found) {
+        return {nullptr, 0};
+    }
+
+    return {
+        make_command(AddRemoveInstrument {empty_idx, new_instrument()}),
+        empty_idx,
+    };
+}
+
+MaybeEditBox try_insert_instrument(Document const& doc, InstrumentIndex instr_idx) {
+    if (doc.instruments[instr_idx]) {
+        return nullptr;
+    }
+    return make_command(AddRemoveInstrument {instr_idx, new_instrument()});
+}
+
+std::tuple<MaybeEditBox, InstrumentIndex> try_remove_instrument(
+    Document const& doc, InstrumentIndex instr_idx
+) {
+    if (!doc.instruments[instr_idx]) {
+        return {nullptr, 0};
+    }
+
+    InstrumentIndex new_idx = EXPR(
+        // Find the next filled instrument slot.
+        for (size_t i = instr_idx + 1; i < MAX_INSTRUMENTS; i++) {
+            if (doc.instruments[i].has_value()) {
+                return (InstrumentIndex) i;
+            }
+        }
+        // We're removing the last instrument. Find the new last instrument.
+        for (size_t i = instr_idx; i--; ) {
+            if (doc.instruments[i].has_value()) {
+                return (InstrumentIndex) i;
+            }
+        }
+        // There are no instruments left. Keep the instrument as-is.
+        // (This differs from FamiTracker which sets the new instrument to 0.)
+        return instr_idx;
+    );
+
+    return {
+        make_command(AddRemoveInstrument {instr_idx, {}}),
+        new_idx,
+    };
+}
+
 
 static void timeline_swap_instruments(
     doc::Timeline & timeline, InstrumentIndex a, InstrumentIndex b

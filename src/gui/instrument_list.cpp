@@ -27,6 +27,7 @@ namespace gui::instrument_list {
 W_OBJECT_IMPL(InstrumentList)
 
 using gui::lib::format::format_hex_2;
+using main_window::MoveCursor_::IGNORE_CURSOR;
 
 namespace {
 enum class DragAction {
@@ -176,7 +177,6 @@ public:
         using doc::InstrumentIndex;
         using edit::edit_instr_list::swap_instruments;
         using edit::edit_instr_list::swap_instruments_cached;
-        using main_window::MoveCursor_::IGNORE_CURSOR;
 
         // Based off QAbstractListModel::dropMimeData().
         if (!data || !(action == Qt::CopyAction || action == Qt::MoveAction))
@@ -242,6 +242,8 @@ static void enable_button_borders(QToolBar * tb) {
         }
     }
 }
+
+using main_window::StateComponent;
 
 class InstrumentListImpl final : public InstrumentList {
     W_OBJECT(InstrumentListImpl)
@@ -311,19 +313,14 @@ public:
 
         connect(
             _list->selectionModel(), &QItemSelectionModel::selectionChanged,
-            win, [win](const QItemSelection &selection, const QItemSelection &) {
-                // Only 1 element can be selected at once, or 0 if you ctrl+click.
-                assert(selection.size() <= 1);
-                if (!selection.empty()) {
-                    debug_unwrap(win->edit_state(), [&](auto & tx) {
-                        tx.set_instrument(selection[0].top());
-                    });
-                }
-            });
+            this, &InstrumentListImpl::on_selection_changed);
 
         connect(
             _list, &QListView::doubleClicked,
             this, &InstrumentListImpl::on_double_click);
+
+        connect(_add, &QAction::triggered, this, &InstrumentListImpl::on_add);
+        connect(_remove, &QAction::triggered, this, &InstrumentListImpl::on_remove);
     }
 
     // it's a nasty hack that we set history to reload changes from a StateTransaction,
@@ -369,8 +366,51 @@ public:
         }
     }
 
+    void on_selection_changed(QItemSelection const& selection) {
+        // Only 1 element can be selected at once, or 0 if you ctrl+click.
+        assert(selection.size() <= 1);
+        if (!selection.empty()) {
+            debug_unwrap(_win.edit_state(), [&](auto & tx) {
+                tx.set_instrument(selection[0].top());
+            });
+        }
+    }
+
     void on_double_click(QModelIndex const& /*idx*/) {
         _win.show_instr_dialog();
+    }
+
+    doc::Document const& get_document() {
+        return _win.state().document();
+    }
+
+    void on_add() {
+        using edit::edit_instr_list::try_add_instrument;
+
+        StateComponent const& state = _win.state();
+        auto [maybe_edit, new_instr] = try_add_instrument(state.document());
+        if (!maybe_edit) {
+            return;
+        }
+
+        auto tx = _win.edit_unwrap();
+        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
+        tx.set_instrument(new_instr);
+    }
+
+    void on_remove() {
+        using edit::edit_instr_list::try_remove_instrument;
+
+        StateComponent const& state = _win.state();
+        auto [maybe_edit, new_instr] =
+            try_remove_instrument(state.document(), state.instrument());
+        if (!maybe_edit) {
+            return;
+        }
+
+        auto tx = _win.edit_unwrap();
+        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
+        tx.set_instrument(new_instr);
     }
 };
 W_OBJECT_IMPL(InstrumentListImpl)

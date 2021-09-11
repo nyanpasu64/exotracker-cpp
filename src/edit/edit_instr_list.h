@@ -1,20 +1,47 @@
 #pragma once
 
 #include "edit_common.h"
+#include <tuple>
 
 namespace edit::edit_instr_list {
 
+using doc::Document;
 using doc::InstrumentIndex;
+
+// Adding/removing instruments.
+
+/// Tries to add an empty instrument in the first empty slot.
+/// Returns {command, new instrument index}.
+/// If all slots are full, returns {nullptr, 0}.
+[[nodiscard]]
+std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(Document const& doc);
+
+/// Tries to add an empty instrument in the specified slot.
+/// If the slot is full, returns nullptr.
+[[nodiscard]]
+MaybeEditBox try_insert_instrument(Document const& doc, InstrumentIndex instr_idx);
+
+/// Tries to remove an instrument at the specified slot
+/// and select the next non-empty slot (or leaving it unchanged otherwise).
+/// Returns {command, new instrument index}.
+/// If the slot has no instrument, returns nullptr.
+[[nodiscard]]
+std::tuple<MaybeEditBox, InstrumentIndex> try_remove_instrument(
+    Document const& doc, InstrumentIndex instr_idx
+);
+
+
+// Reordering instruments.
 
 /// Returns a command which swaps two instruments in the instrument list,
 /// and iterates over every pattern in the timeline to swap instruments (slow).
-[[nodiscard]] EditBox swap_instruments(doc::InstrumentIndex a, doc::InstrumentIndex b);
+[[nodiscard]] EditBox swap_instruments(InstrumentIndex a, InstrumentIndex b);
 
 /// Returns a command which swaps two instruments in the instrument list,
 /// and swaps the current timeline and one with the instruments swapped
 /// (eats RAM).
 [[nodiscard]] EditBox swap_instruments_cached(
-    doc::Document const& doc, doc::InstrumentIndex a, doc::InstrumentIndex b
+    Document const& doc, InstrumentIndex a, InstrumentIndex b
 );
 
 }
