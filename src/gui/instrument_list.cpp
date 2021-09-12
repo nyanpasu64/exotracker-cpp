@@ -338,6 +338,7 @@ public:
 
         {l__w(GridListView);
             _list = w;
+            w->setFocusPolicy(Qt::TabFocus);
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         }
         {l__l(QHBoxLayout);
