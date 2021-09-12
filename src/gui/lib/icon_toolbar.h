@@ -2,17 +2,17 @@
 
 #include <QToolBar>
 
-namespace gui::lib {
+namespace gui::lib::icon_toolbar {
 
 class IconToolBar : public QToolBar {
-    bool _button_borders;
-
 // impl
 public:
-//    explicit IconToolBar(QString const& title, bool button_borders, QWidget * parent = nullptr);
-    explicit IconToolBar(bool button_borders, QWidget * parent = nullptr);
+//    explicit IconToolBar(QString const& title, QWidget * parent = nullptr);
+    explicit IconToolBar(QWidget * parent = nullptr);
 
     QAction * add_icon_action(QString alt, QString icon);
 };
+
+void enable_button_borders(QToolBar * tb);
 
 }

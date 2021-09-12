@@ -7,7 +7,7 @@
 #include <cassert>
 #include <cmath>
 
-namespace gui::lib {
+namespace gui::lib::icon_toolbar {
 
 static QSize best_size(QSize orig_size) {
     assert(orig_size.height() == orig_size.width());
@@ -28,27 +28,30 @@ static QSize best_size(QSize orig_size) {
 }
 
 
-IconToolBar::IconToolBar(bool button_borders, QWidget * parent)
+IconToolBar::IconToolBar(QWidget * parent)
     : QToolBar(parent)
-    , _button_borders{button_borders}
 {
     setIconSize(best_size(iconSize()));
-}
-
-static QToolButton * toolbar_widget(QToolBar * tb, QAction * action) {
-    auto out = qobject_cast<QToolButton *>(tb->widgetForAction(action));
-    assert(out);
-    return out;
 }
 
 QAction * IconToolBar::add_icon_action(QString alt, QString icon) {
     QAction * action = addAction(alt);
     action->setIcon(icons::get_icon(icon, iconSize()));
 
-    // Set flat button borders.
-    toolbar_widget(this, action)->setAutoRaise(!_button_borders);
-
     return action;
+}
+
+
+void enable_button_borders(QToolBar * tb) {
+    auto actions = tb->actions();
+    for (QAction * action : qAsConst(actions)) {
+        // QToolBar::addWidget() creates a QAction wrapping an arbitrary widget.
+        // Ignore actions associated with widgets other than tool buttons.
+        if (auto * button = qobject_cast<QToolButton *>(tb->widgetForAction(action))) {
+            // autoRaise() == true hides the button borders.
+            button->setAutoRaise(false);
+        }
+    }
 }
 
 }

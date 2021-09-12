@@ -64,7 +64,8 @@ namespace gui::main_window {
 using std::unique_ptr;
 using std::make_unique;
 
-using gui::lib::IconToolBar;
+using gui::lib::icon_toolbar::IconToolBar;
+using gui::lib::icon_toolbar::enable_button_borders;
 using gui::pattern_editor::PatternEditor;
 using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
@@ -383,7 +384,7 @@ struct MainWindowUi : MainWindow {
         }
 
         // Toolbar
-        {main__tb(IconToolBar(false));  // No button borders
+        {main__tb(IconToolBar);
             tb->setFloatable(false);
             tb->setAllowedAreas(Qt::TopToolBarArea);
 
@@ -423,7 +424,7 @@ struct MainWindowUi : MainWindow {
             {l__w_factory(TimelineEditor::make(this))
                 _timeline_editor = w;
             }
-            {l__w(IconToolBar(true))  // Show button borders.
+            {l__w(IconToolBar)
                 _timeline.add_row = w->add_icon_action(
                     tr("Add Timeline Entry"), "document-new"
                 );
@@ -439,6 +440,7 @@ struct MainWindowUi : MainWindow {
                 _timeline.clone_row = w->add_icon_action(
                     tr("Clone Row"), "edit-copy"
                 );
+                enable_button_borders(w);
             }
         }
     }

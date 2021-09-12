@@ -2,6 +2,7 @@
 #include "doc.h"
 #include "gui/lib/dpi.h"
 #include "gui/lib/format.h"
+#include "gui/lib/icon_toolbar.h"
 #include "gui/lib/layout_macros.h"
 #include "util/unwrap.h"
 #include "edit/edit_instr_list.h"
@@ -300,17 +301,7 @@ public:
     }
 };
 
-
-static void enable_button_borders(QToolBar * tb) {
-    auto actions = tb->actions();
-    for (QAction * action : qAsConst(actions)) {
-        // Ignore widgets other than tool buttons (like the rename field).
-        if (auto * button = qobject_cast<QToolButton *>(tb->widgetForAction(action))) {
-            // autoRaise() == true hides the button borders.
-            button->setAutoRaise(false);
-        }
-    }
-}
+using gui::lib::icon_toolbar::enable_button_borders;
 
 using main_window::StateComponent;
 
