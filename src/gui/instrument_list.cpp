@@ -8,16 +8,22 @@
 #include <verdigris/wobjectimpl.h>
 
 // Widgets
+#include <QLineEdit>
 #include <QListView>
+#include <QToolBar>
+#include <QToolButton>
 
 // Layouts
 #include <QVBoxLayout>
 
 // Other
 #include <QAbstractListModel>
+#include <QAction>
 #include <QDebug>
 #include <QMimeData>
 #include <QSignalBlocker>
+
+#include <utility>
 
 namespace gui::instrument_list {
 W_OBJECT_IMPL(InstrumentList)
@@ -246,6 +252,19 @@ public:
 };
 W_OBJECT_IMPL(InstrumentListModel)
 
+static void enable_button_borders(QToolBar * tb) {
+    auto actions = tb->actions();
+    for (QAction * action : qAsConst(actions)) {
+        // Ignore widgets other than tool buttons (like the rename field).
+        if (auto * button = qobject_cast<QToolButton *>(tb->widgetForAction(action))) {
+            // autoRaise() == true hides the button borders.
+            button->setAutoRaise(false);
+        }
+    }
+}
+
+using main_window::StateComponent;
+
 class InstrumentListImpl final : public InstrumentList {
     W_OBJECT(InstrumentListImpl)
 public:
@@ -255,6 +274,16 @@ public:
 
     // Widgets
     QListView * _list;
+    QToolBar * _tb;
+    QLineEdit * _rename;
+
+    // Actions
+    QAction * _add;
+    QAction * _remove;
+    QAction * _edit;
+    QAction * _clone;
+    // TODO add export/import buttons
+    QAction * _show_empty;
 
     explicit InstrumentListImpl(MainWindow * win, QWidget * parent)
         : InstrumentList(parent)
@@ -272,6 +301,25 @@ public:
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
             w->setWrapping(true);
         }
+        {l__l(QHBoxLayout);
+            {l__w(QToolBar);
+                _tb = w;
+
+                _add = w->addAction("+");
+                _remove = w->addAction("x");
+                _edit = w->addAction("✏️");
+                _clone = w->addAction("C");
+                w->addSeparator();
+                _show_empty = w->addAction("_");
+
+                _show_empty->setCheckable(true);
+
+                enable_button_borders(w);
+            }
+            {l__w(QLineEdit);
+                _rename = w;
+            }
+        }
 
         // Widget holds a reference, does *not* take ownership.
         // If widget is destroyed first, it doesn't affect the model.
@@ -286,21 +334,42 @@ public:
         _list->setDragDropOverwriteMode(true);
         _list->setDropIndicatorShown(true);
 
+        // Connect instrument list.
         connect(
             _list->selectionModel(), &QItemSelectionModel::selectionChanged,
-            win, [win](const QItemSelection &selection, const QItemSelection &) {
-                // Only 1 element can be selected at once, or 0 if you ctrl+click.
-                assert(selection.size() <= 1);
-                if (!selection.empty()) {
-                    debug_unwrap(win->edit_state(), [&](auto & tx) {
-                        tx.set_instrument(selection[0].top());
-                    });
-                }
-            });
-
+            this, &InstrumentListImpl::on_selection_changed);
         connect(
             _list, &QListView::doubleClicked,
-            this, &InstrumentListImpl::on_double_click);
+            this, &InstrumentListImpl::on_edit_instrument);
+
+        // Connect toolbar.
+        connect(
+            _add, &QAction::triggered,
+            this, &InstrumentListImpl::on_add);
+        connect(
+            _remove, &QAction::triggered,
+            this, &InstrumentListImpl::on_remove);
+        connect(
+            _edit, &QAction::triggered,
+            this, &InstrumentListImpl::on_edit_instrument);
+        connect(
+            _clone, &QAction::triggered,
+            this, &InstrumentListImpl::on_clone);
+        connect(
+            _show_empty, &QAction::toggled,
+            this, &InstrumentListImpl::on_show_empty);
+
+        connect(
+            _rename, &QLineEdit::textEdited,
+            this, &InstrumentListImpl::on_rename);
+    }
+
+    doc::Document const& document() const {
+        return _win.state().document();
+    }
+
+    doc::InstrumentIndex curr_instr_idx() const {
+        return (doc::InstrumentIndex) _win.state().instrument();
     }
 
     // it's a nasty hack that we set history to reload changes from a StateTransaction,
@@ -327,13 +396,35 @@ public:
     }
 
     void update_selection() override {
-        auto idx = _model.index(_win._state.instrument(), 0);
+        auto instr_idx = curr_instr_idx();
+        auto const& instr = document().instruments[instr_idx];
 
-        QItemSelectionModel & list_select = *_list->selectionModel();
-        // _list->selectionModel() merely responds to the active instrument.
-        // Block signals when we change it to match the active instrument.
-        auto s = QSignalBlocker(list_select);
-        list_select.select(idx, QItemSelectionModel::ClearAndSelect);
+        auto idx = _model.index((int) instr_idx, 0);
+
+        {
+            QItemSelectionModel & list_select = *_list->selectionModel();
+            // _list->selectionModel() merely responds to the active instrument.
+            // Block signals when we change it to match the active instrument.
+            auto b = QSignalBlocker(list_select);
+            list_select.select(idx, QItemSelectionModel::ClearAndSelect);
+        }
+
+        _remove->setEnabled(instr.has_value());
+        _edit->setEnabled(instr.has_value());
+        _clone->setEnabled(instr.has_value());
+        _rename->setEnabled(instr.has_value());
+
+        {
+            auto b = QSignalBlocker(_rename);
+            if (instr) {
+                auto name = QString::fromStdString(instr->name);
+                if (_rename->text() != name) {
+                    _rename->setText(std::move(name));
+                }
+            } else {
+                _rename->clear();
+            }
+        }
 
         // Hack to avoid scrolling a widget before it's shown
         // (which causes broken layout and crashes).
@@ -346,8 +437,85 @@ public:
         }
     }
 
-    void on_double_click(QModelIndex const& /*idx*/) {
-        _win.show_instr_dialog();
+    void on_selection_changed(QItemSelection const& selection) {
+        // Only 1 element can be selected at once, or 0 if you ctrl+click.
+        assert(selection.size() <= 1);
+        if (!selection.empty()) {
+            debug_unwrap(_win.edit_state(), [&](auto & tx) {
+                tx.set_instrument(selection[0].top());
+            });
+        }
+    }
+
+    void on_edit_instrument() {
+        if (document().instruments[curr_instr_idx()].has_value()) {
+            _win.show_instr_dialog();
+        }
+    }
+
+    void on_add() {
+        using edit::edit_instr_list::try_add_instrument;
+
+        auto [maybe_edit, new_instr] = try_add_instrument(document());
+        if (!maybe_edit) {
+            return;
+        }
+
+        auto tx = _win.edit_unwrap();
+        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
+        tx.set_instrument(new_instr);
+    }
+
+    void on_remove() {
+        using edit::edit_instr_list::try_remove_instrument;
+
+        auto [maybe_edit, new_instr] =
+            try_remove_instrument(document(), curr_instr_idx());
+        if (!maybe_edit) {
+            return;
+        }
+
+        auto tx = _win.edit_unwrap();
+        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
+        tx.instrument_deleted();
+
+        // If empty slots are hidden, removing an instrument hides it from the list.
+        // To keep the cursor in place, move the cursor to the next visible instrument.
+        if (!_show_empty_slots) {
+            tx.set_instrument(new_instr);
+        }
+    }
+
+    void on_clone() {
+        using edit::edit_instr_list::try_clone_instrument;
+
+        auto [maybe_edit, new_instr] =
+            try_clone_instrument(document(), curr_instr_idx());
+        if (!maybe_edit) {
+            return;
+        }
+
+        auto tx = _win.edit_unwrap();
+        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
+        tx.set_instrument(new_instr);
+    }
+
+    void on_show_empty(bool show) {
+        _show_empty_slots = show;
+        recompute_visible_slots();
+    }
+
+    void on_rename(QString const& qname) {
+        using edit::edit_instr_list::try_rename_instrument;
+
+        auto maybe_edit =
+            try_rename_instrument(document(), curr_instr_idx(), qname.toStdString());
+        if (!maybe_edit) {
+            return;
+        }
+
+        auto tx = _win.edit_unwrap();
+        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
     }
 };
 W_OBJECT_IMPL(InstrumentListImpl)
