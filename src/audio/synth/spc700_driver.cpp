@@ -53,7 +53,7 @@ static uint16_t calc_tuning(
     auto out = (uint16_t) std::round(std::clamp(tuning_reg_f, double(0), double(0x3fff)));
 
     DEBUG_PRINT("    calc_tuning(): note {} -> pitch register {:04x}\n",
-        note.value, out
+        note, out
     );
 
     return out;
@@ -352,7 +352,7 @@ void Spc700ChannelDriver::run_driver(
         auto patch = find_patch(document.instruments[*_prev_instr]->keysplit, note);
         if (!patch) {
             DEBUG_PRINT("    cannot play note, instrument {:02x} does not contain note {}\n",
-                *_prev_instr, note.value
+                *_prev_instr, note
             );
             return false;
         }
@@ -361,7 +361,7 @@ void Spc700ChannelDriver::run_driver(
         // (due to missing sample or ARAM being full).
         if (!chip_driver._samples_valid[patch->sample_idx]) {
             DEBUG_PRINT("    cannot play note, instrument {:02x} + note {} = sample {:02x} not loaded\n",
-                *_prev_instr, note.value, patch->sample_idx
+                *_prev_instr, note, patch->sample_idx
             );
             return false;
         }
@@ -373,7 +373,7 @@ void Spc700ChannelDriver::run_driver(
         if (!sample_maybe) {
             DEBUG_PRINT(
                 "    cannot play note, instrument {:02x} + note {} = sample {:02x} loaded but missing from document\n",
-                *_prev_instr, note.value, patch->sample_idx
+                *_prev_instr, note, patch->sample_idx
             );
             return false;
         }
@@ -393,7 +393,7 @@ void Spc700ChannelDriver::run_driver(
         DEBUG_PRINT(
             "    instrument {:02x} + note {} = sample {:02x}, adsr {:02x} {:02x}, pitch {:02x} {:02x}\n",
             *_prev_instr,
-            note.value,
+            note,
             _channel_id,
             patch->sample_idx,
             adsr[0],
