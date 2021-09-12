@@ -8,6 +8,7 @@
 #include "timing_common.h"
 #include "audio/output.h"
 #include "util/copy_move.h"
+#include "util/release_assert.h"
 
 #include <gsl/span>
 #include <verdigris/wobjectdefs.h>
@@ -217,8 +218,9 @@ public:
         return _cursor.raw_select();
     }
 
-    int instrument() const {
-        return _instrument;
+    doc::InstrumentIndex instrument() const {
+        release_assert(size_t(_instrument) < doc::MAX_INSTRUMENTS);
+        return (doc::InstrumentIndex) _instrument;
     }
 
     friend class StateTransaction;
