@@ -340,6 +340,14 @@ public:
             this, &InstrumentListImpl::show_empty);
     }
 
+    doc::Document const& document() const {
+        return _win.state().document();
+    }
+
+    doc::InstrumentIndex curr_instr_idx() const {
+        return (doc::InstrumentIndex) _win.state().instrument();
+    }
+
     // it's a nasty hack that we set history to reload changes from a StateTransaction,
     // but it works don't touch it
     void set_history(GetDocument get_document) override {
@@ -400,9 +408,7 @@ public:
     void on_add() {
         using edit::edit_instr_list::try_add_instrument;
 
-        StateComponent const& state = _win.state();
-
-        auto [maybe_edit, new_instr] = try_add_instrument(state.document());
+        auto [maybe_edit, new_instr] = try_add_instrument(document());
         if (!maybe_edit) {
             return;
         }
@@ -415,10 +421,8 @@ public:
     void on_remove() {
         using edit::edit_instr_list::try_remove_instrument;
 
-        StateComponent const& state = _win.state();
-
         auto [maybe_edit, new_instr] =
-            try_remove_instrument(state.document(), state.instrument());
+            try_remove_instrument(document(), curr_instr_idx());
         if (!maybe_edit) {
             return;
         }
@@ -432,10 +436,8 @@ public:
     void on_clone() {
         using edit::edit_instr_list::try_clone_instrument;
 
-        StateComponent const& state = _win.state();
-
         auto [maybe_edit, new_instr] =
-            try_clone_instrument(state.document(), state.instrument());
+            try_clone_instrument(document(), curr_instr_idx());
         if (!maybe_edit) {
             return;
         }
