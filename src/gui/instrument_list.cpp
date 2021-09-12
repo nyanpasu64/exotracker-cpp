@@ -129,6 +129,7 @@ public:
         {
             l__w(QListView);
             _widget = w;
+            w->setFocusPolicy(Qt::TabFocus);
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
             w->setWrapping(true);
         }
