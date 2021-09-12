@@ -22,6 +22,7 @@
 #include <QDebug>
 #include <QMimeData>
 #include <QSignalBlocker>
+#include <QStyledItemDelegate>
 
 namespace gui::instrument_list {
 W_OBJECT_IMPL(InstrumentList)
@@ -232,6 +233,23 @@ public:
 };
 W_OBJECT_IMPL(InstrumentListModel)
 
+/// Gives each item a minimum width.
+class InstrumentListDelegate : public QStyledItemDelegate {
+public:
+    // InstrumentListDelegate()
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    static constexpr int MIN_WIDTH = 48;
+
+    QSize sizeHint(
+        QStyleOptionViewItem const& option, QModelIndex const& index
+    ) const override {
+        return QStyledItemDelegate::sizeHint(option, index)
+            .expandedTo({MIN_WIDTH, 0});
+    }
+};
+
+
 static void enable_button_borders(QToolBar * tb) {
     auto actions = tb->actions();
     for (QAction * action : qAsConst(actions)) {
@@ -279,6 +297,7 @@ public:
 
         {l__w(QListView);
             _list = w;
+            _list->setItemDelegate(new InstrumentListDelegate(_list));
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
             w->setWrapping(true);
         }
