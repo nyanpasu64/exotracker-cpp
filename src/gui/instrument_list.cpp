@@ -1,5 +1,6 @@
 #include "instrument_list.h"
 #include "doc.h"
+#include "gui/lib/dpi.h"
 #include "gui/lib/format.h"
 #include "gui/lib/layout_macros.h"
 #include "util/unwrap.h"
@@ -252,6 +253,53 @@ public:
 };
 W_OBJECT_IMPL(InstrumentListModel)
 
+/// Automatically computes a uniform grid based on its item sizes.
+/// Clamps the grid size between a minimum and maximum width.
+class GridListView : public QListView {
+public:
+    explicit GridListView(QWidget * parent = nullptr)
+        : QListView(parent)
+    {
+        setWrapping(true);
+    }
+
+    static constexpr int MIN_WIDTH = 40;
+    static constexpr int MAX_WIDTH = 128;
+
+    void doItemsLayout() override {
+        QStyleOptionViewItem option = viewOptions();
+        auto model = this->model();
+        if (!model || !itemDelegate()) {
+            return QListView::doItemsLayout();
+        }
+
+        // It's not worth setting a minimum instrument size, since FamiTracker doesn't.
+        // If no items, use default invalid size.
+        QSize size;
+
+        int nrows = model->rowCount();
+        for (int row = 0; row < nrows; row++) {
+            if (isRowHidden(row)) {
+                continue;
+            }
+            auto index = model->index(row, 0);
+            auto delegate = itemDelegate(index);
+
+            size = size.expandedTo(delegate->sizeHint(option, index));
+        }
+
+        if (size.isValid()) {
+            int scaled_min_width = qRound(dpi_scale(this, MIN_WIDTH));
+            int scaled_max_width = qRound(dpi_scale(this, MAX_WIDTH));
+            size.setWidth(std::clamp(size.width(), scaled_min_width, scaled_max_width));
+        }
+
+        setGridSize(size);
+        QListView::doItemsLayout();
+    }
+};
+
+
 static void enable_button_borders(QToolBar * tb) {
     auto actions = tb->actions();
     for (QAction * action : qAsConst(actions)) {
@@ -273,7 +321,7 @@ public:
     bool _show_empty_slots = false;
 
     // Widgets
-    QListView * _list;
+    GridListView * _list;
     QToolBar * _tb;
     QLineEdit * _rename;
 
@@ -297,10 +345,9 @@ public:
 
         l->setContentsMargins(0, 0, 0, 0);
 
-        {l__w(QListView);
+        {l__w(GridListView);
             _list = w;
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
-            w->setWrapping(true);
         }
         {l__l(QHBoxLayout);
             {l__w(QToolBar);
