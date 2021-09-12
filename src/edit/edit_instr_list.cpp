@@ -2,15 +2,182 @@
 #include "edit_impl.h"
 #include "modified.h"
 #include "doc.h"
+#include "util/compare.h"
+#include "util/expr.h"
 #include "util/release_assert.h"
+#include "util/typeid_cast.h"
 
 #include <limits>
+#include <optional>
 #include <utility>  // std::move
 
 namespace edit::edit_instr_list {
 
 using namespace doc;
 using edit_impl::make_command;
+
+struct AddRemoveInstrument {
+    InstrumentIndex index;
+    std::optional<Instrument> instr;
+
+    void apply_swap(Document & doc) {
+        if (instr.has_value()) {
+            release_assert(!doc.instruments[index].has_value());
+        } else {
+            release_assert(doc.instruments[index].has_value());
+        }
+        std::swap(instr, doc.instruments[index]);
+    }
+
+    bool can_coalesce(BaseEditCommand & prev) const {
+        return false;
+    }
+
+    static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
+};
+
+static std::optional<InstrumentIndex> get_empty_idx(Instruments const& instruments) {
+    for (size_t i = 0; i < MAX_INSTRUMENTS; i++) {
+        if (!instruments[i]) {
+            return (InstrumentIndex) i;
+        }
+    }
+    return {};
+}
+
+static Instrument new_instrument() {
+    return Instrument {
+        .name = "New Instrument",
+        .keysplit = {
+            InstrumentPatch {},
+        },
+    };
+}
+
+std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(Document const& doc) {
+    auto maybe_empty_idx = get_empty_idx(doc.instruments);
+    if (!maybe_empty_idx) {
+        return {nullptr, 0};
+    }
+    InstrumentIndex empty_idx = *maybe_empty_idx;
+
+    return {
+        make_command(AddRemoveInstrument {empty_idx, new_instrument()}),
+        empty_idx,
+    };
+}
+
+MaybeEditBox try_insert_instrument(Document const& doc, InstrumentIndex instr_idx) {
+    static_assert(
+        MAX_INSTRUMENTS == 256,
+        "Must add bounds check when decreasing instrument limit");
+
+    if (doc.instruments[instr_idx]) {
+        return nullptr;
+    }
+    return make_command(AddRemoveInstrument {instr_idx, new_instrument()});
+}
+
+std::tuple<MaybeEditBox, InstrumentIndex> try_remove_instrument(
+    Document const& doc, InstrumentIndex instr_idx
+) {
+    static_assert(
+        MAX_INSTRUMENTS == 256,
+        "Must add bounds check when decreasing instrument limit");
+
+    if (!doc.instruments[instr_idx]) {
+        return {nullptr, 0};
+    }
+
+    InstrumentIndex new_idx = EXPR(
+        // Find the next filled instrument slot.
+        for (size_t i = instr_idx + 1; i < MAX_INSTRUMENTS; i++) {
+            if (doc.instruments[i].has_value()) {
+                return (InstrumentIndex) i;
+            }
+        }
+        // We're removing the last instrument. Find the new last instrument.
+        for (size_t i = instr_idx; i--; ) {
+            if (doc.instruments[i].has_value()) {
+                return (InstrumentIndex) i;
+            }
+        }
+        // There are no instruments left. Keep the instrument as-is.
+        // (This differs from FamiTracker which sets the new instrument to 0.)
+        return instr_idx;
+    );
+
+    return {
+        make_command(AddRemoveInstrument {instr_idx, {}}),
+        new_idx,
+    };
+}
+
+std::tuple<MaybeEditBox, InstrumentIndex> try_clone_instrument(
+    Document const& doc, InstrumentIndex instr_idx
+) {
+    static_assert(
+        MAX_INSTRUMENTS == 256,
+        "Must add bounds check when decreasing instrument limit");
+
+    if (!doc.instruments[instr_idx]) {
+        return {nullptr, 0};
+    }
+
+    auto maybe_empty_idx = get_empty_idx(doc.instruments);
+    if (!maybe_empty_idx) {
+        return {nullptr, 0};
+    }
+    InstrumentIndex empty_idx = *maybe_empty_idx;
+
+    return {
+        // make a copy of doc.instruments[instr_idx]
+        make_command(AddRemoveInstrument {empty_idx, doc.instruments[instr_idx]}),
+        empty_idx,
+    };
+}
+
+struct RenamePath {
+    InstrumentIndex instr_idx;
+
+    DEFAULT_EQUALABLE(RenamePath)
+};
+
+struct RenameInstrument {
+    RenamePath path;
+    std::string name;
+
+    void apply_swap(Document & doc) {
+        release_assert(doc.instruments[path.instr_idx].has_value());
+        std::swap(doc.instruments[path.instr_idx]->name, name);
+    }
+
+    bool can_coalesce(BaseEditCommand & prev_edit_command) const {
+        using SelfEditCommand = edit_impl::ImplEditCommand<RenameInstrument>;
+        if (auto * prev = typeid_cast<SelfEditCommand *>(&prev_edit_command)) {
+            return prev->path == path;
+        }
+        return false;
+    }
+
+    // ModifiedFlags is currently only used by the audio thread,
+    // and renaming instruments doesn't affect the audio thread.
+    static constexpr ModifiedFlags _modified = (ModifiedFlags) 0;
+};
+
+MaybeEditBox try_rename_instrument(
+    Document const& doc, InstrumentIndex instr_idx, std::string new_name
+) {
+    static_assert(
+        MAX_INSTRUMENTS == 256,
+        "Must add bounds check when decreasing instrument limit");
+
+    if (!doc.instruments[instr_idx]) {
+        return nullptr;
+    }
+    return make_command(RenameInstrument{{instr_idx}, std::move(new_name)});
+}
+
 
 static void timeline_swap_instruments(
     Timeline & timeline, InstrumentIndex a, InstrumentIndex b

@@ -1577,7 +1577,7 @@ StateTransaction::~StateTransaction() noexcept(false) {
     // is tricky.
     // https://docs.google.com/document/d/1xSXmtB4-9Wa11Bo9jWp3cpMvIWSbl6DNN3gojpW-NhE/edit#heading=h.68ro9bhgsp2w
     if (_win->_maybe_instr_dialog) {
-        if (e & E::DocumentReplaced) {
+        if (e & E::InstrumentDeleted) {
             // closes dialog, nulls out pointer later on.
             _win->_maybe_instr_dialog->close();
         } else if (e & (E::DocumentEdited | E::InstrumentSwitched)) {
@@ -1617,6 +1617,10 @@ history::History & StateTransaction::history_mut() {
 
 void StateTransaction::push_edit(edit::EditBox command, MoveCursor cursor_move) {
     _win->push_edit(*this, std::move(command), cursor_move);
+}
+
+void StateTransaction::instrument_deleted() {
+    _queued_updates |= E::InstrumentDeleted;
 }
 
 void StateTransaction::set_document(doc::Document document) {
