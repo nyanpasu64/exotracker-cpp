@@ -425,6 +425,7 @@ public:
 
         auto tx = _win.edit_unwrap();
         tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
+        tx.instrument_deleted();
         tx.set_instrument(new_instr);
     }
 

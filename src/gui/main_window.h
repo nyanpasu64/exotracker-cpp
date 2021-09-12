@@ -232,10 +232,12 @@ public:
 enum class StateUpdateFlag : uint32_t {
     None = 0,
     All = ~(uint32_t)0,
-    DocumentReplaced = 0x1,
-    DocumentEdited = 0x2,
-    CursorMoved = 0x4,
-    InstrumentSwitched = 0x8,
+    DocumentEdited = 0x1,
+    CursorMoved = 0x2,
+    InstrumentSwitched = 0x4,
+
+    DocumentReplaced = 0x100,
+    InstrumentDeleted = 0x200,
 };
 Q_DECLARE_FLAGS(StateUpdateFlags, StateUpdateFlag)
 Q_DECLARE_OPERATORS_FOR_FLAGS(StateUpdateFlags)
@@ -291,6 +293,9 @@ public:
     /// MoveCursor_::IGNORE_CURSOR doesn't move the cursor on undo/redo (for
     /// non-pattern edits).
     void push_edit(edit::EditBox command, MoveCursor cursor_move);
+
+    /// Close the instrument dialog if open.
+    void instrument_deleted();
 
     void set_document(doc::Document document);
 
