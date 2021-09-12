@@ -372,13 +372,20 @@ public:
     }
 
     void update_selection() override {
-        auto idx = _model.index(_win._state.instrument(), 0);
+        auto instr_idx = curr_instr_idx();
+        bool instr_exists = document().instruments[instr_idx].has_value();
 
-        QItemSelectionModel & list_select = *_list->selectionModel();
-        // _list->selectionModel() merely responds to the active instrument.
-        // Block signals when we change it to match the active instrument.
-        auto s = QSignalBlocker(list_select);
-        list_select.select(idx, QItemSelectionModel::ClearAndSelect);
+        auto idx = _model.index((int) instr_idx, 0);
+
+        {
+            QItemSelectionModel & list_select = *_list->selectionModel();
+            // _list->selectionModel() merely responds to the active instrument.
+            // Block signals when we change it to match the active instrument.
+            auto s = QSignalBlocker(list_select);
+            list_select.select(idx, QItemSelectionModel::ClearAndSelect);
+        }
+
+        _remove->setEnabled(instr_exists);
 
         // Hack to avoid scrolling a widget before it's shown
         // (which causes broken layout and crashes).
