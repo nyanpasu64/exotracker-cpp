@@ -868,8 +868,6 @@ public:
             // TODO for single-key drum patch, print "=%1: %2"
 
             auto item = new QListWidgetItem(text, &list);
-            // TODO compute and show list of errors
-            // (eg. missing sample, empty or overshadowed key range...)
 
             std::vector<QString> warnings;
 
