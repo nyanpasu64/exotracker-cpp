@@ -14,6 +14,7 @@ namespace edit::modified {
 
 enum ModifiedFlags : ModifiedInt {
     /// The timeline of grid cells has been changed. The playback point may be invalid.
+    /// If set, Patterns is ignored.
     TimelineRows = 0x1,
     /// Events within some patterns have changed.
     Patterns = 0x2,
