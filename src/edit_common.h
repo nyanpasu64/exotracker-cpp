@@ -37,12 +37,20 @@ public:
     virtual ~BaseEditCommand() = default;
 
     /// Not bounded-time.
-    /// Called on the GUI thread. Return value is sent to the audio thread.
-    [[nodiscard]] virtual EditBox box_clone() const = 0;
-
-    /// Bounded-time. Safe to call on both GUI and audio thread.
+    /// Called on the GUI thread when an edit needs to be sent to the audio thread.
     ///
-    /// Simple but unintuitive API. Atomic CAS is also simple but unintuitive.
+    /// By default, this simply clones the object behind the pointer to a new EditBox.
+    /// Certain subclasses override this method to return a different type, which
+    /// precomputes data to make `apply_swap()` faster, at the cost of using more RAM.
+    ///
+    /// See DESIGN.md#clone_for_audio for justification.
+    [[nodiscard]] virtual EditBox clone_for_audio(doc::Document const& doc) const = 0;
+
+    /// Bounded-time if EditBox was created by `clone_for_audio()`.
+    /// Called on both GUI and audio threads.
+    ///
+    /// Simpler to implement than conventional undo systems with separate undo/redo
+    /// methods.
     ///
     /// For mutations, apply_swap() swaps the command state and document state.
     ///
@@ -84,8 +92,8 @@ struct [[nodiscard]] CursorEdit {
     MaybeCursor after_cursor;
 
     // impl
-    CursorEdit clone() const {
-        return CursorEdit{edit->box_clone(), before_cursor, after_cursor};
+    CursorEdit clone(doc::Document const& doc) const {
+        return CursorEdit{edit->clone_for_audio(doc), before_cursor, after_cursor};
     }
 
     void apply_swap(doc::Document & document) {

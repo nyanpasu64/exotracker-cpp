@@ -10,7 +10,7 @@
 
 namespace edit::edit_doc {
 
-using edit_impl::make_command;
+using namespace edit_impl;
 
 /// type GetFieldMut<T> = fn(&mut Document) -> &mut T;
 template<typename T>
@@ -32,14 +32,13 @@ public:
         std::swap(get_field_mut(document), _value);
     }
 
+    using Impl = ImplEditCommand<Setter, Override::CanMerge>;
     bool can_merge(BaseEditCommand & prev) const {
-        using SelfEditCommand = edit_impl::ImplEditCommand<Setter>;
-
         // TODO when pushing edits, freeze previous commands to prevent merging.
         // Currently, if you undo to after a spinbox edit, and spin it again,
         // the previous undo state is destroyed!
 
-        return typeid(prev) == typeid(SelfEditCommand);
+        return typeid(prev) == typeid(Impl);
     }
 };
 
@@ -79,9 +78,7 @@ public:
         std::swap(document.sequencer_options, _value);
     }
 
-    bool can_merge(BaseEditCommand &) const {
-        return false;
-    }
+    using Impl = ImplEditCommand<SetSequencerOptions, Override::None>;
 };
 
 EditBox set_sequencer_options(
@@ -169,10 +166,7 @@ struct EditRow {
         }
     }
 
-    bool can_merge(BaseEditCommand &) const {
-        return false;
-    }
-
+    using Impl = ImplEditCommand<EditRow, Override::None>;
     constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
 };
 
@@ -220,10 +214,9 @@ struct SetGridLength {
         std::swap(document.timeline[_grid].nbeats, _row_nbeats);
     }
 
+    using Impl = ImplEditCommand<SetGridLength, Override::CanMerge>;
     bool can_merge(BaseEditCommand & prev) const {
-        using ImplPatternEdit = edit_impl::ImplEditCommand<SetGridLength>;
-
-        if (auto p = typeid_cast<ImplPatternEdit *>(&prev)) {
+        if (auto p = typeid_cast<Impl *>(&prev)) {
             SetGridLength & prev = *p;
             return prev._grid == _grid;
         }
@@ -247,10 +240,7 @@ struct MoveGridDown {
         std::swap(document.timeline[_grid], document.timeline[_grid + 1]);
     }
 
-    bool can_merge(BaseEditCommand & prev) const {
-        return false;
-    }
-
+    using Impl = ImplEditCommand<MoveGridDown, Override::None>;
     constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
 };
 
