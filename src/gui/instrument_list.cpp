@@ -3,7 +3,9 @@
 #include "gui/lib/dpi.h"
 #include "gui/lib/format.h"
 #include "gui/lib/icon_toolbar.h"
+#include "gui/lib/instr_warnings.h"
 #include "gui/lib/layout_macros.h"
+#include "gui/lib/list_warnings.h"
 #include "util/unwrap.h"
 #include "edit/edit_instr_list.h"
 
@@ -33,6 +35,10 @@ W_OBJECT_IMPL(InstrumentList)
 using gui::lib::format::format_hex_2;
 using main_window::MoveCursor_::IGNORE_CURSOR;
 
+using gui::lib::instr_warnings::KeysplitWarningIter;
+using gui::lib::instr_warnings::PatchWarnings;
+using namespace gui::lib::list_warnings;
+
 namespace {
 enum class DragAction {
     /// Dragging an instrument swaps the source and destination.
@@ -50,12 +56,20 @@ private:
     GetDocument _get_document;
     DragAction _drag_action = DragAction::Swap;
 
+    std::vector<QString> _instr_warnings;
+    QIcon _warning_icon;
+    QColor _warning_color;
+
 // impl
 public:
     InstrumentListModel(MainWindow * win, GetDocument get_document)
         : _win(win)
         , _get_document(get_document)
-    {}
+        , _warning_icon(warning_icon())
+        , _warning_color(warning_bg())
+    {
+        _instr_warnings.resize(doc::MAX_INSTRUMENTS);
+    }
 
     [[nodiscard]] doc::Document const & get_document() const {
         return _get_document();
@@ -64,7 +78,37 @@ public:
     void set_history(GetDocument get_document) {
         beginResetModel();
         _get_document = get_document;
+
+        doc::Document const& doc = _get_document();
+
+        for (size_t instr_idx = 0; instr_idx < doc::MAX_INSTRUMENTS; instr_idx++) {
+            auto const& instr = doc.instruments[instr_idx];
+            if (!instr.has_value()) {
+                _instr_warnings[instr_idx] = QString();
+                continue;
+            }
+
+            std::vector<QString> all_warnings;
+
+            auto warning_iter = KeysplitWarningIter(doc, *instr);
+            while (auto w = warning_iter.next()) {
+                for (QString const& s : w->warnings) {
+                    all_warnings.push_back(tr("Patch %1: %2").arg(w->patch_idx).arg(s));
+                }
+            }
+
+            if (instr->keysplit.empty()) {
+                all_warnings.push_back(tr("No keysplits found"));
+            }
+
+            _instr_warnings[instr_idx] = warning_tooltip(all_warnings);
+        }
+
         endResetModel();
+    }
+
+    bool has_warning(size_t row) const {
+        return !_instr_warnings[row].isEmpty();
     }
 
 // impl QAbstractItemModel
@@ -86,20 +130,40 @@ public:
             return QVariant();
 
         auto row = (size_t) index.row();
+        assert(instruments.size() ==_instr_warnings.size());
         if (row >= instruments.size())
             return QVariant();
 
-        if (role == Qt::DisplayRole) {
-            if (instruments[row].has_value()) {
+        switch (role) {
+        case Qt::DisplayRole:
+            if (instruments[row]) {
                 return QStringLiteral("%1 - %2").arg(
                     format_hex_2(row), QString::fromStdString(instruments[row]->name)
                 );
             } else {
                 return format_hex_2(row);
             }
-        }
 
-        return QVariant();
+        case Qt::DecorationRole:
+            if (has_warning(row)) {
+                return _warning_icon;
+            } else {
+                return QVariant();
+            }
+
+        case Qt::ToolTipRole:
+            return _instr_warnings[row];
+
+        case Qt::BackgroundRole:
+            if (has_warning(row)) {
+                return _warning_color;
+            } else {
+                return QVariant();
+            }
+
+        default:
+            return QVariant();
+        }
     }
 
     /*
@@ -367,6 +431,7 @@ public:
         // If widget is destroyed first, it doesn't affect the model.
         // If model is destroyed first, its destroyed() signal disconnects all widgets using it.
         _list->setModel(&_model);
+        _list->setIconSize(ICON_SIZE);
 
         _list->setDragEnabled(true);
         _list->setAcceptDrops(true);

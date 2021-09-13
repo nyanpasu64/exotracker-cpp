@@ -35,10 +35,10 @@ public:
         , _instr(instr)
     {}
 
-    PatchWarnings next() {
+    std::optional<PatchWarnings> next() {
         auto const& keysplit = _instr.keysplit;
         if (_patch_idx >= keysplit.size()) {
-            return {-1, {}};
+            return {};
         }
         auto const& patch = keysplit[_patch_idx];
 

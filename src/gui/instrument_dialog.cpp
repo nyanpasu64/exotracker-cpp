@@ -881,7 +881,7 @@ public:
 
             auto item = new QListWidgetItem(text, &list);
 
-            auto warnings = warning_iter.next().warnings;
+            auto warnings = warning_iter.next().value().warnings;
             QString tooltip = warning_tooltip(warnings);
             if (!tooltip.isEmpty()) {
                 item->setToolTip(std::move(tooltip));
