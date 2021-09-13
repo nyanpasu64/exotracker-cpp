@@ -74,7 +74,6 @@ void History::redo() {
 
     // Pop redo.
     CursorEdit command = std::move(redo_stack.back());
-    auto clone = command.clone();
     redo_stack.pop_back();
 
     // Apply to document.
