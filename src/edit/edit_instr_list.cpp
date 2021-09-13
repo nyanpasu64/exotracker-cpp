@@ -29,7 +29,7 @@ struct AddRemoveInstrument {
         std::swap(instr, doc.instruments[index]);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         return false;
     }
 
@@ -147,7 +147,7 @@ struct RenameInstrument {
         std::swap(doc.instruments[path.instr_idx]->name, name);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         using SelfEditCommand = edit_impl::ImplEditCommand<RenameInstrument>;
         if (auto * p = typeid_cast<SelfEditCommand *>(&prev)) {
             return p->path == path;
@@ -215,7 +215,7 @@ struct SwapInstruments {
         // TODO tell synth that instruments swapped?
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         return false;
     }
 
@@ -246,7 +246,7 @@ struct SwapInstrumentsCached {
         // TODO tell synth that instruments swapped?
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         return false;
     }
 

@@ -56,16 +56,16 @@ public:
     virtual void apply_swap(doc::Document & document) = 0;
 
     /// Upon initially pushing an operation `curr` into undo history,
-    /// History calls curr.can_coalesce(prev) *after* calling curr.apply_swap().
+    /// History calls curr.can_merge(prev) *after* calling curr.apply_swap().
     ///
-    /// It's only safe to coalesce multiple edits
+    /// It's only safe to merge multiple edits
     /// if the first edit edits the same location as or dominates the second,
     /// meaning that undoing the first edit produces the same document
     /// whether the second edit was undone or not.
     ///
-    /// If you want two edit operations to coalesce,
+    /// If you want two edit operations to merge,
     /// both must entirely replace the same section of the document.
-    virtual bool can_coalesce(BaseEditCommand & prev) const = 0;
+    virtual bool can_merge(BaseEditCommand & prev) const = 0;
 
     /// Returns a bitflag specifying which parts of the document are modified.
     /// Called by the audio thread to invalidate/recompute sequencer state.

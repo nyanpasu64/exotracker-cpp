@@ -14,16 +14,16 @@ using edit_impl::make_command;
 
 /*
 TODO the current SetKeysplit/PatchSetter division
-screws with the ability to coalesce undo commands.
-Currently all PatchSetter to the same instrument and patch coalesce,
-while all SetKeysplit to the same instrument with _can_coalesce=true coalesce.
+screws with the ability to merge undo commands.
+Currently all PatchSetter to the same instrument and patch merge,
+while all SetKeysplit to the same instrument with _can_merge=true merge.
 
-Additionally, coalescing is a footgun because it's easy to accidentally return true
+Additionally, merging is a footgun because it's easy to accidentally return true
 to two edits of the same type to different indexes in the document.
 
 Hopefully, we can decide on a better way of deciding
 which undo commands to merge or not,
-and decouple the type of edit command from whether it can be coalesced.
+and decouple the type of edit command from whether it can be merged.
 
 See https://docs.google.com/document/d/15aI6Y84rvki-VqljTmqx4nbV-fNhzPQA4dy-LJboJww/edit
 for details.
@@ -32,7 +32,7 @@ for details.
 // Keysplit edits which add, remove, or reorder patches.
 
 /// Adding or removing a patch replaces the instrument's entire keysplit.
-/// The advantage is that SetKeysplit can coalesce with each other when desired.
+/// The advantage is that SetKeysplit can merge with each other when desired.
 /// The disadvantage is that if a user adds 128 patches
 /// and then repeatedly removes/adds/reorders patches,
 /// storing the entire keysplit in each edit wastes RAM in the undo history.
@@ -46,21 +46,21 @@ for details.
 /// both when sending over a document and when inserting instruments later on.
 /// Reserving memory eats RAM even if you never add that many patches,
 /// and is easy to forget to pre-allocate memory.
-/// Additionally it's harder to implement and can't coalesce.
+/// Additionally it's harder to implement and can't merge.
 struct SetKeysplit {
     InstrumentIndex _instr_idx;
     std::vector<InstrumentPatch> _keysplit;
-    bool _can_coalesce;
+    bool _can_merge;
 
 // impl
     SetKeysplit(
         InstrumentIndex instr_idx,
         std::vector<InstrumentPatch> keysplit,
-        bool can_coalesce = false)
+        bool can_merge = false)
     :
         _instr_idx(instr_idx)
         , _keysplit(std::move(keysplit))
-        , _can_coalesce(can_coalesce)
+        , _can_merge(can_merge)
     {}
 
     void apply_swap(doc::Document & doc) {
@@ -69,13 +69,13 @@ struct SetKeysplit {
         std::swap(maybe_instr->keysplit, _keysplit);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         using SelfEditCommand = edit_impl::ImplEditCommand<SetKeysplit>;
 
         if (auto p = typeid_cast<SelfEditCommand *>(&prev)) {
             return p->_instr_idx == _instr_idx
-                && p->_can_coalesce
-                && _can_coalesce;
+                && p->_can_merge
+                && _can_merge;
         }
         return false;
     }
@@ -195,7 +195,7 @@ std::tuple<EditBox, size_t> set_min_key(
 }
 
 // Single-patch edits. All replace the entire patch,
-// and coalesce with other edits of the same instrument and patch index.
+// and merge with other edits of the same instrument and patch index.
 
 static InstrumentPatch const& get_patch(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx
@@ -215,7 +215,7 @@ static InstrumentPatch & get_patch_mut(
     return const_cast<InstrumentPatch &>(get_patch(doc, instr_idx, patch_idx));
 }
 
-/// It's only safe to coalesce multiple edits if they edit the same location,
+/// It's only safe to merge multiple edits if they edit the same location,
 /// meaning that undoing the first edit produces the same document
 /// whether the second edit was undone or not.
 struct EditLocation {
@@ -246,7 +246,7 @@ public:
         std::swap(patch, _value);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         using SelfEditCommand = edit_impl::ImplEditCommand<PatchSetter>;
 
         if (auto p = typeid_cast<SelfEditCommand *>(&prev)) {

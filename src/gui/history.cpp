@@ -22,7 +22,7 @@ void History::push(CursorEdit command) {
         // - prev and command should be combined in undo history.
         // - prev and command mutate the same state,
         //   so History can discard command entirely after calling apply_swap().
-        if (command.edit->can_coalesce(*prev.edit)) {
+        if (command.edit->can_merge(*prev.edit)) {
             prev.after_cursor = command.after_cursor;
 
             // Discard current state. We only keep new state and previous state.
