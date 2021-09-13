@@ -32,14 +32,14 @@ public:
         std::swap(get_field_mut(document), _value);
     }
 
-    bool can_coalesce(BaseEditCommand & prev_edit_command) const {
+    bool can_coalesce(BaseEditCommand & prev) const {
         using SelfEditCommand = edit_impl::ImplEditCommand<Setter>;
 
-        // Is it really a good idea to coalesce spinbox changes?
-        // If you undo to after a spinbox edit, and spin it again,
+        // TODO when pushing edits, freeze previous commands to prevent coalescing.
+        // Currently, if you undo to after a spinbox edit, and spin it again,
         // the previous undo state is destroyed!
 
-        return typeid(prev_edit_command) == typeid(SelfEditCommand);
+        return typeid(prev) == typeid(SelfEditCommand);
     }
 };
 
@@ -130,6 +130,8 @@ struct EditRow {
         }
     }
 
+    // Do *not* replace with default-derived copy/move constructors.
+    // They fail to call _raw_blocks.reserve()!
     EditRow(EditRow const& other) : EditRow(other._grid, other._edit) {}
 
     EditRow(EditRow && other) noexcept
@@ -220,10 +222,6 @@ struct SetGridLength {
 
     bool can_coalesce(BaseEditCommand & prev) const {
         using ImplPatternEdit = edit_impl::ImplEditCommand<SetGridLength>;
-
-        // Is it really a good idea to coalesce spinbox changes?
-        // If you undo to after a spinbox edit, and spin it again,
-        // the previous undo state is destroyed!
 
         if (auto p = typeid_cast<ImplPatternEdit *>(&prev)) {
             SetGridLength & prev = *p;

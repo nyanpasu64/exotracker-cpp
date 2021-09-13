@@ -147,10 +147,10 @@ struct RenameInstrument {
         std::swap(doc.instruments[path.instr_idx]->name, name);
     }
 
-    bool can_coalesce(BaseEditCommand & prev_edit_command) const {
+    bool can_coalesce(BaseEditCommand & prev) const {
         using SelfEditCommand = edit_impl::ImplEditCommand<RenameInstrument>;
-        if (auto * prev = typeid_cast<SelfEditCommand *>(&prev_edit_command)) {
-            return prev->path == path;
+        if (auto * p = typeid_cast<SelfEditCommand *>(&prev)) {
+            return p->path == path;
         }
         return false;
     }
