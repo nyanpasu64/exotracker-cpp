@@ -940,12 +940,16 @@ public:
 
         // out-of-bounds patch_idx should only happen in blank instruments,
         // which should either be prohibited or treated as a no-op.
-        if (patch_idx < instr->keysplit.size()) {
+        bool valid_patch = patch_idx < instr->keysplit.size();
+
+        if (valid_patch) {
             patch = instr->keysplit[patch_idx];
-            _patch_panel->setDisabled(false);
-        } else {
-            _patch_panel->setDisabled(true);
         }
+
+        _patch_panel->setDisabled(!valid_patch);
+        _remove_patch->setDisabled(!valid_patch);
+        _move_patch_up->setDisabled(!valid_patch);
+        _move_patch_down->setDisabled(!valid_patch);
 
         set_value(_min_key, patch.min_note);
 
