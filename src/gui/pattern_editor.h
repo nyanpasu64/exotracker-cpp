@@ -76,6 +76,8 @@ struct ShortcutPair {
 #define SHORTCUT_PAIRS(X, SEP) \
     X(up) SEP \
     X(down) SEP \
+    X(up_row) SEP \
+    X(down_row) SEP \
     X(prev_beat) SEP \
     X(next_beat) SEP \
     X(prev_event) SEP \

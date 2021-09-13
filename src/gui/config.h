@@ -70,6 +70,10 @@ inline namespace keys {
         constexpr static Qt::Key up{Qt::Key_Up};
         constexpr static Qt::Key down{Qt::Key_Down};
 
+        /// Ignores step, always moves 1 row.
+        KeyInt up_row{chord(Qt::ALT, Qt::Key_Up)};
+        KeyInt down_row{chord(Qt::ALT, Qt::Key_Down)};
+
         KeyInt prev_beat{chord(Qt::CTRL, Qt::Key_Up)};
         KeyInt next_beat{chord(Qt::CTRL, Qt::Key_Down)};
 
