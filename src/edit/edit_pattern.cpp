@@ -20,13 +20,6 @@ using namespace doc;
 using timing::GridBlockBeat;
 using edit_impl::make_command;
 
-/// assert() only takes effect on debug builds.
-/// On release builds, skip coalescing instead.
-#define assert_or_false(EXPR) \
-    assert((EXPR)); \
-    if (!(EXPR)) return false
-
-
 namespace edit {
     struct EditPattern {
         doc::Pattern pattern;

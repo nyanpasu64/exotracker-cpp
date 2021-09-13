@@ -69,12 +69,12 @@ struct SetKeysplit {
         std::swap(maybe_instr->keysplit, _keysplit);
     }
 
-    bool can_coalesce(BaseEditCommand & prev_edit_command) const {
+    bool can_coalesce(BaseEditCommand & prev) const {
         using SelfEditCommand = edit_impl::ImplEditCommand<SetKeysplit>;
 
-        if (auto prev = typeid_cast<SelfEditCommand *>(&prev_edit_command)) {
-            return prev->_instr_idx == _instr_idx
-                && prev->_can_coalesce
+        if (auto p = typeid_cast<SelfEditCommand *>(&prev)) {
+            return p->_instr_idx == _instr_idx
+                && p->_can_coalesce
                 && _can_coalesce;
         }
         return false;
@@ -246,11 +246,11 @@ public:
         std::swap(patch, _value);
     }
 
-    bool can_coalesce(BaseEditCommand & prev_edit_command) const {
+    bool can_coalesce(BaseEditCommand & prev) const {
         using SelfEditCommand = edit_impl::ImplEditCommand<PatchSetter>;
 
-        if (auto prev = typeid_cast<SelfEditCommand *>(&prev_edit_command)) {
-            return prev->_path == _path;
+        if (auto p = typeid_cast<SelfEditCommand *>(&prev)) {
+            return p->_path == _path;
         }
         return false;
     }
