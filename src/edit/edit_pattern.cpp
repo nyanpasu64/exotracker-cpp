@@ -18,7 +18,7 @@ namespace edit::edit_pattern {
 
 using namespace doc;
 using timing::GridBlockBeat;
-using edit_impl::make_command;
+using namespace edit_impl;
 
 namespace edit {
     struct EditPattern {
@@ -86,9 +86,7 @@ struct PatternEdit {
             throw std::logic_error("PatternEdit with missing edit operaton");
     }
 
-    bool can_merge(BaseEditCommand & prev) const {
-        return false;
-    }
+    using Impl = ImplEditCommand<PatternEdit, Override::None>;
 };
 
 /// Erase all empty elements of an entire EventList (not a slice).

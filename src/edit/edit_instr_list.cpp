@@ -14,7 +14,7 @@
 namespace edit::edit_instr_list {
 
 using namespace doc;
-using edit_impl::make_command;
+using namespace edit_impl;
 
 struct AddRemoveInstrument {
     InstrumentIndex index;
@@ -29,11 +29,8 @@ struct AddRemoveInstrument {
         std::swap(instr, doc.instruments[index]);
     }
 
-    bool can_merge(BaseEditCommand & prev) const {
-        return false;
-    }
-
     static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
+    using Impl = ImplEditCommand<AddRemoveInstrument, Override::None>;
 };
 
 static std::optional<InstrumentIndex> get_empty_idx(Instruments const& instruments) {
@@ -152,9 +149,9 @@ struct RenameInstrument {
         std::swap(doc.instruments[path.instr_idx]->name, name);
     }
 
+    using Impl = ImplEditCommand<RenameInstrument, Override::CanMerge>;
     bool can_merge(BaseEditCommand & prev) const {
-        using SelfEditCommand = edit_impl::ImplEditCommand<RenameInstrument>;
-        if (auto * p = typeid_cast<SelfEditCommand *>(&prev)) {
+        if (auto * p = typeid_cast<Impl *>(&prev)) {
             return p->path == path;
         }
         return false;
@@ -220,9 +217,8 @@ struct SwapInstruments {
         // TODO tell synth that instruments swapped?
     }
 
-    bool can_merge(BaseEditCommand & prev) const {
-        return false;
-    }
+    using Impl = ImplEditCommand<SwapInstruments, Override::CloneForAudio>;
+    EditBox clone_for_audio(doc::Document const& doc) const;
 
     static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
 };
@@ -251,16 +247,11 @@ struct SwapInstrumentsCached {
         // TODO tell synth that instruments swapped?
     }
 
-    bool can_merge(BaseEditCommand & prev) const {
-        return false;
-    }
-
+    using Impl = ImplEditCommand<SwapInstrumentsCached, Override::None>;
     static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
 };
 
-EditBox swap_instruments_cached(
-    Document const& doc, InstrumentIndex a, InstrumentIndex b
-) {
+EditBox SwapInstruments::clone_for_audio(Document const& doc) const {
     Timeline timeline = doc.timeline;  // Make a copy
     timeline_swap_instruments(timeline, a, b);
     return make_command(SwapInstrumentsCached{a, b, std::move(timeline)});

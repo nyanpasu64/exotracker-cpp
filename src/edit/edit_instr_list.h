@@ -50,13 +50,9 @@ std::tuple<MaybeEditBox, InstrumentIndex> try_clone_instrument(
 
 /// Returns a command which swaps two instruments in the instrument list,
 /// and iterates over every pattern in the timeline to swap instruments (slow).
+///
+/// When cloned, returns a command which swaps the current timeline with one
+/// with the instruments swapped (eats RAM).
 [[nodiscard]] EditBox swap_instruments(InstrumentIndex a, InstrumentIndex b);
-
-/// Returns a command which swaps two instruments in the instrument list,
-/// and swaps the current timeline and one with the instruments swapped
-/// (eats RAM).
-[[nodiscard]] EditBox swap_instruments_cached(
-    Document const& doc, InstrumentIndex a, InstrumentIndex b
-);
 
 }

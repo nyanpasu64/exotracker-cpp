@@ -10,7 +10,7 @@
 namespace edit::edit_instr {
 
 using namespace doc;
-using edit_impl::make_command;
+using namespace edit_impl;
 
 /*
 TODO the current SetKeysplit/PatchSetter division
@@ -69,10 +69,9 @@ struct SetKeysplit {
         std::swap(maybe_instr->keysplit, _keysplit);
     }
 
+    using Impl = ImplEditCommand<SetKeysplit, Override::CanMerge>;
     bool can_merge(BaseEditCommand & prev) const {
-        using SelfEditCommand = edit_impl::ImplEditCommand<SetKeysplit>;
-
-        if (auto p = typeid_cast<SelfEditCommand *>(&prev)) {
+        if (auto p = typeid_cast<Impl *>(&prev)) {
             return p->_instr_idx == _instr_idx
                 && p->_can_merge
                 && _can_merge;
@@ -246,10 +245,9 @@ public:
         std::swap(patch, _value);
     }
 
+    using Impl = ImplEditCommand<PatchSetter, Override::CanMerge>;
     bool can_merge(BaseEditCommand & prev) const {
-        using SelfEditCommand = edit_impl::ImplEditCommand<PatchSetter>;
-
-        if (auto p = typeid_cast<SelfEditCommand *>(&prev)) {
+        if (auto p = typeid_cast<Impl *>(&prev)) {
             return p->_path == _path;
         }
         return false;

@@ -37,7 +37,7 @@ MaybeCursorEdit History::get_undo() const {
     if (undo_stack.empty()) {
         return {};
     }
-    return undo_stack.back().clone();
+    return undo_stack.back().clone(_document);
 }
 
 void History::undo() {
@@ -64,7 +64,7 @@ edit::MaybeCursorEdit History::get_redo() const {
     if (redo_stack.empty()) {
         return {};
     }
-    return redo_stack.back().clone();
+    return redo_stack.back().clone(_document);
 }
 
 void History::redo() {

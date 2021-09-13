@@ -38,7 +38,7 @@ public:
 
     /// Not bounded-time.
     /// Called on the GUI thread. Return value is sent to the audio thread.
-    [[nodiscard]] virtual EditBox box_clone() const = 0;
+    [[nodiscard]] virtual EditBox clone_for_audio(doc::Document const& doc) const = 0;
 
     /// Bounded-time. Safe to call on both GUI and audio thread.
     ///
@@ -84,8 +84,8 @@ struct [[nodiscard]] CursorEdit {
     MaybeCursor after_cursor;
 
     // impl
-    CursorEdit clone() const {
-        return CursorEdit{edit->box_clone(), before_cursor, after_cursor};
+    CursorEdit clone(doc::Document const& doc) const {
+        return CursorEdit{edit->clone_for_audio(doc), before_cursor, after_cursor};
     }
 
     void apply_swap(doc::Document & document) {

@@ -782,7 +782,7 @@ public:
     void push_edit(
         StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move
     ) {
-        send_edit(*this, command->box_clone());
+        send_edit(*this, command->clone_for_audio(tx.state().document()));
 
         edit::MaybeCursor before_cursor;
         edit::MaybeCursor after_cursor;
