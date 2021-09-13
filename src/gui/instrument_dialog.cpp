@@ -445,6 +445,9 @@ class InstrumentDialogImpl final : public InstrumentDialog {
 
     AdsrGraph * _adsr_graph;
 
+    // Updated by reload_keysplit().
+    size_t _keysplit_size = 0;
+
 public:
     InstrumentDialogImpl(MainWindow * parent_win)
         : InstrumentDialog(parent_win)
@@ -688,9 +691,10 @@ public:
         auto instr_idx = curr_instr_idx();
         auto const& doc = document();
 
-        // if keysplit is empty, currentRow() is -1.
-        // auto patch_idx = (size_t) (_keysplit->currentRow() + 1);
-        auto patch_idx = (size_t) _keysplit->model()->rowCount();
+        // Insert a patch at the end of the instrument's keysplit (`_keysplit_size`).
+        // `_keysplit->count()` is wrong, since if the instrument's keysplit has no
+        // patches, the `_keysplit` list widget contains a "No keysplits found" item.
+        auto patch_idx = _keysplit_size;
 
         if (auto edit = edit_instr::try_add_patch(doc, instr_idx, patch_idx)) {
             auto tx = _win->edit_unwrap();
@@ -869,6 +873,7 @@ public:
         auto warning_iter = KeysplitWarningIter(doc, instr);
 
         size_t n = keysplit.size();
+        _keysplit_size = n;
         for (size_t patch_idx = 0; patch_idx < n; patch_idx++) {
             doc::InstrumentPatch const& patch = keysplit[patch_idx];
             QString name = sample_text(samples, patch.sample_idx);
@@ -886,6 +891,12 @@ public:
                 item->setIcon(_warning_icon);
                 item->setBackground(warning_color);
             }
+        }
+
+        if (n == 0) {
+            auto item = new QListWidgetItem(tr("No keysplits found"), &list);
+            item->setIcon(_warning_icon);
+            item->setBackground(warning_color);
         }
 
         if (n > 0) {
