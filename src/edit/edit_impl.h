@@ -24,8 +24,8 @@ struct ImplEditCommand : BaseEditCommand, Body {
         return Body::apply_swap(document);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const override {
-        return Body::can_coalesce(prev);
+    bool can_merge(BaseEditCommand & prev) const override {
+        return Body::can_merge(prev);
     }
 
     [[nodiscard]] ModifiedFlags modified() const override {
@@ -45,7 +45,7 @@ struct NullEditCommand {
     void apply_swap(doc::Document &) {
     }
 
-    bool can_coalesce(BaseEditCommand &) const {
+    bool can_merge(BaseEditCommand &) const {
         return false;
     }
 

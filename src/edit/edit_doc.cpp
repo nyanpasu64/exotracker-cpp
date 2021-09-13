@@ -32,10 +32,10 @@ public:
         std::swap(get_field_mut(document), _value);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         using SelfEditCommand = edit_impl::ImplEditCommand<Setter>;
 
-        // TODO freeze commands to prevent coalescing, upon subsequent edits.
+        // TODO freeze commands to prevent merging, upon subsequent edits.
         // Currently, if you undo to after a spinbox edit, and spin it again,
         // the previous undo state is destroyed!
 
@@ -79,7 +79,7 @@ public:
         std::swap(document.sequencer_options, _value);
     }
 
-    bool can_coalesce(BaseEditCommand &) const {
+    bool can_merge(BaseEditCommand &) const {
         return false;
     }
 };
@@ -169,7 +169,7 @@ struct EditRow {
         }
     }
 
-    bool can_coalesce(BaseEditCommand &) const {
+    bool can_merge(BaseEditCommand &) const {
         return false;
     }
 
@@ -220,10 +220,10 @@ struct SetGridLength {
         std::swap(document.timeline[_grid].nbeats, _row_nbeats);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         using ImplPatternEdit = edit_impl::ImplEditCommand<SetGridLength>;
 
-        // Is it really a good idea to coalesce spinbox changes?
+        // Is it really a good idea to merge spinbox changes?
         // If you undo to after a spinbox edit, and spin it again,
         // the previous undo state is destroyed!
 
@@ -251,7 +251,7 @@ struct MoveGridDown {
         std::swap(document.timeline[_grid], document.timeline[_grid + 1]);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         return false;
     }
 

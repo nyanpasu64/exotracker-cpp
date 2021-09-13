@@ -86,7 +86,7 @@ struct PatternEdit {
             throw std::logic_error("PatternEdit with missing edit operaton");
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
+    bool can_merge(BaseEditCommand & prev) const {
         return false;
     }
 };
