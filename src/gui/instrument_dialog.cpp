@@ -2,6 +2,7 @@
 #include "instrument_dialog/adsr_graph.h"
 #include "gui_common.h"
 #include "gui/lib/format.h"
+#include "gui/lib/instr_warnings.h"
 #include "gui/lib/list_warnings.h"
 #include "gui/lib/parse_note.h"
 #include "gui/lib/layout_macros.h"
@@ -843,9 +844,12 @@ public:
     ///
     /// If new_selection == -1, keeps old selection.
     void reload_keysplit(doc::Instrument const& instr, int new_selection) {
+        using gui::lib::instr_warnings::KeysplitWarningIter;
+
         QListWidget & list = *_keysplit;
         auto b = QSignalBlocker(&list);
-        doc::Samples const& samples = _win->state().document().samples;
+        auto const& doc = _win->state().document();
+        doc::Samples const& samples = doc.samples;
 
         // TODO ensure we always have exactly 1 element selected.
         // TODO how to handle 0 keysplits? create a dummy keysplit pointing to sample 0?
@@ -862,8 +866,9 @@ public:
         // don't have fractionally scaled icons either.
         list.setIconSize(ICON_SIZE);
 
+        auto warning_iter = KeysplitWarningIter(doc, instr);
+
         size_t n = keysplit.size();
-        int curr_min_note = -1;
         for (size_t patch_idx = 0; patch_idx < n; patch_idx++) {
             doc::InstrumentPatch const& patch = keysplit[patch_idx];
             QString name = sample_text(samples, patch.sample_idx);
@@ -874,23 +879,7 @@ public:
 
             auto item = new QListWidgetItem(text, &list);
 
-            std::vector<QString> warnings;
-
-            if (!samples[patch.sample_idx].has_value()) {
-                warnings.push_back(
-                    tr("Sample %1 not found; keysplit will not play")
-                        .arg(format_hex_2(patch.sample_idx))
-                );
-            }
-            if ((int) patch.min_note <= curr_min_note) {
-                warnings.push_back(
-                    tr("Min key %1 out of order; keysplit will not play")
-                        .arg(patch.min_note)
-                );
-            } else {
-                curr_min_note = patch.min_note;
-            }
-
+            auto warnings = warning_iter.next().value().warnings;
             QString tooltip = warning_tooltip(warnings);
             if (!tooltip.isEmpty()) {
                 item->setToolTip(std::move(tooltip));
