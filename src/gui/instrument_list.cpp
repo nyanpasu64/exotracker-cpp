@@ -14,6 +14,7 @@
 // Widgets
 #include <QLineEdit>
 #include <QListView>
+#include <QMenu>
 #include <QToolBar>
 #include <QToolButton>
 
@@ -447,6 +448,12 @@ public:
             _list, &QListView::doubleClicked,
             this, &InstrumentListImpl::on_edit_instrument);
 
+        // Enable right-click menus for instrument list.
+        _list->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(
+            _list, &QWidget::customContextMenuRequested,
+            this, &InstrumentListImpl::on_right_click);
+
         // Connect toolbar.
         connect(
             _add, &QAction::triggered,
@@ -552,6 +559,55 @@ public:
         }
     }
 
+    void on_right_click(QPoint const& pos) {
+        auto index = _list->indexAt(pos);
+        std::optional<doc::InstrumentIndex> instr_idx;
+        if (index.isValid()) {
+            release_assert((size_t) index.row() < doc::MAX_INSTRUMENTS);
+            instr_idx = (doc::InstrumentIndex) index.row();
+        }
+
+        auto const& instruments = document().instruments;
+
+        auto menu = new QMenu(_list);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+
+        {
+            auto add = menu->addAction(tr("&Add Instrument"));
+            // If the user right-clicked an item, add to that slot or the next empty slot.
+            // If the user right-clicked the background, add as usual.
+            connect(
+                add, &QAction::triggered,
+                this, index.isValid()
+                    ? &InstrumentListImpl::on_insert
+                    : &InstrumentListImpl::on_add);
+        }
+
+        if (instr_idx && instruments[*instr_idx].has_value()) {
+            {
+                auto remove = menu->addAction(tr("&Remove Instrument"));
+                connect(
+                    remove, &QAction::triggered,
+                    this, &InstrumentListImpl::on_remove);
+            }
+            {
+                auto clone = menu->addAction(tr("&Clone Instrument"));
+                connect(
+                    clone, &QAction::triggered,
+                    this, &InstrumentListImpl::on_clone);
+            }
+            menu->addSeparator();
+            {
+                auto edit = menu->addAction(tr("&Edit..."));
+                connect(
+                    edit, &QAction::triggered,
+                    this, &InstrumentListImpl::on_edit_instrument);
+            }
+        }
+
+        menu->popup(_list->viewport()->mapToGlobal(pos));
+    }
+
     void on_edit_instrument() {
         if (document().instruments[curr_instr_idx()].has_value()) {
             _win.show_instr_dialog();
@@ -562,6 +618,20 @@ public:
         using edit::edit_instr_list::try_add_instrument;
 
         auto [maybe_edit, new_instr] = try_add_instrument(document());
+        if (!maybe_edit) {
+            return;
+        }
+
+        auto tx = _win.edit_unwrap();
+        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
+        tx.set_instrument(new_instr);
+    }
+
+    void on_insert() {
+        using edit::edit_instr_list::try_insert_instrument;
+
+        auto [maybe_edit, new_instr] =
+            try_insert_instrument(document(), curr_instr_idx());
         if (!maybe_edit) {
             return;
         }
