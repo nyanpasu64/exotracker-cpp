@@ -12,6 +12,7 @@
 // Widgets
 #include <QLineEdit>
 #include <QListView>
+#include <QMenu>
 #include <QToolBar>
 #include <QToolButton>
 
@@ -383,6 +384,12 @@ public:
             _list, &QListView::doubleClicked,
             this, &InstrumentListImpl::on_edit_instrument);
 
+        // Enable right-click menus for instrument list.
+        _list->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(
+            _list, &QWidget::customContextMenuRequested,
+            this, &InstrumentListImpl::on_right_click);
+
         // Connect toolbar.
         connect(
             _add, &QAction::triggered,
@@ -488,6 +495,51 @@ public:
         }
     }
 
+    void on_right_click(QPoint const& pos) {
+        auto index = _list->indexAt(pos);
+        std::optional<InstrumentIndex> instr_idx;
+        if (index.isValid()) {
+            release_assert((size_t) index.row() < doc::MAX_INSTRUMENTS);
+            instr_idx = (InstrumentIndex) index.row();
+        }
+
+        auto const& instruments = document().instruments;
+
+        auto menu = new QMenu(_list);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+
+        auto add = menu->addAction(tr("&Add Instrument"));
+        connect(
+            add, &QAction::triggered,
+            this, index.isValid()
+                ? &InstrumentListImpl::on_add
+                : &InstrumentListImpl::add_at_begin);
+
+        if (instr_idx && instruments[*instr_idx].has_value()) {
+            {
+                auto remove = menu->addAction(tr("&Remove Instrument"));
+                connect(
+                    remove, &QAction::triggered,
+                    this, &InstrumentListImpl::on_remove);
+            }
+            {
+                auto clone = menu->addAction(tr("&Clone Instrument"));
+                connect(
+                    clone, &QAction::triggered,
+                    this, &InstrumentListImpl::on_clone);
+            }
+            menu->addSeparator();
+            {
+                auto edit = menu->addAction(tr("&Edit..."));
+                connect(
+                    edit, &QAction::triggered,
+                    this, &InstrumentListImpl::on_edit_instrument);
+            }
+        }
+
+        menu->popup(_list->viewport()->mapToGlobal(pos));
+    }
+
     void on_edit_instrument() {
         if (document().instruments[curr_instr_idx()].has_value()) {
             _win.show_instr_dialog();
@@ -511,6 +563,10 @@ public:
         auto tx = _win.edit_unwrap();
         tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
         tx.set_instrument(new_instr);
+    }
+
+    void add_at_begin() {
+        add_instrument(0);
     }
 
     void on_remove() {
