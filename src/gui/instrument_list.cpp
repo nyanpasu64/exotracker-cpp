@@ -573,14 +573,13 @@ public:
         menu->setAttribute(Qt::WA_DeleteOnClose);
 
         {
+            bool add_at_selected = _show_empty_slots && index.isValid();
             auto add = menu->addAction(tr("&Add Instrument"));
-            // If the user right-clicked an item, add to that slot or the next empty slot.
-            // If the user right-clicked the background, add as usual.
             connect(
                 add, &QAction::triggered,
-                this, index.isValid()
-                    ? &InstrumentListImpl::on_insert
-                    : &InstrumentListImpl::on_add);
+                this, add_at_selected
+                    ? &InstrumentListImpl::insert_instrument
+                    : &InstrumentListImpl::add_instrument);
         }
 
         if (instr_idx && instruments[*instr_idx].has_value()) {
@@ -615,6 +614,16 @@ public:
     }
 
     void on_add() {
+        // If empty slots are visible, allow initializing instruments in empty slots
+        // through the toolbar, instead of only through the right-click menu.
+        if (_show_empty_slots) {
+            insert_instrument();
+        } else {
+            add_instrument();
+        }
+    }
+
+    void add_instrument() {
         using edit::edit_instr_list::try_add_instrument;
 
         auto [maybe_edit, new_instr] = try_add_instrument(document());
@@ -627,7 +636,7 @@ public:
         tx.set_instrument(new_instr);
     }
 
-    void on_insert() {
+    void insert_instrument() {
         using edit::edit_instr_list::try_insert_instrument;
 
         auto [maybe_edit, new_instr] =
