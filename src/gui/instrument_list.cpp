@@ -48,25 +48,23 @@ enum class DragAction {
 class InstrumentListModel final : public QAbstractListModel {
     W_OBJECT(InstrumentListModel)
 private:
-    // TODO ...?
     MainWindow * _win;
-    GetDocument _get_document;
     DragAction _drag_action = DragAction::Swap;
 
 // impl
 public:
-    InstrumentListModel(MainWindow * win, GetDocument get_document)
+    InstrumentListModel(MainWindow * win)
         : _win(win)
-        , _get_document(get_document)
     {}
 
     [[nodiscard]] doc::Document const & get_document() const {
-        return _get_document();
+        return _win->state().document();
     }
 
-    void set_history(GetDocument get_document) {
+    void reload_state() {
+        // TODO move the call to beginResetModel() to a signal emitted when
+        // StateTransaction::history_mut() is first called.
         beginResetModel();
-        _get_document = get_document;
         endResetModel();
     }
 
@@ -330,7 +328,7 @@ public:
     explicit InstrumentListImpl(MainWindow * win, QWidget * parent)
         : InstrumentList(parent)
         , _win(*win)
-        , _model(win, GetDocument::empty())
+        , _model(win)
     {
         auto c = this;
         auto l = new QVBoxLayout(c);
@@ -422,8 +420,8 @@ public:
 
     // it's a nasty hack that we set history to reload changes from a StateTransaction,
     // but it works don't touch it
-    void set_history(GetDocument get_document) override {
-        _model.set_history(get_document);
+    void reload_state() override {
+        _model.reload_state();
         recompute_visible_slots();
         update_selection();
     }

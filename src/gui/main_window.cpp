@@ -946,7 +946,7 @@ public:
 
         _pattern_editor->set_history(_state.document_getter());
         _timeline_editor->set_history(_state.document_getter());
-        _instrument_list->set_history(_state.document_getter());
+        _instrument_list->reload_state();
 
         // Hook up refresh timer.
         connect(
@@ -1570,7 +1570,7 @@ StateTransaction::~StateTransaction() noexcept(false) {
 
     // InstrumentList depends on _history and _instrument.
     if (e & E::DocumentEdited) {
-        _win->_instrument_list->set_history(state.document_getter());
+        _win->_instrument_list->reload_state();
     } else if (e & E::InstrumentSwitched) {
         _win->_instrument_list->update_selection();
     }
