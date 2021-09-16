@@ -402,12 +402,12 @@ public:
 
     void save_document() {
         using edit::edit_doc::set_sequencer_options;
-        using main_window::keep_cursor;
+        using main_window::MoveCursor_::IGNORE_CURSOR;
 
         auto const& doc = _get_document.get_document();
 
         auto tx = win().edit_unwrap();
-        win().push_edit(tx, set_sequencer_options(doc, _options), keep_cursor());
+        tx.push_edit(set_sequencer_options(doc, _options), IGNORE_CURSOR);
     }
 
     MainWindow & win() {

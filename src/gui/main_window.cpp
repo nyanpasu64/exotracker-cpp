@@ -787,7 +787,7 @@ public:
         edit::Cursor const here = tx.state().cursor();
 
         auto p = &cursor_move;
-        if (std::get_if<MoveCursor_::NotPatternEdit>(p)) {
+        if (std::get_if<MoveCursor_::IgnoreCursor>(p)) {
             before_cursor = std::nullopt;
             after_cursor = std::nullopt;
         } else
@@ -919,7 +919,7 @@ public:
 
     void push_edit(
         StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move
-    ) override {
+    ) {
         _audio.push_edit(tx, std::move(command), cursor_move);
         clamp_cursor(tx);
     }
@@ -1093,20 +1093,15 @@ public:
         // _tempo obtains its value through StateTransaction.
         connect_dspin(_tempo, this, [this] (double tempo) {
             debug_unwrap(edit_state(), [&](auto & tx) {
-                push_edit(
-                    tx,
-                    edit_doc::set_tempo(tempo),
-                    MoveCursor_::NotPatternEdit{}
-                );
+                tx.push_edit(edit_doc::set_tempo(tempo), MoveCursor_::IGNORE_CURSOR);
             });
         });
 
         connect_spin(_length_beats, this, [this] (int grid_length_beats) {
             debug_unwrap(edit_state(), [&](auto & tx) {
-                push_edit(
-                    tx,
+                tx.push_edit(
                     edit_doc::set_grid_length(_state.cursor().y.grid, grid_length_beats),
-                    MoveCursor_::NotPatternEdit{}
+                    MoveCursor_::IGNORE_CURSOR
                 );
             });
         });
@@ -1443,11 +1438,8 @@ public:
         };
 
         auto tx = edit_unwrap();
-        push_edit(
-            tx,
-            edit_doc::add_timeline_row(
-                document, old_grid + 1, _length_beats->value()
-            ),
+        tx.push_edit(
+            edit_doc::add_timeline_row(document, old_grid + 1, _length_beats->value()),
             move_to(new_cursor));
     }
 
@@ -1470,10 +1462,9 @@ public:
         }
 
         auto tx = edit_unwrap();
-        push_edit(
-            tx,
-            edit_doc::remove_timeline_row(_state.cursor().y.grid),
-            move_to(new_cursor));
+        tx.push_edit(
+            edit_doc::remove_timeline_row(_state.cursor().y.grid), move_to(new_cursor)
+        );
     }
 
     void move_grid_up() {
@@ -1483,7 +1474,7 @@ public:
             up.y.grid--;
 
             auto tx = edit_unwrap();
-            push_edit(tx, edit_doc::move_grid_up(_state.cursor().y.grid), move_to(up));
+            tx.push_edit(edit_doc::move_grid_up(_state.cursor().y.grid), move_to(up));
         }
     }
 
@@ -1495,8 +1486,8 @@ public:
             down.y.grid++;
 
             auto tx = edit_unwrap();
-            push_edit(
-                tx, edit_doc::move_grid_down(_state.cursor().y.grid), move_to(down)
+            tx.push_edit(
+                edit_doc::move_grid_down(_state.cursor().y.grid), move_to(down)
             );
         }
     }
@@ -1512,10 +1503,9 @@ public:
         // Right now the clone button keeps the cursor position.
         // Should it move the cursor down by 1 pattern, into the clone?
         // Or down to the beat 0 of the clone?
-        push_edit(
-            tx,
+        tx.push_edit(
             edit_doc::clone_timeline_row(document, _state.cursor().y.grid),
-            keep_cursor());
+            move_to_here());
     }
 };
 W_OBJECT_IMPL(MainWindowImpl)
@@ -1623,6 +1613,10 @@ using E = StateUpdateFlag;
 history::History & StateTransaction::history_mut() {
     _queued_updates |= E::DocumentEdited;
     return state_mut()._history;
+}
+
+void StateTransaction::push_edit(edit::EditBox command, MoveCursor cursor_move) {
+    _win->push_edit(*this, std::move(command), cursor_move);
 }
 
 void StateTransaction::set_document(doc::Document document) {

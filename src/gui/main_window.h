@@ -8,6 +8,7 @@
 #include "timing_common.h"
 #include "audio/output.h"
 #include "util/copy_move.h"
+#include "util/release_assert.h"
 
 #include <gsl/span>
 #include <verdigris/wobjectdefs.h>
@@ -147,13 +148,15 @@ public:
 using CursorOrHere = std::optional<Cursor>;
 
 namespace MoveCursor_ {
-    struct NotPatternEdit {};
+    struct IgnoreCursor {};
     struct MoveFrom {
         CursorOrHere before_or_here;
         CursorOrHere after_or_here;
     };
 
-    using MoveCursor = std::variant<NotPatternEdit, MoveFrom>;
+    using MoveCursor = std::variant<IgnoreCursor, MoveFrom>;
+
+    inline constexpr MoveCursor IGNORE_CURSOR = IgnoreCursor{};
 }
 
 using MoveCursor_::MoveCursor;
@@ -162,7 +165,7 @@ inline MoveCursor move_to(Cursor cursor) {
     return MoveCursor_::MoveFrom{{}, cursor};
 }
 
-inline MoveCursor keep_cursor() {
+inline MoveCursor move_to_here() {
     return MoveCursor_::MoveFrom{{}, {}};
 }
 
@@ -215,8 +218,9 @@ public:
         return _cursor.raw_select();
     }
 
-    int instrument() const {
-        return _instrument;
+    doc::InstrumentIndex instrument() const {
+        release_assert(size_t(_instrument) < doc::MAX_INSTRUMENTS);
+        return (doc::InstrumentIndex) _instrument;
     }
 
     friend class StateTransaction;
@@ -240,7 +244,7 @@ class MainWindow;
 class MainWindowImpl;
 
 class [[nodiscard]] StateTransaction {
-main_window_INTERNAL:
+private:
     MainWindowImpl * _win;
 
     int _uncaught_exceptions;
@@ -279,9 +283,14 @@ public:
         return state().history();
     }
     /// Don't call directly! History::push() will not send edits to the audio thread!
-    /// Instead delegate to MainWindow::push_edit().
+    /// Instead call StateTransaction::push_edit().
     /// (Exception: AudioComponent::undo()/redo() call this as well.)
     History & history_mut();
+
+    /// move_to() or move_to_here() saves and moves the cursor (for pattern edits).
+    /// MoveCursor_::IGNORE_CURSOR doesn't move the cursor on undo/redo (for
+    /// non-pattern edits).
+    void push_edit(edit::EditBox command, MoveCursor cursor_move);
 
     void set_document(doc::Document document);
 
@@ -317,10 +326,6 @@ public:
     virtual std::optional<StateTransaction> edit_state() = 0;
 
     virtual StateTransaction edit_unwrap() = 0;
-
-    /// MoveCursor determines whether to save and move the cursor (for pattern edits)
-    /// or not (for non-pattern edits).
-    virtual void push_edit(StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move) = 0;
 
     virtual void show_instr_dialog() = 0;
 

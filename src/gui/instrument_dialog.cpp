@@ -652,7 +652,7 @@ public:
 
         auto b = QSignalBlocker(widget);
         auto tx = _win->edit_unwrap();
-        _win->push_edit(tx, std::move(cmd), MoveCursor::NotPatternEdit{});
+        tx.push_edit(std::move(cmd), MoveCursor::IGNORE_CURSOR);
     }
 
     void on_set_min_key(int value) {
@@ -672,7 +672,7 @@ public:
         {
             auto b = QSignalBlocker(_min_key);
             auto tx = _win->edit_unwrap();
-            _win->push_edit(tx, std::move(cmd), MoveCursor::NotPatternEdit{});
+            tx.push_edit(std::move(cmd), MoveCursor::IGNORE_CURSOR);
             reload_keysplit(*doc.instruments[instr_idx], (int) new_patch_idx);
         }
     }
@@ -687,7 +687,7 @@ public:
 
         if (auto edit = edit_instr::try_add_patch(doc, instr_idx, patch_idx)) {
             auto tx = _win->edit_unwrap();
-            _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
             reload_keysplit(*doc.instruments[instr_idx], (int) patch_idx);
             // TODO move ~StateTransaction() logic to StateTransaction::commit()
         }
@@ -701,7 +701,7 @@ public:
             doc, instr_idx, curr_patch_idx()
         )) {
             auto tx = _win->edit_unwrap();
-            _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
             // leave current row unchanged, let reload_keysplit() truncate it
         }
     }
@@ -713,7 +713,7 @@ public:
 
         if (auto edit = edit_instr::try_move_patch_up(doc, instr_idx, patch_idx)) {
             auto tx = _win->edit_unwrap();
-            _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
             reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx - 1));
         }
     }
@@ -725,7 +725,7 @@ public:
 
         if (auto edit = edit_instr::try_move_patch_down(doc, instr_idx, patch_idx)) {
             auto tx = _win->edit_unwrap();
-            _win->push_edit(tx, std::move(edit), MoveCursor::NotPatternEdit{});
+            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
             reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx + 1));
         }
     }
