@@ -868,8 +868,6 @@ public:
             // TODO for single-key drum patch, print "=%1: %2"
 
             auto item = new QListWidgetItem(text, &list);
-            // TODO compute and show list of errors
-            // (eg. missing sample, empty or overshadowed key range...)
 
             std::vector<QString> warnings;
 
@@ -942,12 +940,16 @@ public:
 
         // out-of-bounds patch_idx should only happen in blank instruments,
         // which should either be prohibited or treated as a no-op.
-        if (patch_idx < instr->keysplit.size()) {
+        bool valid_patch = patch_idx < instr->keysplit.size();
+
+        if (valid_patch) {
             patch = instr->keysplit[patch_idx];
-            _patch_panel->setDisabled(false);
-        } else {
-            _patch_panel->setDisabled(true);
         }
+
+        _patch_panel->setEnabled(valid_patch);
+        _remove_patch->setEnabled(valid_patch);
+        _move_patch_up->setEnabled(valid_patch);
+        _move_patch_down->setEnabled(valid_patch);
 
         set_value(_min_key, patch.min_note);
 
