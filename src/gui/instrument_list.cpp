@@ -623,10 +623,15 @@ public:
         }
     }
 
+    static std::string new_instrument_name() {
+        return tr("New Instrument").toStdString();
+    }
+
     void add_instrument() {
         using edit::edit_instr_list::try_add_instrument;
 
-        auto [maybe_edit, new_instr] = try_add_instrument(document());
+        auto [maybe_edit, new_instr] =
+            try_add_instrument(document(), new_instrument_name());
         if (!maybe_edit) {
             return;
         }
@@ -640,7 +645,7 @@ public:
         using edit::edit_instr_list::try_insert_instrument;
 
         auto [maybe_edit, new_instr] =
-            try_insert_instrument(document(), curr_instr_idx());
+            try_insert_instrument(document(), curr_instr_idx(), new_instrument_name());
         if (!maybe_edit) {
             return;
         }

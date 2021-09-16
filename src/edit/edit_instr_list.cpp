@@ -45,18 +45,18 @@ static std::optional<InstrumentIndex> get_empty_idx(Instruments const& instrumen
     return {};
 }
 
-static Instrument new_instrument() {
-    // If the name needs to be translatable, maybe accept a std::string
-    // passed from the GUI, created using tr("New Instrument").toStdString()?
+static Instrument new_instrument(std::string name) {
     return Instrument {
-        .name = "New Instrument",
+        .name = std::move(name),
         .keysplit = {
             InstrumentPatch {},
         },
     };
 }
 
-std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(Document const& doc) {
+std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(
+    Document const& doc, std::string name
+) {
     auto maybe_empty_idx = get_empty_idx(doc.instruments);
     if (!maybe_empty_idx) {
         return {nullptr, 0};
@@ -64,13 +64,13 @@ std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(Document const& doc
     InstrumentIndex empty_idx = *maybe_empty_idx;
 
     return {
-        make_command(AddRemoveInstrument {empty_idx, new_instrument()}),
+        make_command(AddRemoveInstrument {empty_idx, new_instrument(std::move(name))}),
         empty_idx,
     };
 }
 
 std::tuple<MaybeEditBox, InstrumentIndex> try_insert_instrument(
-    Document const& doc, InstrumentIndex begin_idx
+    Document const& doc, InstrumentIndex begin_idx, std::string name
 ) {
     static_assert(
         MAX_INSTRUMENTS == 256,
@@ -80,7 +80,7 @@ std::tuple<MaybeEditBox, InstrumentIndex> try_insert_instrument(
         if (!doc.instruments[instr_idx]) {
             auto idx = (InstrumentIndex) instr_idx;
             return {
-                make_command(AddRemoveInstrument{idx, new_instrument()}),
+                make_command(AddRemoveInstrument{idx, new_instrument(std::move(name))}),
                 idx,
             };
         }

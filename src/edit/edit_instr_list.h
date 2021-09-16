@@ -14,7 +14,9 @@ using doc::InstrumentIndex;
 /// Returns {command, new instrument index}.
 /// If all slots are full, returns {nullptr, 0}.
 [[nodiscard]]
-std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(Document const& doc);
+std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(
+    Document const& doc, std::string name
+);
 
 /// Loops through slots starting at the specified slot,
 /// and adds an empty instrument in the first empty slot found.
@@ -22,7 +24,7 @@ std::tuple<MaybeEditBox, InstrumentIndex> try_add_instrument(Document const& doc
 /// If all subsequent slots are full, returns {nullptr, 0}.
 [[nodiscard]]
 std::tuple<MaybeEditBox, InstrumentIndex> try_insert_instrument(
-    Document const& doc, InstrumentIndex instr_idx
+    Document const& doc, InstrumentIndex instr_idx, std::string name
 );
 
 /// Tries to remove an instrument at the specified slot
