@@ -2,17 +2,29 @@
 
 #include "doc.h"
 #include "edit_common.h"
+#include "gui/cursor.h"
 #include "util/copy_move.h"
 
 #include <vector>
 
 namespace gui::history {
 
-using edit::CursorEdit;
-using edit::MaybeCursorEdit;
+using edit::EditBox;
+using gui::cursor::Cursor;
+using MaybeCursor = std::optional<Cursor>;
 
-struct Success {
-    bool succeeded;
+struct [[nodiscard]] CursorEdit {
+    EditBox edit;
+    MaybeCursor cursor;
+};
+
+using MaybeCursorEdit = std::optional<CursorEdit>;
+
+struct UndoFrame {
+    EditBox edit;
+
+    MaybeCursor before_cursor;
+    MaybeCursor after_cursor;
 };
 
 /// Class is not thread-safe, and is only called from GUI thread.
@@ -22,8 +34,8 @@ struct Success {
 class History {
 private:
     doc::Document _document;
-    std::vector<CursorEdit> undo_stack;
-    std::vector<CursorEdit> redo_stack;
+    std::vector<UndoFrame> undo_stack;
+    std::vector<UndoFrame> redo_stack;
 
 public:
     History(doc::Document initial_state);
@@ -37,7 +49,7 @@ public:
     }
 
     /// Clears redo stack, mutates document, pushes command into undo history.
-    void push(CursorEdit command);
+    void push(UndoFrame command);
 
     /*
     Currently we use an unbounded linked-list queue from main to audio thread.

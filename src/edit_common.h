@@ -2,8 +2,6 @@
 
 #include "edit/modified_common.h"
 #include "doc.h"
-#include "gui/cursor.h"
-#include "util/copy_move.h"
 
 #include <cstdint>
 #include <memory>
@@ -81,26 +79,5 @@ public:
     /// (This could be a base-class field instead, I guess.)
     [[nodiscard]] virtual ModifiedFlags modified() const = 0;
 };
-
-using gui::cursor::Cursor;
-using MaybeCursor = std::optional<Cursor>;
-
-struct [[nodiscard]] CursorEdit {
-    EditBox edit;
-
-    MaybeCursor before_cursor;
-    MaybeCursor after_cursor;
-
-    // impl
-    CursorEdit clone(doc::Document const& doc) const {
-        return CursorEdit{edit->clone_for_audio(doc), before_cursor, after_cursor};
-    }
-
-    void apply_swap(doc::Document & document) {
-        edit->apply_swap(document);
-    }
-};
-
-using MaybeCursorEdit = std::optional<CursorEdit>;
 
 }

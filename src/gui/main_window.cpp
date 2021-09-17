@@ -784,9 +784,9 @@ public:
     ) {
         send_edit(*this, command->clone_for_audio(tx.state().document()));
 
-        edit::MaybeCursor before_cursor;
-        edit::MaybeCursor after_cursor;
-        edit::Cursor const here = tx.state().cursor();
+        history::MaybeCursor before_cursor;
+        history::MaybeCursor after_cursor;
+        history::Cursor const here = tx.state().cursor();
 
         auto p = &cursor_move;
         if (std::get_if<MoveCursor_::IgnoreCursor>(p)) {
@@ -798,7 +798,7 @@ public:
             after_cursor = move_from->after_or_here.value_or(here);
         }
 
-        tx.history_mut().push(edit::CursorEdit{
+        tx.history_mut().push(history::UndoFrame{
             std::move(command), before_cursor, after_cursor
         });
 
@@ -810,8 +810,8 @@ public:
     bool undo(StateTransaction & tx) {
         if (auto cursor_edit = tx.history().get_undo()) {
             send_edit(*this, std::move(cursor_edit->edit));
-            if (cursor_edit->before_cursor) {
-                tx.cursor_mut().set(*cursor_edit->before_cursor);
+            if (cursor_edit->cursor) {
+                tx.cursor_mut().set(*cursor_edit->cursor);
             }
             tx.history_mut().undo();
             return true;
@@ -822,8 +822,8 @@ public:
     bool redo(StateTransaction & tx) {
         if (auto cursor_edit = tx.history().get_redo()) {
             send_edit(*this, std::move(cursor_edit->edit));
-            if (cursor_edit->after_cursor) {
-                tx.cursor_mut().set(*cursor_edit->after_cursor);
+            if (cursor_edit->cursor) {
+                tx.cursor_mut().set(*cursor_edit->cursor);
             }
             tx.history_mut().redo();
             return true;
