@@ -1,6 +1,7 @@
 #pragma once
 
 #include "edit_common.h"
+#include "util/enum_flags.h"
 
 namespace edit::edit_impl {
 
@@ -12,6 +13,7 @@ enum Override {
 };
 }
 using Override_::Override;
+DECLARE_OPERATORS_FOR_FLAGS(Override)
 
 /// Since BaseEditCommand has virtual member functions,
 /// subclasses cannot be aggregate-initialized (requiring constructor boilerplate).
