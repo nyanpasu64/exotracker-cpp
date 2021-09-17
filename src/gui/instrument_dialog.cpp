@@ -2,6 +2,8 @@
 #include "instrument_dialog/adsr_graph.h"
 #include "gui_common.h"
 #include "gui/lib/format.h"
+#include "gui/lib/instr_warnings.h"
+#include "gui/lib/list_warnings.h"
 #include "gui/lib/parse_note.h"
 #include "gui/lib/layout_macros.h"
 #include "gui/lib/docs_palette.h"
@@ -413,10 +415,15 @@ namespace edit_instr = edit::edit_instr;
 namespace MoveCursor = gui::main_window::MoveCursor_;
 using adsr_graph::AdsrGraph;
 
+using gui::lib::list_warnings::ICON_SIZE;
+using gui::lib::list_warnings::warning_icon;
+using gui::lib::list_warnings::warning_bg;
+using gui::lib::list_warnings::warning_tooltip;
+
 class InstrumentDialogImpl final : public InstrumentDialog {
     MainWindow * _win;
     SliderSnapStyle _slider_snap;
-    QIcon _error_icon;
+    QIcon _warning_icon;
 
     // widgets
     QToolButton * _add_patch;
@@ -438,6 +445,9 @@ class InstrumentDialogImpl final : public InstrumentDialog {
 
     AdsrGraph * _adsr_graph;
 
+    // Updated by reload_keysplit().
+    size_t _keysplit_size = 0;
+
 public:
     InstrumentDialogImpl(MainWindow * parent_win)
         : InstrumentDialog(parent_win)
@@ -448,7 +458,7 @@ public:
         // Hide contextual-help button in the title bar.
         setWindowFlags(windowFlags().setFlag(Qt::WindowContextHelpButtonHint, false));
 
-        _error_icon = QIcon(QStringLiteral("://icons/warning-sign.svg"));
+        _warning_icon = warning_icon();
 
         build_ui();
         connect_ui();
@@ -681,9 +691,10 @@ public:
         auto instr_idx = curr_instr_idx();
         auto const& doc = document();
 
-        // if keysplit is empty, currentRow() is -1.
-        // auto patch_idx = (size_t) (_keysplit->currentRow() + 1);
-        auto patch_idx = (size_t) _keysplit->model()->rowCount();
+        // Insert a patch at the end of the instrument's keysplit (`_keysplit_size`).
+        // `_keysplit->count()` is wrong, since if the instrument's keysplit has no
+        // patches, the `_keysplit` list widget contains a "No keysplits found" item.
+        auto patch_idx = _keysplit_size;
 
         if (auto edit = edit_instr::try_add_patch(doc, instr_idx, patch_idx)) {
             auto tx = _win->edit_unwrap();
@@ -837,9 +848,12 @@ public:
     ///
     /// If new_selection == -1, keeps old selection.
     void reload_keysplit(doc::Instrument const& instr, int new_selection) {
+        using gui::lib::instr_warnings::KeysplitWarningIter;
+
         QListWidget & list = *_keysplit;
         auto b = QSignalBlocker(&list);
-        doc::Samples const& samples = _win->state().document().samples;
+        auto const& doc = _win->state().document();
+        doc::Samples const& samples = doc.samples;
 
         // TODO ensure we always have exactly 1 element selected.
         // TODO how to handle 0 keysplits? create a dummy keysplit pointing to sample 0?
@@ -849,16 +863,17 @@ public:
         list.clear();
 
         auto & keysplit = instr.keysplit;
-        QColor error_color = pal::get_color(pal::Hue::Yellow, pal::Shade::Light1);
-        error_color.setAlphaF(0.4);
+        QColor warning_color = warning_bg();
 
         // Fractional DPI scaling would be nice, but it's hard to subscribe to
         // font/DPI changes (good luck getting a QWindow), and Qt's regular toolbars
         // don't have fractionally scaled icons either.
-        list.setIconSize(QSize(16, 16));
+        list.setIconSize(ICON_SIZE);
+
+        auto warning_iter = KeysplitWarningIter(doc, instr);
 
         size_t n = keysplit.size();
-        int curr_min_note = -1;
+        _keysplit_size = n;
         for (size_t patch_idx = 0; patch_idx < n; patch_idx++) {
             doc::InstrumentPatch const& patch = keysplit[patch_idx];
             QString name = sample_text(samples, patch.sample_idx);
@@ -869,49 +884,19 @@ public:
 
             auto item = new QListWidgetItem(text, &list);
 
-            std::vector<QString> warnings;
-
-            if (!samples[patch.sample_idx].has_value()) {
-                warnings.push_back(
-                    tr("Sample %1 not found; keysplit will not play")
-                        .arg(format_hex_2(patch.sample_idx))
-                );
+            auto warnings = warning_iter.next().value().warnings;
+            QString tooltip = warning_tooltip(warnings);
+            if (!tooltip.isEmpty()) {
+                item->setToolTip(std::move(tooltip));
+                item->setIcon(_warning_icon);
+                item->setBackground(warning_color);
             }
-            if ((int) patch.min_note <= curr_min_note) {
-                warnings.push_back(
-                    tr("Min key %1 out of order; keysplit will not play")
-                        .arg(patch.min_note)
-                );
-            } else {
-                curr_min_note = patch.min_note;
-            }
+        }
 
-            if (!warnings.empty()) {
-                QTextDocument document;
-                auto cursor = QTextCursor(&document);
-                cursor.beginEditBlock();
-                cursor.insertText(tr("Warnings:"));
-
-                // https://stackoverflow.com/a/51864380
-                QTextList* bullets = nullptr;
-                QTextBlockFormat non_list_format = cursor.blockFormat();
-                for (auto const& w : warnings) {
-                    if (!bullets) {
-                        // create list with 1 item
-                        bullets = cursor.insertList(QTextListFormat::ListDisc);
-                    } else {
-                        // append item to list
-                        cursor.insertBlock();
-                    }
-
-                    cursor.insertText(w);
-                }
-
-                item->setToolTip(document.toHtml());
-                item->setIcon(_error_icon);
-
-                item->setBackground(error_color);
-            }
+        if (n == 0) {
+            auto item = new QListWidgetItem(tr("No keysplits found"), &list);
+            item->setIcon(_warning_icon);
+            item->setBackground(warning_color);
         }
 
         if (n > 0) {

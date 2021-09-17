@@ -219,6 +219,8 @@ add_executable(exotracker-qt
     src/gui/lib/color.cpp
     src/gui/lib/docs_palette.cpp
     src/gui/lib/format.cpp  # Unfortunately tied to QString.
+    src/gui/lib/instr_warnings.cpp
+    src/gui/lib/list_warnings.cpp
     src/gui/lib/parse_note.cpp
     src/gui/lib/painter_ext.cpp
     src/gui/pattern_editor.cpp
