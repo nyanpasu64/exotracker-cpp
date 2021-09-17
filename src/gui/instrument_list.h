@@ -22,7 +22,7 @@ public:
     /// Holds a persistent aliased reference to MainWindow.
     static InstrumentList * make(MainWindow * win, QWidget * parent = nullptr);
 
-    virtual void set_history(GetDocument get_document) = 0;
+    virtual void reload_state() = 0;
 
     virtual void update_selection() = 0;
 };

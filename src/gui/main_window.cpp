@@ -64,7 +64,8 @@ namespace gui::main_window {
 using std::unique_ptr;
 using std::make_unique;
 
-using gui::lib::IconToolBar;
+using gui::lib::icon_toolbar::IconToolBar;
+using gui::lib::icon_toolbar::enable_button_borders;
 using gui::pattern_editor::PatternEditor;
 using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
@@ -383,7 +384,7 @@ struct MainWindowUi : MainWindow {
         }
 
         // Toolbar
-        {main__tb(IconToolBar(false));  // No button borders
+        {main__tb(IconToolBar);
             tb->setFloatable(false);
             tb->setAllowedAreas(Qt::TopToolBarArea);
 
@@ -423,7 +424,7 @@ struct MainWindowUi : MainWindow {
             {l__w_factory(TimelineEditor::make(this))
                 _timeline_editor = w;
             }
-            {l__w(IconToolBar(true))  // Show button borders.
+            {l__w(IconToolBar)
                 _timeline.add_row = w->add_icon_action(
                     tr("Add Timeline Entry"), "document-new"
                 );
@@ -439,6 +440,7 @@ struct MainWindowUi : MainWindow {
                 _timeline.clone_row = w->add_icon_action(
                     tr("Clone Row"), "edit-copy"
                 );
+                enable_button_borders(w);
             }
         }
     }
@@ -944,7 +946,7 @@ public:
 
         _pattern_editor->set_history(_state.document_getter());
         _timeline_editor->set_history(_state.document_getter());
-        _instrument_list->set_history(_state.document_getter());
+        _instrument_list->reload_state();
 
         // Hook up refresh timer.
         connect(
@@ -1568,7 +1570,7 @@ StateTransaction::~StateTransaction() noexcept(false) {
 
     // InstrumentList depends on _history and _instrument.
     if (e & E::DocumentEdited) {
-        _win->_instrument_list->set_history(state.document_getter());
+        _win->_instrument_list->reload_state();
     } else if (e & E::InstrumentSwitched) {
         _win->_instrument_list->update_selection();
     }
@@ -1577,7 +1579,7 @@ StateTransaction::~StateTransaction() noexcept(false) {
     // is tricky.
     // https://docs.google.com/document/d/1xSXmtB4-9Wa11Bo9jWp3cpMvIWSbl6DNN3gojpW-NhE/edit#heading=h.68ro9bhgsp2w
     if (_win->_maybe_instr_dialog) {
-        if (e & E::DocumentReplaced) {
+        if (e & E::InstrumentDeleted) {
             // closes dialog, nulls out pointer later on.
             _win->_maybe_instr_dialog->close();
         } else if (e & (E::DocumentEdited | E::InstrumentSwitched)) {
@@ -1617,6 +1619,10 @@ history::History & StateTransaction::history_mut() {
 
 void StateTransaction::push_edit(edit::EditBox command, MoveCursor cursor_move) {
     _win->push_edit(*this, std::move(command), cursor_move);
+}
+
+void StateTransaction::instrument_deleted() {
+    _queued_updates |= E::InstrumentDeleted;
 }
 
 void StateTransaction::set_document(doc::Document document) {
