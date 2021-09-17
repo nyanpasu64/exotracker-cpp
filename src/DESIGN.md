@@ -137,7 +137,7 @@ using EditBox = std::unique_ptr<BaseEditCommand>;
 
 Every time the user performs an edit action, the program (GUI thread) calls a "constructor function" which takes a `Document const&` and parameters describing user input, and returning a `EditBox`.
 
-The returned `EditBox` is copied. One copy is sent from the GUI to audio thread through a lock-free queue, where OverallSynth calls `apply_swap()` to apply the edit to the audio document. The other copy is kept by the GUI thread, which calls `apply_swap()` on the GUI document, then pushes the command onto the undo stack.
+The returned `EditBox` is copied using `clone_for_audio()`. The copy is sent from the GUI to audio thread through a lock-free queue, where OverallSynth calls `apply_swap()` to apply the edit to the audio document. The original is kept by the GUI thread, which calls `apply_swap()` on the GUI document, then pushes the object onto the undo stack.
 
 `apply_swap()` doesn't mutate the document directly, but instead swaps the command's contents with part of the document (like a pattern vector). This was designed to satisfy two requirements: the ability to undo/redo on the GUI thread, and wait-free operation on the audio thread.
 
@@ -151,7 +151,13 @@ When the audio thread applies an edit, the function call cannot allocate or deal
 
 Once the audio thread processes a command, it cannot deallocate the command object itself, which may own vectors and other heap-allocated data. To achieve this, the audio thread's doesn't receive ownership over commands, only mutable references. The audio thread signals to the GUI thread which commands it's finished processing, so the GUI thread can destroy them.
 
-### Examples (not all implemented in tracker yet)
+### Space–time tradeoff and `clone_for_audio()`
+
+An `EditBox` used by the GUI thread has different requirements than one sent to the audio thread. A GUI edit command should take up minimal RAM since hundreds are stored at once in the `History`, but doesn't need to be bounded time. On the other hand, an edit command sent to the audio thread must be bounded-time, but RAM usage isn't important (since after it gets applied on the audio thread, it's deleted by the GUI thread and not stored in a history).
+
+As a result, "constructor functions" return an `EditBox` optimized for saving space. When the GUI wants to send an `EditBox` to the audio thread, it calls `EditBox clone_for_audio(doc::Document const& doc) const` and sends the result. In most subclasses this method clones the object directly, but some like `SwapInstruments` instead return a different subclass which caches some data from the `doc` parameter, increasing space usage but making `apply_swap()` faster.
+
+### Examples
 
 An "insert note" function picks a single pattern in the document and creates a copy. It inserts a note in the proper spot in the copy, and returns an `EditBox` owning a `BaseEditCommand` subclass containing the edited pattern copy.
 
