@@ -212,7 +212,8 @@ struct SwapInstruments {
         // TODO tell synth that instruments swapped?
     }
 
-    using Impl = ImplEditCommand<SwapInstruments, Override::None>;
+    using Impl = ImplEditCommand<SwapInstruments, Override::CloneForAudio>;
+    EditBox clone_for_audio(doc::Document const& doc) const;
 
     static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
 };
@@ -245,9 +246,7 @@ struct SwapInstrumentsCached {
     static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
 };
 
-EditBox swap_instruments_cached(
-    Document const& doc, InstrumentIndex a, InstrumentIndex b
-) {
+EditBox SwapInstruments::clone_for_audio(Document const& doc) const {
     Timeline timeline = doc.timeline;  // Make a copy
     timeline_swap_instruments(timeline, a, b);
     return make_command(SwapInstrumentsCached{a, b, std::move(timeline)});

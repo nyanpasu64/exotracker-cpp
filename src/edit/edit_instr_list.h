@@ -47,14 +47,11 @@ std::tuple<MaybeEditBox, InstrumentIndex> try_remove_instrument(
 // Reordering instruments.
 
 /// Returns a command which swaps two instruments in the instrument list,
-/// and iterates over every pattern in the timeline to swap instruments (slow).
+/// and iterates over every pattern in the timeline to swap instruments.
+///
+/// When clone_for_audio() is called, precomputes a copy of the current timeline
+/// with the instruments swapped (takes extra RAM, but is O(1) to apply on the
+/// audio thread no matter how many patterns were edited).
 [[nodiscard]] EditBox swap_instruments(InstrumentIndex a, InstrumentIndex b);
-
-/// Returns a command which swaps two instruments in the instrument list,
-/// and swaps the current timeline and one with the instruments swapped
-/// (eats RAM).
-[[nodiscard]] EditBox swap_instruments_cached(
-    Document const& doc, InstrumentIndex a, InstrumentIndex b
-);
 
 }
