@@ -15,7 +15,7 @@
 namespace {
 
 using gui::history::History;
-using gui::history::CursorEdit;
+using gui::history::UndoFrame;
 using gui::cursor::Cursor;
 using edit::EditBox;
 using timing::GridAndBeat;
@@ -29,11 +29,11 @@ using GetEdit = edit::EditBox (*)(doc::Document const&);
 namespace ep = edit::edit_pattern;
 
 /// When we switched to per-digit cursors (and an unused OpenMPT-style digit mode),
-/// we eliminated coalescing two adjacent edits to the same subcolumn.
+/// we eliminated merging two adjacent edits to the same subcolumn.
 /// This allowed removing a significant amount of code.
 ///
 /// Applying edits a and b on a document (which may/not have an existing block),
-/// assert that coalescing does not occur.
+/// assert that merging does not occur.
 void test_pattern_edits(bool start_with_block, GetEdit a, GetEdit b) {
     auto h = History(sample_docs::DOCUMENTS.at("empty").clone());
 
@@ -41,18 +41,18 @@ void test_pattern_edits(bool start_with_block, GetEdit a, GetEdit b) {
         // Create a block, so both a and b operate on an existing block.
         edit::EditBox create_block =
             ep::create_block(h.get_document(), 0, 0, GridAndBeat{0, 0});
-        h.push(CursorEdit{std::move(create_block), Cursor{}, Cursor{}});
+        h.push(UndoFrame{std::move(create_block), Cursor{}, Cursor{}});
     }
 
     auto begin_doc = get_cell(h.get_document().clone());
 
     // Push first edit.
-    h.push(CursorEdit{a(h.get_document()), Cursor{}, Cursor{}});
+    h.push(UndoFrame{a(h.get_document()), Cursor{}, Cursor{}});
     auto after_a = get_cell(h.get_document().clone());
     CHECK_UNARY(after_a != begin_doc);
 
     // Push second edit.
-    h.push(CursorEdit{b(h.get_document()), Cursor{}, Cursor{}});
+    h.push(UndoFrame{b(h.get_document()), Cursor{}, Cursor{}});
     auto after_b = get_cell(h.get_document().clone());
     CHECK_UNARY(after_b != begin_doc);
     // after_b may/not equal after_a.
@@ -112,7 +112,7 @@ PARAMETERIZE(should_start_with_block, bool, start_with_block,
 )
 
 
-TEST_CASE("Check that volume editing operations are not coalesced") {
+TEST_CASE("Check that volume editing operations are not merged") {
     bool start_with_block;
     PICK(should_start_with_block(start_with_block));
     test_pattern_edits(start_with_block, volume_write_1, volume_write_2);
@@ -121,13 +121,13 @@ TEST_CASE("Check that volume editing operations are not coalesced") {
     test_pattern_edits(start_with_block, volume_shift, volume_shift);
 }
 
-TEST_CASE("Check that mixing volume/instrument edits are not coalesced") {
+TEST_CASE("Check that mixing volume/instrument edits are not merged") {
     bool start_with_block;
     PICK(should_start_with_block(start_with_block));
     test_pattern_edits(start_with_block, volume_write_1, instr_write);
 }
 
-TEST_CASE("Check that instrument edits are not coalesced") {
+TEST_CASE("Check that instrument edits are not merged") {
     bool start_with_block;
     PICK(should_start_with_block(start_with_block));
     test_pattern_edits(start_with_block, instr_write, instr_write);

@@ -10,7 +10,7 @@
 
 namespace edit::edit_doc {
 
-using edit_impl::make_command;
+using namespace edit_impl;
 
 /// type GetFieldMut<T> = fn(&mut Document) -> &mut T;
 template<typename T>
@@ -32,14 +32,13 @@ public:
         std::swap(get_field_mut(document), _value);
     }
 
-    bool can_coalesce(BaseEditCommand & prev_edit_command) const {
-        using SelfEditCommand = edit_impl::ImplEditCommand<Setter>;
-
-        // Is it really a good idea to coalesce spinbox changes?
-        // If you undo to after a spinbox edit, and spin it again,
+    using Impl = ImplEditCommand<Setter, Override::CanMerge>;
+    bool can_merge(BaseEditCommand & prev) const {
+        // TODO when pushing edits, freeze previous commands to prevent merging.
+        // Currently, if you undo to after a spinbox edit, and spin it again,
         // the previous undo state is destroyed!
 
-        return typeid(prev_edit_command) == typeid(SelfEditCommand);
+        return typeid(prev) == typeid(Impl);
     }
 };
 
@@ -79,9 +78,7 @@ public:
         std::swap(document.sequencer_options, _value);
     }
 
-    bool can_coalesce(BaseEditCommand &) const {
-        return false;
-    }
+    using Impl = ImplEditCommand<SetSequencerOptions, Override::None>;
 };
 
 EditBox set_sequencer_options(
@@ -130,6 +127,8 @@ struct EditRow {
         }
     }
 
+    // Do *not* replace with default-derived copy/move constructors.
+    // They fail to call _raw_blocks.reserve()!
     EditRow(EditRow const& other) : EditRow(other._grid, other._edit) {}
 
     EditRow(EditRow && other) noexcept
@@ -167,10 +166,7 @@ struct EditRow {
         }
     }
 
-    bool can_coalesce(BaseEditCommand &) const {
-        return false;
-    }
-
+    using Impl = ImplEditCommand<EditRow, Override::None>;
     constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
 };
 
@@ -218,14 +214,9 @@ struct SetGridLength {
         std::swap(document.timeline[_grid].nbeats, _row_nbeats);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
-        using ImplPatternEdit = edit_impl::ImplEditCommand<SetGridLength>;
-
-        // Is it really a good idea to coalesce spinbox changes?
-        // If you undo to after a spinbox edit, and spin it again,
-        // the previous undo state is destroyed!
-
-        if (auto p = typeid_cast<ImplPatternEdit *>(&prev)) {
+    using Impl = ImplEditCommand<SetGridLength, Override::CanMerge>;
+    bool can_merge(BaseEditCommand & prev) const {
+        if (auto p = typeid_cast<Impl *>(&prev)) {
             SetGridLength & prev = *p;
             return prev._grid == _grid;
         }
@@ -249,10 +240,7 @@ struct MoveGridDown {
         std::swap(document.timeline[_grid], document.timeline[_grid + 1]);
     }
 
-    bool can_coalesce(BaseEditCommand & prev) const {
-        return false;
-    }
-
+    using Impl = ImplEditCommand<MoveGridDown, Override::None>;
     constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
 };
 
