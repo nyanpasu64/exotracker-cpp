@@ -69,6 +69,9 @@ set(
         -Wno-unused-function -Wno-unused-parameter
         -Werror=return-type
     >
+    $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
+        -Wtautological-unsigned-zero-compare
+    >
     $<$<CXX_COMPILER_ID:MSVC>:
         /Zc:preprocessor
 #        /W3
