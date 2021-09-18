@@ -96,7 +96,7 @@ static void iterate_adsr(Adsr const adsr, auto & cb) {
     ticked at freq, freq/3, and freq/5, and checks `counters[...] % power-of-2 == 0`.
     */
     NsampT t = 0;
-    uint32_t level = 0;
+    int32_t level = 0;
 
     // Adapted from SPC_DSP.cpp, SPC_DSP::run_envelope().
     enum class EnvMode { Attack, Decay, Decay2 };
@@ -105,7 +105,7 @@ static void iterate_adsr(Adsr const adsr, auto & cb) {
 
     while (true) {
         size_t period_idx;
-        uint32_t const old_level = level;
+        int32_t const old_level = level;
 
         // This function currently only handles ADSR.
         // Using GAIN for exponential release will be simulated in another function.
@@ -113,19 +113,19 @@ static void iterate_adsr(Adsr const adsr, auto & cb) {
         // is not a planned feature, and if implemented, plotting it may require
         // slow sample-accurate emulation.
         if (env_mode == EnvMode::Attack) {
-            period_idx = adsr.attack_rate * 2 + 1;
+            period_idx = (size_t) adsr.attack_rate * 2 + 1;
             level += period_idx < 31 ? 0x20 : 0x400;
         } else
         if (env_mode == EnvMode::Decay) {
             level--;
             level -= level >> 8;
-            period_idx = adsr.decay_rate * 2 + 0x10;
+            period_idx = (size_t) adsr.decay_rate * 2 + 0x10;
         } else
         {
             assert(env_mode == EnvMode::Decay2);
             level--;
             level -= level >> 8;
-            period_idx = adsr.decay_2;
+            period_idx = (size_t) adsr.decay_2;
         }
 
         if (period_idx == 0) {
@@ -187,7 +187,7 @@ static void iterate_adsr(Adsr const adsr, auto & cb) {
                 level = old_level;
             }
             env_mode = EnvMode::Decay2;
-            sustain_point = Point{t + dt, level};
+            sustain_point = Point{t + dt, (uint32_t) level};
         }
 
         if (env_mode == EnvMode::Attack && level > 0x7FF) {
@@ -198,11 +198,11 @@ static void iterate_adsr(Adsr const adsr, auto & cb) {
                 level = old_level;
             }
             env_mode = EnvMode::Decay;
-            decay_begin = Point{t + dt, level};
+            decay_begin = Point{t + dt, (uint32_t) level};
         }
         t += dt;
 
-        if (!cb.point(Point{t, level})) {
+        if (!cb.point(Point{t, (uint32_t) level})) {
             return;
         }
         if (decay_begin.time != 0) {
