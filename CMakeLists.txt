@@ -71,6 +71,7 @@ set(
     >
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
         -Wtautological-unsigned-zero-compare
+        -Wmissing-variable-declarations  # See !52 for explanation.
     >
     $<$<CXX_COMPILER_ID:MSVC>:
         /Zc:preprocessor

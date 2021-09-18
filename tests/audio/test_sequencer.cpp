@@ -159,7 +159,7 @@ TEST_CASE("Test seeking") {
     }
 }
 
-char const * DOC_NAMES[] {
+static char const * DOC_NAMES[] {
     "dream-fragments",
 //    "world-revolution",
 };
@@ -433,7 +433,7 @@ static Document gap_doc(
     };
 }
 
-std::random_device rd;
+static std::random_device rd;
 
 TEST_CASE("Randomly switch between randomly generated documents of the same length") {
     // Keep two sequencers and tick both in lockstep.
