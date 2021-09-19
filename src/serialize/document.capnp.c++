@@ -1846,13 +1846,13 @@ constexpr ::capnp::Kind Versions::_capnpPrivate::kind;
 constexpr ::capnp::_::RawSchema const* Versions::_capnpPrivate::schema;
 #endif  // !CAPNP_LITE
 
-#ifndef _MSC_VER
+#if !defined(_MSC_VER) || defined(__clang__)
 constexpr  ::uint32_t Versions::UNKNOWN;
 #endif
-#ifndef _MSC_VER
+#if !defined(_MSC_VER) || defined(__clang__)
 constexpr  ::uint32_t Versions::MINIMUM;
 #endif
-#ifndef _MSC_VER
+#if !defined(_MSC_VER) || defined(__clang__)
 constexpr  ::uint32_t Versions::CURRENT;
 #endif
 // MaybeEffect
