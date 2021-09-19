@@ -34,6 +34,7 @@
 #include <process.h>
 #endif
 
+#include <algorithm>
 #include <functional>
 
 namespace kj {
@@ -50,7 +51,7 @@ bool hasSubstring(StringPtr haystack, StringPtr needle) {
 #if !defined(_WIN32)
     return memmem(haystack.begin(), haystack.size(), needle.begin(), needle.size()) != nullptr;
 #elif defined(__cpp_lib_boyer_moore_searcher)
-    std::boyer_moore_horspool_searcher searcher{needle.begin(), needle.size()};
+    std::boyer_moore_horspool_searcher searcher{needle.begin(), needle.end()};
     return std::search(haystack.begin(), haystack.end(), searcher) != haystack.end();
 #else
     // TODO(perf): This is not the best algorithm for substring matching. strstr can't be used
