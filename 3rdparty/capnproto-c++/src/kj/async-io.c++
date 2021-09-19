@@ -21,8 +21,7 @@
 
 #if _WIN32
 // Request Vista-level APIs.
-#define WINVER 0x0600
-#define _WIN32_WINNT 0x0600
+#include "win32-api-version.h"
 #endif
 
 #include "async-io.h"
@@ -70,6 +69,11 @@ Promise<size_t> AsyncInputStream::read(void* buffer, size_t minBytes, size_t max
 }
 
 Maybe<uint64_t> AsyncInputStream::tryGetLength() { return nullptr; }
+
+void AsyncInputStream::registerAncillaryMessageHandler(
+    Function<void(ArrayPtr<AncillaryMessage>)> fn) {
+ KJ_UNIMPLEMENTED("registerAncillaryMsgHandler is not implemented by this AsyncInputStream");
+}
 
 namespace {
 
@@ -385,6 +389,35 @@ private:
     }
   }
 
+  template <typename F>
+  static auto teeExceptionVoid(F& fulfiller) {
+    // Returns a functor that can be passed as the second parameter to .then() to propagate the
+    // exception to a given fulfiller. The functor's return type is void.
+    return [&fulfiller](kj::Exception&& e) {
+      fulfiller.reject(kj::cp(e));
+      kj::throwRecoverableException(kj::mv(e));
+    };
+  }
+  template <typename F>
+  static auto teeExceptionSize(F& fulfiller) {
+    // Returns a functor that can be passed as the second parameter to .then() to propagate the
+    // exception to a given fulfiller. The functor's return type is size_t.
+    return [&fulfiller](kj::Exception&& e) -> size_t {
+      fulfiller.reject(kj::cp(e));
+      kj::throwRecoverableException(kj::mv(e));
+      return 0;
+    };
+  }
+  template <typename T, typename F>
+  static auto teeExceptionPromise(F& fulfiller) {
+    // Returns a functor that can be passed as the second parameter to .then() to propagate the
+    // exception to a given fulfiller. The functor's return type is Promise<T>.
+    return [&fulfiller](kj::Exception&& e) -> kj::Promise<T> {
+      fulfiller.reject(kj::cp(e));
+      return kj::mv(e);
+    };
+  }
+
   class BlockedWrite final: public AsyncCapabilityStream {
     // AsyncPipe state when a write() is currently waiting for a corresponding read().
 
@@ -475,7 +508,7 @@ private:
         KJ_SWITCH_ONEOF(capBuffer) {
           KJ_CASE_ONEOF(fds, ArrayPtr<const int>) {
             if (fds.size() > 0 && maxStreams > 0) {
-              // TODO(someday): Maybe AsyncIoStream should have a `Maybe<int> getFd()` method?
+              // TODO(someday): Use AsyncIoStream's `Maybe<int> getFd()` method?
               KJ_FAIL_REQUIRE(
                   "async pipe message was written with FDs attached, but corresponding read "
                   "asked for streams, and we don't know how to convert here");
@@ -524,7 +557,7 @@ private:
           writeBuffer = writeBuffer.slice(amount, writeBuffer.size());
           // We pumped the full amount, so we're done pumping.
           return amount;
-        }));
+        }, teeExceptionSize(fulfiller)));
       }
 
       // First piece doesn't cover the whole pump. Figure out how many more pieces to add.
@@ -558,7 +591,7 @@ private:
             return pipe.pumpTo(output, amount - actual)
                 .then([actual](uint64_t actual2) { return actual + actual2; });
           }
-        }));
+        }, teeExceptionPromise<uint64_t>(fulfiller)));
       } else {
         // Pump ends mid-piece. Write the last, partial piece.
         auto n = amount - actual;
@@ -578,7 +611,7 @@ private:
           morePieces = newMorePieces;
           canceler.release();
           return amount;
-        }));
+        }, teeExceptionSize(fulfiller)));
       }
     }
 
@@ -713,7 +746,7 @@ private:
                               minBytes - actual, maxBytes - actual)
               .then([actual](size_t actual2) { return actual + actual2; });
         }
-      }));
+      }, teeExceptionPromise<size_t>(fulfiller)));
     }
 
     Promise<ReadResult> tryReadWithFds(void* readBuffer, size_t minBytes, size_t maxBytes,
@@ -753,7 +786,7 @@ private:
         // Completed entire pumpTo amount.
         KJ_ASSERT(actual == amount2);
         return amount2;
-      }));
+      }, teeExceptionSize(fulfiller)));
     }
 
     void abortRead() override {
@@ -941,7 +974,7 @@ private:
           }
           KJ_CASE_ONEOF(streamBuffer, ArrayPtr<Own<AsyncCapabilityStream>>) {
             if (streamBuffer.size() > 0 && fds.size() > 0) {
-              // TODO(someday): Maybe AsyncIoStream should have a `Maybe<int> getFd()` method?
+              // TODO(someday): Use AsyncIoStream's `Maybe<int> getFd()` method?
               KJ_FAIL_REQUIRE(
                   "async pipe message was written with FDs attached, but corresponding read "
                   "asked for streams, and we don't know how to convert here");
@@ -1043,7 +1076,7 @@ private:
           // place waiting for more data.
           return actual;
         }
-      }));
+      }, teeExceptionPromise<uint64_t>(fulfiller)));
     }
 
     void shutdownWrite() override {
@@ -1174,7 +1207,7 @@ private:
           KJ_ASSERT(pumpedSoFar == amount);
           return pipe.write(reinterpret_cast<const byte*>(writeBuffer) + actual, size - actual);
         }
-      }));
+      }, teeExceptionPromise<void>(fulfiller)));
     }
 
     Promise<void> write(ArrayPtr<const ArrayPtr<const byte>> pieces) override {
@@ -1201,7 +1234,7 @@ private:
               fulfiller.fulfill(kj::cp(amount));
               pipe.endState(*this);
               return pipe.write(partial2.begin(), partial2.size());
-            }));
+            }, teeExceptionPromise<void>(fulfiller)));
             ++i;
           } else {
             // The pump ends exactly at the end of a piece, how nice.
@@ -1209,7 +1242,7 @@ private:
               canceler.release();
               fulfiller.fulfill(kj::cp(amount));
               pipe.endState(*this);
-            }));
+            }, teeExceptionVoid(fulfiller)));
           }
 
           auto remainder = pieces.slice(i, pieces.size());
@@ -1238,7 +1271,7 @@ private:
           fulfiller.fulfill(kj::cp(amount));
           pipe.endState(*this);
         }
-      }));
+      }, teeExceptionVoid(fulfiller)));
     }
 
     Promise<void> writeWithFds(ArrayPtr<const byte> data,
@@ -1303,7 +1336,7 @@ private:
             KJ_ASSERT(pumpedSoFar == amount);
             return input.pumpTo(pipe, amount2 - actual);
           }
-        }));
+        }, teeExceptionPromise<uint64_t>(fulfiller)));
       });
     }
 
@@ -1610,7 +1643,8 @@ private:
     if (limit == 0) {
       inner = nullptr;
     } else if (amount < requested) {
-      KJ_FAIL_REQUIRE("pipe ended prematurely") { break; }
+      kj::throwRecoverableException(KJ_EXCEPTION(DISCONNECTED,
+          "fixed-length pipe ended prematurely"));
     }
   }
 };
@@ -2004,6 +2038,31 @@ private:
   }
 
   Promise<void> pull() {
+    return pullLoop().eagerlyEvaluate([this](Exception&& exception) {
+      // Exception from our loop, not from inner tryRead(). Something is broken; tell everybody!
+      pulling = false;
+      for (auto& state: branches) {
+        KJ_IF_MAYBE(s, state) {
+          KJ_IF_MAYBE(sink, s->sink) {
+            sink->reject(KJ_EXCEPTION(FAILED, "Exception in tee loop", exception));
+          }
+        }
+      }
+    });
+  }
+
+  constexpr static size_t MAX_BLOCK_SIZE = 1 << 14;  // 16k
+
+  Own<AsyncInputStream> inner;
+  const uint64_t bufferSizeLimit = kj::maxValue;
+  Maybe<uint64_t> length;
+  Maybe<Branch> branches[2];
+  Maybe<Stoppage> stoppage;
+  Promise<void> pullPromise = READY_NOW;
+  bool pulling = false;
+
+private:
+  Promise<void> pullLoop() {
     // Use evalLater() so that two pump sinks added on the same turn of the event loop will not
     // cause buffering.
     return evalLater([this] {
@@ -2034,7 +2093,7 @@ private:
 
       if (stoppage != nullptr) {
         // We're eof or errored, don't read, but loop so we can fill the sink(s).
-        return pull();
+        return pullLoop();
       }
 
       auto& n = KJ_ASSERT_NONNULL(need);
@@ -2054,7 +2113,7 @@ private:
           // TODO(perf): buffer.size() is O(n) where n = # of individual heap-allocated byte arrays.
           if (s->buffer.size() + n.maxBytes > bufferSizeLimit) {
             stoppage = Stoppage(KJ_EXCEPTION(FAILED, "tee buffer size limit exceeded"));
-            return pull();
+            return pullLoop();
           }
         }
       }
@@ -2104,34 +2163,14 @@ private:
           stoppage = Stoppage(Eof());
         }
 
-        return pull();
+        return pullLoop();
       }, [this](Exception&& exception) {
         // Exception from the inner tryRead(). Propagate.
         stoppage = Stoppage(mv(exception));
-        return pull();
+        return pullLoop();
       });
-    }).eagerlyEvaluate([this](Exception&& exception) {
-      // Exception from our loop, not from inner tryRead(). Something is broken; tell everybody!
-      pulling = false;
-      for (auto& state: branches) {
-        KJ_IF_MAYBE(s, state) {
-          KJ_IF_MAYBE(sink, s->sink) {
-            sink->reject(KJ_EXCEPTION(FAILED, "Exception in tee loop", exception));
-          }
-        }
-      }
     });
   }
-
-  constexpr static size_t MAX_BLOCK_SIZE = 1 << 14;  // 16k
-
-  Own<AsyncInputStream> inner;
-  const uint64_t bufferSizeLimit = kj::maxValue;
-  Maybe<uint64_t> length;
-  Maybe<Branch> branches[2];
-  Maybe<Stoppage> stoppage;
-  Promise<void> pullPromise = READY_NOW;
-  bool pulling = false;
 };
 
 constexpr size_t AsyncTee::MAX_BLOCK_SIZE;
@@ -2371,6 +2410,14 @@ public:
       tasks.add(promise.addBranch().then([this]() {
         return KJ_ASSERT_NONNULL(stream)->abortRead();
       }));
+    }
+  }
+
+  kj::Maybe<int> getFd() const override {
+    KJ_IF_MAYBE(s, stream) {
+      return s->get()->getFd();
+    } else {
+      return nullptr;
     }
   }
 
@@ -2658,6 +2705,12 @@ Promise<Own<AsyncIoStream>> CapabilityStreamConnectionReceiver::accept() {
   });
 }
 
+Promise<AuthenticatedStream> CapabilityStreamConnectionReceiver::acceptAuthenticated() {
+  return accept().then([](Own<AsyncIoStream>&& stream) {
+    return AuthenticatedStream { kj::mv(stream), UnknownPeerIdentity::newInstance() };
+  });
+}
+
 uint CapabilityStreamConnectionReceiver::getPort() {
   return 0;
 }
@@ -2674,6 +2727,11 @@ Promise<Own<AsyncIoStream>> CapabilityStreamNetworkAddress::connect() {
       .then(kj::mvCapture(result, [](Own<AsyncIoStream>&& result) {
     return kj::mv(result);
   }));
+}
+Promise<AuthenticatedStream> CapabilityStreamNetworkAddress::connectAuthenticated() {
+  return connect().then([](Own<AsyncIoStream>&& stream) {
+    return AuthenticatedStream { kj::mv(stream), UnknownPeerIdentity::newInstance() };
+  });
 }
 Own<ConnectionReceiver> CapabilityStreamNetworkAddress::listen() {
   return kj::heap<CapabilityStreamConnectionReceiver>(inner);
@@ -3028,4 +3086,81 @@ bool NetworkFilter::shouldAllowParse(const struct sockaddr* addr, uint addrlen) 
 }
 
 }  // namespace _ (private)
+
+// =======================================================================================
+// PeerIdentity implementations
+
+namespace {
+
+class NetworkPeerIdentityImpl final: public NetworkPeerIdentity {
+public:
+  NetworkPeerIdentityImpl(kj::Own<NetworkAddress> addr): addr(kj::mv(addr)) {}
+
+  kj::String toString() override { return addr->toString(); }
+  NetworkAddress& getAddress() override { return *addr; }
+
+private:
+  kj::Own<NetworkAddress> addr;
+};
+
+class LocalPeerIdentityImpl final: public LocalPeerIdentity {
+public:
+  LocalPeerIdentityImpl(Credentials creds): creds(creds) {}
+
+  kj::String toString() override {
+    char pidBuffer[16];
+    kj::StringPtr pidStr = nullptr;
+    KJ_IF_MAYBE(p, creds.pid) {
+      pidStr = strPreallocated(pidBuffer, " pid:", *p);
+    }
+
+    char uidBuffer[16];
+    kj::StringPtr uidStr = nullptr;
+    KJ_IF_MAYBE(u, creds.uid) {
+      uidStr = strPreallocated(uidBuffer, " uid:", *u);
+    }
+
+    return kj::str("(local peer", pidStr, uidStr, ")");
+  }
+
+  Credentials getCredentials() override { return creds; }
+
+private:
+  Credentials creds;
+};
+
+class UnknownPeerIdentityImpl final: public UnknownPeerIdentity {
+public:
+  kj::String toString() override {
+    return kj::str("(unknown peer)");
+  }
+};
+
+}  // namespace
+
+kj::Own<NetworkPeerIdentity> NetworkPeerIdentity::newInstance(kj::Own<NetworkAddress> addr) {
+  return kj::heap<NetworkPeerIdentityImpl>(kj::mv(addr));
+}
+
+kj::Own<LocalPeerIdentity> LocalPeerIdentity::newInstance(LocalPeerIdentity::Credentials creds) {
+  return kj::heap<LocalPeerIdentityImpl>(creds);
+}
+
+kj::Own<UnknownPeerIdentity> UnknownPeerIdentity::newInstance() {
+  static UnknownPeerIdentityImpl instance;
+  return { &instance, NullDisposer::instance };
+}
+
+Promise<AuthenticatedStream> ConnectionReceiver::acceptAuthenticated() {
+  return accept().then([](Own<AsyncIoStream> stream) {
+    return AuthenticatedStream { kj::mv(stream), UnknownPeerIdentity::newInstance() };
+  });
+}
+
+Promise<AuthenticatedStream> NetworkAddress::connectAuthenticated() {
+  return connect().then([](Own<AsyncIoStream> stream) {
+    return AuthenticatedStream { kj::mv(stream), UnknownPeerIdentity::newInstance() };
+  });
+}
+
 }  // namespace kj

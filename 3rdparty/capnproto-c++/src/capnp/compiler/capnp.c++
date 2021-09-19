@@ -23,6 +23,10 @@
 #define _GNU_SOURCE
 #endif
 
+#if _WIN32
+#include <kj/win32-api-version.h>
+#endif
+
 #include "lexer.h"
 #include "parser.h"
 #include "compiler.h"
@@ -50,10 +54,8 @@
 
 #if _WIN32
 #include <process.h>
-#define WIN32_LEAN_AND_MEAN  // ::eyeroll::
 #include <windows.h>
 #include <kj/windows-sanity.h>
-#undef VOID
 #undef CONST
 #else
 #include <sys/wait.h>
@@ -355,9 +357,9 @@ public:
 
     auto dirPathPair = interpretSourceFile(file);
     KJ_IF_MAYBE(module, loader.loadModule(dirPathPair.dir, dirPathPair.path)) {
-      uint64_t id = compiler->add(*module);
-      compiler->eagerlyCompile(id, compileEagerness);
-      sourceFiles.add(SourceFile { id, module->getSourceName(), &*module });
+      auto compiled = compiler->add(*module);
+      compiler->eagerlyCompile(compiled.getId(), compileEagerness);
+      sourceFiles.add(SourceFile { compiled.getId(), compiled, module->getSourceName(), &*module });
     } else {
       return "no such file";
     }
@@ -902,7 +904,7 @@ private:
               state = COMMENT;
               break;
             }
-            // fallthrough
+            KJ_FALLTHROUGH;
           case NORMAL:
             switch (c) {
               case '#': state = COMMENT; break;
@@ -1163,44 +1165,88 @@ public:
     return true;
   }
 
-  kj::MainBuilder::Validity setRootType(kj::StringPtr type) {
+  kj::MainBuilder::Validity setRootType(kj::StringPtr input) {
     KJ_ASSERT(sourceFiles.size() == 1);
 
-    KJ_IF_MAYBE(schema, resolveName(sourceFiles[0].id, type)) {
-      if (schema->getProto().which() != schema::Node::STRUCT) {
-        return "not a struct type";
+    class CliArgumentErrorReporter: public ErrorReporter {
+    public:
+      void addError(uint32_t startByte, uint32_t endByte, kj::StringPtr message) override {
+        if (startByte < endByte) {
+          error = kj::str(startByte + 1, "-", endByte, ": ", message);
+        } else if (startByte > 0) {
+          error = kj::str(startByte + 1, ": ", message);
+        } else {
+          error = kj::str(message);
+        }
       }
-      rootType = schema->asStruct();
-      return true;
+
+      bool hadErrors() override {
+        return error != nullptr;
+      }
+
+      kj::MainBuilder::Validity getValidity() {
+        KJ_IF_MAYBE(e, error) {
+          return kj::mv(*e);
+        } else {
+          return true;
+        }
+      }
+
+    private:
+      kj::Maybe<kj::String> error;
+    };
+
+    CliArgumentErrorReporter errorReporter;
+
+    capnp::MallocMessageBuilder tokenArena;
+    auto lexedTokens = tokenArena.initRoot<capnp::compiler::LexedTokens>();
+    lex(input, lexedTokens, errorReporter);
+
+    CapnpParser parser(tokenArena.getOrphanage(), errorReporter);
+    auto tokens = lexedTokens.asReader().getTokens();
+    CapnpParser::ParserInput parserInput(tokens.begin(), tokens.end());
+
+    bool success = false;
+
+    if (parserInput.getPosition() == tokens.end()) {
+      // Empty argument?
+      errorReporter.addError(0, 0, "Couldn't parse type name.");
     } else {
-      return "no such type";
+      KJ_IF_MAYBE(expression, parser.getParsers().expression(parserInput)) {
+        // The input is expected to contain a *single* expression.
+        if (parserInput.getPosition() == tokens.end()) {
+          // Hooray, now parse it.
+          KJ_IF_MAYBE(compiledType,
+              sourceFiles[0].compiled.evalType(expression->getReader(), errorReporter)) {
+            KJ_IF_MAYBE(type, compiledType->getSchema()) {
+              if (type->isStruct()) {
+                rootType = type->asStruct();
+                success = true;
+              } else {
+                errorReporter.addError(0, 0, "Type is not a struct.");
+              }
+            } else {
+              // Apparently named a file scope.
+              errorReporter.addError(0, 0, "Type is not a struct.");
+            }
+          }
+        } else {
+          errorReporter.addErrorOn(parserInput.current(), "Couldn't parse type name.");
+        }
+      } else {
+        auto best = parserInput.getBest();
+        if (best == tokens.end()) {
+          errorReporter.addError(input.size(), input.size(), "Couldn't parse type name.");
+        } else {
+          errorReporter.addErrorOn(*best, "Couldn't parse type name.");
+        }
+      }
     }
+
+    KJ_ASSERT(success || errorReporter.hadErrors());
+    return errorReporter.getValidity();
   }
 
-private:
-  kj::Maybe<Schema> resolveName(uint64_t scopeId, kj::StringPtr name) {
-    while (name.size() > 0) {
-      kj::String temp;
-      kj::StringPtr part;
-      KJ_IF_MAYBE(dotpos, name.findFirst('.')) {
-        temp = kj::heapString(name.slice(0, *dotpos));
-        part = temp;
-        name = name.slice(*dotpos + 1);
-      } else {
-        part = name;
-        name = nullptr;
-      }
-
-      KJ_IF_MAYBE(childId, compiler->lookup(scopeId, part)) {
-        scopeId = *childId;
-      } else {
-        return nullptr;
-      }
-    }
-    return compiler->getLoader().get(scopeId);
-  }
-
-public:
   kj::MainBuilder::Validity decode() {
     convertTo = Format::TEXT;
     convertFrom = formatFromDeprecatedFlags(Format::BINARY);
@@ -1241,8 +1287,13 @@ private:
       return IMPOSSIBLE;
     }
     if ((prefix[3] & 0x80) != 0) {
-      // Offset is negative (invalid).
-      return IMPOSSIBLE;
+      if (prefix[0] == 0xff && prefix[1] == 0xff && prefix[2] == 0xff && prefix[3] == 0xff &&
+          prefix[4] == 0    && prefix[5] == 0    && prefix[6] == 0    && prefix[7] == 0) {
+        // This is an empty struct with offset of -1. That's valid.
+      } else {
+        // Offset is negative (invalid).
+        return IMPOSSIBLE;
+      }
     }
     if ((prefix[3] & 0xe0) != 0) {
       // Offset is over a gigabyte (implausible).
@@ -1821,6 +1872,7 @@ private:
 
   struct SourceFile {
     uint64_t id;
+    Compiler::ModuleScope compiled;
     kj::StringPtr name;
     Module* module;
   };

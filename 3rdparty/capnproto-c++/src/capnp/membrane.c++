@@ -277,6 +277,11 @@ public:
     }
   }
 
+  void setPipeline(kj::Own<PipelineHook>&& pipeline) override {
+    inner->setPipeline(kj::refcounted<MembranePipelineHook>(
+        kj::mv(pipeline), policy->addRef(), !reverse));
+  }
+
   kj::Promise<void> tailCall(kj::Own<RequestHook>&& request) override {
     return inner->tailCall(MembraneRequestHook::wrap(kj::mv(request), *policy, !reverse));
   }
@@ -380,13 +385,15 @@ public:
         ? policy->outboundCall(interfaceId, methodId, Capability::Client(inner->addRef()))
         : policy->inboundCall(interfaceId, methodId, Capability::Client(inner->addRef()));
     KJ_IF_MAYBE(r, redirect) {
-      // The policy says that *if* this capability points into the membrane, then we want to
-      // redirect the call. However, if this capability is a promise, then it could resolve to
-      // something outside the membrane later. We have to wait before we actually redirect,
-      // otherwise behavior will differ depending on whether the promise is resolved.
-      KJ_IF_MAYBE(p, whenMoreResolved()) {
-        return newLocalPromiseClient(p->attach(addRef()))
-            ->newCall(interfaceId, methodId, sizeHint);
+      if (policy->shouldResolveBeforeRedirecting()) {
+        // The policy says that *if* this capability points into the membrane, then we want to
+        // redirect the call. However, if this capability is a promise, then it could resolve to
+        // something outside the membrane later. We have to wait before we actually redirect,
+        // otherwise behavior will differ depending on whether the promise is resolved.
+        KJ_IF_MAYBE(p, whenMoreResolved()) {
+          return newLocalPromiseClient(p->attach(addRef()))
+              ->newCall(interfaceId, methodId, sizeHint);
+        }
       }
 
       return ClientHook::from(kj::mv(*r))->newCall(interfaceId, methodId, sizeHint);
@@ -408,13 +415,15 @@ public:
         ? policy->outboundCall(interfaceId, methodId, Capability::Client(inner->addRef()))
         : policy->inboundCall(interfaceId, methodId, Capability::Client(inner->addRef()));
     KJ_IF_MAYBE(r, redirect) {
-      // The policy says that *if* this capability points into the membrane, then we want to
-      // redirect the call. However, if this capability is a promise, then it could resolve to
-      // something outside the membrane later. We have to wait before we actually redirect,
-      // otherwise behavior will differ depending on whether the promise is resolved.
-      KJ_IF_MAYBE(p, whenMoreResolved()) {
-        return newLocalPromiseClient(p->attach(addRef()))
-            ->call(interfaceId, methodId, kj::mv(context));
+      if (policy->shouldResolveBeforeRedirecting()) {
+        // The policy says that *if* this capability points into the membrane, then we want to
+        // redirect the call. However, if this capability is a promise, then it could resolve to
+        // something outside the membrane later. We have to wait before we actually redirect,
+        // otherwise behavior will differ depending on whether the promise is resolved.
+        KJ_IF_MAYBE(p, whenMoreResolved()) {
+          return newLocalPromiseClient(p->attach(addRef()))
+              ->call(interfaceId, methodId, kj::mv(context));
+        }
       }
 
       return ClientHook::from(kj::mv(*r))->call(interfaceId, methodId, kj::mv(context));

@@ -21,8 +21,7 @@
 
 #if _WIN32
 // Request Vista-level APIs.
-#define WINVER 0x0600
-#define _WIN32_WINNT 0x0600
+#include "win32-api-version.h"
 #elif !defined(_GNU_SOURCE)
 #define _GNU_SOURCE
 #endif
@@ -33,6 +32,7 @@
 #include "io.h"
 #include "miniposix.h"
 #include <kj/compat/gtest.h>
+#include <kj/time.h>
 #include <sys/types.h>
 #if _WIN32
 #include <ws2tcpip.h>
@@ -88,6 +88,282 @@ TEST(AsyncIo, SimpleNetwork) {
 
   EXPECT_EQ("foo", result);
 }
+
+#if !_WIN32  // TODO(0.10): Implement NetworkPeerIdentity for Win32.
+TEST(AsyncIo, SimpleNetworkAuthentication) {
+  auto ioContext = setupAsyncIo();
+  auto& network = ioContext.provider->getNetwork();
+
+  Own<ConnectionReceiver> listener;
+  Own<AsyncIoStream> server;
+  Own<AsyncIoStream> client;
+
+  char receiveBuffer[4];
+
+  auto port = newPromiseAndFulfiller<uint>();
+
+  port.promise.then([&](uint portnum) {
+    return network.parseAddress("localhost", portnum);
+  }).then([&](Own<NetworkAddress>&& addr) {
+    auto promise = addr->connectAuthenticated();
+    return promise.then([&,addr=kj::mv(addr)](AuthenticatedStream result) mutable {
+      auto id = result.peerIdentity.downcast<NetworkPeerIdentity>();
+
+      // `addr` was resolved from `localhost` and may contain multiple addresses, but
+      // result.peerIdentity tells us the specific address that was used. So it should be one
+      // of the ones on the list, but only one.
+      KJ_EXPECT(strstr(addr->toString().cStr(), id->getAddress().toString().cStr()) != nullptr);
+      KJ_EXPECT(id->getAddress().toString().findFirst(',') == nullptr);
+
+      client = kj::mv(result.stream);
+
+      // `id` should match client->getpeername().
+      union {
+        struct sockaddr generic;
+        struct sockaddr_in ip4;
+        struct sockaddr_in6 ip6;
+      } rawAddr;
+      uint len = sizeof(rawAddr);
+      client->getpeername(&rawAddr.generic, &len);
+      auto peername = network.getSockaddr(&rawAddr.generic, len);
+      KJ_EXPECT(id->toString() == peername->toString());
+
+      return client->write("foo", 3);
+    });
+  }).detach([](kj::Exception&& exception) {
+    KJ_FAIL_EXPECT(exception);
+  });
+
+  kj::String result = network.parseAddress("*").then([&](Own<NetworkAddress>&& result) {
+    listener = result->listen();
+    port.fulfiller->fulfill(listener->getPort());
+    return listener->acceptAuthenticated();
+  }).then([&](AuthenticatedStream result) {
+    auto id = result.peerIdentity.downcast<NetworkPeerIdentity>();
+    server = kj::mv(result.stream);
+
+    // `id` should match server->getpeername().
+    union {
+      struct sockaddr generic;
+      struct sockaddr_in ip4;
+      struct sockaddr_in6 ip6;
+    } addr;
+    uint len = sizeof(addr);
+    server->getpeername(&addr.generic, &len);
+    auto peername = network.getSockaddr(&addr.generic, len);
+    KJ_EXPECT(id->toString() == peername->toString());
+
+    return server->tryRead(receiveBuffer, 3, 4);
+  }).then([&](size_t n) {
+    EXPECT_EQ(3u, n);
+    return heapString(receiveBuffer, n);
+  }).wait(ioContext.waitScope);
+
+  EXPECT_EQ("foo", result);
+}
+#endif
+
+#if !_WIN32 && !__CYGWIN__  // TODO(someday): Debug why this deadlocks on Cygwin.
+
+#if __ANDROID__
+#define TMPDIR "/data/local/tmp"
+#else
+#define TMPDIR "/tmp"
+#endif
+
+TEST(AsyncIo, UnixSocket) {
+  auto ioContext = setupAsyncIo();
+  auto& network = ioContext.provider->getNetwork();
+
+  auto path = kj::str(TMPDIR "/kj-async-io-test.", getpid());
+  KJ_DEFER(unlink(path.cStr()));
+
+  Own<ConnectionReceiver> listener;
+  Own<AsyncIoStream> server;
+  Own<AsyncIoStream> client;
+
+  char receiveBuffer[4];
+
+  auto ready = newPromiseAndFulfiller<void>();
+
+  ready.promise.then([&]() {
+    return network.parseAddress(kj::str("unix:", path));
+  }).then([&](Own<NetworkAddress>&& addr) {
+    auto promise = addr->connectAuthenticated();
+    return promise.then([&,addr=kj::mv(addr)](AuthenticatedStream result) mutable {
+      auto id = result.peerIdentity.downcast<LocalPeerIdentity>();
+      auto creds = id->getCredentials();
+      KJ_IF_MAYBE(p, creds.pid) {
+        KJ_EXPECT(*p == getpid());
+#if __linux__ || __APPLE__
+      } else {
+        KJ_FAIL_EXPECT("LocalPeerIdentity for unix socket had null PID");
+#endif
+      }
+      KJ_IF_MAYBE(u, creds.uid) {
+        KJ_EXPECT(*u == getuid());
+      } else {
+        KJ_FAIL_EXPECT("LocalPeerIdentity for unix socket had null UID");
+      }
+
+      client = kj::mv(result.stream);
+      return client->write("foo", 3);
+    });
+  }).detach([](kj::Exception&& exception) {
+    KJ_FAIL_EXPECT(exception);
+  });
+
+  kj::String result = network.parseAddress(kj::str("unix:", path))
+      .then([&](Own<NetworkAddress>&& result) {
+    listener = result->listen();
+    ready.fulfiller->fulfill();
+    return listener->acceptAuthenticated();
+  }).then([&](AuthenticatedStream result) {
+    auto id = result.peerIdentity.downcast<LocalPeerIdentity>();
+    auto creds = id->getCredentials();
+    KJ_IF_MAYBE(p, creds.pid) {
+      KJ_EXPECT(*p == getpid());
+#if __linux__ || __APPLE__
+    } else {
+      KJ_FAIL_EXPECT("LocalPeerIdentity for unix socket had null PID");
+#endif
+    }
+    KJ_IF_MAYBE(u, creds.uid) {
+      KJ_EXPECT(*u == getuid());
+    } else {
+      KJ_FAIL_EXPECT("LocalPeerIdentity for unix socket had null UID");
+    }
+
+    server = kj::mv(result.stream);
+    return server->tryRead(receiveBuffer, 3, 4);
+  }).then([&](size_t n) {
+    EXPECT_EQ(3u, n);
+    return heapString(receiveBuffer, n);
+  }).wait(ioContext.waitScope);
+
+  EXPECT_EQ("foo", result);
+}
+
+TEST(AsyncIo, AncillaryMessageHandlerNoMsg) {
+  auto ioContext = setupAsyncIo();
+  auto& network = ioContext.provider->getNetwork();
+
+  Own<ConnectionReceiver> listener;
+  Own<AsyncIoStream> server;
+  Own<AsyncIoStream> client;
+
+  char receiveBuffer[4];
+
+  bool clientHandlerCalled = false;
+  kj::Function<void(kj::ArrayPtr<AncillaryMessage>)> clientHandler =
+    [&](kj::ArrayPtr<AncillaryMessage>) {
+    clientHandlerCalled = true;
+  };
+  bool serverHandlerCalled = false;
+  kj::Function<void(kj::ArrayPtr<AncillaryMessage>)> serverHandler =
+    [&](kj::ArrayPtr<AncillaryMessage>) {
+    serverHandlerCalled = true;
+  };
+
+  auto port = newPromiseAndFulfiller<uint>();
+
+  port.promise.then([&](uint portnum) {
+    return network.parseAddress("localhost", portnum);
+  }).then([&](Own<NetworkAddress>&& addr) {
+    auto promise = addr->connectAuthenticated();
+    return promise.then([&,addr=kj::mv(addr)](AuthenticatedStream result) mutable {
+      client = kj::mv(result.stream);
+      client->registerAncillaryMessageHandler(kj::mv(clientHandler));
+      return client->write("foo", 3);
+    });
+  }).detach([](kj::Exception&& exception) {
+    KJ_FAIL_EXPECT(exception);
+  });
+
+  kj::String result = network.parseAddress("*").then([&](Own<NetworkAddress>&& result) {
+    listener = result->listen();
+    port.fulfiller->fulfill(listener->getPort());
+    return listener->acceptAuthenticated();
+  }).then([&](AuthenticatedStream result) {
+    server = kj::mv(result.stream);
+    server->registerAncillaryMessageHandler(kj::mv(serverHandler));
+    return server->tryRead(receiveBuffer, 3, 4);
+  }).then([&](size_t n) {
+    EXPECT_EQ(3u, n);
+    return heapString(receiveBuffer, n);
+  }).wait(ioContext.waitScope);
+
+  EXPECT_EQ("foo", result);
+  EXPECT_FALSE(clientHandlerCalled);
+  EXPECT_FALSE(serverHandlerCalled);
+}
+#endif
+
+// We only support ancillary messages on Unix.
+// MacOS only supports SO_TIMESTAMP on datagram sockets, so this test won't work.
+// Android fails this test for unknown reasons and I don't care because it's an extremely obscure
+// feature anyway.
+#if !_WIN32 && !__CYGWIN__  && !__APPLE__ && !__ANDROID__
+TEST(AsyncIo, AncillaryMessageHandler) {
+  auto ioContext = setupAsyncIo();
+  auto& network = ioContext.provider->getNetwork();
+
+  Own<ConnectionReceiver> listener;
+  Own<AsyncIoStream> server;
+  Own<AsyncIoStream> client;
+
+  char receiveBuffer[4];
+
+  bool clientHandlerCalled = false;
+  kj::Function<void(kj::ArrayPtr<AncillaryMessage>)> clientHandler =
+    [&](kj::ArrayPtr<AncillaryMessage>) {
+    clientHandlerCalled = true;
+  };
+  bool serverHandlerCalled = false;
+  kj::Function<void(kj::ArrayPtr<AncillaryMessage>)> serverHandler =
+    [&](kj::ArrayPtr<AncillaryMessage> msgs) {
+    serverHandlerCalled = true;
+    EXPECT_EQ(1, msgs.size());
+    EXPECT_EQ(SOL_SOCKET, msgs[0].getLevel());
+    EXPECT_EQ(SO_TIMESTAMP, msgs[0].getType());
+  };
+
+  auto port = newPromiseAndFulfiller<uint>();
+
+  port.promise.then([&](uint portnum) {
+    return network.parseAddress("localhost", portnum);
+  }).then([&](Own<NetworkAddress>&& addr) {
+    auto promise = addr->connectAuthenticated();
+    return promise.then([&,addr=kj::mv(addr)](AuthenticatedStream result) mutable {
+      client = kj::mv(result.stream);
+      client->registerAncillaryMessageHandler(kj::mv(clientHandler));
+      return client->write("foo", 3);
+    });
+  }).detach([](kj::Exception&& exception) {
+    KJ_FAIL_EXPECT(exception);
+  });
+
+  kj::String result = network.parseAddress("*").then([&](Own<NetworkAddress>&& result) {
+    listener = result->listen();
+    // Register interest in having the timestamp delivered via cmsg on each recvmsg.
+    int yes = 1;
+    listener->setsockopt(SOL_SOCKET, SO_TIMESTAMP, &yes, sizeof(yes));
+    port.fulfiller->fulfill(listener->getPort());
+    return listener->acceptAuthenticated();
+  }).then([&](AuthenticatedStream result) {
+    server = kj::mv(result.stream);
+    server->registerAncillaryMessageHandler(kj::mv(serverHandler));
+    return server->tryRead(receiveBuffer, 3, 4);
+  }).then([&](size_t n) {
+    EXPECT_EQ(3u, n);
+    return heapString(receiveBuffer, n);
+  }).wait(ioContext.waitScope);
+
+  EXPECT_EQ("foo", result);
+  EXPECT_FALSE(clientHandlerCalled);
+  EXPECT_TRUE(serverHandlerCalled);
+}
+#endif
 
 String tryParse(WaitScope& waitScope, Network& network, StringPtr text, uint portHint = 0) {
   return network.parseAddress(text, portHint).wait(waitScope)->toString();
@@ -776,8 +1052,10 @@ TEST(AsyncIo, Udp) {
 TEST(AsyncIo, AbstractUnixSocket) {
   auto ioContext = setupAsyncIo();
   auto& network = ioContext.provider->getNetwork();
+  auto elapsedSinceEpoch = systemPreciseMonotonicClock().now() - kj::origin<TimePoint>();
+  auto address = kj::str("unix-abstract:foo", getpid(), elapsedSinceEpoch / kj::NANOSECONDS);
 
-  Own<NetworkAddress> addr = network.parseAddress("unix-abstract:foo").wait(ioContext.waitScope);
+  Own<NetworkAddress> addr = network.parseAddress(address).wait(ioContext.waitScope);
 
   Own<ConnectionReceiver> listener = addr->listen();
   // chdir proves no filesystem dependence. Test fails for regular unix socket

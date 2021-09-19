@@ -462,13 +462,8 @@ static void requireValidHeaderName(kj::StringPtr name) {
 }
 
 static void requireValidHeaderValue(kj::StringPtr value) {
-  for (char c: value) {
-    // While the HTTP spec suggests that only printable ASCII characters are allowed in header
-    // values, reality has a different opinion. See: https://github.com/httpwg/http11bis/issues/19
-    // We follow the browsers' lead.
-    KJ_REQUIRE(c != '\0' && c != '\r' && c != '\n', "invalid header value",
-        kj::encodeCEscape(value));
-  }
+  KJ_REQUIRE(HttpHeaders::isValidHeaderValue(value), "invalid header value",
+      kj::encodeCEscape(value));
 }
 
 static const char* BUILTIN_HEADER_NAMES[] = {
@@ -565,6 +560,19 @@ kj::Maybe<HttpHeaderId> HttpHeaderTable::stringToId(kj::StringPtr name) const {
 }
 
 // =======================================================================================
+
+bool HttpHeaders::isValidHeaderValue(kj::StringPtr value) {
+  for (char c: value) {
+    // While the HTTP spec suggests that only printable ASCII characters are allowed in header
+    // values, reality has a different opinion. See: https://github.com/httpwg/http11bis/issues/19
+    // We follow the browsers' lead.
+    if (c == '\0' || c == '\r' || c == '\n') {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 HttpHeaders::HttpHeaders(const HttpHeaderTable& table)
     : table(&table),
@@ -871,7 +879,7 @@ HttpHeaders::RequestOrProtocolError HttpHeaders::tryParseRequest(kj::ArrayPtr<ch
   char* end = trimHeaderEnding(content);
   if (end == nullptr) {
     return ProtocolError { 400, "Bad Request",
-        "ERROR: Request headers have no terminal newline.", content };
+        "Request headers have no terminal newline.", content };
   }
 
   char* ptr = content.begin();
@@ -882,19 +890,19 @@ HttpHeaders::RequestOrProtocolError HttpHeaders::tryParseRequest(kj::ArrayPtr<ch
     request.method = *method;
     if (*ptr != ' ' && *ptr != '\t') {
       return ProtocolError { 501, "Not Implemented",
-          "ERROR: Unrecognized request method.", content };
+          "Unrecognized request method.", content };
     }
     ++ptr;
   } else {
     return ProtocolError { 501, "Not Implemented",
-        "ERROR: Unrecognized request method.", content };
+        "Unrecognized request method.", content };
   }
 
   KJ_IF_MAYBE(path, consumeWord(ptr)) {
     request.url = *path;
   } else {
     return ProtocolError { 400, "Bad Request",
-        "ERROR: Invalid request line.", content };
+        "Invalid request line.", content };
   }
 
   // Ignore rest of line. Don't care about "HTTP/1.1" or whatever.
@@ -902,7 +910,7 @@ HttpHeaders::RequestOrProtocolError HttpHeaders::tryParseRequest(kj::ArrayPtr<ch
 
   if (!parseHeaders(ptr, end)) {
     return ProtocolError { 400, "Bad Request",
-        "ERROR: The headers sent by your client are not valid.", content };
+        "The headers sent by your client are not valid.", content };
   }
 
   return request;
@@ -912,7 +920,7 @@ HttpHeaders::ResponseOrProtocolError HttpHeaders::tryParseResponse(kj::ArrayPtr<
   char* end = trimHeaderEnding(content);
   if (end == nullptr) {
     return ProtocolError { 502, "Bad Gateway",
-        "ERROR: Response headers have no terminal newline.", content };
+        "Response headers have no terminal newline.", content };
   }
 
   char* ptr = content.begin();
@@ -922,25 +930,25 @@ HttpHeaders::ResponseOrProtocolError HttpHeaders::tryParseResponse(kj::ArrayPtr<
   KJ_IF_MAYBE(version, consumeWord(ptr)) {
     if (!version->startsWith("HTTP/")) {
       return ProtocolError { 502, "Bad Gateway",
-          "ERROR: Invalid response status line (invalid protocol).", content };
+          "Invalid response status line (invalid protocol).", content };
     }
   } else {
     return ProtocolError { 502, "Bad Gateway",
-        "ERROR: Invalid response status line (no spaces).", content };
+        "Invalid response status line (no spaces).", content };
   }
 
   KJ_IF_MAYBE(code, consumeNumber(ptr)) {
     response.statusCode = *code;
   } else {
     return ProtocolError { 502, "Bad Gateway",
-        "ERROR: Invalid response status line (invalid status code).", content };
+        "Invalid response status line (invalid status code).", content };
   }
 
   response.statusText = consumeLine(ptr);
 
   if (!parseHeaders(ptr, end)) {
     return ProtocolError { 502, "Bad Gateway",
-        "ERROR: The headers sent by the server are not valid.", content };
+        "The headers sent by the server are not valid.", content };
   }
 
   return response;
@@ -1036,12 +1044,12 @@ kj::String HttpHeaders::toString() const {
 namespace {
 
 static constexpr size_t MIN_BUFFER = 4096;
-static constexpr size_t MAX_BUFFER = 65536;
+static constexpr size_t MAX_BUFFER = 128 * 1024;
 static constexpr size_t MAX_CHUNK_HEADER_SIZE = 32;
 
 class HttpInputStreamImpl final: public HttpInputStream {
 public:
-  explicit HttpInputStreamImpl(AsyncInputStream& inner, HttpHeaderTable& table)
+  explicit HttpInputStreamImpl(AsyncInputStream& inner, const HttpHeaderTable& table)
       : inner(inner), headerBuffer(kj::heapArray<char>(MIN_BUFFER)), headers(table) {
   }
 
@@ -1070,7 +1078,8 @@ public:
               -> HttpInputStream::Response {
       auto response = KJ_REQUIRE_NONNULL(
           responseOrProtocolError.tryGet<HttpHeaders::Response>(), "bad response");
-      auto body = getEntityBody(HttpInputStreamImpl::RESPONSE, requestMethod, 0, headers);
+      auto body = getEntityBody(HttpInputStreamImpl::RESPONSE, requestMethod,
+                                response.statusCode, headers);
 
       return { response.statusCode, response.statusText, headers, kj::mv(body) };
     });
@@ -1536,23 +1545,38 @@ public:
   }
 
   Promise<size_t> tryRead(void* buffer, size_t minBytes, size_t maxBytes) override {
-    if (length == 0) return size_t(0);
-
-    return inner.tryRead(buffer, kj::min(minBytes, length), kj::min(maxBytes, length))
-        .then([=](size_t amount) {
-      length -= amount;
-      if (length > 0 && amount < minBytes) {
-        kj::throwRecoverableException(KJ_EXCEPTION(DISCONNECTED,
-            "premature EOF in HTTP entity body; did not reach Content-Length"));
-      } else if (length == 0) {
-        doneReading();
-      }
-      return amount;
-    });
+    return tryReadInternal(buffer, minBytes, maxBytes, 0);
   }
 
 private:
   size_t length;
+
+  Promise<size_t> tryReadInternal(void* buffer, size_t minBytes, size_t maxBytes,
+                                  size_t alreadyRead) {
+    if (length == 0) return size_t(0);
+
+    // We have to set minBytes to 1 here so that if we read any data at all, we update our
+    // counter immediately, so that we still know where we are in case of cancellation.
+    return inner.tryRead(buffer, 1, kj::min(maxBytes, length))
+        .then([=](size_t amount) -> kj::Promise<size_t> {
+      length -= amount;
+      if (length > 0) {
+        // We haven't reached the end of the entity body yet.
+        if (amount == 0) {
+          kj::throwRecoverableException(KJ_EXCEPTION(DISCONNECTED,
+              "premature EOF in HTTP entity body; did not reach Content-Length"));
+        } else if (amount < minBytes) {
+          // We requested a minimum 1 byte above, but our own caller actually set a larger minimum
+          // which has not yet been reached. Keep trying until we reach it.
+          return tryReadInternal(reinterpret_cast<byte*>(buffer) + amount,
+                                 minBytes - amount, maxBytes - amount, alreadyRead + amount);
+        }
+      } else if (length == 0) {
+        doneReading();
+      }
+      return amount + alreadyRead;
+    });
+  }
 };
 
 class HttpChunkedEntityReader final: public HttpEntityBodyReader {
@@ -1583,25 +1607,20 @@ private:
         chunkSize = nextChunkSize;
         return tryReadInternal(buffer, minBytes, maxBytes, alreadyRead);
       });
-    } else if (chunkSize < minBytes) {
-      // Read entire current chunk and continue to next chunk.
-      return inner.tryRead(buffer, chunkSize, chunkSize)
+    } else {
+      // Read current chunk.
+      // We have to set minBytes to 1 here so that if we read any data at all, we update our
+      // counter immediately, so that we still know where we are in case of cancellation.
+      return inner.tryRead(buffer, 1, kj::min(maxBytes, chunkSize))
           .then([=](size_t amount) -> kj::Promise<size_t> {
         chunkSize -= amount;
-        if (chunkSize > 0) {
-          return KJ_EXCEPTION(DISCONNECTED, "premature EOF in HTTP chunk");
-        }
-
-        return tryReadInternal(reinterpret_cast<byte*>(buffer) + amount,
-                               minBytes - amount, maxBytes - amount, alreadyRead + amount);
-      });
-    } else {
-      // Read only part of the current chunk.
-      return inner.tryRead(buffer, minBytes, kj::min(maxBytes, chunkSize))
-          .then([=](size_t amount) -> size_t {
-        chunkSize -= amount;
-        if (amount < minBytes) {
+        if (amount == 0) {
           kj::throwRecoverableException(KJ_EXCEPTION(DISCONNECTED, "premature EOF in HTTP chunk"));
+        } else if (amount < minBytes) {
+          // We requested a minimum 1 byte above, but our own caller actually set a larger minimum
+          // which has not yet been reached. Keep trying until we reach it.
+          return tryReadInternal(reinterpret_cast<byte*>(buffer) + amount,
+                                 minBytes - amount, maxBytes - amount, alreadyRead + amount);
         }
         return alreadyRead + amount;
       });
@@ -1616,10 +1635,8 @@ template <char first, char... rest>
 struct FastCaseCmp<first, rest...> {
   static constexpr bool apply(const char* actual) {
     return
-      'a' <= first && first <= 'z'
-        ? (*actual | 0x20) == first && FastCaseCmp<rest...>::apply(actual + 1)
-      : 'A' <= first && first <= 'Z'
-        ? (*actual & ~0x20) == first && FastCaseCmp<rest...>::apply(actual + 1)
+      ('a' <= first && first <= 'z') || ('A' <= first && first <= 'Z')
+        ? (*actual | 0x20) == (first | 0x20) && FastCaseCmp<rest...>::apply(actual + 1)
         : *actual == first && FastCaseCmp<rest...>::apply(actual + 1);
   }
 };
@@ -1662,7 +1679,7 @@ kj::Own<kj::AsyncInputStream> HttpInputStreamImpl::getEntityBody(
         length = uint64_t(0);
       }
       return kj::heap<HttpNullEntityReader>(*this, length);
-    } else if (statusCode == 204 || statusCode == 205 || statusCode == 304) {
+    } else if (statusCode == 204 || statusCode == 304) {
       // No body.
       return kj::heap<HttpNullEntityReader>(*this, uint64_t(0));
     }
@@ -1734,7 +1751,8 @@ kj::Own<kj::AsyncInputStream> HttpInputStreamImpl::getEntityBody(
 
 }  // namespace
 
-kj::Own<HttpInputStream> newHttpInputStream(kj::AsyncInputStream& input, HttpHeaderTable& table) {
+kj::Own<HttpInputStream> newHttpInputStream(
+    kj::AsyncInputStream& input, const HttpHeaderTable& table) {
   return kj::heap<HttpInputStreamImpl>(input, table);
 }
 
@@ -2162,7 +2180,7 @@ public:
     return stream->whenWriteDisconnected();
   }
 
-  kj::Promise<Message> receive() override {
+  kj::Promise<Message> receive(size_t maxSize) override {
     size_t headerSize = Header::headerSize(recvData.begin(), recvData.size());
 
     if (headerSize > recvData.size()) {
@@ -2175,7 +2193,8 @@ public:
       }
 
       return stream->tryRead(recvData.end(), 1, recvBuffer.end() - recvData.end())
-          .then([this](size_t actual) -> kj::Promise<Message> {
+          .then([this,maxSize](size_t actual) -> kj::Promise<Message> {
+        receivedBytes += actual;
         if (actual == 0) {
           if (recvData.size() > 0) {
             return KJ_EXCEPTION(DISCONNECTED, "WebSocket EOF in frame header");
@@ -2187,7 +2206,7 @@ public:
         }
 
         recvData = recvBuffer.slice(0, recvData.size() + actual);
-        return receive();
+        return receive(maxSize);
       });
     }
 
@@ -2196,6 +2215,8 @@ public:
     recvData = recvData.slice(headerSize, recvData.size());
 
     size_t payloadLen = recvHeader.getPayloadLen();
+
+    KJ_REQUIRE(payloadLen < maxSize, "WebSocket message is too large");
 
     auto opcode = recvHeader.getOpcode();
     bool isData = opcode < OPCODE_FIRST_CONTROL;
@@ -2250,7 +2271,7 @@ public:
     Mask mask = recvHeader.getMask();
 
     auto handleMessage = kj::mvCapture(message,
-        [this,opcode,payloadTarget,payloadLen,mask,isFin]
+        [this,opcode,payloadTarget,payloadLen,mask,isFin,maxSize]
         (kj::Array<byte>&& message) -> kj::Promise<Message> {
       if (!mask.isZero()) {
         mask.apply(kj::arrayPtr(payloadTarget, payloadLen));
@@ -2258,8 +2279,9 @@ public:
 
       if (!isFin) {
         // Add fragment to the list and loop.
+        auto newMax = maxSize - message.size();
         fragments.add(kj::mv(message));
-        return receive();
+        return receive(newMax);
       }
 
       switch (opcode) {
@@ -2284,10 +2306,10 @@ public:
         case OPCODE_PING:
           // Send back a pong.
           queuePong(kj::mv(message));
-          return receive();
+          return receive(maxSize);
         case OPCODE_PONG:
           // Unsolicited pong. Ignore.
-          return receive();
+          return receive(maxSize);
         default:
           KJ_FAIL_REQUIRE("unknown WebSocket opcode", opcode);
       }
@@ -2303,7 +2325,8 @@ public:
       memcpy(payloadTarget, recvData.begin(), recvData.size());
       size_t remaining = payloadLen - recvData.size();
       auto promise = stream->tryRead(payloadTarget + recvData.size(), remaining, remaining)
-          .then([remaining](size_t amount) {
+          .then([this, remaining](size_t amount) {
+        receivedBytes += amount;
         if (amount < remaining) {
           kj::throwRecoverableException(KJ_EXCEPTION(DISCONNECTED, "WebSocket EOF in message"));
         }
@@ -2312,6 +2335,41 @@ public:
       return promise.then(kj::mv(handleMessage));
     }
   }
+
+  kj::Maybe<kj::Promise<void>> tryPumpFrom(WebSocket& other) override {
+    KJ_IF_MAYBE(optOther, kj::dynamicDowncastIfAvailable<WebSocketImpl>(other)) {
+      // Both WebSockets are raw WebSockets, so we can pump the streams directly rather than read
+      // whole messages.
+
+      if ((maskKeyGenerator == nullptr) == (optOther->maskKeyGenerator == nullptr)) {
+        // Oops, it appears that we either believe we are the client side of both sockets, or we
+        // are the server side of both sockets. Since clients must "mask" their outgoing frames but
+        // servers must *not* do so, we can't direct-pump. Sad.
+        return nullptr;
+      }
+
+      // Check same error conditions as with sendImpl().
+      KJ_REQUIRE(!disconnected, "WebSocket can't send after disconnect()");
+      KJ_REQUIRE(!currentlySending, "another message send is already in progress");
+      currentlySending = true;
+
+      // If the application chooses to pump messages out, but receives incoming messages normally
+      // with `receive()`, then we will receive pings and attempt to send pongs. But we can't
+      // safely insert a pong in the middle of a pumped stream. We kind of don't have a choice
+      // except to drop them on the floor, which is what will happen if we set `hasSentClose` true.
+      // Hopefully most apps that set up a pump do so in both directions at once, and so pings will
+      // flow through and pongs will flow back.
+      hasSentClose = true;
+
+      return optOther->optimizedPumpTo(*this);
+    }
+
+    return nullptr;
+  }
+
+  uint64_t sentByteCount() override { return sentBytes; }
+
+  uint64_t receivedByteCount() override { return receivedBytes; }
 
 private:
   class Mask {
@@ -2513,6 +2571,9 @@ private:
   kj::Array<byte> recvBuffer;
   kj::ArrayPtr<byte> recvData;
 
+  uint64_t sentBytes = 0;
+  uint64_t receivedBytes = 0;
+
   kj::Promise<void> sendImpl(byte opcode, kj::ArrayPtr<const byte> message) {
     KJ_REQUIRE(!disconnected, "WebSocket can't send after disconnect()");
     KJ_REQUIRE(!currentlySending, "another message send is already in progress");
@@ -2551,7 +2612,7 @@ private:
     if (!mask.isZero()) {
       promise = promise.attach(kj::mv(ownMessage));
     }
-    return promise.then([this]() {
+    return promise.then([this, size = sendParts[0].size() + sendParts[1].size()]() {
       currentlySending = false;
 
       // Send queued pong if needed.
@@ -2560,6 +2621,7 @@ private:
         queuedPong = nullptr;
         queuePong(kj::mv(payload));
       }
+      sentBytes += size;
     });
   }
 
@@ -2590,6 +2652,51 @@ private:
     sendParts[0] = sendHeader.compose(true, OPCODE_PONG, payload.size(), Mask(maskKeyGenerator));
     sendParts[1] = payload;
     return stream->write(sendParts).attach(kj::mv(payload));
+  }
+
+  kj::Promise<void> optimizedPumpTo(WebSocketImpl& other) {
+    KJ_IF_MAYBE(p, other.sendingPong) {
+      // We recently sent a pong, make sure it's finished before proceeding.
+      auto promise = p->then([this, &other]() {
+        return optimizedPumpTo(other);
+      });
+      other.sendingPong = nullptr;
+      return promise;
+    }
+
+    if (recvData.size() > 0) {
+      // We have some data buffered. Write it first.
+      return other.stream->write(recvData.begin(), recvData.size())
+          .then([this, &other, size = recvData.size()]() {
+        recvData = nullptr;
+        other.sentBytes += size;
+        return optimizedPumpTo(other);
+      });
+    }
+
+    auto cancelPromise = other.stream->whenWriteDisconnected()
+        .then([this]() -> kj::Promise<void> {
+      this->abort();
+      return KJ_EXCEPTION(DISCONNECTED,
+          "destination of WebSocket pump disconnected prematurely");
+    });
+
+    // There's no buffered incoming data, so start pumping stream now.
+    return stream->pumpTo(*other.stream).then([this, &other](size_t s) -> kj::Promise<void> {
+      // WebSocket pumps are expected to include end-of-stream.
+      other.disconnected = true;
+      other.stream->shutdownWrite();
+      receivedBytes += s;
+      other.sentBytes += s;
+      return kj::READY_NOW;
+    }, [&other](kj::Exception&& e) -> kj::Promise<void> {
+      // We don't know if it was a read or a write that threw. If it was a read that threw, we need
+      // to send a disconnect on the destination. If it was the destination that threw, it
+      // shouldn't hurt to disconnect() it again, but we'll catch and squelch any exceptions.
+      other.disconnected = true;
+      kj::runCatchingExceptions([&other]() { other.stream->shutdownWrite(); });
+      return kj::mv(e);
+    }).exclusiveJoin(kj::mv(cancelPromise));
   }
 };
 
@@ -2699,23 +2806,27 @@ public:
 
   kj::Promise<void> send(kj::ArrayPtr<const byte> message) override {
     KJ_IF_MAYBE(s, state) {
-      return s->send(message);
+      return s->send(message).then([&, size = message.size()]() { transferredBytes += size; });
     } else {
-      return newAdaptedPromise<void, BlockedSend>(*this, MessagePtr(message));
+      return newAdaptedPromise<void, BlockedSend>(*this, MessagePtr(message))
+          .then([&, size = message.size()]() { transferredBytes += size; });
     }
   }
   kj::Promise<void> send(kj::ArrayPtr<const char> message) override {
     KJ_IF_MAYBE(s, state) {
-      return s->send(message);
+      return s->send(message).then([&, size = message.size()]() { transferredBytes += size; });
     } else {
-      return newAdaptedPromise<void, BlockedSend>(*this, MessagePtr(message));
+      return newAdaptedPromise<void, BlockedSend>(*this, MessagePtr(message))
+          .then([&, size = message.size()]() { transferredBytes += size; });
     }
   }
   kj::Promise<void> close(uint16_t code, kj::StringPtr reason) override {
     KJ_IF_MAYBE(s, state) {
-      return s->close(code, reason);
+      return s->close(code, reason)
+          .then([&, size = reason.size()]() { transferredBytes += (2 +size); });
     } else {
-      return newAdaptedPromise<void, BlockedSend>(*this, MessagePtr(ClosePtr { code, reason }));
+      return newAdaptedPromise<void, BlockedSend>(*this, MessagePtr(ClosePtr { code, reason }))
+          .then([&, size = reason.size()]() { transferredBytes += (2 +size); });
     }
   }
   kj::Promise<void> disconnect() override {
@@ -2749,19 +2860,29 @@ public:
     }
   }
 
-  kj::Promise<Message> receive() override {
+  kj::Promise<Message> receive(size_t maxSize) override {
     KJ_IF_MAYBE(s, state) {
-      return s->receive();
+      return s->receive(maxSize);
     } else {
-      return newAdaptedPromise<Message, BlockedReceive>(*this);
+      return newAdaptedPromise<Message, BlockedReceive>(*this, maxSize);
     }
   }
   kj::Promise<void> pumpTo(WebSocket& other) override {
     KJ_IF_MAYBE(s, state) {
-      return s->pumpTo(other);
+      auto before = other.receivedByteCount();
+      return s->pumpTo(other).attach(kj::defer([this, &other, before]() {
+        transferredBytes += other.receivedByteCount() - before;
+      }));
     } else {
       return newAdaptedPromise<void, BlockedPumpTo>(*this, other);
     }
+  }
+
+  uint64_t sentByteCount() override {
+    return transferredBytes;
+  }
+  uint64_t receivedByteCount() override {
+    return transferredBytes;
   }
 
 private:
@@ -2771,6 +2892,8 @@ private:
   // outstanding, `state` is null.
 
   kj::Own<WebSocket> ownState;
+
+  uint64_t transferredBytes = 0;
 
   bool aborted = false;
   Maybe<Own<PromiseFulfiller<void>>> abortedFulfiller = nullptr;
@@ -2827,7 +2950,7 @@ private:
       KJ_FAIL_ASSERT("another message send is already in progress");
     }
 
-    kj::Promise<Message> receive() override {
+    kj::Promise<Message> receive(size_t maxSize) override {
       KJ_REQUIRE(canceler.isEmpty(), "already pumping");
       fulfiller.fulfill();
       pipe.endState(*this);
@@ -2872,6 +2995,13 @@ private:
         return kj::mv(e);
       }));
     }
+
+  uint64_t sentByteCount() override {
+    KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+  }
+  uint64_t receivedByteCount() override {
+    KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+   }
 
   private:
     kj::PromiseFulfiller<void>& fulfiller;
@@ -2918,9 +3048,9 @@ private:
       KJ_FAIL_ASSERT("another message send is already in progress");
     }
 
-    kj::Promise<Message> receive() override {
+    kj::Promise<Message> receive(size_t maxSize) override {
       KJ_REQUIRE(canceler.isEmpty(), "another message receive is already in progress");
-      return canceler.wrap(input.receive()
+      return canceler.wrap(input.receive(maxSize)
           .then([this](Message message) {
         if (message.is<Close>()) {
           canceler.release();
@@ -2951,6 +3081,13 @@ private:
       }));
     }
 
+    uint64_t sentByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+    }
+    uint64_t receivedByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+    }
+
   private:
     kj::PromiseFulfiller<void>& fulfiller;
     WebSocketPipeImpl& pipe;
@@ -2960,8 +3097,9 @@ private:
 
   class BlockedReceive final: public WebSocket {
   public:
-    BlockedReceive(kj::PromiseFulfiller<Message>& fulfiller, WebSocketPipeImpl& pipe)
-        : fulfiller(fulfiller), pipe(pipe) {
+    BlockedReceive(kj::PromiseFulfiller<Message>& fulfiller, WebSocketPipeImpl& pipe,
+                   size_t maxSize)
+        : fulfiller(fulfiller), pipe(pipe), maxSize(maxSize) {
       KJ_REQUIRE(pipe.state == nullptr);
       pipe.state = *this;
     }
@@ -3007,7 +3145,7 @@ private:
     }
     kj::Maybe<kj::Promise<void>> tryPumpFrom(WebSocket& other) override {
       KJ_REQUIRE(canceler.isEmpty(), "already pumping");
-      return canceler.wrap(other.receive().then([this,&other](Message message) {
+      return canceler.wrap(other.receive(maxSize).then([this,&other](Message message) {
         canceler.release();
         fulfiller.fulfill(kj::mv(message));
         pipe.endState(*this);
@@ -3020,16 +3158,24 @@ private:
       }));
     }
 
-    kj::Promise<Message> receive() override {
+    kj::Promise<Message> receive(size_t maxSize) override {
       KJ_FAIL_ASSERT("another message receive is already in progress");
     }
     kj::Promise<void> pumpTo(WebSocket& other) override {
       KJ_FAIL_ASSERT("another message receive is already in progress");
     }
 
+    uint64_t sentByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+    }
+    uint64_t receivedByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+    }
+
   private:
     kj::PromiseFulfiller<Message>& fulfiller;
     WebSocketPipeImpl& pipe;
+    size_t maxSize;
     Canceler canceler;
   };
 
@@ -3093,11 +3239,18 @@ private:
       }));
     }
 
-    kj::Promise<Message> receive() override {
+    kj::Promise<Message> receive(size_t maxSize) override {
       KJ_FAIL_ASSERT("another message receive is already in progress");
     }
     kj::Promise<void> pumpTo(WebSocket& other) override {
       KJ_FAIL_ASSERT("another message receive is already in progress");
+    }
+
+    uint64_t sentByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+    }
+    uint64_t receivedByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
     }
 
   private:
@@ -3132,12 +3285,20 @@ private:
       KJ_FAIL_REQUIRE("can't tryPumpFrom() after disconnect()");
     }
 
-    kj::Promise<Message> receive() override {
+    kj::Promise<Message> receive(size_t maxSize) override {
       return KJ_EXCEPTION(DISCONNECTED, "WebSocket disconnected");
     }
     kj::Promise<void> pumpTo(WebSocket& other) override {
       return kj::READY_NOW;
     }
+
+    uint64_t sentByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+    }
+    uint64_t receivedByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+    }
+
   };
 
   class Aborted final: public WebSocket {
@@ -3166,11 +3327,18 @@ private:
           "other end of WebSocketPipe was destroyed"));
     }
 
-    kj::Promise<Message> receive() override {
+    kj::Promise<Message> receive(size_t maxSize) override {
       return KJ_EXCEPTION(DISCONNECTED, "other end of WebSocketPipe was destroyed");
     }
     kj::Promise<void> pumpTo(WebSocket& other) override {
       return KJ_EXCEPTION(DISCONNECTED, "other end of WebSocketPipe was destroyed");
+    }
+
+    uint64_t sentByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
+    }
+    uint64_t receivedByteCount() override {
+      KJ_FAIL_ASSERT("Bytes are not counted for the individual states of WebSocketPipeImpl.");
     }
   };
 };
@@ -3207,12 +3375,15 @@ public:
     return out->tryPumpFrom(other);
   }
 
-  kj::Promise<Message> receive() override {
-    return in->receive();
+  kj::Promise<Message> receive(size_t maxSize) override {
+    return in->receive(maxSize);
   }
   kj::Promise<void> pumpTo(WebSocket& other) override {
     return in->pumpTo(other);
   }
+
+  uint64_t sentByteCount() override { return out->sentByteCount(); }
+  uint64_t receivedByteCount() override { return in->sentByteCount(); }
 
 private:
   kj::Own<WebSocketPipeImpl> in;
@@ -3235,9 +3406,10 @@ WebSocketPipe newWebSocketPipe() {
 
 namespace {
 
-class HttpClientImpl final: public HttpClient {
+class HttpClientImpl final: public HttpClient,
+                            private HttpClientErrorHandler {
 public:
-  HttpClientImpl(HttpHeaderTable& responseHeaderTable, kj::Own<kj::AsyncIoStream> rawStream,
+  HttpClientImpl(const HttpHeaderTable& responseHeaderTable, kj::Own<kj::AsyncIoStream> rawStream,
                  HttpClientSettings settings)
       : httpInput(*rawStream, responseHeaderTable),
         httpOutput(*rawStream),
@@ -3334,11 +3506,8 @@ public:
         }
         KJ_CASE_ONEOF(protocolError, HttpHeaders::ProtocolError) {
           closed = true;
-          // TODO(someday): Do something with ProtocolError::rawContent. Exceptions feel like the
-          //   most idiomatic way to report errors when using HttpClient::request(), but we don't
-          //   have a good way of attaching the raw content to the exception.
-          KJ_FAIL_REQUIRE(protocolError.description) { break; }
-          return HttpClient::Response();
+          return settings.errorHandler.orDefault(*this).handleProtocolError(
+              kj::mv(protocolError));
         }
       }
 
@@ -3390,20 +3559,37 @@ public:
           if (response.statusCode == 101) {
             if (!fastCaseCmp<'w', 'e', 'b', 's', 'o', 'c', 'k', 'e', 't'>(
                     responseHeaders.get(HttpHeaderId::UPGRADE).orDefault(nullptr).cStr())) {
-              KJ_FAIL_REQUIRE("server returned incorrect Upgrade header; should be 'websocket'",
-                              responseHeaders.get(HttpHeaderId::UPGRADE).orDefault("(null)")) {
-                break;
+              kj::String ownMessage;
+              kj::StringPtr message;
+              KJ_IF_MAYBE(actual, responseHeaders.get(HttpHeaderId::UPGRADE)) {
+                ownMessage = kj::str(
+                    "Server failed WebSocket handshake: incorrect Upgrade header: "
+                    "expected 'websocket', got '", *actual, "'.");
+                message = ownMessage;
+              } else {
+                message = "Server failed WebSocket handshake: missing Upgrade header.";
               }
-              return HttpClient::WebSocketResponse();
+              return settings.errorHandler.orDefault(*this).handleWebSocketProtocolError({
+                502, "Bad Gateway", message, nullptr
+              });
             }
 
             auto expectedAccept = generateWebSocketAccept(keyBase64);
             if (responseHeaders.get(HttpHeaderId::SEC_WEBSOCKET_ACCEPT).orDefault(nullptr)
                   != expectedAccept) {
-              KJ_FAIL_REQUIRE("server returned incorrect Sec-WebSocket-Accept header",
-                  responseHeaders.get(HttpHeaderId::SEC_WEBSOCKET_ACCEPT).orDefault("(null)"),
-                  expectedAccept) { break; }
-              return HttpClient::WebSocketResponse();
+              kj::String ownMessage;
+              kj::StringPtr message;
+              KJ_IF_MAYBE(actual, responseHeaders.get(HttpHeaderId::SEC_WEBSOCKET_ACCEPT)) {
+                ownMessage = kj::str(
+                    "Server failed WebSocket handshake: incorrect Sec-WebSocket-Accept header: "
+                    "expected '", expectedAccept, "', got '", *actual, "'.");
+                message = ownMessage;
+              } else {
+                message = "Server failed WebSocket handshake: missing Upgrade header.";
+              }
+              return settings.errorHandler.orDefault(*this).handleWebSocketProtocolError({
+                502, "Bad Gateway", message, nullptr
+              });
             }
 
             return {
@@ -3434,11 +3620,8 @@ public:
           }
         }
         KJ_CASE_ONEOF(protocolError, HttpHeaders::ProtocolError) {
-          // TODO(someday): Do something with ProtocolError::rawContent. Exceptions feel like the
-          //   most idiomatic way to report errors when using HttpClient::request(), but we don't
-          //   have a good way of attaching the raw content to the exception.
-          KJ_FAIL_REQUIRE(protocolError.description) { break; }
-          return HttpClient::WebSocketResponse();
+          return settings.errorHandler.orDefault(*this).handleWebSocketProtocolError(
+              kj::mv(protocolError));
         }
       }
 
@@ -3518,11 +3701,25 @@ kj::Promise<kj::Own<kj::AsyncIoStream>> HttpClient::connect(kj::StringPtr host) 
 }
 
 kj::Own<HttpClient> newHttpClient(
-    HttpHeaderTable& responseHeaderTable, kj::AsyncIoStream& stream,
+    const HttpHeaderTable& responseHeaderTable, kj::AsyncIoStream& stream,
     HttpClientSettings settings) {
   return kj::heap<HttpClientImpl>(responseHeaderTable,
       kj::Own<kj::AsyncIoStream>(&stream, kj::NullDisposer::instance),
       kj::mv(settings));
+}
+
+HttpClient::Response HttpClientErrorHandler::handleProtocolError(
+      HttpHeaders::ProtocolError protocolError) {
+  KJ_FAIL_REQUIRE(protocolError.description) { break; }
+  return HttpClient::Response();
+}
+
+HttpClient::WebSocketResponse HttpClientErrorHandler::handleWebSocketProtocolError(
+      HttpHeaders::ProtocolError protocolError) {
+  auto response = handleProtocolError(protocolError);
+  return HttpClient::WebSocketResponse {
+    response.statusCode, response.statusText, response.headers, kj::mv(response.body)
+  };
 }
 
 // =======================================================================================
@@ -3531,7 +3728,7 @@ namespace {
 
 class NetworkAddressHttpClient final: public HttpClient {
 public:
-  NetworkAddressHttpClient(kj::Timer& timer, HttpHeaderTable& responseHeaderTable,
+  NetworkAddressHttpClient(kj::Timer& timer, const HttpHeaderTable& responseHeaderTable,
                            kj::Own<kj::NetworkAddress> address, HttpClientSettings settings)
       : timer(timer),
         responseHeaderTable(responseHeaderTable),
@@ -3588,7 +3785,7 @@ public:
 
 private:
   kj::Timer& timer;
-  HttpHeaderTable& responseHeaderTable;
+  const HttpHeaderTable& responseHeaderTable;
   kj::Own<kj::NetworkAddress> address;
   HttpClientSettings settings;
 
@@ -3755,7 +3952,7 @@ private:
 
 class NetworkHttpClient final: public HttpClient, private kj::TaskSet::ErrorHandler {
 public:
-  NetworkHttpClient(kj::Timer& timer, HttpHeaderTable& responseHeaderTable,
+  NetworkHttpClient(kj::Timer& timer, const HttpHeaderTable& responseHeaderTable,
                     kj::Network& network, kj::Maybe<kj::Network&> tlsNetwork,
                     HttpClientSettings settings)
       : timer(timer),
@@ -3797,7 +3994,7 @@ public:
 
 private:
   kj::Timer& timer;
-  HttpHeaderTable& responseHeaderTable;
+  const HttpHeaderTable& responseHeaderTable;
   kj::Network& network;
   kj::Maybe<kj::Network&> tlsNetwork;
   HttpClientSettings settings;
@@ -3887,13 +4084,13 @@ private:
 
 }  // namespace
 
-kj::Own<HttpClient> newHttpClient(kj::Timer& timer, HttpHeaderTable& responseHeaderTable,
+kj::Own<HttpClient> newHttpClient(kj::Timer& timer, const HttpHeaderTable& responseHeaderTable,
                                   kj::NetworkAddress& addr, HttpClientSettings settings) {
   return kj::heap<NetworkAddressHttpClient>(timer, responseHeaderTable,
       kj::Own<kj::NetworkAddress>(&addr, kj::NullDisposer::instance), kj::mv(settings));
 }
 
-kj::Own<HttpClient> newHttpClient(kj::Timer& timer, HttpHeaderTable& responseHeaderTable,
+kj::Own<HttpClient> newHttpClient(kj::Timer& timer, const HttpHeaderTable& responseHeaderTable,
                                   kj::Network& network, kj::Maybe<kj::Network&> tlsNetwork,
                                   HttpClientSettings settings) {
   return kj::heap<NetworkHttpClient>(
@@ -4327,8 +4524,8 @@ private:
     kj::Promise<void> whenAborted() override {
       return inner->whenAborted();
     }
-    kj::Promise<Message> receive() override {
-      return inner->receive().then([this](Message&& message) -> kj::Promise<Message> {
+    kj::Promise<Message> receive(size_t maxSize) override {
+      return inner->receive(maxSize).then([this](Message&& message) -> kj::Promise<Message> {
         if (message.is<WebSocket::Close>()) {
           return afterReceiveClosed()
               .then([message = kj::mv(message)]() mutable { return kj::mv(message); });
@@ -4346,6 +4543,9 @@ private:
         return afterSendClosed();
       });
     }
+
+    uint64_t sentByteCount() override { return inner->sentByteCount(); }
+    uint64_t receivedByteCount() override { return inner->receivedByteCount(); }
 
   private:
     kj::Own<kj::WebSocket> inner;
@@ -4570,6 +4770,37 @@ public:
     }
   }
 
+public:
+  kj::Promise<bool> startLoop(bool firstRequest) {
+    return loop(firstRequest).catch_([this](kj::Exception&& e) -> kj::Promise<bool> {
+      // Exception; report 5xx.
+
+      KJ_IF_MAYBE(p, webSocketError) {
+        // sendWebSocketError() was called. Finish sending and close the connection. Don't log
+        // the exception because it's probably a side-effect of this.
+        auto promise = kj::mv(*p);
+        webSocketError = nullptr;
+        return kj::mv(promise);
+      }
+
+      return sendError(kj::mv(e));
+    });
+  }
+
+private:
+  HttpServer& server;
+  kj::AsyncIoStream& stream;
+  HttpService& service;
+  HttpInputStreamImpl httpInput;
+  HttpOutputStream httpOutput;
+  kj::Maybe<HttpMethod> currentMethod;
+  bool timedOut = false;
+  bool closed = false;
+  bool upgraded = false;
+  bool webSocketClosed = false;
+  bool closeAfterSend = false;  // True if send() should set Connection: close.
+  kj::Maybe<kj::Promise<bool>> webSocketError;
+
   kj::Promise<bool> loop(bool firstRequest) {
     if (!firstRequest && server.draining && httpInput.isCleanDrain()) {
       // Don't call awaitNextMessage() in this case because that will initiate a read() which will
@@ -4610,7 +4841,7 @@ public:
             timedOut = true;
             return HttpHeaders::ProtocolError {
               408, "Request Timeout",
-              "ERROR: Timed out waiting for next request headers.", nullptr
+              "Timed out waiting for next request headers.", nullptr
             };
           }));
         }
@@ -4621,7 +4852,7 @@ public:
         this->closed = true;
         return HttpHeaders::RequestOrProtocolError(HttpHeaders::ProtocolError {
           408, "Request Timeout",
-          "ERROR: Client closed connection or connection timeout "
+          "Client closed connection or connection timeout "
           "while waiting for request headers.", nullptr
         });
       }
@@ -4635,7 +4866,7 @@ public:
         timedOut = true;
         return HttpHeaders::ProtocolError {
           408, "Request Timeout",
-          "ERROR: Timed out waiting for initial request headers.", nullptr
+          "Timed out waiting for initial request headers.", nullptr
         };
       });
       receivedHeaders = receivedHeaders.exclusiveJoin(kj::mv(timeoutPromise));
@@ -4785,34 +5016,8 @@ public:
       }
 
       KJ_UNREACHABLE;
-    }).catch_([this](kj::Exception&& e) -> kj::Promise<bool> {
-      // Exception; report 5xx.
-
-      KJ_IF_MAYBE(p, webSocketError) {
-        // sendWebSocketError() was called. Finish sending and close the connection. Don't log
-        // the exception because it's probably a side-effect of this.
-        auto promise = kj::mv(*p);
-        webSocketError = nullptr;
-        return kj::mv(promise);
-      }
-
-      return sendError(kj::mv(e));
     });
   }
-
-private:
-  HttpServer& server;
-  kj::AsyncIoStream& stream;
-  HttpService& service;
-  HttpInputStreamImpl httpInput;
-  HttpOutputStream httpOutput;
-  kj::Maybe<HttpMethod> currentMethod;
-  bool timedOut = false;
-  bool closed = false;
-  bool upgraded = false;
-  bool webSocketClosed = false;
-  bool closeAfterSend = false;  // True if send() should set Connection: close.
-  kj::Maybe<kj::Promise<bool>> webSocketError;
 
   kj::Own<kj::AsyncOutputStream> send(
       uint statusCode, kj::StringPtr statusText, const HttpHeaders& headers,
@@ -4823,12 +5028,33 @@ private:
     kj::StringPtr connectionHeaders[HttpHeaders::CONNECTION_HEADERS_COUNT];
     kj::String lengthStr;
 
+    if (!closeAfterSend) {
+      // Check if application wants us to close connections.
+      KJ_IF_MAYBE(c, server.settings.callbacks) {
+        if (c->shouldClose()) {
+          closeAfterSend = true;
+        }
+      }
+    }
+
+    // TODO(0.10): If `server.draining`, we should probably set `closeAfterSend` -- UNLESS the
+    //   connection was created using listenHttpCleanDrain(), in which case the application may
+    //   intend to continue using the connection.
+
     if (closeAfterSend) {
       connectionHeaders[HttpHeaders::BuiltinIndices::CONNECTION] = "close";
     }
 
-    if (statusCode == 204 || statusCode == 205 || statusCode == 304) {
+    if (statusCode == 204 || statusCode == 304) {
       // No entity-body.
+    } else if (statusCode == 205) {
+      // Status code 205 also has no body, but unlike 204 and 304, it must explicitly encode an
+      // empty body, e.g. using content-length: 0. I'm guessing this is one of those things, where
+      // some early clients expected an explicit body while others assumed an empty body, and so
+      // the standard had to choose the common denominator.
+      //
+      // Spec: https://tools.ietf.org/html/rfc7231#section-6.3.6
+      connectionHeaders[HttpHeaders::BuiltinIndices::CONTENT_LENGTH] = "0";
     } else KJ_IF_MAYBE(s, expectedBodySize) {
       // HACK: We interpret a zero-length expected body length on responses to HEAD requests to mean
       //   "don't set a Content-Length header at all." This provides a way to omit a body header on
@@ -4883,18 +5109,18 @@ private:
     // it to be GET.
 
     if (method != HttpMethod::GET) {
-      return sendWebSocketError("ERROR: WebSocket must be initiated with a GET request.");
+      return sendWebSocketError("WebSocket must be initiated with a GET request.");
     }
 
     if (requestHeaders.get(HttpHeaderId::SEC_WEBSOCKET_VERSION).orDefault(nullptr) != "13") {
-      return sendWebSocketError("ERROR: The requested WebSocket version is not supported.");
+      return sendWebSocketError("The requested WebSocket version is not supported.");
     }
 
     kj::String key;
     KJ_IF_MAYBE(k, requestHeaders.get(HttpHeaderId::SEC_WEBSOCKET_KEY)) {
       key = kj::str(*k);
     } else {
-      return sendWebSocketError("ERROR: Missing Sec-WebSocket-Key");
+      return sendWebSocketError("Missing Sec-WebSocket-Key");
     }
 
     auto websocketAccept = generateWebSocketAccept(key);
@@ -4981,9 +5207,12 @@ private:
       kj::Promise<void> whenAborted() override {
         return kj::cp(exception);
       }
-      kj::Promise<Message> receive() override {
+      kj::Promise<Message> receive(size_t maxSize) override {
         return kj::cp(exception);
       }
+
+      uint64_t sentByteCount() override { KJ_FAIL_ASSERT("received bad WebSocket handshake"); }
+      uint64_t receivedByteCount() override { KJ_FAIL_ASSERT("received bad WebSocket handshake"); }
 
     private:
       kj::Exception exception;
@@ -4994,17 +5223,17 @@ private:
   }
 };
 
-HttpServer::HttpServer(kj::Timer& timer, HttpHeaderTable& requestHeaderTable, HttpService& service,
-                       Settings settings)
+HttpServer::HttpServer(kj::Timer& timer, const HttpHeaderTable& requestHeaderTable,
+                       HttpService& service, Settings settings)
     : HttpServer(timer, requestHeaderTable, &service, settings,
                  kj::newPromiseAndFulfiller<void>()) {}
 
-HttpServer::HttpServer(kj::Timer& timer, HttpHeaderTable& requestHeaderTable,
+HttpServer::HttpServer(kj::Timer& timer, const HttpHeaderTable& requestHeaderTable,
                        HttpServiceFactory serviceFactory, Settings settings)
     : HttpServer(timer, requestHeaderTable, kj::mv(serviceFactory), settings,
                  kj::newPromiseAndFulfiller<void>()) {}
 
-HttpServer::HttpServer(kj::Timer& timer, HttpHeaderTable& requestHeaderTable,
+HttpServer::HttpServer(kj::Timer& timer, const HttpHeaderTable& requestHeaderTable,
                        kj::OneOf<HttpService*, HttpServiceFactory> service,
                        Settings settings, kj::PromiseFulfillerPair<void> paf)
     : timer(timer), requestHeaderTable(requestHeaderTable), service(kj::mv(service)),
@@ -5067,7 +5296,7 @@ kj::Promise<bool> HttpServer::listenHttpCleanDrain(kj::AsyncIoStream& connection
 
   // Start reading requests and responding to them, but immediately cancel processing if the client
   // disconnects.
-  auto promise = obj->loop(true)
+  auto promise = obj->startLoop(true)
       .exclusiveJoin(connection.whenWriteDisconnected().then([]() {return false;}));
 
   // Eagerly evaluate so that we drop the connection when the promise resolves, even if the caller
@@ -5087,7 +5316,7 @@ kj::Promise<void> HttpServerErrorHandler::handleClientProtocolError(
   HttpHeaders headers(headerTable);
   headers.set(HttpHeaderId::CONTENT_TYPE, "text/plain");
 
-  auto errorMessage = kj::str(protocolError.description);
+  auto errorMessage = kj::str("ERROR: ", protocolError.description);
   auto body = response.send(protocolError.statusCode, protocolError.statusMessage,
                             headers, errorMessage.size());
 

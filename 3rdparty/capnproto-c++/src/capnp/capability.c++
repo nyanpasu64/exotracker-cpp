@@ -143,7 +143,7 @@ public:
   MallocMessageBuilder message;
 };
 
-class LocalCallContext final: public CallContextHook, public kj::Refcounted {
+class LocalCallContext final: public CallContextHook, public ResponseHook, public kj::Refcounted {
 public:
   LocalCallContext(kj::Own<MallocMessageBuilder>&& request, kj::Own<ClientHook> clientRef,
                    kj::Own<kj::PromiseFulfiller<void>> cancelAllowedFulfiller)
@@ -167,6 +167,11 @@ public:
       response = Response<AnyPointer>(responseBuilder.asReader(), kj::mv(localResponse));
     }
     return responseBuilder;
+  }
+  void setPipeline(kj::Own<PipelineHook>&& pipeline) override {
+    KJ_IF_MAYBE(f, tailCallPipelineFulfiller) {
+      f->get()->fulfill(AnyPointer::Pipeline(kj::mv(pipeline)));
+    }
   }
   kj::Promise<void> tailCall(kj::Own<RequestHook>&& request) override {
     auto result = directTailCall(kj::mv(request));
@@ -236,8 +241,23 @@ public:
     // Now the other branch returns the response from the context.
     auto promise = forked.addBranch().then(kj::mvCapture(context,
         [](kj::Own<LocalCallContext>&& context) {
-      context->getResults(MessageSize { 0, 0 });  // force response allocation
-      return kj::mv(KJ_ASSERT_NONNULL(context->response));
+      // force response allocation
+      auto reader = context->getResults(MessageSize { 0, 0 }).asReader();
+
+      if (context->isShared()) {
+        // We can't just move away context->response as `context` itself is still referenced by
+        // something -- probably a Pipeline object. As a bit of a hack, LocalCallContext itself
+        // implements ResponseHook so that we can just return a ref on it.
+        //
+        // TODO(cleanup): Maybe ResponseHook should be refcounted? Note that context->response
+        //   might not necessarily contain a LocalResponse if it was resolved by a tail call, so
+        //   we'd have to add refcounting to all ResponseHook implementations.
+        context->releaseParams();      // The call is done so params can definitely be dropped.
+        context->clientRef = nullptr;  // Definitely not using the client cap anymore either.
+        return Response<AnyPointer>(reader, kj::mv(context));
+      } else {
+        return kj::mv(KJ_ASSERT_NONNULL(context->response));
+      }
     }));
 
     // We return the other branch.
@@ -540,6 +560,14 @@ public:
 
   Request<AnyPointer, AnyPointer> newCall(
       uint64_t interfaceId, uint16_t methodId, kj::Maybe<MessageSize> sizeHint) override {
+    KJ_IF_MAYBE(r, resolved) {
+      // We resolved to a shortened path. New calls MUST go directly to the replacement capability
+      // so that their ordering is consistent with callers who call getResolved() to get direct
+      // access to the new capability. In particular it's important that we don't place these calls
+      // in our streaming queue.
+      return r->get()->newCall(interfaceId, methodId, sizeHint);
+    }
+
     auto hook = kj::heap<LocalRequest>(
         interfaceId, methodId, sizeHint, kj::addRef(*this));
     auto root = hook->message->getRoot<AnyPointer>();
@@ -548,6 +576,14 @@ public:
 
   VoidPromiseAndPipeline call(uint64_t interfaceId, uint16_t methodId,
                               kj::Own<CallContextHook>&& context) override {
+    KJ_IF_MAYBE(r, resolved) {
+      // We resolved to a shortened path. New calls MUST go directly to the replacement capability
+      // so that their ordering is consistent with callers who call getResolved() to get direct
+      // access to the new capability. In particular it's important that we don't place these calls
+      // in our streaming queue.
+      return r->get()->call(interfaceId, methodId, kj::mv(context));
+    }
+
     auto contextPtr = context.get();
 
     // We don't want to actually dispatch the call synchronously, because we don't want the callee
@@ -667,7 +703,17 @@ private:
     resolveTask = server->shortenPath().map([this](kj::Promise<Capability::Client> promise) {
       return promise.then([this](Capability::Client&& cap) {
         auto hook = ClientHook::from(kj::mv(cap));
-        resolved = hook->addRef();
+
+        if (blocked) {
+          // This is a streaming interface and we have some calls queued up as a result. We cannot
+          // resolve directly to the new shorter path because this may allow new calls to hop
+          // the queue -- we need to embargo new calls until the queue clears out.
+          auto promise = kj::newAdaptedPromise<kj::Promise<void>, BlockedCall>(*this)
+              .then([hook = kj::mv(hook)]() mutable { return kj::mv(hook); });
+          hook = newLocalPromiseClient(kj::mv(promise));
+        }
+
+        resolved = kj::mv(hook);
       }).fork();
     });
   }
@@ -797,6 +843,36 @@ kj::Own<ClientHook> newLocalPromiseClient(kj::Promise<kj::Own<ClientHook>>&& pro
 kj::Own<PipelineHook> newLocalPromisePipeline(kj::Promise<kj::Own<PipelineHook>>&& promise) {
   return kj::refcounted<QueuedPipeline>(kj::mv(promise));
 }
+
+// =======================================================================================
+
+namespace _ {  // private
+
+class PipelineBuilderHook final: public PipelineHook, public kj::Refcounted {
+public:
+  PipelineBuilderHook(uint firstSegmentWords)
+      : message(firstSegmentWords),
+        root(message.getRoot<AnyPointer>()) {}
+
+  kj::Own<PipelineHook> addRef() override {
+    return kj::addRef(*this);
+  }
+
+  kj::Own<ClientHook> getPipelinedCap(kj::ArrayPtr<const PipelineOp> ops) override {
+    return root.asReader().getPipelinedCap(ops);
+  }
+
+  MallocMessageBuilder message;
+  AnyPointer::Builder root;
+};
+
+PipelineBuilderPair newPipelineBuilder(uint firstSegmentWords) {
+  auto hook = kj::refcounted<PipelineBuilderHook>(firstSegmentWords);
+  auto root = hook->root;
+  return { root, kj::mv(hook) };
+}
+
+}  // namespace _ (private)
 
 // =======================================================================================
 
