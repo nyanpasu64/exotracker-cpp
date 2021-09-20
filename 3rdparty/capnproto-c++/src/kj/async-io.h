@@ -43,6 +43,7 @@ class AutoCloseFd;
 class NetworkAddress;
 class AsyncOutputStream;
 class AsyncIoStream;
+class AncillaryMessage;
 
 // =======================================================================================
 // Streaming I/O
@@ -84,6 +85,12 @@ public:
   //
   // To prevent runaway memory allocation, consider using a more conservative value for `limit` than
   // the default, particularly on untrusted data streams which may never see EOF.
+
+  virtual void registerAncillaryMessageHandler(Function<void(ArrayPtr<AncillaryMessage>)> fn);
+  // Register interest in checking for ancillary messages (aka control messages) when reading.
+  // The provided callback will be called whenever any are encountered. The messages passed to
+  // the function do not live beyond when function returns.
+  // Only supported on Unix (the default impl throws UNIMPLEMENTED). Most apps will not use this.
 };
 
 class AsyncOutputStream {
@@ -146,10 +153,14 @@ public:
   // Note that we don't provide methods that return NetworkAddress because it usually wouldn't
   // be useful. You can't connect() to or listen() on these addresses, obviously, because they are
   // ephemeral addresses for a single connection.
+
+  virtual kj::Maybe<int> getFd() const { return nullptr; }
+  // Get the underlying Unix file descriptor, if any. Returns nullptr if this object actually
+  // isn't wrapping a file descriptor.
 };
 
 class AsyncCapabilityStream: public AsyncIoStream {
-  // An AsyncIoStream that also allows transmitting new stream objects and file descirptors
+  // An AsyncIoStream that also allows transmitting new stream objects and file descriptors
   // (capabilities, in the object-capability model sense), in addition to bytes.
   //
   // Capabilities can be attached to bytes when they are written. On the receiving end, the read()
@@ -158,7 +169,7 @@ class AsyncCapabilityStream: public AsyncIoStream {
   // Note that AsyncIoStream's regular byte-oriented methods can be used on AsyncCapabilityStream,
   // with the effect of silently dropping any capabilities attached to the respective bytes. E.g.
   // using `AsyncIoStream::tryRead()` to read bytes that had been sent with `writeWithFds()` will
-  // silently drop the FDs (closing them if appropriate). Also note that puming a stream with
+  // silently drop the FDs (closing them if appropriate). Also note that pumping a stream with
   // `pumpTo()` always drops all capabilities attached to the pumped data. (TODO(someday): Do we
   // want a version of pumpTo() that preserves capabilities?)
   //
@@ -299,12 +310,114 @@ Own<AsyncIoStream> newPromisedStream(Promise<Own<AsyncIoStream>> promise);
 // Constructs an Async*Stream which waits for a promise to resolve, then forwards all calls to the
 // promised stream.
 
+// =======================================================================================
+// Authenticated streams
+
+class PeerIdentity {
+  // PeerIdentity provides information about a connecting client. Various subclasses exist to
+  // address different network types.
+public:
+  virtual kj::String toString() = 0;
+  // Returns a human-readable string identifying the peer. Where possible, this string will be
+  // in the same format as the addresses you could pass to `kj::Network::parseAddress()`. However,
+  // only certain subclasses of `PeerIdentity` guarantee this property.
+};
+
+struct AuthenticatedStream {
+  // A pair of an `AsyncIoStream` and a `PeerIdentity`. This is used as the return type of
+  // `NetworkAddress::connectAuthenticated()` and `ConnectionReceiver::acceptAuthenticated()`.
+
+  Own<AsyncIoStream> stream;
+  // The byte stream.
+
+  Own<PeerIdentity> peerIdentity;
+  // An object indicating who is at the other end of the stream.
+  //
+  // Different subclasses of `PeerIdentity` are used in different situations:
+  // - TCP connections will use NetworkPeerIdentity, which gives the network address of the client.
+  // - Local (unix) socket connections will use LocalPeerIdentity, which identifies the UID
+  //   and PID of the process that initiated the connection.
+  // - TLS connections will use TlsPeerIdentity which provides details of the client certificate,
+  //   if any was provided.
+  // - When no meaningful peer identity can be provided, `UnknownPeerIdentity` is returned.
+  //
+  // Implementations of `Network`, `ConnectionReceiver`, `NetworkAddress`, etc. should document the
+  // specific assumptions the caller can make about the type of `PeerIdentity`s used, allowing for
+  // identities to be statically downcast if the right conditions are met. In the absence of
+  // documented promises, RTTI may be needed to query the type.
+};
+
+class NetworkPeerIdentity: public PeerIdentity {
+  // PeerIdentity used for network protocols like TCP/IP. This identifies the remote peer.
+  //
+  // This is only "authenticated" to the extent that we know data written to the stream will be
+  // routed to the given address. This does not preclude the possibility of man-in-the-middle
+  // attacks by attackers who are able to manipulate traffic along the route.
+public:
+  virtual NetworkAddress& getAddress() = 0;
+  // Obtain the peer's address as a NetworkAddress object. The returned reference's lifetime is the
+  // same as the `NetworkPeerIdentity`, but you can always call `clone()` on it to get a copy that
+  // lives longer.
+
+  static kj::Own<NetworkPeerIdentity> newInstance(kj::Own<NetworkAddress> addr);
+  // Construct an instance of this interface wrapping the given address.
+};
+
+class LocalPeerIdentity: public PeerIdentity {
+  // PeerIdentity used for connections between processes on the local machine -- in particular,
+  // Unix sockets.
+  //
+  // (This interface probably isn't useful on Windows.)
+public:
+  struct Credentials {
+    kj::Maybe<int> pid;
+    kj::Maybe<uint> uid;
+
+    // We don't cover groups at present because some systems produce a list of groups while others
+    // only provide the peer's main group, the latter being pretty useless.
+  };
+
+  virtual Credentials getCredentials() = 0;
+  // Get the PID and UID of the peer process, if possible.
+  //
+  // Either ID may be null if the peer could not be identified. Some operating systems do not
+  // support retrieving these credentials, or can only provide one or the other. Some situations
+  // (like user and PID namespaces on Linux) may also make it impossible to represent the peer's
+  // credentials accurately.
+  //
+  // Note the meaning here can be subtle. Multiple processes can potentially have the socket in
+  // their file descriptor tables. The identified process is the one who called `connect()` or
+  // `listen()`.
+  //
+  // On Linux this is implemented with SO_PEERCRED.
+
+  static kj::Own<LocalPeerIdentity> newInstance(Credentials creds);
+  // Construct an instance of this interface wrapping the given credentials.
+};
+
+class UnknownPeerIdentity: public PeerIdentity {
+public:
+  static kj::Own<UnknownPeerIdentity> newInstance();
+  // Get an instance of this interface. This actually always returns the same instance with no
+  // memory allocation.
+};
+
+// =======================================================================================
+// Accepting connections
+
 class ConnectionReceiver {
   // Represents a server socket listening on a port.
 
 public:
   virtual Promise<Own<AsyncIoStream>> accept() = 0;
   // Accept the next incoming connection.
+
+  virtual Promise<AuthenticatedStream> acceptAuthenticated();
+  // Accept the next incoming connection, and also provide a PeerIdentity with any information
+  // about the client.
+  //
+  // For backwards-compatibility, the default implementation of this method calls `accept()` and
+  // then adds `UnknownPeerIdentity`.
 
   virtual uint getPort() = 0;
   // Gets the port number, if applicable (i.e. if listening on IP).  This is useful if you didn't
@@ -335,14 +448,14 @@ public:
   // Protocol-specific message type.
 
   template <typename T>
-  inline Maybe<const T&> as();
+  inline Maybe<const T&> as() const;
   // Interpret the ancillary message as the given struct type. Most ancillary messages are some
   // sort of struct, so this is a convenient way to access it. Returns nullptr if the message
   // is smaller than the struct -- this can happen if the message was truncated due to
   // insufficient ancillary buffer space.
 
   template <typename T>
-  inline ArrayPtr<const T> asArray();
+  inline ArrayPtr<const T> asArray() const;
   // Interpret the ancillary message as an array of items. If the message size does not evenly
   // divide into elements of type T, the remainder is discarded -- this can happen if the message
   // was truncated due to insufficient ancillary buffer space.
@@ -377,7 +490,7 @@ public:
   // Get the content of the datagram.
 
   virtual MaybeTruncated<ArrayPtr<const AncillaryMessage>> getAncillary() = 0;
-  // Ancilarry messages received with the datagram. See the recvmsg() system call and the cmsghdr
+  // Ancillary messages received with the datagram. See the recvmsg() system call and the cmsghdr
   // struct. Most apps don't need this.
   //
   // If the returned value is truncated, then the last message in the array may itself be
@@ -431,6 +544,14 @@ public:
   // Make a new connection to this address.
   //
   // The address must not be a wildcard ("*").  If it is an IP address, it must have a port number.
+
+  virtual Promise<AuthenticatedStream> connectAuthenticated();
+  // Connect to the address and return both the connection and information about the peer identity.
+  // This is especially useful when using TLS, to get certificate details.
+  //
+  // For backwards-compatibility, the default implementation of this method calls `connect()` and
+  // then uses a `NetworkPeerIdentity` wrapping a clone of this `NetworkAddress` -- which is not
+  // particularly useful.
 
   virtual Own<ConnectionReceiver> listen() = 0;
   // Listen for incoming connections on this address.
@@ -808,6 +929,11 @@ public:
   Promise<Own<AsyncIoStream>> accept() override;
   uint getPort() override;
 
+  Promise<AuthenticatedStream> acceptAuthenticated() override;
+  // Always produces UnknownIdentity. Capability-based security patterns should not rely on
+  // authenticating peers; the other end of the capability stream should only be given to
+  // authorized parties in the first place.
+
 private:
   AsyncCapabilityStream& inner;
 };
@@ -836,6 +962,11 @@ public:
   Own<NetworkAddress> clone() override;
   String toString() override;
 
+  Promise<AuthenticatedStream> connectAuthenticated() override;
+  // Always produces UnknownIdentity. Capability-based security patterns should not rely on
+  // authenticating peers; the other end of the capability stream should only be given to
+  // authorized parties in the first place.
+
 private:
   kj::Maybe<AsyncIoProvider&> provider;
   AsyncCapabilityStream& inner;
@@ -852,7 +983,7 @@ inline int AncillaryMessage::getLevel() const { return level; }
 inline int AncillaryMessage::getType() const { return type; }
 
 template <typename T>
-inline Maybe<const T&> AncillaryMessage::as() {
+inline Maybe<const T&> AncillaryMessage::as() const {
   if (data.size() >= sizeof(T)) {
     return *reinterpret_cast<const T*>(data.begin());
   } else {
@@ -861,7 +992,7 @@ inline Maybe<const T&> AncillaryMessage::as() {
 }
 
 template <typename T>
-inline ArrayPtr<const T> AncillaryMessage::asArray() {
+inline ArrayPtr<const T> AncillaryMessage::asArray() const {
   return arrayPtr(reinterpret_cast<const T*>(data.begin()), data.size() / sizeof(T));
 }
 

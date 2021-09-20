@@ -21,6 +21,10 @@
 
 // This program is a code generator plugin for `capnp compile` which generates C++ code.
 
+#if _WIN32
+#include <kj/win32-api-version.h>
+#endif
+
 #include <capnp/schema.capnp.h>
 #include "../serialize.h"
 #include <kj/debug.h>
@@ -40,10 +44,8 @@
 #include <capnp/stream.capnp.h>
 
 #if _WIN32
-#define WIN32_LEAN_AND_MEAN  // ::eyeroll::
 #include <windows.h>
 #include <kj/windows-sanity.h>
-#undef VOID
 #undef CONST
 #else
 #include <sys/time.h>
@@ -302,7 +304,7 @@ kj::String KJ_STRINGIFY(const CppTypeName& typeName) {
   }
 }
 
-CppTypeName whichKind(schema::Type::Which which) {
+CppTypeName whichKind(Type type) {
   // Make a CppTypeName representing the capnp::Kind value for the given schema type. This makes
   // CppTypeName conflate types and values, but this is all just a hack for MSVC's benefit. Its
   // primary use is as a non-type template parameter to `capnp::List<T, K>` -- normally the Kind K
@@ -310,30 +312,37 @@ CppTypeName whichKind(schema::Type::Which which) {
   // of `capnp::List<T, K>` is the return type of a function, and the element type T is a template
   // instantiation.
 
-  switch (which) {
-      case schema::Type::VOID: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+  switch (type.which()) {
+    case schema::Type::VOID: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
 
-      case schema::Type::BOOL: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::INT8: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::INT16: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::INT32: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::INT64: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::UINT8: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::UINT16: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::UINT32: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::UINT64: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::FLOAT32: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
-      case schema::Type::FLOAT64: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::BOOL: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::INT8: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::INT16: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::INT32: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::INT64: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::UINT8: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::UINT16: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::UINT32: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::UINT64: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::FLOAT32: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
+    case schema::Type::FLOAT64: return CppTypeName::makePrimitive(" ::capnp::Kind::PRIMITIVE");
 
-      case schema::Type::TEXT: return CppTypeName::makePrimitive(" ::capnp::Kind::BLOB");
-      case schema::Type::DATA: return CppTypeName::makePrimitive(" ::capnp::Kind::BLOB");
+    case schema::Type::TEXT: return CppTypeName::makePrimitive(" ::capnp::Kind::BLOB");
+    case schema::Type::DATA: return CppTypeName::makePrimitive(" ::capnp::Kind::BLOB");
 
-      case schema::Type::ENUM: return CppTypeName::makePrimitive(" ::capnp::Kind::ENUM");
-      case schema::Type::STRUCT: return CppTypeName::makePrimitive(" ::capnp::Kind::STRUCT");
-      case schema::Type::INTERFACE: return CppTypeName::makePrimitive(" ::capnp::Kind::INTERFACE");
+    case schema::Type::ENUM: return CppTypeName::makePrimitive(" ::capnp::Kind::ENUM");
+    case schema::Type::STRUCT: return CppTypeName::makePrimitive(" ::capnp::Kind::STRUCT");
+    case schema::Type::INTERFACE: return CppTypeName::makePrimitive(" ::capnp::Kind::INTERFACE");
 
-      case schema::Type::LIST: return CppTypeName::makePrimitive(" ::capnp::Kind::LIST");
-      case schema::Type::ANY_POINTER: return CppTypeName::makePrimitive(" ::capnp::Kind::OTHER");
+    case schema::Type::LIST: return CppTypeName::makePrimitive(" ::capnp::Kind::LIST");
+    case schema::Type::ANY_POINTER: {
+      switch (type.whichAnyPointerKind()) {
+        case schema::Type::AnyPointer::Unconstrained::CAPABILITY:
+          return CppTypeName::makePrimitive(" ::capnp::Kind::INTERFACE");
+        default:
+          return CppTypeName::makePrimitive(" ::capnp::Kind::OTHER");
+      }
+    }
   }
 
   KJ_UNREACHABLE;
@@ -514,7 +523,7 @@ private:
         auto params = kj::heapArrayBuilder<CppTypeName>(2);
         auto list = type.asList();
         params.add(typeName(list.getElementType(), method));
-        params.add(whichKind(list.whichElementType()));
+        params.add(whichKind(list.getElementType()));
         result.addMemberTemplate("List", params.finish());
         return result;
       }
@@ -539,9 +548,12 @@ private:
               return CppTypeName::makePrimitive(" ::capnp::AnyStruct");
             case schema::Type::AnyPointer::Unconstrained::LIST:
               return CppTypeName::makePrimitive(" ::capnp::AnyList");
-            case schema::Type::AnyPointer::Unconstrained::CAPABILITY:
+            case schema::Type::AnyPointer::Unconstrained::CAPABILITY: {
               hasInterfaces = true;  // Probably need to #include <capnp/capability.h>.
-              return CppTypeName::makePrimitive(" ::capnp::Capability");
+              auto result = CppTypeName::makePrimitive(" ::capnp::Capability");
+              result.setHasInterfaces();
+              return result;
+            }
           }
           KJ_UNREACHABLE;
         }
@@ -1785,7 +1797,7 @@ private:
             "      ::capnp::bounded<", offset, ">() * ::capnp::POINTERS), kj::mv(value));\n"
             "}\n",
             COND(type.hasDisambiguatedTemplate(),
-                "#ifndef _MSC_VER\n"
+                "#if !defined(_MSC_VER) || defined(__clang__)\n"
                 "// Excluded under MSVC because bugs may make it unable to compile this method.\n"),
             templateContext.allDecls(),
             "inline ::capnp::Orphan<", type, "> ", scope, "Builder::disown", titleCase, "() {\n",
@@ -1793,7 +1805,7 @@ private:
             "  return ::capnp::_::PointerHelpers<", type, ">::disown(_builder.getPointerField(\n"
             "      ::capnp::bounded<", offset, ">() * ::capnp::POINTERS));\n"
             "}\n",
-            COND(type.hasDisambiguatedTemplate(), "#endif  // !_MSC_VER\n"),
+            COND(type.hasDisambiguatedTemplate(), "#endif  // !_MSC_VER || __clang__\n"),
             COND(shouldExcludeInLiteMode, "#endif  // !CAPNP_LITE\n"),
             "\n")
       };
@@ -2573,7 +2585,7 @@ private:
           scope.size() == 0 ? kj::strTree() : kj::strTree(
               // TODO(msvc): MSVC doesn't like definitions of constexprs, but other compilers and
               //   the standard require them.
-              "#ifndef _MSC_VER\n"
+              "#if !defined(_MSC_VER) || defined(__clang__)\n"
               "constexpr ", typeName_, ' ', scope, upperCase, ";\n"
               "#endif\n")
         };
@@ -3043,6 +3055,8 @@ private:
             }
           },
           "\n"
+          "CAPNP_BEGIN_HEADER\n"
+          "\n"
           "namespace capnp {\n"
           "namespace schemas {\n"
           "\n",
@@ -3058,7 +3072,10 @@ private:
           KJ_MAP(n, nodeTexts) { return kj::mv(n.readerBuilderDefs); },
           separator, "\n",
           KJ_MAP(n, nodeTexts) { return kj::mv(n.inlineMethodDefs); },
-          KJ_MAP(n, namespaceParts) { return kj::strTree("}  // namespace\n"); }, "\n"),
+          KJ_MAP(n, namespaceParts) { return kj::strTree("}  // namespace\n"); },
+          "\n"
+          "CAPNP_END_HEADER\n"
+          "\n"),
 
       kj::strTree(
           "// Generated by Cap'n Proto compiler, DO NOT EDIT\n"

@@ -383,7 +383,12 @@ public:
   }
 
   void zero(uint64_t offset, uint64_t size) const {
-#ifdef FALLOC_FL_PUNCH_HOLE
+    // If FALLOC_FL_PUNCH_HOLE is defined, use it to efficiently zero the area.
+    //
+    // A fallocate() wrapper was only added to Android's Bionic C library as of API level 21,
+    // but FALLOC_FL_PUNCH_HOLE is apparently defined in the headers before that, so we'll
+    // have to explicitly test for that case.
+#if defined(FALLOC_FL_PUNCH_HOLE) && !(__ANDROID__ && __BIONIC__ && __ANDROID_API__ < 21)
     KJ_SYSCALL_HANDLE_ERRORS(
         fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, size)) {
       case EOPNOTSUPP:
@@ -409,7 +414,7 @@ public:
 #else
     // Use a 4k buffer of zeros amplified by iov to write zeros with as few syscalls as possible.
     size_t count = (size + sizeof(ZEROS) - 1) / sizeof(ZEROS);
-    const size_t iovmax = miniposix::iovMax(count);
+    const size_t iovmax = miniposix::iovMax();
     KJ_STACK_ARRAY(struct iovec, iov, kj::min(iovmax, count), 16, 256);
 
     for (auto& item: iov) {
@@ -774,7 +779,7 @@ public:
         if (!exists(path)) {
           return nullptr;
         }
-        // fallthrough
+        KJ_FALLTHROUGH;
       default:
         KJ_FAIL_SYSCALL("openat(fd, path, O_DIRECTORY)", error, path) { return nullptr; }
     }
@@ -909,7 +914,7 @@ public:
           mode = mode - WriteMode::CREATE_PARENT;
           return createNamedTemporary(finalName, mode, kj::mv(tryCreate));
         }
-        // fallthrough
+        KJ_FALLTHROUGH;
       default:
         KJ_FAIL_SYSCALL("create(path)", error, path) { break; }
         return nullptr;
@@ -952,7 +957,7 @@ public:
             // Retry, but make sure we don't try to create the parent again.
             return tryReplaceNode(path, mode - WriteMode::CREATE_PARENT, kj::mv(tryCreate));
           }
-          // fallthrough
+          KJ_FALLTHROUGH;
         default:
           KJ_FAIL_SYSCALL("create(path)", error, path) { return false; }
       } else {
@@ -1097,7 +1102,10 @@ public:
 
       KJ_SYSCALL_HANDLE_ERRORS(syscall(SYS_renameat2,
           fromDirFd, fromPath.cStr(), fd.get(), toPath.cStr(), RENAME_EXCHANGE)) {
-        case ENOSYS:
+        case ENOSYS:  // Syscall not supported by kernel.
+        case EINVAL:  // Maybe we screwed up, or maybe the syscall is not supported by the
+                      // filesystem. Unfortunately, there's no way to tell, so assume the latter.
+                      // ZFS in particular apparently produces EINVAL.
           break;  // fall back to traditional means
         case ENOENT:
           // Presumably because the target path doesn't exist.
@@ -1126,7 +1134,10 @@ public:
     } else if (has(mode, WriteMode::CREATE)) {
       KJ_SYSCALL_HANDLE_ERRORS(syscall(SYS_renameat2,
           fromDirFd, fromPath.cStr(), fd.get(), toPath.cStr(), RENAME_NOREPLACE)) {
-        case ENOSYS:
+        case ENOSYS:  // Syscall not supported by kernel.
+        case EINVAL:  // Maybe we screwed up, or maybe the syscall is not supported by the
+                      // filesystem. Unfortunately, there's no way to tell, so assume the latter.
+                      // ZFS in particular apparently produces EINVAL.
           break;  // fall back to traditional means
         case EEXIST:
           return false;
@@ -1165,8 +1176,10 @@ public:
         if (S_ISDIR(stats.st_mode)) {
           return mkdirat(fd, candidatePath.cStr(), 0700);
         } else {
-#if __APPLE__
-          // No mknodat() on OSX, gotta open() a file, ugh.
+#if __APPLE__ || __FreeBSD__
+          // - No mknodat() on OSX, gotta open() a file, ugh.
+          // - On a modern FreeBSD, mknodat() is reserved strictly for device nodes,
+          //   you cannot create a regular file using it (EINVAL).
           int newFd = openat(fd, candidatePath.cStr(),
                              O_RDWR | O_CREAT | O_EXCL | MAYBE_O_CLOEXEC, 0700);
           if (newFd >= 0) close(newFd);
