@@ -34,6 +34,7 @@ namespace gui::instrument_list {
 W_OBJECT_IMPL(InstrumentList)
 
 using doc::InstrumentIndex;
+using gui::lib::dpi::dpi_scale;
 using gui::lib::instr_warnings::KeysplitWarningIter;
 using gui::lib::instr_warnings::PatchWarnings;
 using namespace gui::lib::list_warnings;

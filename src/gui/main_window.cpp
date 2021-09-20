@@ -6,6 +6,7 @@
 #include "gui/instrument_list.h"
 #include "gui/move_cursor.h"
 #include "gui/tempo_dialog.h"
+#include "lib/dpi.h"
 #include "lib/layout_macros.h"
 #include "gui_common.h"
 #include "cmd_queue.h"
@@ -64,6 +65,7 @@ namespace gui::main_window {
 using std::unique_ptr;
 using std::make_unique;
 
+using gui::lib::dpi::dpi_scale;
 using gui::lib::icon_toolbar::IconToolBar;
 using gui::lib::icon_toolbar::enable_button_borders;
 using gui::pattern_editor::PatternEditor;
@@ -236,7 +238,7 @@ void CursorAndSelection::clear_select() {
 static void setup_error_dialog(QErrorMessage & dialog) {
     static constexpr int W = 640;
     static constexpr int H = 360;
-    dialog.resize(W, H);
+    dialog.resize(dpi_scale(&dialog, W), dpi_scale(&dialog, H));
     dialog.setModal(true);
 }
 
