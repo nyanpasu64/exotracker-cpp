@@ -261,6 +261,8 @@ public:
     explicit WheelSpinBoxT(QWidget * parent = nullptr)
         : SpinBox(parent)
     {
+        SpinBox::setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+
         // Prevent mouse scrolling from focusing the spinbox.
         SpinBox::setFocusPolicy(Qt::StrongFocus);
     }
