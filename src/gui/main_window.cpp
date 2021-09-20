@@ -261,6 +261,8 @@ public:
     explicit WheelSpinBoxT(QWidget * parent = nullptr)
         : SpinBox(parent)
     {
+        SpinBox::setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+
         // Prevent mouse scrolling from focusing the spinbox.
         SpinBox::setFocusPolicy(Qt::StrongFocus);
     }
@@ -516,6 +518,14 @@ struct MainWindowUi : MainWindow {
         // Pattern editing.
         {l__l(QVBoxLayout);
             {l__c_form(QGroupBox, QFormLayout);
+                c->setTitle(tr("View"));
+
+                {form__label_w(tr("Zoom"), WheelSpinBox);
+                    _zoom_level = w;
+                    w->setRange(1, MAX_ZOOM_LEVEL);
+                }
+            }
+            {l__c_form(QGroupBox, QFormLayout);
                 c->setTitle(tr("Note entry"));
 
                 {form__label_w(tr("Octave"), WheelSpinBox);
@@ -527,14 +537,7 @@ struct MainWindowUi : MainWindow {
                     w->setRange(gui_bottom_octave, gui_bottom_octave + peak_octave);
                 }
 
-                {form__label_w(tr("Zoom"), WheelSpinBox);
-                    _zoom_level = w;
-                    w->setRange(1, MAX_ZOOM_LEVEL);
-                }
-            }
-            {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("Step"));
-                {form__label_w(tr("Rows"), WheelSpinBox);
+                {form__label_w(tr("Step"), WheelSpinBox);
                     _step = w;
                     w->setRange(0, 256);
                 }
