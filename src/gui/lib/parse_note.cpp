@@ -7,7 +7,7 @@ namespace doc {
 
 namespace gui::lib::parse_note {
 
-QString stripped(const QString &t, int * pos) {
+static QString stripped(const QString &t, int * pos) {
     QStringView text(t);
 
     const qsizetype s = text.size();

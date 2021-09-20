@@ -97,7 +97,7 @@ constexpr AudioOptions FAST_RESAMPLER = {
     .resampler_quality = SRC_ZERO_ORDER_HOLD,
 };
 
-CommandQueue play_from_begin() {
+static CommandQueue play_from_begin() {
     CommandQueue out;
     out.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
     return out;
@@ -106,7 +106,7 @@ CommandQueue play_from_begin() {
 /// Constructs a new OverallSynth at the specified sampling rate,
 /// and runs it for the specified amount of time.
 /// Returns the generated audio.
-std::vector<Amplitude> run_new_synth(
+static std::vector<Amplitude> run_new_synth(
     doc::Document const & document,
     uint32_t smp_per_s,
     NsampT nsamp,
@@ -129,7 +129,7 @@ std::vector<Amplitude> run_new_synth(
     return buffer;
 };
 
-void check_signed_amplitude(gsl::span<Amplitude> buffer, Amplitude threshold) {
+static void check_signed_amplitude(gsl::span<Amplitude> buffer, Amplitude threshold) {
     bool positive_found = false;
     bool negative_found = false;
 

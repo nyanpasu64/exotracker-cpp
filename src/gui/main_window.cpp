@@ -233,7 +233,7 @@ void CursorAndSelection::clear_select() {
     }
 }
 
-void setup_error_dialog(QErrorMessage & dialog) {
+static void setup_error_dialog(QErrorMessage & dialog) {
     static constexpr int W = 640;
     static constexpr int H = 360;
     dialog.resize(W, H);

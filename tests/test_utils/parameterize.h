@@ -52,7 +52,7 @@ SubcaseNameMaybe subcase_tree(
 /// (Unconfirmed) Do NOT early-exit on first match,
 /// since doctest will only iterate if subsequent subcases fail.
 #define PARAMETERIZE(func_name, T, parameter, OPTIONs) \
-    [[nodiscard]] StackedFunc<SubcaseName> func_name( \
+    [[nodiscard]] static StackedFunc<SubcaseName> func_name( \
         T & parameter, StackedFunc<SubcaseName> inner = noop \
     ) { \
         return [&, inner](SubcaseName stack) { \

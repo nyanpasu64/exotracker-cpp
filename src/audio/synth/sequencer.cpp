@@ -73,7 +73,7 @@ void ChannelSequencer::stop_playback() {
 
 // # Grid-cell/pattern code.
 
-doc::MaybeGridIndex calc_next_grid(
+static doc::MaybeGridIndex calc_next_grid(
     doc::Timeline const& timeline, doc::GridIndex grid_index
 ) {
     grid_index++;
@@ -177,7 +177,7 @@ static void check_invariants(ChannelSequencer const & self) {
     }
 }
 
-EventPos event_vs_now(TickT ticks_per_beat, BeatPlusTick now, BeatPlusTick ev) {
+static EventPos event_vs_now(TickT ticks_per_beat, BeatPlusTick now, BeatPlusTick ev) {
     TickT ev_minus_now =
         ticks_per_beat * (ev.beat - now.beat) + (ev.dtick - now.dtick);
     if (ev_minus_now > 0) {
@@ -189,7 +189,7 @@ EventPos event_vs_now(TickT ticks_per_beat, BeatPlusTick now, BeatPlusTick ev) {
     }
 }
 
-void print_chip_channel(ChannelSequencer const& self) {
+static void print_chip_channel(ChannelSequencer const& self) {
     fmt::print(stderr, "seq {},{} ", self._chip_index, self._chan_index);
 }
 

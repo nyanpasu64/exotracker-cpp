@@ -15,9 +15,9 @@ PARAMETERIZE(range_0_4, int, x,
     OPTION(x, 3);
 )
 
-int how_many_subcases = 0;
-int sum_x = 0;
-int sum_y = 0;
+static int how_many_subcases = 0;
+static int sum_x = 0;
+static int sum_y = 0;
 
 constexpr int nx = 3;
 constexpr int ny = 4;

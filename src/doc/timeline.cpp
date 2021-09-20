@@ -9,7 +9,7 @@ namespace doc::timeline {
 using event_list::EventIndex;
 using doc_util::event_search::EventSearch;
 
-EventIndex calc_end_ev(TimedEventsRef events, BeatFraction rel_end_time) {
+static EventIndex calc_end_ev(TimedEventsRef events, BeatFraction rel_end_time) {
     EventSearch kv{events};
     return EventIndex(kv.beat_begin(rel_end_time) - events.begin());
 }
