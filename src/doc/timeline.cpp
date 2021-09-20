@@ -181,7 +181,7 @@ static TimelineCell single_block(BeatOrEnd end_time) {
     EventList events;
     auto num_events = (int) end_time.value_or(1u);
     for (int i = 0; i < num_events; i++) {
-        events.push_back({i, {i}});
+        events.push_back({i, {(NoteInt) i}});
     }
 
     return TimelineCell{TimelineBlock{0, end_time,
@@ -210,7 +210,7 @@ TEST_CASE("Check TimelineCellIter with a single block overflowing the grid cell"
 static TimelineCell single_block_loop(BeatOrEnd end_time, uint32_t loop_modulo) {
     EventList events;
     for (uint32_t i = 0; i < loop_modulo; i++) {
-        events.push_back({i, {i}});
+        events.push_back({i, {(NoteInt) i}});
     }
 
     return TimelineCell{TimelineBlock{0, end_time,

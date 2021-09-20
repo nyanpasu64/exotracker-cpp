@@ -69,19 +69,19 @@ set(
         -Wno-unused-function -Wno-unused-parameter
         -Werror=return-type
     >
+    $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
+        -Wtautological-unsigned-zero-compare
+    >
     $<$<CXX_COMPILER_ID:MSVC>:
         /Zc:preprocessor
-#        /W3
-        /W4
+        /W3
+        # I want to use /W4, but I get *far* too many false-positive C4244 warnings
+        # when passing integer literals into functions.
+        # And /w34244 doesn't help; it means "enable C4244 at /W3",
+        # not "enable the /W3 version of C4244".
         /wd4100  # allow unused parameters
         /wd4505  # allow unused functions
         /wd4456 /wd4457  # allow shadowing
-
-        # Loosen warnings on external libraries.
-        /experimental:external /external:anglebrackets
-        /external:W3
-        /wd4251  # Qt has DLL linkage warnings when using /external:anglebrackets
-        # Omit /external:templates- since Blip_Buffer has compile-time if statements
     >
     # /W4 causes lots of warnings in blip-buffer and Qt.
     # /experimental:external /external:anglebrackets causes lots of C4251 warnings:
