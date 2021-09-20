@@ -66,6 +66,7 @@ set(
     options
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
         -Wall -Wextra -Wconversion -Wsign-conversion
+        -Wmissing-declarations  # See !52 for explanation.
         -Wno-unused-function -Wno-unused-parameter
         -Werror=return-type
     >

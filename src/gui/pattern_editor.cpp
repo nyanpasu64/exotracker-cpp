@@ -272,7 +272,7 @@ static void calc_font_metrics(PatternEditor & self) {
     );
 }
 
-void create_image(PatternEditor & self) {
+static void create_image(PatternEditor & self) {
     /*
     https://www.qt.io/blog/2009/12/16/qt-graphics-and-performance-an-overview
 
@@ -1062,7 +1062,7 @@ public:
 
 }
 
-QLinearGradient make_gradient(
+static QLinearGradient make_gradient(
     int cursor_top, int cursor_bottom,  QColor color, int top_alpha, int bottom_alpha
 ) {
     // QLinearGradient's constructor takes the begin and endpoints.
@@ -2299,14 +2299,14 @@ void PatternEditor::next_pattern_pressed(StateTransaction & tx) {
     switch_grid_index<increment_mod>(*this, tx);
 }
 
-ColumnIndex ncol(ColumnList const& cols) {
+static ColumnIndex ncol(ColumnList const& cols) {
     return (ColumnIndex) cols.size();
 }
 
-SubColumnIndex nsubcol(ColumnList const& cols, CursorX const& cursor_x) {
+static SubColumnIndex nsubcol(ColumnList const& cols, CursorX const& cursor_x) {
     return (SubColumnIndex) cols[cursor_x.column].subcolumns.size();
 }
-CellIndex ncell(ColumnList const& cols, CursorX const& cursor_x) {
+static CellIndex ncell(ColumnList const& cols, CursorX const& cursor_x) {
     return cols[cursor_x.column].subcolumns[cursor_x.subcolumn].ncell;
 }
 
@@ -2542,10 +2542,11 @@ static Cursor step_cursor(PatternEditor const& self) {
 }
 
 namespace ed = edit::edit_pattern;
+using doc::ChipIndex;
+using doc::ChannelIndex;
 
-auto calc_cursor_x(PatternEditor const & self) ->
-    std::tuple<doc::ChipIndex, doc::ChannelIndex, SubColumnCells, CellIndex>
-{
+static std::tuple<ChipIndex, ChannelIndex, SubColumnCells, CellIndex>
+calc_cursor_x(PatternEditor const & self) {
     doc::Document const & document = self.get_document();
     auto cursor_x = get_cursor(self).x;
 
@@ -2579,11 +2580,8 @@ void PatternEditor::delete_key_pressed() {
     );
 }
 
-void note_pressed(
-    PatternEditor & self,
-    doc::ChipIndex chip,
-    doc::ChannelIndex channel,
-    doc::Note note
+static void note_pressed(
+    PatternEditor & self, ChipIndex chip, ChannelIndex channel, doc::Note note
 ) {
     std::optional<doc::InstrumentIndex> instrument{};
     auto const& state = self._win._state;
@@ -2657,8 +2655,8 @@ struct DigitField {
 
 static void add_digit(
     PatternEditor & self,
-    doc::ChipIndex chip,
-    doc::ChannelIndex channel,
+    ChipIndex chip,
+    ChannelIndex channel,
     DigitField field,
     DigitIndex digit_index,
     uint8_t nybble
@@ -2711,8 +2709,8 @@ struct EffectField {
 
 static void add_effect_char(
     PatternEditor & self,
-    doc::ChipIndex chip,
-    doc::ChannelIndex channel,
+    ChipIndex chip,
+    ChannelIndex channel,
     EffectField field,
     CellIndex char_index,
     char c)

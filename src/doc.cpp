@@ -42,7 +42,7 @@ Document Document::clone() const {
     return (DocumentCopy const&) *this;
 }
 
-void post_init(Document & document) {
+static void post_init(Document & document) {
     // Set tables to the correct length.
     document.instruments.v.resize(MAX_INSTRUMENTS);
 

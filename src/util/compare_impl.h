@@ -7,7 +7,7 @@
 
 
 #define ZZ_KEY_FUNCTION(T, FUNCTION, PAREN_OF_FIELDS) \
-    auto FUNCTION(T const& self) { \
+    static auto FUNCTION(T const& self) { \
         return std::tie PAREN_OF_FIELDS; \
     } \
 

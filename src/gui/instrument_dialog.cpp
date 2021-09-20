@@ -1,12 +1,13 @@
 #include "instrument_dialog.h"
 #include "instrument_dialog/adsr_graph.h"
 #include "gui_common.h"
+#include "gui/lib/docs_palette.h"
 #include "gui/lib/format.h"
 #include "gui/lib/instr_warnings.h"
+#include "gui/lib/layout_macros.h"
 #include "gui/lib/list_warnings.h"
 #include "gui/lib/parse_note.h"
-#include "gui/lib/layout_macros.h"
-#include "gui/lib/docs_palette.h"
+#include "gui/lib/small_button.h"
 #include "edit/edit_instr.h"
 #include "util/defer.h"
 #include "util/release_assert.h"
@@ -156,11 +157,7 @@ public:
     }
 };
 
-QToolButton * small_button(const QString &text, QWidget *parent = nullptr) {
-    auto w = new QToolButton(parent);
-    w->setText(text);
-    return w;
-}
+using gui::lib::small_button::small_button;
 
 /// Make the slider jump to the point of click,
 /// instead of stepping up/down by increments.

@@ -6,12 +6,12 @@
 namespace cmd_queue {
 
 // impl
-void init(CommandQueue & self) {
+static void init(CommandQueue & self) {
     self._begin = self._end = new AudioCommand{StopPlayback{}};
 }
 
 /// Only run this when there are no live readers left.
-void destroy_all(CommandQueue & self) {
+static void destroy_all(CommandQueue & self) {
     if (self._begin == nullptr) {
         return;
     }

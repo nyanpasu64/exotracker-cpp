@@ -1,6 +1,7 @@
 #include "adsr_graph.h"
 #include "gui/lib/layout_macros.h"
 #include "gui/lib/painter_ext.h"
+#include "gui/lib/small_button.h"
 #include "gui_common.h"
 #include "audio/tempo_calc.h"
 #include "util/release_assert.h"
@@ -308,11 +309,7 @@ static AdsrResult get_adsr(Adsr adsr, NsampT end_time) {
 // fn release_gain(adsr: &[]Point, release_time: NsampT, gain: u8) -> []Point
 // where the starting point is { .time = release_time, .ampl = adsr[...].ampl }.
 
-QToolButton * small_button(const QString &text, QWidget *parent = nullptr) {
-    auto w = new QToolButton(parent);
-    w->setText(text);
-    return w;
-}
+using gui::lib::small_button::small_button;
 
 AdsrGraph::AdsrGraph(QWidget * parent)
     : QWidget(parent)
@@ -474,7 +471,7 @@ struct TickSpacing {
     int major;
 };
 
-TickSpacing get_tick_spacing(qreal range) {
+static TickSpacing get_tick_spacing(qreal range) {
     // Based on https://stackoverflow.com/q/8506881.
 
     auto exponent = (int) floor(log10(range));
