@@ -192,7 +192,7 @@ struct [[nodiscard]] TimelineCell {
     }
 };
 
-/// One timeline item, all channels. Stores duration of timeline item.
+/// One timeline item, one channel. Stores duration of timeline item.
 struct [[nodiscard]] TimelineCellRef {
     BeatFraction const nbeats;
     TimelineCell const& cell;
