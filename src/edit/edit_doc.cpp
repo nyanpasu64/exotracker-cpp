@@ -109,12 +109,12 @@ using namespace doc;
 
 struct AddRemoveFrame {
     doc::GridIndex _grid;
-    std::optional<TimelineRow> _edit;
+    std::optional<TimelineFrame> _edit;
 
     /// If the command holds a row to be inserted, reserve memory for each cell.
     /// Once a cell gets swapped into the document,
     /// adding blocks must not allocate memory, to prevent blocking the audio thread.
-    AddRemoveFrame(doc::GridIndex grid, std::optional<TimelineRow> edit)
+    AddRemoveFrame(doc::GridIndex grid, std::optional<TimelineFrame> edit)
         : _grid(grid)
         , _edit(std::move(edit))
     {
@@ -140,8 +140,8 @@ struct AddRemoveFrame {
     void apply_swap(doc::Document & document) {
         assert(document.timeline.capacity() >= MAX_TIMELINE_FRAMES);
 
-        auto validate_reserved = [] (TimelineRow & row) {
-            for (auto & channel_cells : row.chip_channel_cells) {
+        auto validate_reserved = [] (TimelineFrame & frame) {
+            for (auto & channel_cells : frame.chip_channel_cells) {
                 for (auto & cell : channel_cells) {
                     (void) cell;
                     assert(cell._raw_blocks.capacity() >= doc::MAX_BLOCKS_PER_CELL);
@@ -149,9 +149,9 @@ struct AddRemoveFrame {
             }
         };
 
-        auto validate_empty = [] (TimelineRow & row) {
-            (void) row;
-            assert(row.chip_channel_cells.capacity() == 0);
+        auto validate_empty = [] (TimelineFrame & frame) {
+            (void) frame;
+            assert(frame.chip_channel_cells.capacity() == 0);
         };
 
         if (_edit) {
@@ -169,12 +169,12 @@ struct AddRemoveFrame {
     }
 
     using Impl = ImplEditCommand<AddRemoveFrame, Override::None>;
-    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
+    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineFrames;
 };
 
 // Exported via headers.
 
-EditBox add_timeline_row(
+EditBox add_timeline_frame(
     doc::Document const& document, doc::GridIndex grid_pos, doc::BeatFraction nbeats
 ) {
     ChipChannelTo<TimelineCell> chip_channel_cells;
@@ -192,17 +192,17 @@ EditBox add_timeline_row(
 
     return make_command(AddRemoveFrame(
         grid_pos,
-        TimelineRow{nbeats, std::move(chip_channel_cells)}
+        TimelineFrame{nbeats, std::move(chip_channel_cells)}
     ));
 }
 
-EditBox remove_timeline_row(doc::GridIndex grid_pos) {
+EditBox remove_timeline_frame(doc::GridIndex grid_pos) {
     return make_command(AddRemoveFrame(grid_pos, {}));
 }
 
-EditBox clone_timeline_row(doc::Document const& document, doc::GridIndex grid_pos) {
+EditBox clone_timeline_frame(doc::Document const& document, doc::GridIndex grid_pos) {
     return make_command(AddRemoveFrame(
-        grid_pos + 1, TimelineRow(document.timeline[grid_pos])
+        grid_pos + 1, TimelineFrame(document.timeline[grid_pos])
     ));
 }
 
@@ -226,7 +226,7 @@ struct SetGridLength {
         return false;
     }
 
-    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
+    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineFrames;
 };
 
 EditBox set_grid_length(doc::GridIndex grid_pos, doc::BeatFraction nbeats) {
@@ -243,7 +243,7 @@ struct MoveGridDown {
     }
 
     using Impl = ImplEditCommand<MoveGridDown, Override::None>;
-    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineRows;
+    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineFrames;
 };
 
 EditBox move_grid_up(doc::GridIndex grid_pos) {

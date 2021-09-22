@@ -189,7 +189,7 @@ My goal in exploring alternative approaches is not file-size efficiency (deletin
 
 The frame/order editor is replaced with a timeline editor, and its functionality is changed significantly.
 
-The pattern grid structure from existing trackers is carried over (under the name of timeline rows and grid cells). Each timeline row has its own length which can vary between rows (like OpenMPT, unlike FamiTracker). Each timeline row holds one timeline cell (or grid cell) per channel. However, unlike patterns, timeline cells do not contain events directly, but through several layers of indirection.
+The pattern grid structure from existing trackers is carried over (under the name of timeline frames and grid cells). Each timeline frame has its own length which can vary between rows (like OpenMPT, unlike FamiTracker). Each timeline frame holds one timeline cell (or grid cell) per channel. However, unlike patterns, timeline cells do not contain events directly, but through several layers of indirection.
 
 A timeline cell can hold zero or more blocks, which carry a start and end time (in integer beats) and a pattern. These blocks have nonzero length, do not overlap in time, occur in increasing time order, and lie between 0 and the timeline cell's length (the last block's end time can take on a special value corresponding to "end of cell")[1].
 
@@ -209,7 +209,7 @@ It is also intended to have a similar degree of flexibility as a DAW like Reaper
 
 The timeline code is implemented in `doc/timeline.h`. I added several helper classes.
 
-`TimelineCellRef` and `TimelineCellRefMut` store a reference to a timeline cell, and the owning timeline row's length.
+`TimelineCellRef` and `TimelineCellRefMut` store a reference to a timeline cell, and the owning timeline frame's length.
 
 `TimelineChannelRef` and `TimelineChannelRefMut` store a reference to a `Timeline` (all grid cells, all channels), and a chip and channel value. Timelines are currently stored as `[grid] [chip, channel] TimelineCell` to make adding/removing grid cells easy. But `TimelineChannelRef` can be indexed `[grid] TimelineCell`, to simplify code (like sequencers and cursor movement) that interacts with multiple grid/timeline cells, but only one channel.
 

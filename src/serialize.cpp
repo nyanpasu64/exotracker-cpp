@@ -320,7 +320,7 @@ void serialize_chip_channel_cells(
 }
 
 void serialize_timeline_item(
-    TimelineRow const& item, gen::TimelineItem::Builder gen_item
+    TimelineFrame const& item, gen::TimelineItem::Builder gen_item
 ) {
     FractionInt num = item.nbeats.numerator();
     FractionInt den = item.nbeats.denominator();
@@ -1088,7 +1088,7 @@ optional<ChipChannelCells> load_chip_channel_cells(
     return {move(cc_cells)};
 }
 
-optional<TimelineRow> load_timeline_item(
+optional<TimelineFrame> load_timeline_item(
     ErrorState & state,
     gen::TimelineItem::Reader gen_item,
     ChipMetadataRef chips_metadata)
@@ -1104,7 +1104,7 @@ optional<TimelineRow> load_timeline_item(
     POP();
 
     if (maybe_nbeats && chip_channel_cells) {
-        return TimelineRow {
+        return TimelineFrame {
             .nbeats = *maybe_nbeats,
             .chip_channel_cells = move(*chip_channel_cells),
         };

@@ -68,7 +68,7 @@ public:
     /// Keeps real time in ticks, recomputes position in event list.
     virtual void doc_edited(doc::Document const& document) = 0;
 
-    /// Called when the timeline rows are edited.
+    /// Called when the timeline frames are edited.
     /// The cursor may no longer be in-bounds, so clamp the cursor to be in-bounds.
     /// Rows may be added, deleted, or change duration,
     /// so invalidate both real time and events.

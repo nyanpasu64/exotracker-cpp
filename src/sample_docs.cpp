@@ -94,7 +94,7 @@ static Document empty() {
 
     Timeline timeline;
 
-    timeline.push_back([]() -> TimelineRow {
+    timeline.push_back([]() -> TimelineFrame {
         TimelineCell ch0{};
 
         TimelineCell ch1{TimelineBlock::from_events({
@@ -113,7 +113,7 @@ static Document empty() {
             }, 4}
         }};
 
-        return TimelineRow{
+        return TimelineFrame{
             .nbeats = 16,
             .chip_channel_cells = {{move(ch0), move(ch1), move(ch2), move(ch3), {}, {}, {}, {}}},
         };
@@ -153,7 +153,7 @@ static Document dream_fragments() {
 
     Timeline timeline;
 
-    timeline.push_back([]() -> TimelineRow {
+    timeline.push_back([]() -> TimelineFrame {
         TimelineCell ch0{TimelineBlock::from_events({
             // Since ch0 has only 1 effect column,
             // the delay should neither be visible on-screen
@@ -175,7 +175,7 @@ static Document dream_fragments() {
             Ev(at(5, 1, 2), pitch(7, 2)),
             Ev(at(6, 1, 2), pitch(7, 1)),
         })};
-        return TimelineRow{
+        return TimelineFrame{
             .nbeats = 8,
             .chip_channel_cells = {{move(ch0), move(ch1), {}, {}, {}, {}, {}, {}}},
         };
@@ -209,7 +209,7 @@ static Document dream_fragments() {
             Ev(0, pitch(7, 4)).instr(0).no_effect().delay(4),
             Ev(4, pitch(7, 6)).no_effect().delay(4),
         })};
-        return TimelineRow{
+        return TimelineFrame{
             .nbeats = 8,
             .chip_channel_cells = {{move(ch0), move(ch1), move(ch2), move(ch3), {}, {}, {}, {}}},
         };
@@ -247,14 +247,14 @@ static Document all_channels() {
 
     Timeline timeline;
 
-    timeline.push_back([]() -> TimelineRow {
+    timeline.push_back([]() -> TimelineFrame {
         std::vector<TimelineCell> channels;
         for (int i = 0; i < 8; i++) {
             channels.push_back({TimelineBlock::from_events({
                 Ev(BeatFraction(i, 4), Note(Chromatic(60 + i))).instr(0)
             })});
         }
-        return TimelineRow{
+        return TimelineFrame{
             .nbeats = 8,
             .chip_channel_cells = {move(channels)},
         };
@@ -352,7 +352,7 @@ static Document world_revolution() {
         Ev(0, {}).volume(0x7f)
     })};
 
-    timeline.push_back([&]() -> TimelineRow {
+    timeline.push_back([&]() -> TimelineFrame {
         // Add two blocks into one grid cell, as a test case.
         auto ch0 = TimelineCell{
             TimelineBlock{0, BeatOrEnd(8),
@@ -423,14 +423,14 @@ static Document world_revolution() {
             }}},
         };
 
-        return TimelineRow{
+        return TimelineFrame{
             .nbeats = 16,
             .chip_channel_cells = {{
                 move(ch0), move(ch1), move(tri), noise_loop, dpcm_level
             }},
         };
     }());
-    timeline.push_back([&]() -> TimelineRow {
+    timeline.push_back([&]() -> TimelineFrame {
         auto ch0 = TimelineCell{TimelineBlock::from_events({
             // 0
             Ev(0, pitch(6, 0)).instr(TRUMPET),
@@ -462,7 +462,7 @@ static Document world_revolution() {
             }}},
         };
 
-        return TimelineRow {
+        return TimelineFrame {
             .nbeats = 8,
             .chip_channel_cells = {{
                 move(ch0), move(ch1), move(tri), noise_loop, dpcm_level
@@ -503,7 +503,7 @@ static Document render_test() {
 
     Timeline timeline;
 
-    timeline.push_back([]() -> TimelineRow {
+    timeline.push_back([]() -> TimelineFrame {
         TimelineCell ch0{TimelineBlock::from_events([&] {
             EventList ev;
             for (int i = 0; i <= 10; i++) {
@@ -526,7 +526,7 @@ static Document render_test() {
             Ev(4, {NOTE_RELEASE}),
         })};
 
-        return TimelineRow{
+        return TimelineFrame{
             .nbeats = 10 + 1,
             .chip_channel_cells = {{move(ch0), move(ch1)}},
         };
@@ -568,7 +568,7 @@ static Document audio_test() {
 
     Timeline timeline;
 
-    timeline.push_back([&]() -> TimelineRow {
+    timeline.push_back([&]() -> TimelineFrame {
         TimelineCell ch0{};
 
         TimelineCell ch1{TimelineBlock::from_events({
@@ -587,7 +587,7 @@ static Document audio_test() {
             }, 4}
         }};
 
-        return TimelineRow{
+        return TimelineFrame{
             .nbeats = 4,
             .chip_channel_cells = {
                 {get_channel(pitch(5, 0)), get_channel(pitch(5, 4))},
@@ -637,7 +637,7 @@ static Document block_test() {
 
     Timeline timeline;
     for (size_t i = 0; i < ch0.size(); i++) {
-        timeline.push_back(TimelineRow{
+        timeline.push_back(TimelineFrame{
             .nbeats = 2,
             .chip_channel_cells = {{move(ch0[i]), move(ch1[i])}, {{}, {}}},
         });

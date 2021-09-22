@@ -307,7 +307,7 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
             }
         }
 
-        if (total_modified & ModifiedFlags::TimelineRows) {
+        if (total_modified & ModifiedFlags::TimelineFrames) {
             for (auto & chip : _chip_instances) {
                 chip->timeline_modified(_document);
             }

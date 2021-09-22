@@ -49,7 +49,7 @@ static doc::Document one_note_document(MaybeChannelID which_channel, doc::Note p
 
     Timeline timeline;
 
-    timeline.push_back([&]() -> TimelineRow {
+    timeline.push_back([&]() -> TimelineFrame {
         EventList one_note {TimedRowEvent{0, RowEvent{pitch, 0}}};
         EventList blank {};
 
@@ -62,7 +62,7 @@ static doc::Document one_note_document(MaybeChannelID which_channel, doc::Note p
             }
         }
 
-        return TimelineRow {
+        return TimelineFrame {
             .nbeats = 4,
             .chip_channel_cells = {move(channel_cells)},
         };
