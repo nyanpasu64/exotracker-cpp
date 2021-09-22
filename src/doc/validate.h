@@ -208,7 +208,7 @@ using std::optional;
 
 size_t truncate_frequency_table(ErrorState & state, size_t gen_size);
 [[nodiscard]] doc::FrequenciesOwned validate_frequency_table(
-    ErrorState & state, doc::FrequenciesOwned freq_table
+    ErrorState & state, doc::FrequenciesRef freq_table, size_t valid_size
 );
 
 [[nodiscard]] doc::SampleTuning validate_tuning(

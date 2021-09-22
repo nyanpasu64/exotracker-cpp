@@ -12,6 +12,7 @@
 #include "doc/instr.h"
 #include "doc/accidental_common.h"
 #include "chip_common.h"
+#include "util/box_array.h"
 #include "util/copy_move.h"
 
 #ifdef UNITTEST
@@ -32,6 +33,8 @@ using namespace ::doc::timeline;
 using namespace ::doc::sample;
 using namespace ::doc::instr;
 using accidental::AccidentalMode;
+
+using util::box_array::BoxArray;
 
 /// The sound engine is driven by the S-SMP timer, which runs at a high frequency
 /// (8010 Hz / `spc_timer_period`), fixed per-game and not changing with song tempo.
@@ -119,7 +122,7 @@ inline namespace tuning {
 
     /// .size() must be CHROMATIC_COUNT.
     template<typename T>
-    using Owned_ = std::vector<T>;
+    using Owned_ = BoxArray<T, CHROMATIC_COUNT>;
 
     template<typename T>
     using Ref_ = gsl::span<T const, CHROMATIC_COUNT>;

@@ -85,7 +85,7 @@ struct SetKeysplit {
 MaybeEditBox try_add_patch(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx
 ) {
-    release_assert(instr_idx < doc.instruments.v.size());
+    release_assert(instr_idx < doc.instruments.size());
     auto & maybe_instr = doc.instruments[instr_idx];
 
     release_assert(maybe_instr);
@@ -112,7 +112,7 @@ MaybeEditBox try_add_patch(
 MaybeEditBox try_remove_patch(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx
 ) {
-    release_assert(instr_idx < doc.instruments.v.size());
+    release_assert(instr_idx < doc.instruments.size());
     auto & maybe_instr = doc.instruments[instr_idx];
 
     release_assert(maybe_instr);
@@ -131,7 +131,7 @@ MaybeEditBox try_remove_patch(
 MaybeEditBox try_move_patch_down(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx
 ) {
-    release_assert(instr_idx < doc.instruments.v.size());
+    release_assert(instr_idx < doc.instruments.size());
     auto & maybe_instr = doc.instruments[instr_idx];
 
     release_assert(maybe_instr);
@@ -159,7 +159,7 @@ MaybeEditBox try_move_patch_up(
 std::tuple<EditBox, size_t> set_min_key(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx, doc::Chromatic value
 ) {
-    release_assert(instr_idx < doc.instruments.v.size());
+    release_assert(instr_idx < doc.instruments.size());
     auto & maybe_instr = doc.instruments[instr_idx];
 
     release_assert(maybe_instr);
@@ -199,7 +199,7 @@ std::tuple<EditBox, size_t> set_min_key(
 static InstrumentPatch const& get_patch(
     doc::Document const& doc, size_t instr_idx, size_t patch_idx
 ) {
-    release_assert(instr_idx < doc.instruments.v.size());
+    release_assert(instr_idx < doc.instruments.size());
     auto & maybe_instr = doc.instruments[instr_idx];
     release_assert(maybe_instr);
 

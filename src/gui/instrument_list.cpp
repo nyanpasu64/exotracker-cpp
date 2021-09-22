@@ -121,12 +121,12 @@ public:
             return 0;
         } else {
             // The root has items.
-            return int(get_document().instruments.v.size());
+            return int(get_document().instruments.size());
         }
     }
 
     QVariant data(QModelIndex const & index, int role) const override {
-        auto & instruments = get_document().instruments.v;
+        auto & instruments = get_document().instruments;
 
         if (!index.isValid() || index.parent().isValid())
             return QVariant();
@@ -493,7 +493,7 @@ public:
     }
 
     void recompute_visible_slots() {
-        auto & instruments = _model.get_document().instruments.v;
+        auto & instruments = _model.get_document().instruments;
         int nrow = _model.rowCount({});
 
         if (_show_empty_slots) {

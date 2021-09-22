@@ -17,7 +17,6 @@ inline namespace tuning {
         Chromatic root_chromatic, FreqDouble root_frequency
     ) {
         FrequenciesOwned out;
-        out.resize(CHROMATIC_COUNT);
 
         for (size_t i = 0; i < CHROMATIC_COUNT; i++) {
             auto semitone_offset = (ptrdiff_t)i - (ptrdiff_t)root_chromatic;
@@ -43,13 +42,6 @@ Document Document::clone() const {
 }
 
 static void post_init(Document & document) {
-    // Set tables to the correct length.
-    document.instruments.v.resize(MAX_INSTRUMENTS);
-
-    // We could assert instead of resizing,
-    // but that makes it more difficult for unit tests to construct test documents.
-    document.frequency_table.resize(CHROMATIC_COUNT);
-
     release_assert_equal(document.chip_channel_settings.size(), document.chips.size());
     for (ChipIndex chip = 0; chip < document.chips.size(); chip++) {
         release_assert_equal(

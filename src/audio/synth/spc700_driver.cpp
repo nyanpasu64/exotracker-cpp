@@ -113,7 +113,7 @@ Spc700Driver::Spc700Driver(NsampT samples_per_sec, doc::FrequenciesRef frequenci
         Spc700ChannelDriver(7),
     }
     // c++ is... special(ized).
-    , _freq_table(frequencies.begin(), frequencies.end())
+    , _freq_table(frequencies)
 {
     // TODO, samples_per_sec is ignored.
     // Should calc_tuning() be based off the actual playback frequency,

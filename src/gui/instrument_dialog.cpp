@@ -317,7 +317,7 @@ using gui::lib::format::format_hex_2;
 using gui::lib::format::format_note_keysplit;
 
 static QString sample_text(doc::Samples const& samples, size_t sample_idx) {
-    assert(sample_idx < samples.v.size());
+    assert(sample_idx < samples.size());
     auto const& maybe_sample = samples[sample_idx];
     if (maybe_sample) {
         QString name = QString::fromStdString(maybe_sample->name);
@@ -818,9 +818,7 @@ public:
         auto const& doc = state.document();
 
         auto instr_idx = curr_instr_idx();
-
-        assert(doc.instruments.v.size() == doc::MAX_INSTRUMENTS);
-        release_assert(instr_idx < doc.instruments.v.size());
+        release_assert(instr_idx < doc.instruments.size());
 
         auto const& instr = doc.instruments[instr_idx];
         if (!instr) {

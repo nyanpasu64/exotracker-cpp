@@ -281,6 +281,7 @@ add_executable(exotracker-tests
     tests/run_tests.cpp
     tests/test_utils/parameterize.cpp
 
+    tests/test_box_array.cpp
     tests/test_document.cpp
     tests/test_edit_history.cpp
     tests/test_math.cpp
