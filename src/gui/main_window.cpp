@@ -1,12 +1,17 @@
 #define main_window_INTERNAL public
 #include "main_window.h"
+
+// Widgets
 #include "gui/pattern_editor.h"
 #include "gui/timeline_editor.h"
 #include "gui/instrument_dialog.h"
 #include "gui/instrument_list.h"
-#include "gui/move_cursor.h"
+#include "gui/sample_list.h"
 #include "gui/tempo_dialog.h"
-#include "lib/layout_macros.h"
+#include "gui/lib/icon_toolbar.h"
+// Other
+#include "gui/move_cursor.h"
+#include "gui/lib/layout_macros.h"
 #include "gui_common.h"
 #include "cmd_queue.h"
 #include "edit/edit_doc.h"
@@ -33,7 +38,7 @@
 #include <QMenuBar>
 #include <QPushButton>
 #include <QSpinBox>
-#include "gui/lib/icon_toolbar.h"
+#include <QTabWidget>
 #include <QToolButton>
 // Layouts
 #include <QBoxLayout>
@@ -70,6 +75,7 @@ using gui::pattern_editor::PatternEditor;
 using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
 using gui::instrument_list::InstrumentList;
+using gui::sample_list::SampleList;
 using doc::BeatFraction;
 using util::math::ceildiv;
 using util::math::frac_floor;
@@ -319,7 +325,9 @@ struct MainWindowUi : MainWindow {
         QAction * clone_frame;
     } _timeline;
 
+    QTabWidget * _instr_tabs;
     InstrumentList * _instrument_list;
+    SampleList * _sample_list;
 
     PatternEditor * _pattern_editor;
 
@@ -574,9 +582,19 @@ struct MainWindowUi : MainWindow {
     } }
 
     void instrument_list_panel(QBoxLayout * l) {
+        {l__w(QTabWidget);
+            _instr_tabs = w;
+
+            auto c = w;
+            {
+                auto w = InstrumentList::make(this);
+                w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+                c->addTab(w, tr("Instruments"));
+            }
+
+        }
         {l__w_factory(InstrumentList::make(this))
             _instrument_list = w;
-            w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         }
     }
 
