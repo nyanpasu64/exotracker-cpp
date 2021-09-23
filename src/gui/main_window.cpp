@@ -820,24 +820,29 @@ public:
     }
 
     bool undo(StateTransaction & tx) {
-        if (auto cursor_edit = tx.history().get_undo()) {
+        // undo() should never be callable when the undo history is empty.
+        // This is because ~StateTransaction() should disable the MainWindowUi::_undo
+        // action when the undo history is empty, preventing the action from calling
+        // MainWindowImpl::undo() and AudioComponent::undo().
+        assert(tx.history().can_undo());
+
+        if (auto cursor_edit = tx.history_mut().try_undo()) {
             send_edit(*this, std::move(cursor_edit->edit));
             if (cursor_edit->cursor) {
                 tx.cursor_mut().set(*cursor_edit->cursor);
             }
-            tx.history_mut().undo();
             return true;
         }
         return false;
     }
 
     bool redo(StateTransaction & tx) {
-        if (auto cursor_edit = tx.history().get_redo()) {
+        assert(tx.history().can_redo());
+        if (auto cursor_edit = tx.history_mut().try_redo()) {
             send_edit(*this, std::move(cursor_edit->edit));
             if (cursor_edit->cursor) {
                 tx.cursor_mut().set(*cursor_edit->cursor);
             }
-            tx.history_mut().redo();
             return true;
         }
         return false;
@@ -1597,6 +1602,11 @@ StateTransaction::~StateTransaction() noexcept(false) {
             _win->_maybe_instr_dialog->reload_state(e & E::InstrumentSwitched);
         }
     }
+
+    auto const& history = state.history();
+
+    _win->_undo->setEnabled(history.can_undo());
+    _win->_redo->setEnabled(history.can_redo());
 
     doc::Document const& doc = state.document();
 

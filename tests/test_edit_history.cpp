@@ -58,7 +58,7 @@ void test_pattern_edits(bool start_with_block, GetEdit a, GetEdit b) {
     // after_b may/not equal after_a.
 
     // Undo and check if both edits were reverted.
-    h.undo();
+    CHECK_UNARY(h.try_undo().has_value());
     auto undo = get_cell(h.get_document().clone());
     CHECK_UNARY(undo == after_a);
     CHECK_UNARY(undo != begin_doc);
