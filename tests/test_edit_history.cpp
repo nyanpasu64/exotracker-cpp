@@ -135,4 +135,56 @@ TEST_CASE("Check that instrument edits are not merged") {
     test_pattern_edits(start_with_block, instr_shift, instr_shift);
 }
 
+TEST_CASE("Check that undo and redo work") {
+    auto h = History(sample_docs::DOCUMENTS.at("empty").clone());
+    auto const before = h.get_document().clone();
+
+    CHECK_FALSE(h.can_undo());
+    CHECK_FALSE(h.can_redo());
+
+    // Push an edit.
+    h.push(UndoFrame{
+        ep::insert_note(h.get_document(), 0, 0, GridAndBeat{0, 0}, 60, {}),
+        Cursor{},
+        Cursor{},
+    });
+    auto const after = h.get_document().clone();
+    CHECK(after == after);
+
+    // Undo and ensure edit was reverted.
+    {
+        CHECK(h.can_undo());
+        CHECK_FALSE(h.can_redo());
+        CHECK(h.try_undo().has_value());
+
+        auto undo = h.get_document().clone();
+        CHECK(undo == before);
+        CHECK(undo != after);
+
+        CHECK_FALSE(h.can_undo());
+        CHECK(h.can_redo());
+        CHECK_FALSE(h.try_undo().has_value());
+        CHECK(h.get_document() == undo);
+    }
+
+    // Redo and ensure edit was applied.
+    {
+        CHECK_FALSE(h.can_undo());
+        CHECK(h.can_redo());
+        CHECK(h.try_redo().has_value());
+
+        auto redo = h.get_document().clone();
+        CHECK(redo != before);
+        CHECK(redo == after);
+
+        CHECK(h.can_undo());
+        CHECK_FALSE(h.can_redo());
+        CHECK_FALSE(h.try_redo().has_value());
+        CHECK(h.get_document() == redo);
+    }
+
+    CHECK(h.can_undo());
+    CHECK_FALSE(h.can_redo());
+}
+
 }
