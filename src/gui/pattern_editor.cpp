@@ -77,12 +77,12 @@ PatternEditorShortcuts::PatternEditorShortcuts(QWidget * widget) :
 
     #define X(PAIR) \
         PAIR{QShortcut{widget}, QShortcut{widget}}
-    SHORTCUT_PAIRS(X, COMMA)
+    FOREACH_SHORTCUT_PAIR(X, COMMA)
     #undef X
     #undef COMMA
 
     #define X(KEY)  ,KEY{widget}
-    SHORTCUTS(X, )
+    FOREACH_SHORTCUT(X, )
     #undef X
 {}
 
@@ -135,11 +135,11 @@ static void setup_shortcuts(PatternEditor & self) {
 
     #define X(KEY) \
         init_pair(self._shortcuts.KEY, shortcut_keys.KEY);
-    SHORTCUT_PAIRS(X, )
+    FOREACH_SHORTCUT_PAIR(X, )
     #undef X
 
     #define X(KEY)  init_shortcut(self._shortcuts.KEY, shortcut_keys.KEY);
-    SHORTCUTS(X, )
+    FOREACH_SHORTCUT(X, )
     #undef X
 
     // Cursor movement actions clear or extend the selection
@@ -203,7 +203,7 @@ static void setup_shortcuts(PatternEditor & self) {
     // Copy, don't borrow, local lambdas.
     #define X(KEY) \
         connect_shortcut_pair(self._shortcuts.KEY, &PatternEditor::KEY##_pressed);
-    SHORTCUT_PAIRS(X, )
+    FOREACH_SHORTCUT_PAIR(X, )
     #undef X
 
     auto connect_shortcut = [&] (QShortcut & shortcut, Method method) {
@@ -217,7 +217,7 @@ static void setup_shortcuts(PatternEditor & self) {
 
     #define X(KEY) \
         connect_shortcut(self._shortcuts.KEY, &PatternEditor::KEY##_pressed);
-    SHORTCUTS(X, )
+    FOREACH_SHORTCUT(X, )
     #undef X
 }
 

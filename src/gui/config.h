@@ -134,7 +134,7 @@ inline namespace visual {
 
     /// Overall colors (not different in focused/unfocused patterns).
     /// Stored in PatternAppearance fields.
-    #define OVERALL_COLORS(X) \
+    #define FOREACH_OVERALL_COLOR(X) \
         X(overall_bg) \
         X(base_subcolumn_bg) \
         X(channel_divider) \
@@ -144,7 +144,7 @@ inline namespace visual {
 
     /// Colors which are dimmed in inactive patterns.
     /// Stored in PatternAppearance fields.
-    #define PATTERN_COLORS(X) \
+    #define FOREACH_PATTERN_COLOR(X) \
         X(gridline_beat) \
         X(gridline_non_beat) \
         X(select_bg) \
@@ -160,7 +160,7 @@ inline namespace visual {
     /// Subcolumn types used to parameterize background/divider methods.
     /// Not stored directly in PatternAppearance, but computed from other fields.
     /// Dimmed in inactive patterns.
-    #define SUBCOLUMNS(X) \
+    #define FOREACH_SUBCOLUMN(X) \
         X(note) \
         X(instrument) \
         X(volume) \
@@ -170,14 +170,14 @@ inline namespace visual {
     /// Only used internally in PatternAppearance.
     enum class PatternColor {
         #define X(COLOR)  COLOR,
-        PATTERN_COLORS(X)
+        FOREACH_PATTERN_COLOR(X)
         #undef X
     };
 
     /// Only used internally in PatternAppearance.
     enum class SubColumn {
         #define X(SUBCOLUMN)  SUBCOLUMN,
-        SUBCOLUMNS(X)
+        FOREACH_SUBCOLUMN(X)
         #undef X
     };
 
@@ -185,12 +185,12 @@ inline namespace visual {
     class PatternAppearance {
     public:
         #define X(COLOR)  QColor COLOR;
-        OVERALL_COLORS(X)
+        FOREACH_OVERALL_COLOR(X)
         #undef X
 
     gui_config_INTERNAL:
         #define X(COLOR)  QColor _##COLOR;
-        PATTERN_COLORS(X)
+        FOREACH_PATTERN_COLOR(X)
         #undef X
 
         // All blending is conducted in approximate linear light (assuming gamma=2).
@@ -240,7 +240,7 @@ inline namespace visual {
             inline QColor COLOR(bool focused) const { \
                 return get_color(PatternColor::COLOR, focused); \
             }
-        PATTERN_COLORS(X)
+        FOREACH_PATTERN_COLOR(X)
         #undef X
 
         QColor block_handle_border(bool focused) const;
@@ -252,7 +252,7 @@ inline namespace visual {
             inline QColor SUBCOLUMN##_divider(bool focused) const { \
                 return get_subcolumn_divider(SubColumn::SUBCOLUMN, focused); \
             }
-        SUBCOLUMNS(X)
+        FOREACH_SUBCOLUMN(X)
         #undef X
     };
 

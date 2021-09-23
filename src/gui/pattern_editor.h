@@ -73,7 +73,7 @@ struct ShortcutPair {
 
 /// This is a list of all cursor movement keys (single source of truth)
 /// where you can hold Shift to create a selection.
-#define SHORTCUT_PAIRS(X, SEP) \
+#define FOREACH_SHORTCUT_PAIR(X, SEP) \
     X(up) SEP \
     X(down) SEP \
     X(up_row) SEP \
@@ -96,7 +96,7 @@ struct ShortcutPair {
 //    X(prev_channel) SEP
 //    X(next_channel)
 
-#define SHORTCUTS(X, SEP) \
+#define FOREACH_SHORTCUT(X, SEP) \
     X(escape) SEP\
     X(toggle_edit) SEP\
     X(delete_key) SEP\
@@ -108,11 +108,11 @@ struct PatternEditorShortcuts {
     // [0] is just the keystroke, [1] is with Shift pressed.
     #define X(KEY) \
         ShortcutPair KEY;
-    SHORTCUT_PAIRS(X, )
+    FOREACH_SHORTCUT_PAIR(X, )
     #undef X
 
     #define X(KEY)  QShortcut KEY;
-    SHORTCUTS(X, )
+    FOREACH_SHORTCUT(X, )
     #undef X
 
     explicit PatternEditorShortcuts(QWidget * widget);
@@ -215,11 +215,11 @@ pattern_editor_INTERNAL:
 
     #define X(KEY) \
         void KEY##_pressed(StateTransaction & tx);
-    SHORTCUT_PAIRS(X, )
+    FOREACH_SHORTCUT_PAIR(X, )
     #undef X
     #define X(KEY) \
         void KEY##_pressed();
-    SHORTCUTS(X, )
+    FOREACH_SHORTCUT(X, )
     #undef X
 
     void keyPressEvent(QKeyEvent * event) override;
