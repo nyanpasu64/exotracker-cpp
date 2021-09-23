@@ -34,8 +34,8 @@ struct UndoFrame {
 class History {
 private:
     doc::Document _document;
-    std::vector<UndoFrame> undo_stack;
-    std::vector<UndoFrame> redo_stack;
+    std::vector<UndoFrame> _undo_stack;
+    std::vector<UndoFrame> _redo_stack;
 
 public:
     History(doc::Document initial_state);
