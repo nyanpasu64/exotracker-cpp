@@ -289,12 +289,16 @@ struct MainWindowUi : MainWindow {
     using MainWindow::MainWindow;
     // Use raw pointers since QObjects automatically destroy children.
 
+    QMenuBar * _menu_bar;
+
     // File menu
     QAction * _open;
     QAction * _save_as;
     QAction * _exit;
 
     // Edit menu
+    QAction * _undo;
+    QAction * _redo;
     QAction * _overflow_paste;
     QAction * _key_repeat;
 
@@ -348,6 +352,8 @@ struct MainWindowUi : MainWindow {
 
         // Menu
         {main__m();
+            _menu_bar = m;
+
             {m__m(tr("&File"));
                 _open = m->addAction(tr("&Open"));
                 _save_as = m->addAction(tr("Save &As"));
@@ -356,6 +362,9 @@ struct MainWindowUi : MainWindow {
             }
 
             {m__m(tr("&Edit"));
+                _undo = m->addAction(tr("&Undo"));
+                _redo = m->addAction(tr("&Redo"));
+
                 {m__check(tr("&Overflow paste"));
                     _overflow_paste = a;
                     a->setChecked(true);
@@ -859,8 +868,6 @@ public:
     // Editor actions:
     QAction _play_pause;
     QAction _play_from_row;
-    QAction _undo;
-    QAction _redo;
 
     // Zoom actions:
     QAction _zoom_out;
@@ -1305,45 +1312,45 @@ public:
         // For the time being, connecting shortcut actions is allowed,
         // but most of these actions will have toolbar/menu entries in the future.
 
-        auto bind_editor_action = [this] (QAction & action) {
-            action.setShortcutContext(Qt::WidgetWithChildrenShortcut);
+        auto bind_editor_action = [this] (QAction * action) {
+            action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 
             // "A QWidget should only have one of each action and adding an action
             // it already has will not cause the same action to be in the widget twice."
-            _pattern_editor->addAction(&action);
+            _pattern_editor->addAction(action);
         };
 
-        auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
-            connect(&action, &QAction::triggered, this, func, Qt::UniqueConnection);
+        auto connect_action = [this] (QAction * action, auto /*copied*/ func) {
+            connect(action, &QAction::triggered, this, func, Qt::UniqueConnection);
         };
 
         #define BIND_FROM_CONFIG(NAME) \
             _##NAME.setShortcut(QKeySequence{shortcuts.NAME}); \
-            bind_editor_action(_##NAME)
+            bind_editor_action(&_##NAME)
 
         BIND_FROM_CONFIG(play_pause);
-        connect_action(_play_pause, [this] () {
+        connect_action(&_play_pause, [this] () {
             auto tx = edit_unwrap();
             _audio.play_pause(tx);
         });
 
         BIND_FROM_CONFIG(play_from_row);
-        connect_action(_play_from_row, [this] () {
+        connect_action(&_play_from_row, [this] () {
             auto tx = edit_unwrap();
             _audio.play_from_row(tx);
         });
 
-        _undo.setShortcuts(QKeySequence::Undo);
+        _undo->setShortcuts(QKeySequence::Undo);
         bind_editor_action(_undo);
         connect_action(_undo, &MainWindowImpl::undo);
 
-        _redo.setShortcuts(QKeySequence::Redo);
+        _redo->setShortcuts(QKeySequence::Redo);
         bind_editor_action(_redo);
         connect_action(_redo, &MainWindowImpl::redo);
 
         // TODO maybe these shortcuts should be inactive when order editor is focused
         BIND_FROM_CONFIG(zoom_out);
-        connect_action(_zoom_out, [this] () {
+        connect_action(&_zoom_out, [this] () {
             int const curr_zoom = _zoom_level->value();
 
             // Pick the next smaller zoom level in the fixed zoom sequence.
@@ -1357,7 +1364,7 @@ public:
         });
 
         BIND_FROM_CONFIG(zoom_in);
-        connect_action(_zoom_in, [this] () {
+        connect_action(&_zoom_in, [this] () {
             int const curr_zoom = _zoom_level->value();
 
             // Pick the next larger zoom level in the fixed zoom sequence.
@@ -1371,25 +1378,25 @@ public:
         });
 
         BIND_FROM_CONFIG(zoom_out_half);
-        connect_action(_zoom_out_half, [this] () {
+        connect_action(&_zoom_out_half, [this] () {
             // Halve zoom, rounded down. QSpinBox will clamp minimum to 1.
             _zoom_level->setValue(_zoom_level->value() / 2);
         });
 
         BIND_FROM_CONFIG(zoom_in_half);
-        connect_action(_zoom_in_half, [this] () {
+        connect_action(&_zoom_in_half, [this] () {
             // Double zoom. QSpinBox will truncate to maximum value.
             _zoom_level->setValue(_zoom_level->value() * 2);
         });
 
         BIND_FROM_CONFIG(zoom_out_triplet);
-        connect_action(_zoom_out_triplet, [this] () {
+        connect_action(&_zoom_out_triplet, [this] () {
             // Multiply zoom by 2/3, rounded down. QSpinBox will clamp minimum to 1.
             _zoom_level->setValue(_zoom_level->value() * 2 / 3);
         });
 
         BIND_FROM_CONFIG(zoom_in_triplet);
-        connect_action(_zoom_in_triplet, [this] () {
+        connect_action(&_zoom_in_triplet, [this] () {
             // Multiply zoom by 3/2, rounded up.
             // If we rounded down, zooming 1 would result in 1, which is bad.
             // QSpinBox will truncate to maximum value.
@@ -1403,7 +1410,7 @@ public:
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
         this->addAction(&_restart_audio);
-        connect_action(_restart_audio, [this] () {
+        connect_action(&_restart_audio, [this] () {
             _audio.restart_audio_thread(_state);
         });
     }
