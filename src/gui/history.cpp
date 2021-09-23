@@ -70,7 +70,7 @@ MaybeCursorEdit History::get_redo() const {
         return {};
     }
 
-    UndoFrame const& redo = undo_stack.back();
+    UndoFrame const& redo = redo_stack.back();
     return CursorEdit {
         .edit = redo.edit->clone_for_audio(_document),
         .cursor = redo.after_cursor,
