@@ -72,19 +72,20 @@ using doc::gui_traits::channel_name;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
 
+#define COMMA ,
+
 PatternEditorShortcuts::PatternEditorShortcuts(QWidget * widget) :
-    #define COMMA ,
-
     #define X(PAIR) \
-        PAIR{QShortcut{widget}, QShortcut{widget}}
-    FOREACH_SHORTCUT_PAIR(X, COMMA)
+        PAIR{QShortcut{widget}, QShortcut{widget}},
+    FOREACH_SHORTCUT_PAIR(X,)
     #undef X
-    #undef COMMA
 
-    #define X(KEY)  ,KEY{widget}
-    FOREACH_SHORTCUT(X, )
+    #define X(KEY)  KEY{widget}
+    FOREACH_SHORTCUT(X, COMMA)
     #undef X
 {}
+
+#undef COMMA
 
 W_OBJECT_IMPL(PatternEditor)
 
