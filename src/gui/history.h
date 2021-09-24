@@ -34,8 +34,8 @@ struct UndoFrame {
 class History {
 private:
     doc::Document _document;
-    std::vector<UndoFrame> undo_stack;
-    std::vector<UndoFrame> redo_stack;
+    std::vector<UndoFrame> _undo_stack;
+    std::vector<UndoFrame> _redo_stack;
 
 public:
     History(doc::Document initial_state);
@@ -51,31 +51,28 @@ public:
     /// Clears redo stack, mutates document, pushes command into undo history.
     void push(UndoFrame command);
 
+    /// Returns whether the undo stack is non-empty.
+    bool can_undo() const;
+    /// Returns whether the redo stack is non-empty.
+    bool can_redo() const;
+
     /*
     Currently we use an unbounded linked-list queue from main to audio thread.
-    But if we switch to a ring buffer, the audio thread may reject messages.
-    I want History to be compatible with such an API.
-    So History::get_undo() must return an "undo command" without applying it,
-    so MainWindow can try sending it to the audio thread, and if it succeeds,
-    call History::undo().
-
-    This complicates the API. Is it worth it? I don't know.
+    But if we switch to a bounded queue (ring buffer), the audio thread may reject
+    messages. In that case, check that the queue isn't full before calling undo()
+    and sending the returned command over the queue.
     */
-    /// If undo stack non-empty, returns the state needed to undo the GUI and audio
-    /// thread: the GUI cursor location before the edit, and an EditBox to be sent to
-    /// the audio thread.
-    MaybeCursorEdit get_undo() const;
+    /// If the undo stack is empty, does nothing and returns nullopt. Otherwise,
+    /// applies the command on top of the undo stack and moves it to the redo stack,
+    /// and returns a clone of the command (which gets sent to the audio thread)
+    /// and the new GUI cursor location (or nullopt).
+    MaybeCursorEdit try_undo();
 
-    /// If undo stack non-empty, applies and moves command from undo to redo stack.
-    void undo();
-
-    /// If redo stack non-empty, returns the state needed to redo the GUI and audio
-    /// thread: the GUI cursor location after the edit, and an EditBox to be sent to
-    /// the audio thread.
-    MaybeCursorEdit get_redo() const;
-
-    /// If redo stack non-empty, applies and moves command from redo to undo stack.
-    void redo();
+    /// If the redo stack is empty, does nothing and returns nullopt. Otherwise,
+    /// applies the command on top of the redo stack and moves it to the undo stack,
+    /// and returns a clone of the command (which gets sent to the audio thread)
+    /// and the new GUI cursor location (or nullopt).
+    MaybeCursorEdit try_redo();
 };
 
 /// Cannot be used at static initialization time, before main() begins.
