@@ -1,7 +1,7 @@
 #pragma once
 
 #include "events.h"
-#include "util/copy_move.h"
+#include "util/box_array.h"
 
 #ifdef UNITTEST
 #include "util/compare.h"
@@ -15,6 +15,7 @@
 namespace doc::sample {
 
 using events::Chromatic;
+using util::box_array::BoxArray;
 
 inline constexpr uint32_t MIN_SAMPLE_RATE = 1;
 inline constexpr uint32_t MAX_SAMPLE_RATE = 1'000'000;
@@ -60,30 +61,9 @@ struct Sample {
 using MaybeSample = std::optional<Sample>;
 
 /// The number of slots is MAX_SAMPLES. (It is an error to resize v.)
-/// SampleIndex < Samples.v.size() == MAX_SAMPLES
+/// SampleIndex < Samples.size() == MAX_SAMPLES
 constexpr size_t MAX_SAMPLES = 256;
-struct Samples {
-    std::vector<std::optional<Sample>> v;
-
-// impl
-    Samples() {
-        v.resize(MAX_SAMPLES);
-    }
-
-    DEFAULT_COPY(Samples)
-    DEFAULT_MOVE(Samples)
-
-    std::optional<Sample> const & operator[](size_t idx) const {
-        return v[idx];
-    }
-    std::optional<Sample> & operator[](size_t idx) {
-        return v[idx];
-    }
-
-#ifdef UNITTEST
-    DEFAULT_EQUALABLE(Samples)
-#endif
-};
+using Samples = BoxArray<std::optional<Sample>, MAX_SAMPLES>;
 
 using SampleIndex = uint8_t;
 

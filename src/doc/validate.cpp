@@ -76,21 +76,18 @@ size_t truncate_frequency_table(ErrorState & state, size_t gen_size) {
 }
 
 doc::FrequenciesOwned validate_frequency_table(
-    ErrorState & state, doc::FrequenciesOwned orig_freq_table
+    ErrorState & state, doc::FrequenciesRef orig_freq_table, size_t valid_size
 ) {
-    auto freq_table = equal_temperament();
-    assert(freq_table.size() == CHROMATIC_COUNT);
-
-    auto orig_size = orig_freq_table.size();
-    release_assert(orig_size <= CHROMATIC_COUNT);
-    if (orig_size < CHROMATIC_COUNT) {
+    release_assert(valid_size <= CHROMATIC_COUNT);
+    if (valid_size < CHROMATIC_COUNT) {
         PUSH_WARNING(state,
             " too short, size()={} < {}, padding with placeholder tuning",
-            orig_size, CHROMATIC_COUNT
+            valid_size, CHROMATIC_COUNT
         );
     }
 
-    auto valid_size = std::min(orig_size, CHROMATIC_COUNT);
+    auto freq_table = equal_temperament();
+
     for (size_t i = 0; i < valid_size; i++) {
         auto freq = orig_freq_table[i];
         if (MIN_TUNING_FREQ <= freq && freq <= MAX_TUNING_FREQ) {

@@ -65,8 +65,12 @@ using std::vector;
 
 template<typename T>
 inline kj::ArrayPtr<T const> array_ptr(std::vector<T> const& vec) {
-    // TODO add gsl::span support, if i ever need it
     return kj::ArrayPtr<T const>(vec.data(), vec.size());
+}
+
+template<typename T, size_t N>
+inline kj::ArrayPtr<T const> array_ptr(gsl::span<T, N> span) {
+    return kj::ArrayPtr<T const>(span.data(), span.size());
 }
 
 template<typename T>
@@ -133,7 +137,7 @@ void serialize_sample(
 }
 
 void serialize_samples(Samples const& samples_, gen::Document::Builder gen_doc) {
-    auto samples = span(samples_.v);
+    auto samples = samples_.dyn_span();
     release_assert_equal(samples.size(), MAX_SAMPLES);
 
     auto num_samples = (uint) leading_size(samples);
@@ -180,7 +184,7 @@ void serialize_instrument(
 void serialize_instruments(
     Instruments const& instruments_, gen::Document::Builder gen_doc
 ) {
-    auto instruments = span(instruments_.v);
+    auto instruments = instruments_.dyn_span();
     release_assert_equal(instruments.size(), MAX_INSTRUMENTS);
 
     auto num_instr = (uint) leading_size(instruments);
@@ -372,7 +376,7 @@ void serialize_impl(
     serialize_sequencer_options(doc.sequencer_options, gen_doc.initSequencerOptions());
 
     // @2
-    gen_doc.setFrequencyTable(array_ptr(doc.frequency_table));
+    gen_doc.setFrequencyTable(array_ptr(doc.frequency_table.span()));
 
     // @3
     gen_doc.setAccidentalMode(EXPR(switch (doc.accidental_mode) {
@@ -655,12 +659,11 @@ FrequenciesOwned load_frequency_table(ErrorState & state, GenVecDouble gen_freq_
     auto valid_size = truncate_frequency_table(state, gen_freq_table.size());
 
     FrequenciesOwned freq_table;
-    freq_table.resize(valid_size);
     for (uint i = 0; i < valid_size; i++) {
         freq_table[i] = gen_freq_table[i];
     }
 
-    return validate_frequency_table(state, move(freq_table));
+    return validate_frequency_table(state, freq_table.span(), valid_size);
 }
 
 SampleTuning load_tuning(ErrorState & state, gen::SampleTuning::Reader gen_tuning) {
@@ -689,7 +692,6 @@ Sample load_sample(ErrorState & state, gen::MaybeSample::Some::Reader gen_sample
 using GenSamples = ::capnp::List< ::serialize::generated::MaybeSample, ::capnp::Kind::STRUCT>::Reader;
 Samples load_samples(ErrorState & state, GenSamples gen_samples) {
     Samples samples;
-    assert(samples.v.size() == MAX_SAMPLES);
     auto prefix = ErrorPrefixer(state);
 
     auto valid_size = truncate_samples(state, gen_samples.size());
@@ -745,7 +747,6 @@ Instrument load_instrument(
 using GenInstruments = ::capnp::List< ::serialize::generated::MaybeInstrument, ::capnp::Kind::STRUCT>::Reader;
 Instruments load_instruments(ErrorState & state, GenInstruments gen_instruments) {
     Instruments instruments;
-    assert(instruments.v.size() == MAX_INSTRUMENTS);
     auto prefix = ErrorPrefixer(state);
 
     auto n_instr = truncate_instruments(state, gen_instruments.size());

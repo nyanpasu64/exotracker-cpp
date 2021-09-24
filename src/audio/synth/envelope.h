@@ -72,7 +72,7 @@ private:
     /// If _curr_instr loaded, use it. Otherwise, use empty envelope.
     /// next() should never branch or index using _curr_instr directly.
     EnvelopeT const & extract_env(doc::Document const & document) {
-        if (_curr_instr.has_value() && *_curr_instr < document.instruments.v.size()) {
+        if (_curr_instr.has_value() && *_curr_instr < document.instruments.size()) {
             auto const & instr = document.instruments[*_curr_instr];
             if (instr.has_value()) {
                 return (*instr).*_field;

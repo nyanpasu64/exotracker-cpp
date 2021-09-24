@@ -2,7 +2,7 @@
 
 #include "sample.h"
 #include "events.h"
-#include "util/copy_move.h"
+#include "util/box_array.h"
 
 #ifdef UNITTEST
 #include "util/compare.h"
@@ -18,6 +18,7 @@
 namespace doc::instr {
 
 using events::Chromatic;
+using util::box_array::BoxArray;
 
 template<class IntT_>
 struct Envelope {
@@ -128,29 +129,8 @@ struct Instrument {
 using MaybeInstrument = std::optional<Instrument>;
 
 /// The number of slots is MAX_INSTRUMENTS. (It is an error to resize v.)
-/// idx < Instruments.v.size() == MAX_INSTRUMENTS.
+/// idx < Instruments.size() == MAX_INSTRUMENTS.
 constexpr size_t MAX_INSTRUMENTS = 256;
-struct Instruments {
-    std::vector<std::optional<Instrument>> v;
-
-// impl
-    Instruments() {
-        v.resize(MAX_INSTRUMENTS);
-    }
-
-    DEFAULT_COPY(Instruments)
-    DEFAULT_MOVE(Instruments)
-
-    std::optional<Instrument> const & operator[](size_t idx) const {
-        return v[idx];
-    }
-    std::optional<Instrument> & operator[](size_t idx) {
-        return v[idx];
-    }
-
-#ifdef UNITTEST
-    DEFAULT_EQUALABLE(Instruments)
-#endif
-};
+using Instruments = BoxArray<std::optional<Instrument>, MAX_INSTRUMENTS>;
 
 }
