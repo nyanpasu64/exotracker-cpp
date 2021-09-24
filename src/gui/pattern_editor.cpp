@@ -2775,10 +2775,17 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
     auto subp = &subcolumn.type;
 
     if (std::get_if<SubColumn_::Note>(subp)) {
+        Qt::KeyboardModifiers modifiers = event->modifiers();
+
+        // If any modifiers are held other than Shift, don't insert a note.
+        if (modifiers & ~Qt::ShiftModifier) {
+            return;
+        }
+
         // Pick the octave based on whether the user pressed the lower or upper key row.
         // If the user is holding shift, give the user an extra 2 octaves of range
         // (transpose the lower row down 1 octave, and the upper row up 1).
-        bool shift_pressed = event->modifiers().testFlag(Qt::ShiftModifier);
+        bool shift_pressed = modifiers.testFlag(Qt::ShiftModifier);
 
         auto const & piano_keys = get_app().options().pattern_keys.piano_keys;
 
