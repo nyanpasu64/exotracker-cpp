@@ -71,10 +71,10 @@ TEST(OneOf, Basic) {
   EXPECT_EQ("foo", var.get<String>());
   EXPECT_EQ("", var2.get<String>());
 
-  if (false) {
+  auto canCompile KJ_UNUSED = [&]() {
     var.allHandled<3>();
     // var.allHandled<2>();  // doesn't compile
-  }
+  };
 }
 
 TEST(OneOf, Copy) {
@@ -195,6 +195,9 @@ KJ_TEST("OneOf copy/move from alternative variants") {
     OneOf<int, bool, String> dst = kj::mv(src);
     KJ_ASSERT(dst.is<String>());
     KJ_EXPECT(dst.get<String>() == "foo");
+
+    String s = kj::mv(dst).get<String>();
+    KJ_EXPECT(s == "foo");
   }
 
   {

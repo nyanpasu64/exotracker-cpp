@@ -21,9 +21,7 @@
 // THE SOFTWARE.
 
 #if _WIN32
-#define WIN32_LEAN_AND_MEAN 1  // lolz
-#define WINVER 0x0600
-#define _WIN32_WINNT 0x0600
+#include "win32-api-version.h"
 #endif
 
 #include "time.h"
@@ -72,7 +70,7 @@ class Win32PreciseClock: public Clock {
   typedef VOID WINAPI GetSystemTimePreciseAsFileTimeFunc(LPFILETIME);
 public:
   Date now() const override {
-    static const GetSystemTimePreciseAsFileTimeFunc* getSystemTimePreciseAsFileTimePtr =
+    static GetSystemTimePreciseAsFileTimeFunc* const getSystemTimePreciseAsFileTimePtr =
         getGetSystemTimePreciseAsFileTime();
     FILETIME ft;
     if (getSystemTimePreciseAsFileTimePtr == nullptr) {

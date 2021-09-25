@@ -1,6 +1,6 @@
 ## Process this file with autoconf to produce configure.
 
-AC_INIT([Capn Proto],[0.8.0],[capnproto@googlegroups.com],[capnproto-c++])
+AC_INIT([Capn Proto],[0.9.1],[capnproto@googlegroups.com],[capnproto-c++])
 
 AC_CONFIG_SRCDIR([src/capnp/layout.c++])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -117,8 +117,10 @@ CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS"
 
 AC_DEFUN([CAPNP_PKG_CONFIG_FILES], [ \
   pkgconfig/capnp.pc \
+  pkgconfig/capnpc.pc \
   pkgconfig/capnp-rpc.pc \
   pkgconfig/capnp-json.pc \
+  pkgconfig/capnp-websocket.pc \
   pkgconfig/kj.pc \
   pkgconfig/kj-async.pc \
   pkgconfig/kj-http.pc \
@@ -192,6 +194,11 @@ AS_IF([test "$with_openssl" != no], [
   CXXFLAGS="$CXXFLAGS -DKJ_HAS_OPENSSL"
 ])
 AM_CONDITIONAL([BUILD_KJ_TLS], [test "$with_openssl" != no])
+
+# CapnProtoConfig.cmake.in needs this variable.
+AC_SUBST(WITH_OPENSSL, $with_openssl)
+
+AM_CONDITIONAL([HAS_FUZZING_ENGINE], [test "x$LIB_FUZZING_ENGINE" != "x"])
 
 AC_CONFIG_FILES([Makefile] CAPNP_PKG_CONFIG_FILES CAPNP_CMAKE_CONFIG_FILES)
 AC_OUTPUT

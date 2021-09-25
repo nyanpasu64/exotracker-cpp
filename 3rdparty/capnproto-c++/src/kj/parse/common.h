@@ -41,6 +41,14 @@
 #include "../tuple.h"
 #include "../vector.h"
 
+#if _MSC_VER && _MSC_VER < 1920 && !__clang__
+#define KJ_MSVC_BROKEN_DECLTYPE 1
+#endif
+
+#if KJ_MSVC_BROKEN_DECLTYPE
+#include <type_traits>  // result_of_t
+#endif
+
 KJ_BEGIN_HEADER
 
 namespace kj {
@@ -97,7 +105,14 @@ private:
 template <typename T> struct OutputType_;
 template <typename T> struct OutputType_<Maybe<T>> { typedef T Type; };
 template <typename Parser, typename Input>
-using OutputType = typename OutputType_<decltype(instance<Parser&>()(instance<Input&>()))>::Type;
+using OutputType = typename OutputType_<
+#if KJ_MSVC_BROKEN_DECLTYPE
+    std::result_of_t<Parser(Input)>
+    // The instance<T&>() based version below results in many compiler errors on MSVC2017.
+#else
+    decltype(instance<Parser&>()(instance<Input&>()))
+#endif
+    >::Type;
 // Synonym for the output type of a parser, given the parser type and the input type.
 
 // =======================================================================================

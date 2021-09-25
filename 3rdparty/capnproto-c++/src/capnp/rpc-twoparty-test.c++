@@ -25,6 +25,11 @@
 #define _GNU_SOURCE
 #endif
 
+// Includes just for need SOL_SOCKET and SO_SNDBUF
+#if _WIN32
+#include <kj/win32-api-version.h>
+#endif
+
 #include "rpc-twoparty.h"
 #include "test-util.h"
 #include <capnp/rpc.capnp.h>
@@ -33,9 +38,7 @@
 #include <kj/compat/gtest.h>
 #include <kj/miniposix.h>
 
-// Includes just for need SOL_SOCKET and SO_SNDBUF
 #if _WIN32
-#define WIN32_LEAN_AND_MEAN  // ::eyeroll::
 #include <winsock2.h>
 #include <mswsock.h>
 #include <kj/windows-sanity.h>
@@ -84,6 +87,18 @@ private:
   int& handleCount;
 };
 
+class TestMonotonicClock final: public kj::MonotonicClock {
+public:
+  kj::TimePoint now() const override {
+    return time;
+  }
+
+  void reset() { time = kj::systemCoarseMonotonicClock().now(); }
+  void increment(kj::Duration d) { time += d; }
+private:
+  kj::TimePoint time = kj::systemCoarseMonotonicClock().now();
+};
+
 kj::AsyncIoProvider::PipeThread runServer(kj::AsyncIoProvider& ioProvider,
                                           int& callCount, int& handleCount) {
   return ioProvider.newPipeThread(
@@ -114,16 +129,27 @@ Capability::Client getPersistentCap(RpcSystem<rpc::twoparty::VatId>& client,
 
 TEST(TwoPartyNetwork, Basic) {
   auto ioContext = kj::setupAsyncIo();
+  TestMonotonicClock clock;
   int callCount = 0;
   int handleCount = 0;
 
   auto serverThread = runServer(*ioContext.provider, callCount, handleCount);
-  TwoPartyVatNetwork network(*serverThread.pipe, rpc::twoparty::Side::CLIENT);
+  TwoPartyVatNetwork network(*serverThread.pipe, rpc::twoparty::Side::CLIENT, capnp::ReaderOptions(), clock);
   auto rpcClient = makeRpcClient(network);
+
+  KJ_EXPECT(network.getCurrentQueueCount() == 0);
+  KJ_EXPECT(network.getCurrentQueueSize() == 0);
+  KJ_EXPECT(network.getOutgoingMessageWaitTime() == 0 * kj::SECONDS);
 
   // Request the particular capability from the server.
   auto client = getPersistentCap(rpcClient, rpc::twoparty::Side::SERVER,
       test::TestSturdyRefObjectId::Tag::TEST_INTERFACE).castAs<test::TestInterface>();
+  clock.increment(1 * kj::SECONDS);
+
+  KJ_EXPECT(network.getCurrentQueueCount() == 1);
+  KJ_EXPECT(network.getCurrentQueueSize() > 0);
+  KJ_EXPECT(network.getOutgoingMessageWaitTime() == 1 * kj::SECONDS);
+  size_t oldSize = network.getCurrentQueueSize();
 
   // Use the capability.
   auto request1 = client.fooRequest();
@@ -131,9 +157,20 @@ TEST(TwoPartyNetwork, Basic) {
   request1.setJ(true);
   auto promise1 = request1.send();
 
+  KJ_EXPECT(network.getCurrentQueueCount() == 2);
+  KJ_EXPECT(network.getCurrentQueueSize() > oldSize);
+  KJ_EXPECT(network.getOutgoingMessageWaitTime() == 1 * kj::SECONDS);
+  oldSize = network.getCurrentQueueSize();
+
   auto request2 = client.bazRequest();
   initTestMessage(request2.initS());
   auto promise2 = request2.send();
+
+  KJ_EXPECT(network.getCurrentQueueCount() == 3);
+  KJ_EXPECT(network.getCurrentQueueSize() > oldSize);
+  oldSize = network.getCurrentQueueSize();
+
+  clock.increment(1 * kj::SECONDS);
 
   bool barFailed = false;
   auto request3 = client.barRequest();
@@ -146,6 +183,12 @@ TEST(TwoPartyNetwork, Basic) {
 
   EXPECT_EQ(0, callCount);
 
+  KJ_EXPECT(network.getCurrentQueueCount() == 4);
+  KJ_EXPECT(network.getCurrentQueueSize() > oldSize);
+  // Oldest message is now 2 seconds old
+  KJ_EXPECT(network.getOutgoingMessageWaitTime() == 2 * kj::SECONDS);
+  oldSize = network.getCurrentQueueSize();
+
   auto response1 = promise1.wait(ioContext.waitScope);
 
   EXPECT_EQ("foo", response1.getX());
@@ -156,6 +199,20 @@ TEST(TwoPartyNetwork, Basic) {
 
   EXPECT_EQ(2, callCount);
   EXPECT_TRUE(barFailed);
+
+  // There's still a `Finish` message queued.
+  KJ_EXPECT(network.getCurrentQueueCount() > 0);
+  KJ_EXPECT(network.getCurrentQueueSize() > 0);
+  // Oldest message was sent, next oldest should be 0 seconds old since we haven't incremented
+  // the clock yet.
+  KJ_EXPECT(network.getOutgoingMessageWaitTime() == 0 * kj::SECONDS);
+
+  // Let any I/O finish.
+  kj::Promise<void>(kj::NEVER_DONE).poll(ioContext.waitScope);
+
+  // Now nothing is queued.
+  KJ_EXPECT(network.getCurrentQueueCount() == 0);
+  KJ_EXPECT(network.getCurrentQueueSize() == 0);
 }
 
 TEST(TwoPartyNetwork, Pipelining) {
@@ -210,6 +267,10 @@ TEST(TwoPartyNetwork, Pipelining) {
     EXPECT_FALSE(disconnected);
 
     // What if we disconnect?
+    // TODO(cleanup): This is kind of cheating, we are shutting down the underlying socket to
+    //   simulate a disconnect, but it's weird to pull the rug out from under our VatNetwork like
+    //   this and it causes a bit of a race between write failures and read failures. This part of
+    //   the test should maybe be restructured.
     serverThread.pipe->shutdownWrite();
 
     // The other side should also disconnect.
@@ -231,8 +292,19 @@ TEST(TwoPartyNetwork, Pipelining) {
           .castAs<test::TestExtends>().graultRequest();
       auto pipelinePromise2 = pipelineRequest2.send();
 
-      EXPECT_ANY_THROW(pipelinePromise.wait(ioContext.waitScope));
-      EXPECT_ANY_THROW(pipelinePromise2.wait(ioContext.waitScope));
+      pipelinePromise.then([](auto) {
+        KJ_FAIL_EXPECT("should have thrown");
+      }, [](kj::Exception&& e) {
+        KJ_EXPECT(e.getType() == kj::Exception::Type::DISCONNECTED);
+        // I wish we could test stack traces somehow... oh well.
+      }).wait(ioContext.waitScope);
+
+      pipelinePromise2.then([](auto) {
+        KJ_FAIL_EXPECT("should have thrown");
+      }, [](kj::Exception&& e) {
+        KJ_EXPECT(e.getType() == kj::Exception::Type::DISCONNECTED);
+        // I wish we could test stack traces somehow... oh well.
+      }).wait(ioContext.waitScope);
 
       EXPECT_EQ(3, callCount);
       EXPECT_EQ(1, reverseCallCount);
@@ -739,6 +811,84 @@ KJ_TEST("Streaming over RPC then unwrap with CapabilitySet") {
   // Finish it.
   KJ_ASSERT_NONNULL(server.fulfiller)->fulfill();
   promise.wait(waitScope);
+}
+
+KJ_TEST("promise cap resolves between starting request and sending it") {
+  kj::EventLoop loop;
+  kj::WaitScope waitScope(loop);
+  auto pipe = kj::newTwoWayPipe();
+
+  // Client exports TestCallOrderImpl as its bootstrap.
+  TwoPartyClient client(*pipe.ends[0], kj::heap<TestCallOrderImpl>(), rpc::twoparty::Side::CLIENT);
+
+  // Server exports a promise, which will later resolve to loop back to the capability the client
+  // exported.
+  auto paf = kj::newPromiseAndFulfiller<Capability::Client>();
+  TwoPartyClient server(*pipe.ends[1], kj::mv(paf.promise), rpc::twoparty::Side::SERVER);
+
+  // Create a request but don't send it yet.
+  auto cap = client.bootstrap().castAs<test::TestCallOrder>();
+  auto req1 = cap.getCallSequenceRequest();
+
+  // Fulfill the promise now so that the server's bootstrap loops back to the client's bootstrap.
+  paf.fulfiller->fulfill(server.bootstrap());
+  cap.whenResolved().wait(waitScope);
+
+  // Send the request we created earlier, and also create and send a second request.
+  auto promise1 = req1.send();
+  auto promise2 = cap.getCallSequenceRequest().send();
+
+  // They should arrive in order of send()s.
+  auto n1 = promise1.wait(waitScope).getN();
+  KJ_EXPECT(n1 == 0, n1);
+  auto n2 = promise2.wait(waitScope).getN();
+  KJ_EXPECT(n2 == 1, n2);
+}
+
+KJ_TEST("write error propagates to read error") {
+  kj::EventLoop loop;
+  kj::WaitScope waitScope(loop);
+  auto frontPipe = kj::newTwoWayPipe();
+  auto backPipe = kj::newTwoWayPipe();
+
+  TwoPartyClient client(*frontPipe.ends[0]);
+
+  int callCount;
+  TwoPartyClient server(*backPipe.ends[1], kj::heap<TestInterfaceImpl>(callCount),
+                        rpc::twoparty::Side::SERVER);
+
+  auto pumpUpTask = frontPipe.ends[1]->pumpTo(*backPipe.ends[0]);
+  auto pumpDownTask = backPipe.ends[0]->pumpTo(*frontPipe.ends[1]);
+
+  auto cap = client.bootstrap().castAs<test::TestInterface>();
+
+  // Make sure the connections work.
+  {
+    auto req = cap.fooRequest();
+    req.setI(123);
+    req.setJ(true);
+    auto resp = req.send().wait(waitScope);
+    EXPECT_EQ("foo", resp.getX());
+  }
+
+  // Disconnect upstream task in such a way that future writes on the client will fail, but the
+  // server doesn't notice the disconnect and so won't react.
+  pumpUpTask = nullptr;
+  frontPipe.ends[1]->abortRead();  // causes write() on ends[0] to fail in the future
+
+  {
+    auto req = cap.fooRequest();
+    req.setI(123);
+    req.setJ(true);
+    auto promise = req.send().then([](auto) {
+      KJ_FAIL_EXPECT("expected exception");
+    }, [](kj::Exception&& e) {
+      KJ_ASSERT(e.getDescription() == "abortRead() has been called");
+    });
+
+    KJ_ASSERT(promise.poll(waitScope));
+    promise.wait(waitScope);
+  }
 }
 
 }  // namespace

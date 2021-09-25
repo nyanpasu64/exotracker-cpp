@@ -47,8 +47,8 @@ CAPNP_BEGIN_HEADER
 namespace capnp {
 
 #define CAPNP_VERSION_MAJOR 0
-#define CAPNP_VERSION_MINOR 8
-#define CAPNP_VERSION_MICRO 0
+#define CAPNP_VERSION_MINOR 9
+#define CAPNP_VERSION_MICRO 1
 
 #define CAPNP_VERSION \
   (CAPNP_VERSION_MAJOR * 1000000 + CAPNP_VERSION_MINOR * 1000 + CAPNP_VERSION_MICRO)
@@ -173,7 +173,7 @@ inline constexpr Kind kind() {
   return k;
 }
 
-#if _MSC_VER
+#if _MSC_VER && !defined(__clang__)
 
 #define CAPNP_KIND(T) ::capnp::_::Kind_<T>::kind
 // Avoid constexpr methods in MSVC (it remains buggy in many situations).
@@ -199,7 +199,7 @@ inline constexpr Style style() {
 template <typename T, Kind k = CAPNP_KIND(T)>
 struct List;
 
-#if _MSC_VER
+#if _MSC_VER && !defined(__clang__)
 
 template <typename T, Kind k>
 struct List {};
@@ -314,7 +314,7 @@ namespace _ {  // private
 template <typename T, Kind k = CAPNP_KIND(T)>
 struct PointerHelpers;
 
-#if _MSC_VER
+#if _MSC_VER && !defined(__clang__)
 
 template <typename T, Kind k>
 struct PointerHelpers {};

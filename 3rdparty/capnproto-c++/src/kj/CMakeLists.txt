@@ -3,6 +3,7 @@
 
 set(kj_sources_lite
   array.c++
+  list.c++
   common.c++
   debug.c++
   exception.c++
@@ -10,12 +11,12 @@ set(kj_sources_lite
   memory.c++
   mutex.c++
   string.c++
+  source-location.c++
   hash.c++
   table.c++
   thread.c++
   main.c++
   arena.c++
-  test-helpers.c++
   units.c++
   encoding.c++
 
@@ -44,9 +45,11 @@ set(kj_headers
   memory.h
   refcount.h
   array.h
+  list.h
   vector.h
   string.h
   string-tree.h
+  source-location.h
   hash.h
   table.h
   map.h
@@ -130,6 +133,7 @@ set(kj-async_headers
   async-unix.h
   async-win32.h
   async-io.h
+  async-queue.h
   timer.h
 )
 if(NOT CAPNP_LITE)
@@ -168,6 +172,29 @@ if(NOT CAPNP_LITE)
   install(FILES ${kj-http_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/kj/compat")
 endif()
 
+# kj-tls ======================================================================
+set(kj-tls_sources
+  compat/readiness-io.c++
+  compat/tls.c++
+)
+set(kj-tls_headers
+  compat/readiness-io.h
+  compat/tls.h
+)
+if(NOT CAPNP_LITE)
+  add_library(kj-tls ${kj-tls_sources})
+  add_library(CapnProto::kj-tls ALIAS kj-tls)
+  target_link_libraries(kj-tls PUBLIC kj-async)
+  if (WITH_OPENSSL)
+    target_compile_definitions(kj-tls PRIVATE KJ_HAS_OPENSSL)
+    target_link_libraries(kj-tls PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  endif()
+  # Ensure the library has a version set to match autotools build
+  set_target_properties(kj-tls PROPERTIES VERSION ${VERSION})
+  install(TARGETS kj-tls ${INSTALL_TARGETS_DEFAULT_ARGS})
+  install(FILES ${kj-tls_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/kj/compat")
+endif()
+
 # kj-gzip ======================================================================
 
 set(kj-gzip_sources
@@ -200,6 +227,7 @@ if(BUILD_TESTING)
     common-test.c++
     memory-test.c++
     array-test.c++
+    list-test.c++
     string-test.c++
     table-test.c++
     map-test.c++
@@ -226,6 +254,7 @@ if(BUILD_TESTING)
       async-win32-test.c++
       async-win32-xthread-test.c++
       async-io-test.c++
+      async-queue-test.c++
       refcount-test.c++
       string-tree-test.c++
       encoding-test.c++
@@ -241,8 +270,15 @@ if(BUILD_TESTING)
       compat/url-test.c++
       compat/http-test.c++
       compat/gzip-test.c++
+      compat/tls-test.c++
     )
-    target_link_libraries(kj-heavy-tests kj-http kj-gzip kj-async kj-test kj)
+    target_link_libraries(kj-heavy-tests kj-http kj-gzip kj-tls kj-async kj-test kj)
+    if (WITH_OPENSSL)
+      set_source_files_properties(compat/tls-test.c++
+        PROPERTIES
+          COMPILE_DEFINITIONS KJ_HAS_OPENSSL
+      )
+    endif()
     add_dependencies(check kj-heavy-tests)
     add_test(NAME kj-heavy-tests-run COMMAND kj-heavy-tests)
   endif()  # NOT CAPNP_LITE

@@ -249,6 +249,17 @@ class HttpHeaders {
 public:
   explicit HttpHeaders(const HttpHeaderTable& table);
 
+  static bool isValidHeaderValue(kj::StringPtr value);
+  // This returns whether the value is a valid parameter to the set call. While the HTTP spec
+  // suggests that only printable ASCII characters are allowed in header values, in practice that
+  // turns out to not be the case. We follow the browser's lead in disallowing \r and \n.
+  // https://github.com/httpwg/http11bis/issues/19
+  // Use this if you want to validate the value before supplying it to set() if you want to avoid
+  // an exception being thrown (e.g. you have custom error reporting). NOTE that set will still
+  // validate the value. If performance is a problem this API needs to be adjusted to a
+  // `validateHeaderValue` function that returns a special type that set can be confident has
+  // already passed through the validation routine.
+
   KJ_DISALLOW_COPY(HttpHeaders);
   HttpHeaders(HttpHeaders&&) = default;
   HttpHeaders& operator=(HttpHeaders&&) = default;
@@ -552,7 +563,9 @@ public:
 
   typedef kj::OneOf<kj::String, kj::Array<byte>, Close> Message;
 
-  virtual kj::Promise<Message> receive() = 0;
+  static constexpr size_t SUGGESTED_MAX_MESSAGE_SIZE = 1u << 20;  // 1MB
+
+  virtual kj::Promise<Message> receive(size_t maxSize = SUGGESTED_MAX_MESSAGE_SIZE) = 0;
   // Read one message from the WebSocket and return it. Can only call once at a time. Do not call
   // again after Close is received.
 
@@ -570,6 +583,9 @@ public:
   // if this WebSocket implementation is able to perform the pump in an optimized way, better than
   // the default implementation of pumpTo(). The default implementation of pumpTo() always tries
   // calling this first, and the default implementation of tryPumpFrom() always returns null.
+
+  virtual uint64_t sentByteCount() = 0;
+  virtual uint64_t receivedByteCount() = 0;
 };
 
 class HttpClient {
@@ -694,6 +710,28 @@ public:
   // UNIMPLEMENTED.
 };
 
+class HttpClientErrorHandler {
+public:
+  virtual HttpClient::Response handleProtocolError(HttpHeaders::ProtocolError protocolError);
+  // Override this function to customize error handling when the client receives an HTTP message
+  // that fails to parse. The default implementations throws an exception.
+  //
+  // There are two main use cases for overriding this:
+  // 1. `protocolError` contains the actual header content that failed to parse, giving you the
+  //    opportunity to log it for debugging purposes. The default implementation throws away this
+  //    content.
+  // 2. You could potentially convert protocol errors into HTTP error codes, e.g. 502 Bad Gateway.
+  //
+  // Note that `protocolError` may contain pointers into buffers that are no longer valid once
+  // this method returns; you will have to make copies if you want to keep them.
+
+  virtual HttpClient::WebSocketResponse handleWebSocketProtocolError(
+      HttpHeaders::ProtocolError protocolError);
+  // Like handleProtocolError() but for WebSocket requests. The default implementation calls
+  // handleProtocolError() and converts the Response to WebSocketResponse. There is probably very
+  // little reason to override this.
+};
+
 struct HttpClientSettings {
   kj::Duration idleTimeout = 5 * kj::SECONDS;
   // For clients which automatically create new connections, any connection idle for at least this
@@ -707,9 +745,13 @@ struct HttpClientSettings {
   // or vulnerable proxies between you and the server, you can provide a dummy entropy source that
   // doesn't generate real entropy (e.g. returning the same value every time). Otherwise, you must
   // provide a cryptographically-random entropy source.
+
+  kj::Maybe<HttpClientErrorHandler&> errorHandler = nullptr;
+  // Customize how protocol errors are handled by the HttpClient. If null, HttpClientErrorHandler's
+  // default implementation will be used.
 };
 
-kj::Own<HttpClient> newHttpClient(kj::Timer& timer, HttpHeaderTable& responseHeaderTable,
+kj::Own<HttpClient> newHttpClient(kj::Timer& timer, const HttpHeaderTable& responseHeaderTable,
                                   kj::Network& network, kj::Maybe<kj::Network&> tlsNetwork,
                                   HttpClientSettings settings = HttpClientSettings());
 // Creates a proxy HttpClient that connects to hosts over the given network. The URL must always
@@ -725,7 +767,7 @@ kj::Own<HttpClient> newHttpClient(kj::Timer& timer, HttpHeaderTable& responseHea
 // `tlsNetwork` is required to support HTTPS destination URLs. If null, only HTTP URLs can be
 // fetched.
 
-kj::Own<HttpClient> newHttpClient(kj::Timer& timer, HttpHeaderTable& responseHeaderTable,
+kj::Own<HttpClient> newHttpClient(kj::Timer& timer, const HttpHeaderTable& responseHeaderTable,
                                   kj::NetworkAddress& addr,
                                   HttpClientSettings settings = HttpClientSettings());
 // Creates an HttpClient that always connects to the given address no matter what URL is requested.
@@ -739,7 +781,8 @@ kj::Own<HttpClient> newHttpClient(kj::Timer& timer, HttpHeaderTable& responseHea
 //
 // `responseHeaderTable` is used when parsing HTTP responses. Requests can use any header table.
 
-kj::Own<HttpClient> newHttpClient(HttpHeaderTable& responseHeaderTable, kj::AsyncIoStream& stream,
+kj::Own<HttpClient> newHttpClient(const HttpHeaderTable& responseHeaderTable,
+                                  kj::AsyncIoStream& stream,
                                   HttpClientSettings settings = HttpClientSettings());
 // Creates an HttpClient that speaks over the given pre-established connection. The client may
 // be used as a proxy client or a host client depending on whether the peer is operating as
@@ -764,7 +807,7 @@ kj::Own<HttpService> newHttpService(HttpClient& client);
 // Adapts an HttpClient to an HttpService and vice versa.
 
 kj::Own<HttpInputStream> newHttpInputStream(
-    kj::AsyncInputStream& input, HttpHeaderTable& headerTable);
+    kj::AsyncInputStream& input, const HttpHeaderTable& headerTable);
 // Create an HttpInputStream on top of the given stream. Normally applications would not call this
 // directly, but it can be useful for implementing protocols that aren't quite HTTP but use similar
 // message delimiting.
@@ -797,6 +840,7 @@ WebSocketPipe newWebSocketPipe();
 // accepts the message.
 
 class HttpServerErrorHandler;
+class HttpServerCallbacks;
 
 struct HttpServerSettings {
   kj::Duration headerTimeout = 15 * kj::SECONDS;
@@ -818,6 +862,9 @@ struct HttpServerSettings {
   kj::Maybe<HttpServerErrorHandler&> errorHandler = nullptr;
   // Customize how client protocol errors and service application exceptions are handled by the
   // HttpServer. If null, HttpServerErrorHandler's default implementation will be used.
+
+  kj::Maybe<HttpServerCallbacks&> callbacks = nullptr;
+  // Additional optional callbacks used to control some server behavior.
 };
 
 class HttpServerErrorHandler {
@@ -854,6 +901,17 @@ public:
   // `response.send()`. In this case, no response will be sent, and the connection will be closed.
 };
 
+class HttpServerCallbacks {
+public:
+  virtual bool shouldClose() { return false; }
+  // Whenever the HttpServer begins response headers, it will check `shouldClose()` to decide
+  // whether to send a `Connection: close` header and close the connection.
+  //
+  // This can be useful e.g. if the server has too many connections open and wants to shed some
+  // of them. Note that to implement graceful shutdown of a server, you should use
+  // `HttpServer::drain()` instead.
+};
+
 class HttpServer final: private kj::TaskSet::ErrorHandler {
   // Class which listens for requests on ports or connections and sends them to an HttpService.
 
@@ -861,13 +919,13 @@ public:
   typedef HttpServerSettings Settings;
   typedef kj::Function<kj::Own<HttpService>(kj::AsyncIoStream&)> HttpServiceFactory;
 
-  HttpServer(kj::Timer& timer, HttpHeaderTable& requestHeaderTable, HttpService& service,
+  HttpServer(kj::Timer& timer, const HttpHeaderTable& requestHeaderTable, HttpService& service,
              Settings settings = Settings());
   // Set up an HttpServer that directs incoming connections to the given service. The service
   // may be a host service or a proxy service depending on whether you are intending to implement
   // an HTTP server or an HTTP proxy.
 
-  HttpServer(kj::Timer& timer, HttpHeaderTable& requestHeaderTable,
+  HttpServer(kj::Timer& timer, const HttpHeaderTable& requestHeaderTable,
              HttpServiceFactory serviceFactory, Settings settings = Settings());
   // Like the other constructor, but allows a new HttpService object to be used for each
   // connection, based on the connection object. This is particularly useful for capturing the
@@ -904,7 +962,7 @@ private:
   class Connection;
 
   kj::Timer& timer;
-  HttpHeaderTable& requestHeaderTable;
+  const HttpHeaderTable& requestHeaderTable;
   kj::OneOf<HttpService*, HttpServiceFactory> service;
   Settings settings;
 
@@ -917,7 +975,7 @@ private:
 
   kj::TaskSet tasks;
 
-  HttpServer(kj::Timer& timer, HttpHeaderTable& requestHeaderTable,
+  HttpServer(kj::Timer& timer, const HttpHeaderTable& requestHeaderTable,
              kj::OneOf<HttpService*, HttpServiceFactory> service,
              Settings settings, kj::PromiseFulfillerPair<void> paf);
 
