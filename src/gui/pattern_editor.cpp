@@ -2775,10 +2775,17 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
     auto subp = &subcolumn.type;
 
     if (std::get_if<SubColumn_::Note>(subp)) {
+        Qt::KeyboardModifiers modifiers = event->modifiers();
+
+        // If any modifiers are held other than Shift, don't insert a note.
+        if (modifiers & ~Qt::ShiftModifier) {
+            return;
+        }
+
         // Pick the octave based on whether the user pressed the lower or upper key row.
         // If the user is holding shift, give the user an extra 2 octaves of range
         // (transpose the lower row down 1 octave, and the upper row up 1).
-        bool shift_pressed = event->modifiers().testFlag(Qt::ShiftModifier);
+        bool shift_pressed = modifiers.testFlag(Qt::ShiftModifier);
 
         auto const & piano_keys = get_app().options().pattern_keys.piano_keys;
 
@@ -2801,7 +2808,6 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
 
                     auto note = doc::Note{doc::NoteInt(chromatic)};
                     note_pressed(*this, chip, channel, note);
-                    update();
                     return;
                 }
             }
@@ -2812,14 +2818,12 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
         DigitField field{*p, (DigitIndex) subcolumn.ncell};
         if (auto nybble = format::hex_from_key(*event)) {
             add_digit(*this, chip, channel, field, (DigitIndex) cell, *nybble);
-            update();
         }
     } else
     if (auto p = std::get_if<SubColumn_::Volume>(subp)) {
         DigitField field{*p, (DigitIndex) subcolumn.ncell};
         if (auto nybble = format::hex_from_key(*event)) {
             add_digit(*this, chip, channel, field, (DigitIndex) cell, *nybble);
-            update();
         }
     } else
     if (auto p = std::get_if<SubColumn_::Effect>(subp)) {
@@ -2831,7 +2835,6 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
 
             if (auto nybble = format::hex_from_key(*event)) {
                 add_digit(*this, chip, channel, field, digit, *nybble);
-                update();
             }
         } else {
             EffectField field{*p, document.effect_name_chars};
