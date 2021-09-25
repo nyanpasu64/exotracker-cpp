@@ -2808,7 +2808,6 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
 
                     auto note = doc::Note{doc::NoteInt(chromatic)};
                     note_pressed(*this, chip, channel, note);
-                    update();
                     return;
                 }
             }
@@ -2819,14 +2818,12 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
         DigitField field{*p, (DigitIndex) subcolumn.ncell};
         if (auto nybble = format::hex_from_key(*event)) {
             add_digit(*this, chip, channel, field, (DigitIndex) cell, *nybble);
-            update();
         }
     } else
     if (auto p = std::get_if<SubColumn_::Volume>(subp)) {
         DigitField field{*p, (DigitIndex) subcolumn.ncell};
         if (auto nybble = format::hex_from_key(*event)) {
             add_digit(*this, chip, channel, field, (DigitIndex) cell, *nybble);
-            update();
         }
     } else
     if (auto p = std::get_if<SubColumn_::Effect>(subp)) {
@@ -2838,7 +2835,6 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
 
             if (auto nybble = format::hex_from_key(*event)) {
                 add_digit(*this, chip, channel, field, digit, *nybble);
-                update();
             }
         } else {
             EffectField field{*p, document.effect_name_chars};
