@@ -762,14 +762,14 @@ const ::capnp::_::RawSchema s_cffbc472e0f2ff20 = {
   1, 1, i_cffbc472e0f2ff20, nullptr, nullptr, { &s_cffbc472e0f2ff20, nullptr, nullptr, 0, 0, nullptr }
 };
 #endif  // !CAPNP_LITE
-static const ::capnp::_::AlignedData<77> b_d1c37795ff851c2f = {
+static const ::capnp::_::AlignedData<77> b_c1dabd63a0b671dd = {
   {   0,   0,   0,   0,   5,   0,   6,   0,
-     47,  28, 133, 255, 149, 119, 195, 209,
+    221, 113, 182, 160,  99, 189, 218, 193,
      29,   0,   0,   0,   1,   0,   1,   0,
     212, 222, 147, 231, 182,  81,  75, 214,
       1,   0,   7,   0,   0,   0,   0,   0,
       0,   0,   0,   0,   0,   0,   0,   0,
-     21,   0,   0,   0,  82,   1,   0,   0,
+     21,   0,   0,   0,  90,   1,   0,   0,
      41,   0,   0,   0,   7,   0,   0,   0,
       0,   0,   0,   0,   0,   0,   0,   0,
      37,   0,   0,   0, 175,   0,   0,   0,
@@ -779,8 +779,8 @@ static const ::capnp::_::AlignedData<77> b_d1c37795ff851c2f = {
      97, 108, 105, 122, 101,  47, 100, 111,
      99, 117, 109, 101, 110, 116,  46,  99,
      97, 112, 110, 112,  58,  84, 105, 109,
-    101, 108, 105, 110, 101,  73, 116, 101,
-    109,   0,   0,   0,   0,   0,   0,   0,
+    101, 108, 105, 110, 101,  70, 114,  97,
+    109, 101,   0,   0,   0,   0,   0,   0,
       0,   0,   0,   0,   1,   0,   1,   0,
      12,   0,   0,   0,   3,   0,   4,   0,
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -841,16 +841,16 @@ static const ::capnp::_::AlignedData<77> b_d1c37795ff851c2f = {
       0,   0,   0,   0,   0,   0,   0,   0,
       0,   0,   0,   0,   0,   0,   0,   0, }
 };
-::capnp::word const* const bp_d1c37795ff851c2f = b_d1c37795ff851c2f.words;
+::capnp::word const* const bp_c1dabd63a0b671dd = b_c1dabd63a0b671dd.words;
 #if !CAPNP_LITE
-static const ::capnp::_::RawSchema* const d_d1c37795ff851c2f[] = {
+static const ::capnp::_::RawSchema* const d_c1dabd63a0b671dd[] = {
   &s_cffbc472e0f2ff20,
 };
-static const uint16_t m_d1c37795ff851c2f[] = {2, 1, 0};
-static const uint16_t i_d1c37795ff851c2f[] = {0, 1, 2};
-const ::capnp::_::RawSchema s_d1c37795ff851c2f = {
-  0xd1c37795ff851c2f, b_d1c37795ff851c2f.words, 77, d_d1c37795ff851c2f, m_d1c37795ff851c2f,
-  1, 3, i_d1c37795ff851c2f, nullptr, nullptr, { &s_d1c37795ff851c2f, nullptr, nullptr, 0, 0, nullptr }
+static const uint16_t m_c1dabd63a0b671dd[] = {2, 1, 0};
+static const uint16_t i_c1dabd63a0b671dd[] = {0, 1, 2};
+const ::capnp::_::RawSchema s_c1dabd63a0b671dd = {
+  0xc1dabd63a0b671dd, b_c1dabd63a0b671dd.words, 77, d_c1dabd63a0b671dd, m_c1dabd63a0b671dd,
+  1, 3, i_c1dabd63a0b671dd, nullptr, nullptr, { &s_c1dabd63a0b671dd, nullptr, nullptr, 0, 0, nullptr }
 };
 #endif  // !CAPNP_LITE
 static const ::capnp::_::AlignedData<67> b_e0a81db883371cec = {
@@ -1804,7 +1804,7 @@ static const ::capnp::_::AlignedData<222> b_ebd00718fee78c30 = {
       0,   0,   0,   0,   0,   0,   0,   0,
       0,   0,   0,   0,   3,   0,   1,   0,
      16,   0,   0,   0,   0,   0,   0,   0,
-     47,  28, 133, 255, 149, 119, 195, 209,
+    221, 113, 182, 160,  99, 189, 218, 193,
       0,   0,   0,   0,   0,   0,   0,   0,
       0,   0,   0,   0,   0,   0,   0,   0,
      14,   0,   0,   0,   0,   0,   0,   0,
@@ -1820,7 +1820,7 @@ static const ::capnp::_::RawSchema* const d_ebd00718fee78c30[] = {
   &s_a8a856289ab511b0,
   &s_b79be6fd6b53c23a,
   &s_c011ae832de79b57,
-  &s_d1c37795ff851c2f,
+  &s_c1dabd63a0b671dd,
 };
 static const uint16_t m_ebd00718fee78c30[] = {3, 9, 8, 5, 2, 7, 6, 1, 10, 0, 4};
 static const uint16_t i_ebd00718fee78c30[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -1919,12 +1919,12 @@ constexpr ::capnp::Kind TimelineCell::_capnpPrivate::kind;
 constexpr ::capnp::_::RawSchema const* TimelineCell::_capnpPrivate::schema;
 #endif  // !CAPNP_LITE
 
-// TimelineItem
-constexpr uint16_t TimelineItem::_capnpPrivate::dataWordSize;
-constexpr uint16_t TimelineItem::_capnpPrivate::pointerCount;
+// TimelineFrame
+constexpr uint16_t TimelineFrame::_capnpPrivate::dataWordSize;
+constexpr uint16_t TimelineFrame::_capnpPrivate::pointerCount;
 #if !CAPNP_LITE
-constexpr ::capnp::Kind TimelineItem::_capnpPrivate::kind;
-constexpr ::capnp::_::RawSchema const* TimelineItem::_capnpPrivate::schema;
+constexpr ::capnp::Kind TimelineFrame::_capnpPrivate::kind;
+constexpr ::capnp::_::RawSchema const* TimelineFrame::_capnpPrivate::schema;
 #endif  // !CAPNP_LITE
 
 // SampleTuning

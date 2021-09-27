@@ -99,7 +99,7 @@ struct TimelineBlock {
 
   beginTime @0 :Int32;  # Any negative side effects for switching C++ to UInt32?
   endTime @1 :UInt32;
-  # 0xffff_ffff means "end of TimelineItem".
+  # 0xffff_ffff means "end of TimelineFrame".
   # Other values are treated as integer beat numbers.
 
   pattern @2 :Pattern;
@@ -112,7 +112,7 @@ struct TimelineCell {
   blocks @0 :List(TimelineBlock);
 }
 
-struct TimelineItem {
+struct TimelineFrame {
   # One timeline item, all channels. Stores duration of timeline item.
 
   nbeatsNum @0 :UInt32;
@@ -128,10 +128,6 @@ struct SampleTuning {
   rootKey @1 :UInt8;
   detuneCents @2 :Int16;
 }
-
-# Native support for optional fields in FlatBuffers was only added(?) in 2020,
-# and has not appeared in any stable release yet.
-# See https://github.com/google/flatbuffers/issues/6014 for more details.
 
 struct MaybeSample { union {
   none @0 :Void;
@@ -202,9 +198,6 @@ enum ChipKind {
 struct PerChannelSettings {
   nEffectCol @0 :UInt8 = 1;
 }
-# kinda regretting using flatbuffers.
-# in cap'n proto, i can just say List(List(ChannelSettings) or a generic type,
-# instead of defining monomorphized wrapper types.
 
 struct Document {
   version @0 :Version;
@@ -238,5 +231,5 @@ struct Document {
 
   chipChannelSettings @9 :List(List(PerChannelSettings));
 
-  timeline @10 :List(TimelineItem);
+  timeline @10 :List(TimelineFrame);
 }

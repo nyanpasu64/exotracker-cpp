@@ -298,7 +298,7 @@ void serialize_timeline_cell(
 }
 
 void serialize_chip_channel_cells(
-    ChipChannelCells const& cc_cells, gen::TimelineItem::Builder gen_item
+    ChipChannelCells const& cc_cells, gen::TimelineFrame::Builder gen_item
 ) {
     auto num_chips = (uint) cc_cells.size();
     auto gen_cc_cells = gen_item.initChipChannelCells(num_chips);
@@ -320,7 +320,7 @@ void serialize_chip_channel_cells(
 }
 
 void serialize_timeline_item(
-    TimelineFrame const& item, gen::TimelineItem::Builder gen_item
+    TimelineFrame const& item, gen::TimelineFrame::Builder gen_item
 ) {
     FractionInt num = item.nbeats.numerator();
     FractionInt den = item.nbeats.denominator();
@@ -1090,7 +1090,7 @@ optional<ChipChannelCells> load_chip_channel_cells(
 
 optional<TimelineFrame> load_timeline_item(
     ErrorState & state,
-    gen::TimelineItem::Reader gen_item,
+    gen::TimelineFrame::Reader gen_item,
     ChipMetadataRef chips_metadata)
 {
     auto prefix = ErrorPrefixer(state);
@@ -1113,7 +1113,7 @@ optional<TimelineFrame> load_timeline_item(
     }
 }
 
-using GenTimeline = ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Reader;
+using GenTimeline = ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Reader;
 optional<Timeline> load_timeline(
     ErrorState & state, GenTimeline gen_timeline, ChipMetadataRef chips
 ) {
