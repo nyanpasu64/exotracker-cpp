@@ -406,7 +406,7 @@ static Document empty_doc(int n_seq_entry) {
     Timeline timeline;
 
     for (int seq_entry_idx = 0; seq_entry_idx < n_seq_entry; seq_entry_idx++) {
-        timeline.push_back(TimelineRow {
+        timeline.push_back(TimelineFrame {
             .nbeats = 4,
             .chip_channel_cells = {
                 // chip 0

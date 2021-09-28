@@ -34,14 +34,14 @@ static Document simple_doc() {
 
     Timeline timeline;
 
-    timeline.push_back([]() -> TimelineRow {
+    timeline.push_back([]() -> TimelineFrame {
         TimelineCell ch0{TimelineBlock::from_events({
             // TimeInPattern, RowEvent
             {0, {0}},
             {1, {1}},
         })};
 
-        return TimelineRow{
+        return TimelineFrame{
             .nbeats = 2,
             .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
@@ -281,7 +281,7 @@ static Document parametric_doc(
     Timeline timeline;
 
     // grid 0
-    timeline.push_back([&]() -> TimelineRow {
+    timeline.push_back([&]() -> TimelineFrame {
         TimelineCell ch0{
             TimelineBlock::from_events({
                 // TimeInPattern, RowEvent
@@ -290,7 +290,7 @@ static Document parametric_doc(
             }, loop_length)
         };
 
-        return TimelineRow {
+        return TimelineFrame {
             .nbeats = 4,
             .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
@@ -300,7 +300,7 @@ static Document parametric_doc(
     delay = peak_delay - delay;
 
     // grid 1
-    timeline.push_back([&]() -> TimelineRow {
+    timeline.push_back([&]() -> TimelineFrame {
         TimelineCell ch0{
             // Add two blocks into one grid cell, as a test case.
             TimelineBlock{(BeatIndex) beat, beat + 2, Pattern{
@@ -319,7 +319,7 @@ static Document parametric_doc(
             }},
         };
 
-        return TimelineRow {
+        return TimelineFrame {
             .nbeats = 4,
             .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
@@ -353,7 +353,7 @@ static Document short_doc(
     Timeline timeline;
 
     // grid 0
-    timeline.push_back([&]() -> TimelineRow {
+    timeline.push_back([&]() -> TimelineFrame {
         EventList events;
         for (uint32_t beat = 0; beat < nbeat; beat++) {
             events.push_back(Ev(beat, {beat}).delay(delay));
@@ -361,7 +361,7 @@ static Document short_doc(
 
         TimelineCell ch0{TimelineBlock::from_events(move(events), loop_length)};
 
-        return TimelineRow {
+        return TimelineFrame {
             .nbeats = 4,
             .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
@@ -398,25 +398,25 @@ static Document gap_doc(
     }
 
     // grid 0
-    timeline.push_back([&]() -> TimelineRow {
+    timeline.push_back([&]() -> TimelineFrame {
         TimelineCell ch0{
             TimelineBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}}
         };
 
-        return TimelineRow {
+        return TimelineFrame {
             .nbeats = 4,
             .chip_channel_cells = {{move(ch0), {}, {}, {}, {}, {}, {}, {}}},
         };
     }());
 
     // grid 1
-    timeline.push_back(TimelineRow {
+    timeline.push_back(TimelineFrame {
         .nbeats = 4,
         .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
     });
 
     // grid 2
-    timeline.push_back(TimelineRow {
+    timeline.push_back(TimelineFrame {
         .nbeats = 4,
         .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
     });

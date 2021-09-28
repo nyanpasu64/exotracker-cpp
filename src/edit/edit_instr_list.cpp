@@ -174,7 +174,7 @@ MaybeEditBox try_rename_instrument(
 static void timeline_swap_instruments(
     Timeline & timeline, InstrumentIndex a, InstrumentIndex b
 ) {
-    for (TimelineRow & frame : timeline) {
+    for (TimelineFrame & frame : timeline) {
         for (auto & channel_cells : frame.chip_channel_cells) {
             for (TimelineCell & cell : channel_cells) {
                 for (TimelineBlock & block : cell._raw_blocks) {

@@ -29,7 +29,7 @@ struct GridIndex {
 using MaybeGridIndex = std::optional<GridIndex>;
 
 /// Type doesn't really matter.
-/// You cannot store more than 256 timeline items,
+/// You cannot store more than 256 timeline frames,
 /// or valid indices of 0 through 0xff.
 ///
 /// Note that a 256-item-long document's length will not fit in a single byte!
@@ -88,7 +88,7 @@ struct [[nodiscard]] Pattern {
 
 using timed_events::BeatFraction;
 
-/// Very long timeline items and/or patterns with thousands of beats
+/// Very long timeline frames and/or patterns with thousands of beats
 /// can cause the UI to slow down.
 /// If people end up actually using huge patterns and encountering slowdown,
 /// the pattern editor may be improved to only draw on-screen items,
@@ -169,7 +169,7 @@ struct [[nodiscard]] TimelineBlock {
 /// One timeline item, one channel.
 /// Can hold multiple blocks at non-overlapping increasing times.
 /// Each block *should* have nonzero length, and not extend past
-/// [0, TimelineItem::nbeats]? IDK.
+/// [0, TimelineFrame::nbeats]? IDK.
 struct [[nodiscard]] TimelineCell {
     DenseMap<BlockIndex, TimelineBlock> _raw_blocks;
 
@@ -192,7 +192,7 @@ struct [[nodiscard]] TimelineCell {
     }
 };
 
-/// One timeline item, all channels. Stores duration of timeline item.
+/// One timeline frame, one channel. Stores duration of timeline frame.
 struct [[nodiscard]] TimelineCellRef {
     BeatFraction const nbeats;
     TimelineCell const& cell;
@@ -205,22 +205,22 @@ struct [[nodiscard]] TimelineCellRefMut {
 
 
 using ChipChannelCells = ChipChannelTo<TimelineCell>;
-/// One grid cell, all channels. Stores duration of grid cell.
-struct [[nodiscard]] TimelineRow {
+/// One timeline frame, all channels. Stores duration of timeline frame.
+struct [[nodiscard]] TimelineFrame {
     BeatFraction nbeats;
 
     ChipChannelCells chip_channel_cells;
 
 // impl
 #ifdef UNITTEST
-    DEFAULT_EQUALABLE(TimelineRow)
+    DEFAULT_EQUALABLE(TimelineFrame)
 #endif
 };
 
 
 /// All grid cells, all channels.
-using Timeline = DenseMap<GridIndex, TimelineRow>;
-using TimelineRef = gsl::span<TimelineRow const>;
+using Timeline = DenseMap<GridIndex, TimelineFrame>;
+using TimelineRef = gsl::span<TimelineFrame const>;
 
 
 /// All grid cells, one channel.
@@ -242,8 +242,8 @@ public:
     }
 
     [[nodiscard]] TimelineCellRef operator[](GridIndex i) const {
-        auto & row = _timeline[(size_t) i];
-        return TimelineCellRef{row.nbeats, row.chip_channel_cells[_chip][_channel]};
+        auto & frame = _timeline[(size_t) i];
+        return TimelineCellRef{frame.nbeats, frame.chip_channel_cells[_chip][_channel]};
     }
 };
 
@@ -266,8 +266,10 @@ public:
     }
 
     [[nodiscard]] TimelineCellRefMut operator[](GridIndex i) {
-        auto & row = _timeline[(size_t) i];
-        return TimelineCellRefMut{row.nbeats, row.chip_channel_cells[_chip][_channel]};
+        auto & frame = _timeline[(size_t) i];
+        return TimelineCellRefMut{
+            frame.nbeats, frame.chip_channel_cells[_chip][_channel]
+        };
     }
 };
 

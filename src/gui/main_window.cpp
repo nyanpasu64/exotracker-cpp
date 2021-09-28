@@ -310,13 +310,13 @@ struct MainWindowUi : MainWindow {
     TimelineEditor * _timeline_editor;
 
     struct Timeline {
-        QAction * add_row;
-        QAction * remove_row;
+        QAction * add_frame;
+        QAction * remove_frame;
 
         QAction * move_up;
         QAction * move_down;
 
-        QAction * clone_row;
+        QAction * clone_frame;
     } _timeline;
 
     InstrumentList * _instrument_list;
@@ -436,20 +436,20 @@ struct MainWindowUi : MainWindow {
                 _timeline_editor = w;
             }
             {l__w(IconToolBar)
-                _timeline.add_row = w->add_icon_action(
-                    tr("Add Timeline Entry"), "document-new"
+                _timeline.add_frame = w->add_icon_action(
+                    tr("Add Timeline Frame"), "document-new"
                 );
-                _timeline.remove_row = w->add_icon_action(
-                    tr("Delete Timeline Entry"), "edit-delete"
+                _timeline.remove_frame = w->add_icon_action(
+                    tr("Delete Timeline Frame"), "edit-delete"
                 );
                 _timeline.move_up = w->add_icon_action(
-                    tr("Move Row Up"), "go-up"
+                    tr("Move Frame Up"), "go-up"
                 );
                 _timeline.move_down = w->add_icon_action(
-                    tr("Move Row Down"), "go-down"
+                    tr("Move Frame Down"), "go-down"
                 );
-                _timeline.clone_row = w->add_icon_action(
-                    tr("Clone Row"), "edit-copy"
+                _timeline.clone_frame = w->add_icon_action(
+                    tr("Clone Frame"), "edit-copy"
                 );
                 enable_button_borders(w);
             }
@@ -509,7 +509,7 @@ struct MainWindowUi : MainWindow {
 
             // TODO rework settings GUI
             {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("Timeline item"));
+                c->setTitle(tr("Timeline frame"));
 
                 form->addRow(
                     new QLabel(tr("Length (beats)")),
@@ -1152,11 +1152,11 @@ public:
         auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
             connect(&action, &QAction::triggered, this, func);
         };
-        connect_action(*_timeline.add_row, &MainWindowImpl::add_timeline_row);
-        connect_action(*_timeline.remove_row, &MainWindowImpl::remove_timeline_row);
-        connect_action(*_timeline.move_up, &MainWindowImpl::move_grid_up);
-        connect_action(*_timeline.move_down, &MainWindowImpl::move_grid_down);
-        connect_action(*_timeline.clone_row, &MainWindowImpl::clone_timeline_row);
+        connect_action(*_timeline.add_frame, &MainWindowImpl::add_timeline_frame);
+        connect_action(*_timeline.remove_frame, &MainWindowImpl::remove_timeline_frame);
+        connect_action(*_timeline.move_up, &MainWindowImpl::move_frame_up);
+        connect_action(*_timeline.move_down, &MainWindowImpl::move_frame_down);
+        connect_action(*_timeline.clone_frame, &MainWindowImpl::clone_timeline_frame);
 
         // Bind keyboard shortcuts, and (for the time being) connect to functions.
         reload_shortcuts();
@@ -1436,7 +1436,7 @@ public:
         }
     }
 
-    void add_timeline_row() {
+    void add_timeline_frame() {
         auto & document = get_document();
         if (document.timeline.size() >= doc::MAX_TIMELINE_FRAMES) {
             return;
@@ -1456,11 +1456,11 @@ public:
 
         auto tx = edit_unwrap();
         tx.push_edit(
-            edit_doc::add_timeline_row(document, old_grid + 1, _length_beats->value()),
+            edit_doc::add_timeline_frame(document, old_grid + 1, _length_beats->value()),
             move_to(new_cursor));
     }
 
-    void remove_timeline_row() {
+    void remove_timeline_frame() {
         auto old_grid = _state.cursor().y.grid;
 
         // The resulting cursor is invalid if you delete the last row.
@@ -1480,11 +1480,11 @@ public:
 
         auto tx = edit_unwrap();
         tx.push_edit(
-            edit_doc::remove_timeline_row(_state.cursor().y.grid), move_to(new_cursor)
+            edit_doc::remove_timeline_frame(_state.cursor().y.grid), move_to(new_cursor)
         );
     }
 
-    void move_grid_up() {
+    void move_frame_up() {
         auto const& cursor = _state.cursor();
         if (cursor.y.grid.v > 0) {
             auto up = cursor;
@@ -1495,7 +1495,7 @@ public:
         }
     }
 
-    void move_grid_down() {
+    void move_frame_down() {
         auto const& cursor = _state.cursor();
         auto & document = get_document();
         if (cursor.y.grid + 1 < document.timeline.size()) {
@@ -1509,7 +1509,7 @@ public:
         }
     }
 
-    void clone_timeline_row() {
+    void clone_timeline_frame() {
         auto & document = get_document();
         if (document.timeline.size() >= doc::MAX_TIMELINE_FRAMES) {
             return;
@@ -1521,7 +1521,7 @@ public:
         // Should it move the cursor down by 1 pattern, into the clone?
         // Or down to the beat 0 of the clone?
         tx.push_edit(
-            edit_doc::clone_timeline_row(document, _state.cursor().y.grid),
+            edit_doc::clone_timeline_frame(document, _state.cursor().y.grid),
             move_to_here());
     }
 };

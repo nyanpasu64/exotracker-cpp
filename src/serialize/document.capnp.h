@@ -29,7 +29,7 @@ CAPNP_DECLARE_SCHEMA(f3626db692c3e9df);
 CAPNP_DECLARE_SCHEMA(e9bfcd5dae76e2b5);
 CAPNP_DECLARE_SCHEMA(e78f975f863e0853);
 CAPNP_DECLARE_SCHEMA(cffbc472e0f2ff20);
-CAPNP_DECLARE_SCHEMA(d1c37795ff851c2f);
+CAPNP_DECLARE_SCHEMA(c1dabd63a0b671dd);
 CAPNP_DECLARE_SCHEMA(e0a81db883371cec);
 CAPNP_DECLARE_SCHEMA(90a6dcb426a2f466);
 CAPNP_DECLARE_SCHEMA(d865c2f3ce83f894);
@@ -213,15 +213,15 @@ struct TimelineCell {
   };
 };
 
-struct TimelineItem {
-  TimelineItem() = delete;
+struct TimelineFrame {
+  TimelineFrame() = delete;
 
   class Reader;
   class Builder;
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(d1c37795ff851c2f, 1, 1)
+    CAPNP_DECLARE_STRUCT_HEADER(c1dabd63a0b671dd, 1, 1)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -1180,9 +1180,9 @@ private:
 };
 #endif  // !CAPNP_LITE
 
-class TimelineItem::Reader {
+class TimelineFrame::Reader {
 public:
-  typedef TimelineItem Reads;
+  typedef TimelineFrame Reads;
 
   Reader() = default;
   inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
@@ -1216,9 +1216,9 @@ private:
   friend class ::capnp::Orphanage;
 };
 
-class TimelineItem::Builder {
+class TimelineFrame::Builder {
 public:
-  typedef TimelineItem Builds;
+  typedef TimelineFrame Builds;
 
   Builder() = delete;  // Deleted to discourage incorrect usage.
                        // You can explicitly initialize to nullptr instead.
@@ -1256,9 +1256,9 @@ private:
 };
 
 #if !CAPNP_LITE
-class TimelineItem::Pipeline {
+class TimelineFrame::Pipeline {
 public:
-  typedef TimelineItem Pipelines;
+  typedef TimelineFrame Pipelines;
 
   inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
   inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
@@ -2120,7 +2120,7 @@ public:
   inline  ::capnp::List< ::capnp::List< ::serialize::generated::PerChannelSettings,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Reader getChipChannelSettings() const;
 
   inline bool hasTimeline() const;
-  inline  ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Reader getTimeline() const;
+  inline  ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Reader getTimeline() const;
 
 private:
   ::capnp::_::StructReader _reader;
@@ -2208,11 +2208,11 @@ public:
   inline ::capnp::Orphan< ::capnp::List< ::capnp::List< ::serialize::generated::PerChannelSettings,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>> disownChipChannelSettings();
 
   inline bool hasTimeline();
-  inline  ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Builder getTimeline();
-  inline void setTimeline( ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Reader value);
-  inline  ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Builder initTimeline(unsigned int size);
-  inline void adoptTimeline(::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>>&& value);
-  inline ::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>> disownTimeline();
+  inline  ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Builder getTimeline();
+  inline void setTimeline( ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Reader value);
+  inline  ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Builder initTimeline(unsigned int size);
+  inline void adoptTimeline(::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>>&& value);
+  inline ::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>> disownTimeline();
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -2727,68 +2727,68 @@ inline ::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineBlock,  :
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
 
-inline  ::uint32_t TimelineItem::Reader::getNbeatsNum() const {
+inline  ::uint32_t TimelineFrame::Reader::getNbeatsNum() const {
   return _reader.getDataField< ::uint32_t>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS);
 }
 
-inline  ::uint32_t TimelineItem::Builder::getNbeatsNum() {
+inline  ::uint32_t TimelineFrame::Builder::getNbeatsNum() {
   return _builder.getDataField< ::uint32_t>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS);
 }
-inline void TimelineItem::Builder::setNbeatsNum( ::uint32_t value) {
+inline void TimelineFrame::Builder::setNbeatsNum( ::uint32_t value) {
   _builder.setDataField< ::uint32_t>(
       ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
-inline  ::uint32_t TimelineItem::Reader::getNbeatsDen() const {
+inline  ::uint32_t TimelineFrame::Reader::getNbeatsDen() const {
   return _reader.getDataField< ::uint32_t>(
       ::capnp::bounded<1>() * ::capnp::ELEMENTS);
 }
 
-inline  ::uint32_t TimelineItem::Builder::getNbeatsDen() {
+inline  ::uint32_t TimelineFrame::Builder::getNbeatsDen() {
   return _builder.getDataField< ::uint32_t>(
       ::capnp::bounded<1>() * ::capnp::ELEMENTS);
 }
-inline void TimelineItem::Builder::setNbeatsDen( ::uint32_t value) {
+inline void TimelineFrame::Builder::setNbeatsDen( ::uint32_t value) {
   _builder.setDataField< ::uint32_t>(
       ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
-inline bool TimelineItem::Reader::hasChipChannelCells() const {
+inline bool TimelineFrame::Reader::hasChipChannelCells() const {
   return !_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
 }
-inline bool TimelineItem::Builder::hasChipChannelCells() {
+inline bool TimelineFrame::Builder::hasChipChannelCells() {
   return !_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
 }
-inline  ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Reader TimelineItem::Reader::getChipChannelCells() const {
+inline  ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Reader TimelineFrame::Reader::getChipChannelCells() const {
   return ::capnp::_::PointerHelpers< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>>::get(_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
-inline  ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Builder TimelineItem::Builder::getChipChannelCells() {
+inline  ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Builder TimelineFrame::Builder::getChipChannelCells() {
   return ::capnp::_::PointerHelpers< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>>::get(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
-inline void TimelineItem::Builder::setChipChannelCells( ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Reader value) {
+inline void TimelineFrame::Builder::setChipChannelCells( ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Reader value) {
   ::capnp::_::PointerHelpers< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>>::set(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS), value);
 }
-inline void TimelineItem::Builder::setChipChannelCells(::kj::ArrayPtr<const  ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>::Reader> value) {
+inline void TimelineFrame::Builder::setChipChannelCells(::kj::ArrayPtr<const  ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>::Reader> value) {
   ::capnp::_::PointerHelpers< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>>::set(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS), value);
 }
-inline  ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Builder TimelineItem::Builder::initChipChannelCells(unsigned int size) {
+inline  ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Builder TimelineFrame::Builder::initChipChannelCells(unsigned int size) {
   return ::capnp::_::PointerHelpers< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>>::init(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS), size);
 }
-inline void TimelineItem::Builder::adoptChipChannelCells(
+inline void TimelineFrame::Builder::adoptChipChannelCells(
     ::capnp::Orphan< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>>&& value) {
   ::capnp::_::PointerHelpers< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>>::adopt(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS), kj::mv(value));
 }
-inline ::capnp::Orphan< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>> TimelineItem::Builder::disownChipChannelCells() {
+inline ::capnp::Orphan< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>> TimelineFrame::Builder::disownChipChannelCells() {
   return ::capnp::_::PointerHelpers< ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>>::disown(_builder.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS));
 }
@@ -3610,29 +3610,29 @@ inline bool Document::Builder::hasTimeline() {
   return !_builder.getPointerField(
       ::capnp::bounded<6>() * ::capnp::POINTERS).isNull();
 }
-inline  ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Reader Document::Reader::getTimeline() const {
-  return ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>>::get(_reader.getPointerField(
+inline  ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Reader Document::Reader::getTimeline() const {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>>::get(_reader.getPointerField(
       ::capnp::bounded<6>() * ::capnp::POINTERS));
 }
-inline  ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Builder Document::Builder::getTimeline() {
-  return ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>>::get(_builder.getPointerField(
+inline  ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Builder Document::Builder::getTimeline() {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>>::get(_builder.getPointerField(
       ::capnp::bounded<6>() * ::capnp::POINTERS));
 }
-inline void Document::Builder::setTimeline( ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Reader value) {
-  ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>>::set(_builder.getPointerField(
+inline void Document::Builder::setTimeline( ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>>::set(_builder.getPointerField(
       ::capnp::bounded<6>() * ::capnp::POINTERS), value);
 }
-inline  ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>::Builder Document::Builder::initTimeline(unsigned int size) {
-  return ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>>::init(_builder.getPointerField(
+inline  ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Builder Document::Builder::initTimeline(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>>::init(_builder.getPointerField(
       ::capnp::bounded<6>() * ::capnp::POINTERS), size);
 }
 inline void Document::Builder::adoptTimeline(
-    ::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>>&& value) {
-  ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>>::adopt(_builder.getPointerField(
+    ::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>>::adopt(_builder.getPointerField(
       ::capnp::bounded<6>() * ::capnp::POINTERS), kj::mv(value));
 }
-inline ::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>> Document::Builder::disownTimeline() {
-  return ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineItem,  ::capnp::Kind::STRUCT>>::disown(_builder.getPointerField(
+inline ::capnp::Orphan< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>> Document::Builder::disownTimeline() {
+  return ::capnp::_::PointerHelpers< ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>>::disown(_builder.getPointerField(
       ::capnp::bounded<6>() * ::capnp::POINTERS));
 }
 

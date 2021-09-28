@@ -1113,7 +1113,7 @@ static void draw_pattern_background(
     ForeachGrid foreach_grid{seq};
 
     auto draw_pattern_bg = [&] (GridCellPosition const & pos) {
-        doc::TimelineRow const & grid_cell = document.timeline[pos.grid];
+        doc::TimelineFrame const & grid_cell = document.timeline[pos.grid];
 
         #define CACHE_SUBCOLUMN_COLOR(OUT) \
             QColor OUT##_divider = visual.OUT##_divider(pos.focused); \
