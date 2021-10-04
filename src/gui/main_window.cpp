@@ -941,13 +941,14 @@ public:
         clamp_cursor(tx);
     }
 
-    void show_instr_dialog() override {
+    InstrumentDialog * show_instr_dialog() override {
         if (!_maybe_instr_dialog) {
             _maybe_instr_dialog = InstrumentDialog::make(this);
             _maybe_instr_dialog->show();
         } else {
             _maybe_instr_dialog->activateWindow();
         }
+        return _maybe_instr_dialog;
     }
 
     // private methods

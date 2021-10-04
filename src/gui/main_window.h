@@ -21,6 +21,10 @@
 #include <optional>
 #include <variant>
 
+namespace gui::instrument_dialog {
+    class InstrumentDialog;
+}
+
 namespace gui::main_window {
 #ifndef main_window_INTERNAL
 #define main_window_INTERNAL private
@@ -332,7 +336,7 @@ public:
 
     virtual StateTransaction edit_unwrap() = 0;
 
-    virtual void show_instr_dialog() = 0;
+    virtual instrument_dialog::InstrumentDialog * show_instr_dialog() = 0;
 
 // constructors
     static std::unique_ptr<MainWindow> make(
