@@ -4,6 +4,7 @@
 #include "gui/lib/format.h"
 #include "gui/lib/icon_toolbar.h"
 #include "gui/lib/layout_macros.h"
+#include "gui/lib/list_warnings.h"
 #include "util/unwrap.h"
 #include "edit/edit_sample_list.h"
 
@@ -33,6 +34,7 @@ W_OBJECT_IMPL(SampleList)
 
 using doc::SampleIndex;
 using gui::lib::dpi::dpi_scale;
+using namespace gui::lib::list_warnings;
 using main_window::MoveCursor_::IGNORE_CURSOR;
 
 using gui::lib::format::format_hex_2;
@@ -53,11 +55,19 @@ private:
     MainWindow * _win;
     DragAction _drag_action = DragAction::Swap;
 
+    std::vector<QString> _sample_warnings;
+    QIcon _warning_icon;
+    QColor _warning_color;
+
 // impl
 public:
     SampleListModel(MainWindow * win)
         : _win(win)
-    {}
+        , _warning_icon(warning_icon())
+        , _warning_color(warning_bg())
+    {
+        _sample_warnings.resize(doc::MAX_SAMPLES);
+    }
 
     [[nodiscard]] doc::Document const & get_document() const {
         return _win->state().document();
@@ -67,7 +77,30 @@ public:
         // TODO move the call to beginResetModel() to a signal emitted when
         // StateTransaction::history_mut() is first called.
         beginResetModel();
+
+        doc::Document const& doc = get_document();
+
+        for (size_t sample_idx = 0; sample_idx < doc::MAX_SAMPLES; sample_idx++) {
+            auto const& sample = doc.samples[sample_idx];
+            if (!sample.has_value()) {
+                _sample_warnings[sample_idx] = QString();
+                continue;
+            }
+
+            std::vector<QString> all_warnings;
+
+            if (sample->brr.empty()) {
+                all_warnings.push_back(tr("Sample is empty"));
+            }
+
+            _sample_warnings[sample_idx] = warning_tooltip(all_warnings);
+        }
+
         endResetModel();
+    }
+
+    bool has_warning(size_t row) const {
+        return !_instr_warnings[row].isEmpty();
     }
 
 // impl QAbstractItemModel
@@ -100,6 +133,23 @@ public:
                 );
             } else {
                 return format_hex_2(row);
+            }
+
+        case Qt::DecorationRole:
+            if (has_warning(row)) {
+                return _warning_icon;
+            } else {
+                return QVariant();
+            }
+
+        case Qt::ToolTipRole:
+            return _sample_warnings[row];
+
+        case Qt::BackgroundRole:
+            if (has_warning(row)) {
+                return _warning_color;
+            } else {
+                return QVariant();
             }
 
         default:
