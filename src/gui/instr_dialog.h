@@ -3,7 +3,7 @@
 #include "gui/main_window.h"
 #include "gui/lib/persistent_dialog.h"
 
-namespace gui::instrument_dialog {
+namespace gui::instr_dialog {
 
 using main_window::MainWindow;
 using gui::lib::persistent_dialog::PersistentDialog;

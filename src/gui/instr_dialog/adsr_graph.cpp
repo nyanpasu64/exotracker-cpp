@@ -21,7 +21,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace gui::instrument_dialog::adsr_graph {
+namespace gui::instr_dialog::adsr_graph {
 
 using NsampT = uint32_t;
 static NsampT const PERIODS [32] =

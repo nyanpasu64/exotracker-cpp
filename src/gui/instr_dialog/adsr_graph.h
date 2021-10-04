@@ -14,7 +14,7 @@ namespace doc {
     using namespace doc::instr;
 }
 
-namespace gui::instrument_dialog::adsr_graph {
+namespace gui::instr_dialog::adsr_graph {
 
 using doc::Adsr;
 

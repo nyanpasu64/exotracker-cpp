@@ -1,5 +1,5 @@
-#include "instrument_dialog.h"
-#include "instrument_dialog/adsr_graph.h"
+#include "instr_dialog.h"
+#include "instr_dialog/adsr_graph.h"
 #include "gui_common.h"
 #include "gui/sample_dialog.h"
 #include "gui/lib/docs_palette.h"
@@ -42,7 +42,7 @@
 #include <utility>  // std::move
 #include <vector>
 
-namespace gui::instrument_dialog {
+namespace gui::instr_dialog {
 
 class ColumnListWidget : public QListWidget {
 public:

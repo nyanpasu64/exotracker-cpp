@@ -1,4 +1,4 @@
-#include "instrument_list.h"
+#include "instr_list.h"
 #include "doc.h"
 #include "gui/lib/dpi.h"
 #include "gui/lib/format.h"
@@ -30,7 +30,7 @@
 
 #include <utility>
 
-namespace gui::instrument_list {
+namespace gui::instr_list {
 W_OBJECT_IMPL(InstrumentList)
 
 using doc::InstrumentIndex;

@@ -234,11 +234,11 @@ add_executable(exotracker-qt
     src/gui/lib/sample_text.cpp
     src/gui/pattern_editor.cpp
     src/gui/timeline_editor.cpp
-    src/gui/instrument_list.cpp
+    src/gui/instr_list.cpp
 
     src/gui/tempo_dialog.cpp
-    src/gui/instrument_dialog.cpp
-    src/gui/instrument_dialog/adsr_graph.cpp
+    src/gui/instr_dialog.cpp
+    src/gui/instr_dialog/adsr_graph.cpp
     src/gui/sample_dialog.cpp
 
     # Resources

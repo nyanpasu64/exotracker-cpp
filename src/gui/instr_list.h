@@ -6,7 +6,7 @@
 
 #include <QWidget>
 
-namespace gui::instrument_list {
+namespace gui::instr_list {
 
 using main_window::MainWindow;
 

@@ -4,8 +4,8 @@
 // Widgets
 #include "gui/pattern_editor.h"
 #include "gui/timeline_editor.h"
-#include "gui/instrument_dialog.h"
-#include "gui/instrument_list.h"
+#include "gui/instr_dialog.h"
+#include "gui/instr_list.h"
 #include "gui/sample_dialog.h"
 #include "gui/tempo_dialog.h"
 #include "gui/lib/icon_toolbar.h"
@@ -73,7 +73,7 @@ using gui::lib::icon_toolbar::enable_button_borders;
 using gui::pattern_editor::PatternEditor;
 using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
-using gui::instrument_list::InstrumentList;
+using gui::instr_list::InstrumentList;
 using doc::BeatFraction;
 using util::math::ceildiv;
 using util::math::frac_floor;
@@ -863,7 +863,7 @@ public:
 }  // anonymous namespace
 
 using tempo_dialog::TempoDialog;
-using instrument_dialog::InstrumentDialog;
+using instr_dialog::InstrumentDialog;
 using sample_dialog::SampleDialog;
 
 // module-private

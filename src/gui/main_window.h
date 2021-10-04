@@ -21,7 +21,7 @@
 #include <optional>
 #include <variant>
 
-namespace gui::instrument_dialog {
+namespace gui::instr_dialog {
     class InstrumentDialog;
 }
 namespace gui::sample_dialog {
@@ -344,7 +344,7 @@ public:
 
     virtual StateTransaction edit_unwrap() = 0;
 
-    virtual instrument_dialog::InstrumentDialog * show_instr_dialog() = 0;
+    virtual instr_dialog::InstrumentDialog * show_instr_dialog() = 0;
 
     virtual sample_dialog::SampleDialog * maybe_sample_dialog() const = 0;
 
