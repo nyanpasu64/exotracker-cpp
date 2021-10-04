@@ -1661,6 +1661,7 @@ CursorAndSelection & StateTransaction::cursor_mut() {
 
 void StateTransaction::set_instrument(int instrument) {
     _queued_updates |= E::InstrumentSwitched;
+    release_assert((size_t) instrument < doc::MAX_INSTRUMENTS);
     state_mut()._instrument = instrument;
 }
 
