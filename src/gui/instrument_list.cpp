@@ -481,7 +481,7 @@ public:
     }
 
     InstrumentIndex curr_instr_idx() const {
-        return (InstrumentIndex) _win.state().instrument();
+        return _win.state().instrument();
     }
 
     // it's a nasty hack that we set history to reload changes from a StateTransaction,
