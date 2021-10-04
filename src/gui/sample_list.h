@@ -3,6 +3,8 @@
 #include "history.h"
 #include "gui/main_window.h"
 
+#include <verdigris/wobjectdefs.h>
+
 #include <QWidget>
 
 namespace gui::sample_list {
@@ -11,6 +13,7 @@ using history::GetDocument;
 using main_window::MainWindow;
 
 class SampleList : public QWidget {
+    W_OBJECT(SampleList)
 protected:
     // SampleList()
     using QWidget::QWidget;

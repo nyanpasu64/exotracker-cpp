@@ -185,6 +185,7 @@ private:
     CursorAndSelection _cursor{};
 
     int _instrument = 0;
+    int _sample = 0;
 
 public:
     bool _insert_instrument = true;  // no side effects when changed, so let the world see
@@ -225,6 +226,11 @@ public:
     doc::InstrumentIndex instrument() const {
         release_assert(size_t(_instrument) < doc::MAX_INSTRUMENTS);
         return (doc::InstrumentIndex) _instrument;
+    }
+
+    doc::SampleIndex sample() const {
+        release_assert(size_t(_sample) < doc::MAX_SAMPLES);
+        return (doc::SampleIndex) _sample;
     }
 
     friend class StateTransaction;

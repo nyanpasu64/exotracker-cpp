@@ -581,20 +581,23 @@ struct MainWindowUi : MainWindow {
         }
     } }
 
+    static constexpr int INSTR_LIST_INDEX = 1;
+
     void instrument_list_panel(QBoxLayout * l) {
         {l__w(QTabWidget);
             _instr_tabs = w;
-
             auto c = w;
+
+            {
+                auto w = SampleList::make(this);
+                w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+                c->addTab(w, tr("Samples"));
+            }
             {
                 auto w = InstrumentList::make(this);
                 w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
                 c->addTab(w, tr("Instruments"));
             }
-
-        }
-        {l__w_factory(InstrumentList::make(this))
-            _instrument_list = w;
         }
     }
 
@@ -1620,6 +1623,10 @@ StateTransaction::~StateTransaction() noexcept(false) {
             // may close dialog and null out pointer later on.
             _win->_maybe_instr_dialog->reload_state(e & E::InstrumentSwitched);
         }
+    }
+
+    if (e & E::InstrumentSwitched) {
+        _win->_instr_tabs->setCurrentIndex(MainWindowUi::INSTR_LIST_INDEX);
     }
 
     auto const& history = state.history();
