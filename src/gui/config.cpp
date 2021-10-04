@@ -108,7 +108,7 @@ inline namespace visual {
         // please optimize this switch into an indexing operation
         switch (color_type) {
             #define X(COLOR)  case PatternColor::COLOR: out = visual._##COLOR; break;
-            PATTERN_COLORS(X)
+            FOREACH_PATTERN_COLOR(X)
             #undef X
         }
 
