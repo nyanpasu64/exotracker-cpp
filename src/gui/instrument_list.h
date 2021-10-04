@@ -1,6 +1,5 @@
 #pragma once
 
-#include "history.h"
 #include "gui/main_window.h"
 
 #include <verdigris/wobjectdefs.h>
@@ -9,7 +8,6 @@
 
 namespace gui::instrument_list {
 
-using history::GetDocument;
 using main_window::MainWindow;
 
 class InstrumentList : public QWidget {
