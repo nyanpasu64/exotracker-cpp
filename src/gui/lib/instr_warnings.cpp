@@ -27,13 +27,13 @@ std::optional<PatchWarnings> KeysplitWarningIter::next() {
 
     if (!samples[patch.sample_idx].has_value()) {
         warnings.push_back(
-            QObject::tr("Sample %1 not found; keysplit will not play")
+            QObject::tr("Sample %1 not found; patch will not play")
                 .arg(format_hex_2(patch.sample_idx))
         );
     }
     if ((int) patch.min_note <= _curr_min_note) {
         warnings.push_back(
-            QObject::tr("Min key %1 out of order; keysplit will not play")
+            QObject::tr("Min key %1 out of order; patch will not play")
                 .arg(patch.min_note)
         );
     } else {
