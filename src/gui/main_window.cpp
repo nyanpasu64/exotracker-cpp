@@ -1683,7 +1683,14 @@ CursorAndSelection & StateTransaction::cursor_mut() {
 
 void StateTransaction::set_instrument(int instrument) {
     _queued_updates |= E::InstrumentSwitched;
+    release_assert((size_t) instrument < doc::MAX_INSTRUMENTS);
     state_mut()._instrument = instrument;
+}
+
+void StateTransaction::set_sample(int sample) {
+    _queued_updates |= E::SampleSwitched;
+    release_assert((size_t) sample < doc::MAX_SAMPLES);
+    state_mut()._sample = sample;
 }
 
 // public

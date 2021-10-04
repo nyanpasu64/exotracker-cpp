@@ -245,6 +245,7 @@ enum class StateUpdateFlag : uint32_t {
     DocumentEdited = 0x1,
     CursorMoved = 0x2,
     InstrumentSwitched = 0x4,
+    SampleSwitched = 0x4,
 
     DocumentReplaced = 0x100,
     InstrumentDeleted = 0x200,
@@ -312,6 +313,7 @@ public:
     CursorAndSelection & cursor_mut();
 
     void set_instrument(int instrument);
+    void set_sample(int sample);
 };
 
 
