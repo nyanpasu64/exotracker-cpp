@@ -944,24 +944,6 @@ public:
         clamp_cursor(tx);
     }
 
-    static void focus_dialog(QWidget * widget) {
-        // Un-minimize.
-        widget->showNormal();
-        // Bring to top. (Unnecessary on KWin X11.)
-        widget->raise();
-        // Focus.
-        widget->activateWindow();
-    }
-
-    void show_instr_dialog() override {
-        if (!_maybe_instr_dialog) {
-            _maybe_instr_dialog = InstrumentDialog::make(this);
-            _maybe_instr_dialog->show();
-        } else {
-            focus_dialog(_maybe_instr_dialog);
-        }
-    }
-
     // private methods
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindowUi(std::move(document), parent)
@@ -1175,6 +1157,25 @@ public:
 
         // Initialize GUI state.
         edit_unwrap().update_all();
+    }
+
+    static void focus_dialog(QWidget * widget) {
+        // Un-minimize.
+        widget->showNormal();
+        // Bring to top. (Unnecessary on KWin X11.)
+        widget->raise();
+        // Focus.
+        widget->activateWindow();
+    }
+
+    InstrumentDialog * show_instr_dialog() override {
+        if (!_maybe_instr_dialog) {
+            _maybe_instr_dialog = InstrumentDialog::make(this);
+            _maybe_instr_dialog->show();
+        } else {
+            focus_dialog(_maybe_instr_dialog);
+        }
+        return _maybe_instr_dialog;
     }
 
     void on_open() {
