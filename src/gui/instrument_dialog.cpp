@@ -524,6 +524,13 @@ public:
                 {l__w_factory(qlabel(tr("Sample"))); }
                 {l__w(QComboBox, 1);
                     _sample = w;
+                    // Tie sample picker's width to available space, not the longest
+                    // sample name (which causes long names to stretch the dialog's
+                    // width). If the dropdown is too short to show a full name,
+                    // the user can resize the dialog.
+                    w->setSizeAdjustPolicy(
+                        QComboBox::AdjustToMinimumContentsLengthWithIcon
+                    );
                 }
             }
 
