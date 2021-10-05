@@ -186,6 +186,8 @@ add_library(exotracker-headless
     src/edit/edit_instr.cpp
     src/edit/edit_instr_list.cpp
     src/edit/edit_pattern.cpp
+    src/edit/edit_sample.cpp
+    src/edit/edit_sample_list.cpp
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
     src/doc/validate.cpp
@@ -235,6 +237,7 @@ add_executable(exotracker-qt
     src/gui/tempo_dialog.cpp
     src/gui/instrument_dialog.cpp
     src/gui/instrument_dialog/adsr_graph.cpp
+    src/gui/sample_dialog.cpp
 
     # Resources
     res/exotracker.qrc

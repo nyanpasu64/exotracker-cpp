@@ -6,6 +6,7 @@
 #include "gui/timeline_editor.h"
 #include "gui/instrument_dialog.h"
 #include "gui/instrument_list.h"
+#include "gui/sample_dialog.h"
 #include "gui/tempo_dialog.h"
 #include "gui/lib/icon_toolbar.h"
 // Other
@@ -856,6 +857,7 @@ public:
 
 using tempo_dialog::TempoDialog;
 using instrument_dialog::InstrumentDialog;
+using sample_dialog::SampleDialog;
 
 // module-private
 class MainWindowImpl : public MainWindowUi {
@@ -867,6 +869,7 @@ public:
     QTimer _gui_refresh_timer;
     QErrorMessage _error_dialog{this};
     QPointer<InstrumentDialog> _maybe_instr_dialog;
+    QPointer<SampleDialog> _maybe_sample_dialog;
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
@@ -1176,6 +1179,19 @@ public:
             focus_dialog(_maybe_instr_dialog);
         }
         return _maybe_instr_dialog;
+    }
+
+    SampleDialog * show_sample_dialog(std::optional<doc::SampleIndex> sample) override {
+        if (!_maybe_sample_dialog) {
+            _maybe_sample_dialog = SampleDialog::make(sample.value_or(0), this, this);
+            _maybe_sample_dialog->show();
+        } else {
+            focus_dialog(_maybe_sample_dialog);
+            if (sample) {
+                _maybe_sample_dialog->reload_state(sample);
+            }
+        }
+        return _maybe_sample_dialog;
     }
 
     void on_open() {
@@ -1616,6 +1632,12 @@ StateTransaction::~StateTransaction() noexcept(false) {
         }
     }
 
+    if (_win->_maybe_sample_dialog) {
+        if (e & E::DocumentEdited) {
+            _win->_maybe_sample_dialog->reload_state(_sample_index);
+        }
+    }
+
     auto const& history = state.history();
 
     _win->_undo->setEnabled(history.can_undo());
@@ -1672,6 +1694,10 @@ void StateTransaction::set_instrument(int instrument) {
     _queued_updates |= E::InstrumentSwitched;
     release_assert((size_t) instrument < doc::MAX_INSTRUMENTS);
     state_mut()._instrument = instrument;
+}
+
+void StateTransaction::set_sample_index(doc::SampleIndex sample) {
+    _sample_index = sample;
 }
 
 // public

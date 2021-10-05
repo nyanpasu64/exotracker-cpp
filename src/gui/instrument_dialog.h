@@ -3,8 +3,6 @@
 #include "gui/main_window.h"
 #include "gui/lib/persistent_dialog.h"
 
-#include <QDialog>
-
 namespace gui::instrument_dialog {
 
 using main_window::MainWindow;

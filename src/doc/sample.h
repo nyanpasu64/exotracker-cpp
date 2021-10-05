@@ -17,8 +17,8 @@ namespace doc::sample {
 using events::Chromatic;
 using util::box_array::BoxArray;
 
-inline constexpr uint32_t MIN_SAMPLE_RATE = 1;
-inline constexpr uint32_t MAX_SAMPLE_RATE = 1'000'000;
+inline constexpr uint32_t MIN_SAMPLE_RATE = 0;
+inline constexpr uint32_t MAX_SAMPLE_RATE = 999'999;
 
 struct SampleTuning {
     // TODO write a way to compute tuning per-note

@@ -19,6 +19,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPushButton>
 #include <QSpinBox>
 #include <QToolButton>
 
@@ -433,6 +434,7 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     QWidget * _patch_panel;
     QSpinBox * _min_key;
     QComboBox * _sample;
+    QPushButton * _open_sample_dialog;
     Control _attack;
     Control _decay;
     Control _sustain;
@@ -524,6 +526,9 @@ public:
                     w->setSizeAdjustPolicy(
                         QComboBox::AdjustToMinimumContentsLengthWithIcon
                     );
+                }
+                {l__w(QPushButton(tr("&Edit Samples")));
+                    _open_sample_dialog = w;
                 }
             }
 
@@ -640,6 +645,28 @@ public:
 
     size_t curr_patch_idx() const {
         return (size_t) current_row(*_keysplit);
+    }
+
+    std::optional<doc::SampleIndex> curr_sample_index() const {
+        auto const& doc = document();
+        auto const& instr = doc.instruments[curr_instr_idx()];
+
+        // If instruments[curr_instr_idx()] is absent, the instrument dialog should
+        // close, making this code unreachable. If instruments[curr_instr_idx()]
+        // is absent anyway, assert on debug builds and return "no sample found" on
+        // release builds.
+        assert(instr);
+        if (!instr) {
+            return {};
+        }
+
+        size_t patch_idx = curr_patch_idx();
+        // In case of empty instrument with a single "no patches found" row,
+        // return "no sample found".
+        if (patch_idx >= instr->keysplit.size()) {
+            return {};
+        }
+        return instr->keysplit[patch_idx].sample_idx;
     }
 
     template<typename F>
@@ -766,6 +793,12 @@ public:
             _note_names, &QCheckBox::stateChanged,
             this, [this]() {
                 reload_state(false);
+            });
+
+        connect(
+            _open_sample_dialog, &QPushButton::clicked,
+            this, [this]() {
+                _win->show_sample_dialog(curr_sample_index());
             });
 
         auto connect_spin = [this](QSpinBox * spin, auto make_edit) {

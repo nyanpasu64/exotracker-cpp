@@ -29,11 +29,13 @@ enum ModifiedFlags : ModifiedInt {
     /// Any field in SequencerOptions has changed.
     SequencerOptions = TargetTempo | SpcTimerPeriod | TicksPerBeat,
 
-    /// Sample data has changed, but the memory layout (order and size of samples) has not.
-    /// Keep playing existing notes.
-    SamplesEdited = 0x100,
-    /// Repack all samples into RAM, and stop playing notes.
-    SamplesMoved = 0x200,
+    /// Sample metadata has changed, but the actual data has not.
+    /// Keep playing existing notes. (TODO reload tuning/loop points)
+    SampleMetadataEdited = 0x100,
+    /// Sample data and/or sizes have changed.
+    /// Repack all samples into RAM, and stop currently-playing notes.
+    /// If set, SampleMetadataEdited is ignored.
+    SamplesEdited = 0x200,
 
     /// Instruments edited. Nothing checks for this so far,
     /// but include it for completeness.
