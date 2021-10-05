@@ -463,11 +463,6 @@ public:
         : InstrumentDialog(parent_win)
         , _win(parent_win)
     {
-        setAttribute(Qt::WA_DeleteOnClose);
-
-        // Hide contextual-help button in the title bar.
-        setWindowFlags(windowFlags().setFlag(Qt::WindowContextHelpButtonHint, false));
-
         _warning_icon = warning_icon();
 
         build_ui();
@@ -543,7 +538,6 @@ public:
                 }
                 {l__w(QPushButton(tr("Edit Samples")));
                     _open_sample_dialog = w;
-                    w->setAutoDefault(false);
                 }
             }
 

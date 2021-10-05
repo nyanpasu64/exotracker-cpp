@@ -303,11 +303,6 @@ public:
         , _win(*win)
         , _model(win)
     {
-        setAttribute(Qt::WA_DeleteOnClose);
-
-        // Hide contextual-help button in the title bar.
-        setWindowFlags(windowFlags().setFlag(Qt::WindowContextHelpButtonHint, false));
-
         build_ui();
         connect_ui();
         reload_state();

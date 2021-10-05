@@ -1,12 +1,14 @@
 #pragma once
 
 #include "gui/main_window.h"
+#include "gui/lib/persistent_dialog.h"
 
 #include <QDialog>
 
 namespace gui::instrument_dialog {
 
 using main_window::MainWindow;
+using gui::lib::persistent_dialog::PersistentDialog;
 
 /// Closing the instrument dialog (eg. the user clicking X,
 /// deleting the active instrument, or opening a new document),
@@ -19,13 +21,13 @@ using main_window::MainWindow;
 /// but to be safe, never access an InstrumentDialog
 /// after closing it or calling reload_state().
 /// Wait until the next callback, and then re-verify the QPointer is non-null.
-class InstrumentDialog : public QDialog {
+class InstrumentDialog : public PersistentDialog {
+protected:
+    // InstrumentDialog(), cannot be called except by subclass
+    using PersistentDialog::PersistentDialog;
 
 public:
     static InstrumentDialog * make(MainWindow * parent_win);
-
-    // InstrumentDialog(), cannot be called except by subclass
-    using QDialog::QDialog;
 
     /// May close the dialog and delete the object!
     virtual void reload_state(bool instrument_switched) = 0;
