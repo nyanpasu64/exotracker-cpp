@@ -38,8 +38,19 @@
 
 namespace gui::instrument_dialog {
 
-class ListWidget : public QListWidget {
-    QSize viewportSizeHint() const {
+class ColumnListWidget : public QListWidget {
+public:
+    ColumnListWidget(QWidget * parent = nullptr)
+        : QListWidget(parent)
+    {
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+
+        // Tie width to viewportSizeHint() (smaller, scales with font size).
+        setSizeAdjustPolicy(QListView::AdjustToContents);
+    }
+
+protected:
+    QSize viewportSizeHint() const override {
         const int w = qMax(4, fontMetrics().averageCharWidth());
         return QSize(20 * w, 0);
     }
@@ -492,12 +503,8 @@ public:
                 append_stretch();
             }
 
-            {l__w(ListWidget);
+            {l__w(ColumnListWidget);
                 _keysplit = w;
-                w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
-
-                // Make keysplit widget smaller and scale with font size
-                w->setSizeAdjustPolicy(QListWidget::AdjustToContents);
             }
 
             {l__w(QCheckBox(tr("Note names")));
