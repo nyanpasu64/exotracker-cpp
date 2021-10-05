@@ -6,6 +6,7 @@
 #include "gui/timeline_editor.h"
 #include "gui/instrument_dialog.h"
 #include "gui/instrument_list.h"
+#include "gui/sample_dialog.h"
 #include "gui/tempo_dialog.h"
 #include "gui/lib/icon_toolbar.h"
 // Other
@@ -856,6 +857,7 @@ public:
 
 using tempo_dialog::TempoDialog;
 using instrument_dialog::InstrumentDialog;
+using sample_dialog::SampleDialog;
 
 // module-private
 class MainWindowImpl : public MainWindowUi {
@@ -867,6 +869,7 @@ public:
     QTimer _gui_refresh_timer;
     QErrorMessage _error_dialog{this};
     QPointer<InstrumentDialog> _maybe_instr_dialog;
+    QPointer<SampleDialog> _maybe_sample_dialog;
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
@@ -961,6 +964,16 @@ public:
             focus_dialog(_maybe_instr_dialog);
         }
         return _maybe_instr_dialog;
+    }
+
+    SampleDialog * show_sample_dialog() override {
+        if (!_maybe_sample_dialog) {
+            _maybe_sample_dialog = SampleDialog::make(this, this);
+            _maybe_sample_dialog->show();
+        } else {
+            focus_dialog(_maybe_sample_dialog);
+        }
+        return _maybe_sample_dialog;
     }
 
     // private methods

@@ -19,6 +19,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPushButton>
 #include <QSpinBox>
 #include <QToolButton>
 
@@ -444,6 +445,7 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     QWidget * _patch_panel;
     QSpinBox * _min_key;
     QComboBox * _sample;
+    QPushButton * _open_sample_dialog;
     Control _attack;
     Control _decay;
     Control _sustain;
@@ -538,6 +540,10 @@ public:
                     w->setSizeAdjustPolicy(
                         QComboBox::AdjustToMinimumContentsLengthWithIcon
                     );
+                }
+                {l__w(QPushButton(tr("Edit Samples")));
+                    _open_sample_dialog = w;
+                    w->setAutoDefault(false);
                 }
             }
 
@@ -779,6 +785,10 @@ public:
         connect(
             _note_names, &QCheckBox::stateChanged,
             this, &InstrumentDialogImpl::reload_state);
+
+        connect(
+            _open_sample_dialog, &QPushButton::clicked,
+            _win, &MainWindow::show_sample_dialog);
 
         auto connect_spin = [this](QSpinBox * spin, auto make_edit) {
             connect(

@@ -24,6 +24,9 @@
 namespace gui::instrument_dialog {
     class InstrumentDialog;
 }
+namespace gui::sample_dialog {
+    class SampleDialog;
+}
 
 namespace gui::main_window {
 #ifndef main_window_INTERNAL
@@ -337,6 +340,8 @@ public:
     virtual StateTransaction edit_unwrap() = 0;
 
     virtual instrument_dialog::InstrumentDialog * show_instr_dialog() = 0;
+
+    virtual sample_dialog::SampleDialog * show_sample_dialog() = 0;
 
 // constructors
     static std::unique_ptr<MainWindow> make(
