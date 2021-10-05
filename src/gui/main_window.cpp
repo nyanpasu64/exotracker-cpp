@@ -944,12 +944,21 @@ public:
         clamp_cursor(tx);
     }
 
+    static void focus_dialog(QWidget * widget) {
+        // Un-minimize.
+        widget->showNormal();
+        // Bring to top. (Unnecessary on KWin X11.)
+        widget->raise();
+        // Focus.
+        widget->activateWindow();
+    }
+
     InstrumentDialog * show_instr_dialog() override {
         if (!_maybe_instr_dialog) {
             _maybe_instr_dialog = InstrumentDialog::make(this);
             _maybe_instr_dialog->show();
         } else {
-            _maybe_instr_dialog->activateWindow();
+            focus_dialog(_maybe_instr_dialog);
         }
         return _maybe_instr_dialog;
     }
