@@ -474,7 +474,7 @@ public:
     }
 
     void build_keysplit(QBoxLayout * l) {
-        {l__c_l(QGroupBox(tr("Keysplits")), QVBoxLayout);
+        {l__c_l(QGroupBox(tr("Keysplit")), QVBoxLayout);
             {l__l(QHBoxLayout);
                 // TODO add icons
                 {l__w_factory(small_button("+"));
