@@ -47,12 +47,19 @@ public:
     // which is illegal to dereference.
     DEFAULT_MOVE(BoxArray)
 
+    T const* data() const {
+        return _arr->data();
+    }
+    T * data() {
+        return _arr->data();
+    }
+
     Span span() const {
         // Passing cbegin() doesn't compile on MSVC's stdlib.
-        return Span(_arr->data(), N);
+        return Span(data(), N);
     }
     SpanMut span_mut() {
-        return Span(_arr->data(), N);
+        return Span(data(), N);
     }
     operator Span() const {
         return span();
@@ -82,13 +89,25 @@ public:
     }
 
     T const& operator[](size_t idx) const {
-        return (*_arr)[idx];
+        return data()[idx];
     }
     T & operator[](size_t idx) {
-        return (*_arr)[idx];
+        return data()[idx];
     }
 
-    // TODO add data()/begin()/end()
+    T const* begin() const {
+        return data();
+    }
+    T * begin() {
+        return data();
+    }
+
+    T const* end() const {
+        return data() + N;
+    }
+    T * end() {
+        return data() + N;
+    }
 };
 
 }
