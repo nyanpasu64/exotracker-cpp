@@ -24,6 +24,31 @@ namespace audio::synth::spc700_driver {
 Spc700ChannelDriver::Spc700ChannelDriver(uint8_t channel_id)
     : _channel_id(channel_id)
 {
+    DEBUG_PRINT("initializing channel {}\n", _channel_id);
+}
+
+/// Compute the address of per-voice registers, given our current channel number.
+static Address calc_voice_reg(size_t channel_id, Address v_reg) {
+    auto channel_addr = Address(channel_id << 4);
+    release_assert(v_reg <= 0x09);  // the largest SPC_DSP::v_... value.
+    return channel_addr + v_reg;
+}
+
+void Spc700ChannelDriver::restore_state(
+    doc::Document const& document, RegisterWriteQueue & regs
+) const {
+    DEBUG_PRINT("  restore_state() channel {}\n", _channel_id);
+
+    write_volume(regs);
+    // TODO set GAIN (not used yet).
+}
+
+void Spc700ChannelDriver::write_volume(RegisterWriteQueue & regs) const {
+    DEBUG_PRINT("    volume {}\n", _prev_volume);
+
+    // TODO stereo
+    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_voll), _prev_volume);
+    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_volr), _prev_volume);
 }
 
 constexpr double CENTS_PER_OCTAVE = 1200.;
@@ -82,13 +107,6 @@ static doc::InstrumentPatch const* find_patch(
         }
     }
     return matching;
-}
-
-/// Compute the address of per-voice registers, given our current channel number.
-static Address calc_voice_reg(size_t channel_id, Address v_reg) {
-    auto channel_addr = Address(channel_id << 4);
-    release_assert(v_reg <= 0x09);  // the largest SPC_DSP::v_... value.
-    return channel_addr + v_reg;
 }
 
 /// For some registers, we must wait two full samples worth of clocks
@@ -254,13 +272,9 @@ void Spc700ChannelDriver::run_driver(
             }
         }
         if (ev.volume) {
-            #ifdef DRIVER_DEBUG
-            fmt::print(stderr, "channel {}, volume {}\n", _channel_id, *ev.volume);
-            #endif
-
-            // TODO stereo
-            voice_reg8(SPC_DSP::v_voll, *ev.volume);
-            voice_reg8(SPC_DSP::v_volr, *ev.volume);
+            DEBUG_PRINT("channel {}, volume {}\n", _channel_id, *ev.volume);
+            _prev_volume = *ev.volume;
+            write_volume(regs);
         }
         // TODO ev.effects
     }
@@ -295,12 +309,39 @@ void Spc700Driver::reset_state(
     Spc700Synth & synth,
     RegisterWriteQueue & regs)
 {
-    synth._p->chip.reset();
+    DEBUG_PRINT("Spc700Driver::reset_state()\n");
 
-    // TODO replace *this with a freshly constructed instance?
-    // idk, state management is hard, and we need a principled strategy (idk what yet).
+    // Reset Spc700Driver and all Spc700ChannelDriver, except for the frequency table.
+    auto freq_table = std::move(_freq_table);
+    *this = Spc700Driver();
+    _freq_table = std::move(freq_table);
 
+    // TODO store "initial" state as member state instead, so "reset synth" =
+    // "reset state" + "setup synth". Then when samples are reloaded,
+    // we can setup synth without resetting state.
+
+    // Reset Spc700Synth, reinitialize _samples_valid and synth's ARAM,
+    // and write default driver state to sound chips.
     reload_samples(document, synth, regs);  // writes SAMPLE_DIR to $5D.
+}
+
+Spc700Driver::Spc700Driver()
+    : _channels{
+        Spc700ChannelDriver(0),
+        Spc700ChannelDriver(1),
+        Spc700ChannelDriver(2),
+        Spc700ChannelDriver(3),
+        Spc700ChannelDriver(4),
+        Spc700ChannelDriver(5),
+        Spc700ChannelDriver(6),
+        Spc700ChannelDriver(7),
+    }
+{}
+
+void Spc700Driver::restore_state(
+    doc::Document const& document, RegisterWriteQueue & regs
+) const {
+    DEBUG_PRINT("Spc700Driver::restore_state()\n");
 
     // Initialize registers:
     // Maximize master volume.
@@ -331,13 +372,9 @@ void Spc700Driver::reset_state(
 
     // TODO initialize r_efb, r_esa, r_edl, r_fir + 0x10*n. (r_endx is not useful.)
 
+    // Restore per-channel state.
     for (size_t i = 0; i < enum_count<ChannelID>; i++) {
-        // Volume 32 out of [-128..127] is an acceptable default.
-        // 64 results in clipping when playing many channels at once.
-        regs.write(calc_voice_reg(i, SPC_DSP::v_voll), 0x20);
-        regs.write(calc_voice_reg(i, SPC_DSP::v_volr), 0x20);
-
-        // TODO set GAIN (not used yet).
+        _channels[i].restore_state(document, regs);
     }
 }
 
@@ -362,6 +399,15 @@ void Spc700Driver::reload_samples(
     Spc700Synth & synth,
     RegisterWriteQueue & regs)
 {
+    DEBUG_PRINT("Spc700Driver::reload_samples()\n");
+
+    // When samples are moved around in RAM, playing notes must be stopped.
+    // Reset the APU (stops all notes), then rewrite the current volume/etc.
+    // (but not notes) to the APU.
+
+    synth.reset();
+    restore_state(document, regs);
+
     std::fill(std::begin(_samples_valid), std::end(_samples_valid), false);
 
     bool samples_found = false;
@@ -378,6 +424,8 @@ void Spc700Driver::reload_samples(
 
     if (samples_found) {
         size_t first_unused_slot = last_smp_idx + 1;
+
+        uint8_t * ram_64k = synth.ram_64k();
 
         /// The offset in SPC memory to write the next sample to.
         size_t sample_start_addr = SAMPLE_DIR + first_unused_slot * SAMPLE_DIR_ENTRY_SIZE;
@@ -428,16 +476,16 @@ void Spc700Driver::reload_samples(
 
             // Write the sample entry.
             size_t sample_entry_addr = SAMPLE_DIR + i * SAMPLE_DIR_ENTRY_SIZE;
-            synth._p->ram_64k[sample_entry_addr + 0] = (uint8_t) sample_start_addr;
-            synth._p->ram_64k[sample_entry_addr + 1] = (uint8_t) (sample_start_addr >> 8);
-            synth._p->ram_64k[sample_entry_addr + 2] = (uint8_t) sample_loop_addr;
-            synth._p->ram_64k[sample_entry_addr + 3] = (uint8_t) (sample_loop_addr >> 8);
+            ram_64k[sample_entry_addr + 0] = (uint8_t) sample_start_addr;
+            ram_64k[sample_entry_addr + 1] = (uint8_t) (sample_start_addr >> 8);
+            ram_64k[sample_entry_addr + 2] = (uint8_t) sample_loop_addr;
+            ram_64k[sample_entry_addr + 3] = (uint8_t) (sample_loop_addr >> 8);
 
             // Write the sample data.
             std::copy(
                 smp.brr.begin(),
                 smp.brr.begin() + (ptrdiff_t) brr_size_clamped,
-                &synth._p->ram_64k[sample_start_addr]);
+                &ram_64k[sample_start_addr]);
 
             sample_start_addr = sample_end_addr;
             _samples_valid[i] = true;
@@ -446,13 +494,6 @@ void Spc700Driver::reload_samples(
 
     // Set base address.
     regs.write(SPC_DSP::r_dir, SAMPLE_DIR >> 8);
-
-    // When samples are moved around in RAM, playback must be stopped.
-    // TODO hard-cut all notes, don't just trigger release envelopes.
-    // Maybe reset the APU and rewrite all active effects?
-
-    // stop_playback(regs) is insufficient because I'm planning
-    // for it to not hard-cut all channels, only release.
 }
 
 void Spc700Driver::stop_playback(RegisterWriteQueue /*mut*/& regs) {

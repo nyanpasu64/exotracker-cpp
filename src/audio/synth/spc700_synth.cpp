@@ -2,14 +2,29 @@
 #include "spc700_driver.h"
 #include "impl_chip_common.h"
 
+#include <algorithm>  // std::fill
 #include <memory>
 
 namespace audio::synth::spc700_synth {
 
+Spc700Inner::Spc700Inner() {
+    chip.init(ram_64k);
+}
+
+void Spc700Inner::reset() {
+    using std::begin, std::end;
+    std::fill(begin(ram_64k), end(ram_64k), 0);
+
+    chip = SPC_DSP();
+    chip.init(ram_64k);
+}
+
 Spc700Synth::Spc700Synth()
     : _p(std::make_unique<Spc700Inner>())
-{
-    _p->chip.init(_p->ram_64k);
+{}
+
+void Spc700Synth::reset() {
+    _p->reset();
 }
 
 void Spc700Synth::write_reg(RegisterWrite write) {
