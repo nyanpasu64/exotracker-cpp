@@ -266,7 +266,7 @@ void Spc700ChannelDriver::run_driver(
     }
 }
 
-Spc700Driver::Spc700Driver(NsampT samples_per_sec, doc::FrequenciesRef frequencies)
+Spc700Driver::Spc700Driver(doc::FrequenciesRef frequencies)
     : _channels{
         Spc700ChannelDriver(0),
         Spc700ChannelDriver(1),

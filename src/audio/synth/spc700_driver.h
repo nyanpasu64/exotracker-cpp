@@ -70,7 +70,7 @@ private:
 public:
     using ChannelID = chip_kinds::Spc700ChannelID;
 
-    Spc700Driver(NsampT samples_per_sec, FrequenciesRef frequencies);
+    Spc700Driver(FrequenciesRef frequencies);
     DISABLE_COPY(Spc700Driver)
     DEFAULT_MOVE(Spc700Driver)
 
