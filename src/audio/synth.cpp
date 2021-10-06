@@ -196,7 +196,7 @@ OverallSynth::OverallSynth(
         switch (chip_kind) {
             case ChipKind::Spc700: {
                 auto instance = spc700::make_Spc700Instance(
-                   chip_index, SAMPLES_PER_S_IDEAL, _document.frequency_table
+                   chip_index, _document.frequency_table
                 );
 
                 instance->reload_samples(_document);

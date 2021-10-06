@@ -214,7 +214,7 @@ TEST_CASE("Test that notes produce sound") {
         doc::Document document{one_note_document(which_channel, note)};
         CommandQueue play_commands = play_from_begin();
 
-        auto driver = Spc700Driver(SAMPLES_PER_S_IDEAL, document.frequency_table);
+        auto driver = Spc700Driver(document.frequency_table);
 
         std::vector<Amplitude> buffer = run_new_synth(
             document, 48000, 4 * 1024, play_commands.begin()
@@ -230,7 +230,7 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
     doc::Document document{one_note_document(Spc700ChannelID::Channel1, note)};
     CommandQueue play_commands = play_from_begin();
 
-    auto driver = Spc700Driver(SAMPLES_PER_S_IDEAL, document.frequency_table);
+    auto driver = Spc700Driver(document.frequency_table);
 
 #define INCREASE(x)  x = (x) * 3 / 2 + 3
 
