@@ -74,13 +74,11 @@ public:
     DISABLE_COPY(Spc700Driver)
     DEFAULT_MOVE(Spc700Driver)
 
-    // RegisterWriteQueue is currently unused.
     void reset_state(
         doc::Document const& document,
         Spc700Synth & synth,
         RegisterWriteQueue & register_writes);
 
-    // RegisterWriteQueue is currently unused.
     void reload_samples(
         doc::Document const& document,
         Spc700Synth & synth,
