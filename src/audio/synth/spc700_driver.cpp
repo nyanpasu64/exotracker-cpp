@@ -101,6 +101,172 @@ constexpr ClockT CLOCKS_PER_TWO_SAMPLES = 64;
 // and ChipInstance::run_chip_for() will truncate our register write
 // to prevent it from overflowing the tick.
 
+void Spc700ChannelDriver::run_driver(
+    doc::Document const& document,
+    Spc700Driver const& chip_driver,
+    bool tick_tempo,
+    EventsRef events,
+    RegisterWriteQueue &/*mut*/ regs,
+    Spc700ChipFlags & flags)
+{
+    // If the sequencer was not ticked, we should not be receiving note events.
+    // (If I someday add tempo-independent note cuts, they will be emitted
+    // from the driver, not the sequencer's EventsRef.)
+    if (!tick_tempo) {
+        // TODO release_assert?
+        assert(events.empty());
+    }
+
+    if (tick_tempo) {
+        // TODO move note processing into a separate method, and tick volume slides
+        // (crescendos, but not staccatos???) only when the sequencer advances.
+    }
+    // TODO unconditionally tick vibratos (possibly pitch bends, idk).
+
+    auto const channel_flag = uint8_t(1 << _channel_id);
+
+    auto voice_reg8 = [this, &regs](Address v_reg, uint8_t value) {
+        auto addr = calc_voice_reg(_channel_id, v_reg);
+        regs.write(addr, value);
+    };
+    auto voice_reg16 = [this, &regs](Address v_reg, uint16_t value) {
+        auto addr = calc_voice_reg(_channel_id, v_reg);
+        regs.write(addr, (uint8_t) value);
+        regs.write(Address(addr + 1), (uint8_t) (value >> 8));
+    };
+
+    using Success = bool;
+    auto try_play_note = [&](doc::Chromatic note) -> Success {
+        // TODO perhaps return pitch || 0, and don't run voice_reg16(),
+        // but instead return a pitch directly and let the caller cache it
+        // for pitch bends and vibrato.
+        // TODO perhaps cache the currently loaded keysplit tuning?! idk if practical
+
+        if (!_prev_instr) {
+            DEBUG_PRINT("    cannot play note, no instrument set\n");
+            return false;
+        }
+
+        if (!document.instruments[*_prev_instr]) {
+            DEBUG_PRINT("    cannot play note, instrument {:02x} does not exist\n", *_prev_instr);
+            return false;
+        }
+
+        auto patch = find_patch(document.instruments[*_prev_instr]->keysplit, note);
+        if (!patch) {
+            DEBUG_PRINT("    cannot play note, instrument {:02x} does not contain note {}\n",
+                *_prev_instr, note
+            );
+            return false;
+        }
+
+        // Check to see if the sample has been loaded into ARAM or not
+        // (due to missing sample or ARAM being full).
+        if (!chip_driver._samples_valid[patch->sample_idx]) {
+            DEBUG_PRINT("    cannot play note, instrument {:02x} + note {} = sample {:02x} not loaded\n",
+                *_prev_instr, note, patch->sample_idx
+            );
+            return false;
+        }
+
+        auto const& sample_maybe = document.samples[patch->sample_idx];
+        // If a sample has been loaded to the driver, it must be valid in the document.
+        // However there are probably state propagation bugs, so don't crash on release builds.
+        assert(sample_maybe);
+        if (!sample_maybe) {
+            DEBUG_PRINT(
+                "    cannot play note, instrument {:02x} + note {} = sample {:02x} loaded but missing from document\n",
+                *_prev_instr, note, patch->sample_idx
+            );
+            return false;
+        }
+
+        // Write sample index.
+        voice_reg8(SPC_DSP::v_srcn, patch->sample_idx);
+
+        // Write ADSR.
+        auto adsr = patch->adsr.to_hex();
+        voice_reg8(SPC_DSP::v_adsr0, adsr[0]);
+        voice_reg8(SPC_DSP::v_adsr1, adsr[1]);
+
+        // Write pitch.
+        auto pitch = calc_tuning(chip_driver._freq_table, sample_maybe->tuning, note);
+        voice_reg16(SPC_DSP::v_pitchl, pitch);
+
+        DEBUG_PRINT(
+            "    instrument {:02x} + note {} = sample {:02x}, adsr {:02x} {:02x}, pitch {:02x} {:02x}\n",
+            *_prev_instr,
+            note,
+            _channel_id,
+            patch->sample_idx,
+            adsr[0],
+            adsr[1],
+            (uint8_t) pitch,
+            (uint8_t) (pitch >> 8));
+
+        return true;
+    };
+
+    auto note_cut = [&]() {
+        flags.koff |= channel_flag;
+        _note_playing = false;
+    };
+
+    for (doc::RowEvent const& ev : events) {
+        if (ev.instr) {
+            DEBUG_PRINT(
+                "channel {} instrument change to {:02x}\n", _channel_id, *ev.instr
+            );
+            _prev_instr = *ev.instr;
+
+            // TODO maybe disable mid-note instrument changes,
+            // due to undesirable complexity when writing a hardware driver.
+            // Maybe add an explicit "legato" effect or instrument ID.
+            if (_note_playing && !ev.note) {
+                if (!try_play_note(_prev_note)) {
+                    note_cut();
+                }
+            }
+        }
+        if (ev.note) {
+            doc::Note note = *ev.note;
+
+            if (note.is_valid_note()) {
+                DEBUG_PRINT("channel {}, playing note {}\n", _channel_id, note.value);
+                _prev_note = (Chromatic) note.value;
+
+                if (try_play_note(_prev_note)) {
+                    flags.kon |= channel_flag;
+                    _note_playing = true;
+                    // TODO save current note's base pitch register, for vibrato and pitch bends
+                } else {
+                    note_cut();
+                }
+            } else if (note.is_release()) {
+                DEBUG_PRINT("channel {}, note release\n", _channel_id);
+                // TODO each instrument should hold a GAIN envelope used for release.
+                // TODO upon note release, should _note_playing = false immediately
+                // (can't change instruments during release envelopes) or never
+                // (subsequent instrument changes without notes waste CPU time)?
+                note_cut();
+            } else if (note.is_cut()) {
+                DEBUG_PRINT("channel {}, note cut\n", _channel_id);
+                note_cut();
+            }
+        }
+        if (ev.volume) {
+            #ifdef DRIVER_DEBUG
+            fmt::print(stderr, "channel {}, volume {}\n", _channel_id, *ev.volume);
+            #endif
+
+            // TODO stereo
+            voice_reg8(SPC_DSP::v_voll, *ev.volume);
+            voice_reg8(SPC_DSP::v_volr, *ev.volume);
+        }
+        // TODO ev.effects
+    }
+}
+
 Spc700Driver::Spc700Driver(NsampT samples_per_sec, doc::FrequenciesRef frequencies)
     : _channels{
         Spc700ChannelDriver(0),
@@ -296,172 +462,6 @@ void Spc700Driver::stop_playback(RegisterWriteQueue /*mut*/& regs) {
     // This delays future register writes
     // caused by Spc700ChannelDriver::tick() on the same tick.
     regs.wait(CLOCKS_PER_TWO_SAMPLES);
-}
-
-void Spc700ChannelDriver::run_driver(
-    doc::Document const& document,
-    Spc700Driver const& chip_driver,
-    bool tick_tempo,
-    EventsRef events,
-    RegisterWriteQueue &/*mut*/ regs,
-    Spc700ChipFlags & flags)
-{
-    // If the sequencer was not ticked, we should not be receiving note events.
-    // (If I someday add tempo-independent note cuts, they will be emitted
-    // from the driver, not the sequencer's EventsRef.)
-    if (!tick_tempo) {
-        // TODO release_assert?
-        assert(events.empty());
-    }
-
-    if (tick_tempo) {
-        // TODO move note processing into a separate method, and tick volume slides
-        // (crescendos, but not staccatos???) only when the sequencer advances.
-    }
-    // TODO unconditionally tick vibratos (possibly pitch bends, idk).
-
-    auto const channel_flag = uint8_t(1 << _channel_id);
-
-    auto voice_reg8 = [this, &regs](Address v_reg, uint8_t value) {
-        auto addr = calc_voice_reg(_channel_id, v_reg);
-        regs.write(addr, value);
-    };
-    auto voice_reg16 = [this, &regs](Address v_reg, uint16_t value) {
-        auto addr = calc_voice_reg(_channel_id, v_reg);
-        regs.write(addr, (uint8_t) value);
-        regs.write(Address(addr + 1), (uint8_t) (value >> 8));
-    };
-
-    using Success = bool;
-    auto try_play_note = [&](doc::Chromatic note) -> Success {
-        // TODO perhaps return pitch || 0, and don't run voice_reg16(),
-        // but instead return a pitch directly and let the caller cache it
-        // for pitch bends and vibrato.
-        // TODO perhaps cache the currently loaded keysplit tuning?! idk if practical
-
-        if (!_prev_instr) {
-            DEBUG_PRINT("    cannot play note, no instrument set\n");
-            return false;
-        }
-
-        if (!document.instruments[*_prev_instr]) {
-            DEBUG_PRINT("    cannot play note, instrument {:02x} does not exist\n", *_prev_instr);
-            return false;
-        }
-
-        auto patch = find_patch(document.instruments[*_prev_instr]->keysplit, note);
-        if (!patch) {
-            DEBUG_PRINT("    cannot play note, instrument {:02x} does not contain note {}\n",
-                *_prev_instr, note
-            );
-            return false;
-        }
-
-        // Check to see if the sample has been loaded into ARAM or not
-        // (due to missing sample or ARAM being full).
-        if (!chip_driver._samples_valid[patch->sample_idx]) {
-            DEBUG_PRINT("    cannot play note, instrument {:02x} + note {} = sample {:02x} not loaded\n",
-                *_prev_instr, note, patch->sample_idx
-            );
-            return false;
-        }
-
-        auto const& sample_maybe = document.samples[patch->sample_idx];
-        // If a sample has been loaded to the driver, it must be valid in the document.
-        // However there are probably state propagation bugs, so don't crash on release builds.
-        assert(sample_maybe);
-        if (!sample_maybe) {
-            DEBUG_PRINT(
-                "    cannot play note, instrument {:02x} + note {} = sample {:02x} loaded but missing from document\n",
-                *_prev_instr, note, patch->sample_idx
-            );
-            return false;
-        }
-
-        // Write sample index.
-        voice_reg8(SPC_DSP::v_srcn, patch->sample_idx);
-
-        // Write ADSR.
-        auto adsr = patch->adsr.to_hex();
-        voice_reg8(SPC_DSP::v_adsr0, adsr[0]);
-        voice_reg8(SPC_DSP::v_adsr1, adsr[1]);
-
-        // Write pitch.
-        auto pitch = calc_tuning(chip_driver._freq_table, sample_maybe->tuning, note);
-        voice_reg16(SPC_DSP::v_pitchl, pitch);
-
-        DEBUG_PRINT(
-            "    instrument {:02x} + note {} = sample {:02x}, adsr {:02x} {:02x}, pitch {:02x} {:02x}\n",
-            *_prev_instr,
-            note,
-            _channel_id,
-            patch->sample_idx,
-            adsr[0],
-            adsr[1],
-            (uint8_t) pitch,
-            (uint8_t) (pitch >> 8));
-
-        return true;
-    };
-
-    auto note_cut = [&]() {
-        flags.koff |= channel_flag;
-        _note_playing = false;
-    };
-
-    for (doc::RowEvent const& ev : events) {
-        if (ev.instr) {
-            DEBUG_PRINT(
-                "channel {} instrument change to {:02x}\n", _channel_id, *ev.instr
-            );
-            _prev_instr = *ev.instr;
-
-            // TODO maybe disable mid-note instrument changes,
-            // due to undesirable complexity when writing a hardware driver.
-            // Maybe add an explicit "legato" effect or instrument ID.
-            if (_note_playing && !ev.note) {
-                if (!try_play_note(_prev_note)) {
-                    note_cut();
-                }
-            }
-        }
-        if (ev.note) {
-            doc::Note note = *ev.note;
-
-            if (note.is_valid_note()) {
-                DEBUG_PRINT("channel {}, playing note {}\n", _channel_id, note.value);
-                _prev_note = (Chromatic) note.value;
-
-                if (try_play_note(_prev_note)) {
-                    flags.kon |= channel_flag;
-                    _note_playing = true;
-                    // TODO save current note's base pitch register, for vibrato and pitch bends
-                } else {
-                    note_cut();
-                }
-            } else if (note.is_release()) {
-                DEBUG_PRINT("channel {}, note release\n", _channel_id);
-                // TODO each instrument should hold a GAIN envelope used for release.
-                // TODO upon note release, should _note_playing = false immediately
-                // (can't change instruments during release envelopes) or never
-                // (subsequent instrument changes without notes waste CPU time)?
-                note_cut();
-            } else if (note.is_cut()) {
-                DEBUG_PRINT("channel {}, note cut\n", _channel_id);
-                note_cut();
-            }
-        }
-        if (ev.volume) {
-            #ifdef DRIVER_DEBUG
-            fmt::print(stderr, "channel {}, volume {}\n", _channel_id, *ev.volume);
-            #endif
-
-            // TODO stereo
-            voice_reg8(SPC_DSP::v_voll, *ev.volume);
-            voice_reg8(SPC_DSP::v_volr, *ev.volume);
-        }
-        // TODO ev.effects
-    }
 }
 
 void Spc700Driver::run_driver(
