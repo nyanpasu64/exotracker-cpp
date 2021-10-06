@@ -317,6 +317,12 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
                 chip->doc_edited(_document);
             }
         }
+
+        if (total_modified & ModifiedFlags::SamplesEdited) {
+            for (auto & chip : _chip_instances) {
+                chip->reload_samples(_document);
+            }
+        }
     }
 
     // TODO Instrument/tuning edits might invalidate driver or cause OOB reads.

@@ -21,13 +21,15 @@ using music_driver::RegisterWrite;
 constexpr size_t SPC_MEMORY_SIZE = 0x1'0000;
 
 struct Spc700Inner {
+    uint8_t ram_64k[SPC_MEMORY_SIZE] = {};
+    SPC_DSP chip;
+
+// impl
     /// SPC_DSP is self-referential and points to ram_64k.
     DISABLE_COPY_MOVE(Spc700Inner)
 
-    Spc700Inner() = default;
-
-    uint8_t ram_64k[SPC_MEMORY_SIZE] = {};
-    SPC_DSP chip;
+    Spc700Inner();
+    void reset();
 };
 
 class Spc700Synth {
@@ -36,6 +38,8 @@ class Spc700Synth {
 // impl
 public:
     Spc700Synth();
+
+    void reset();
 
     /// Write to a S-DSP register (not to ARAM).
     /// (In the actual SNES, this corresponds to a $F2 write followed by $F3.)
@@ -46,9 +50,9 @@ public:
         ClockT const nclk,
         WriteTo write_to);
 
-    /// The driver needs to be able to manipulate RAM and emulator state directly,
-    /// when editing the sample layout.
-    friend class spc700_driver::Spc700Driver;
+    uint8_t * ram_64k() {
+        return _p->ram_64k;
+    }
 };
 
 }
