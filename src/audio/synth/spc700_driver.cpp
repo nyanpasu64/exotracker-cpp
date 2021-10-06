@@ -197,7 +197,6 @@ void Spc700ChannelDriver::run_driver(
             "    instrument {:02x} + note {} = sample {:02x}, adsr {:02x} {:02x}, pitch {:02x} {:02x}\n",
             *_prev_instr,
             note,
-            _channel_id,
             patch->sample_idx,
             adsr[0],
             adsr[1],
