@@ -481,11 +481,9 @@ public:
     }
 
     InstrumentIndex curr_instr_idx() const {
-        return (InstrumentIndex) _win.state().instrument();
+        return _win.state().instrument();
     }
 
-    // it's a nasty hack that we set history to reload changes from a StateTransaction,
-    // but it works don't touch it
     void reload_state() override {
         _model.reload_state();
         recompute_visible_slots();
