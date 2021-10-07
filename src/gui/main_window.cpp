@@ -1,12 +1,16 @@
 #define main_window_INTERNAL public
 #include "main_window.h"
+
+// Widgets
 #include "gui/pattern_editor.h"
 #include "gui/timeline_editor.h"
 #include "gui/instrument_dialog.h"
 #include "gui/instrument_list.h"
-#include "gui/move_cursor.h"
 #include "gui/tempo_dialog.h"
-#include "lib/layout_macros.h"
+#include "gui/lib/icon_toolbar.h"
+// Other
+#include "gui/move_cursor.h"
+#include "gui/lib/layout_macros.h"
 #include "gui_common.h"
 #include "cmd_queue.h"
 #include "edit/edit_doc.h"
@@ -33,7 +37,6 @@
 #include <QMenuBar>
 #include <QPushButton>
 #include <QSpinBox>
-#include "gui/lib/icon_toolbar.h"
 #include <QToolButton>
 // Layouts
 #include <QBoxLayout>
