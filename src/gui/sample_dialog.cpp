@@ -518,16 +518,6 @@ public:
 
     void import_sample(SampleIndex begin_idx) {
         // TODO open dialog
-        using edit::edit_sample_list::try_add_sample;
-
-        auto [maybe_edit, new_sample] = try_add_sample(document(), begin_idx);
-        if (!maybe_edit) {
-            return;
-        }
-
-        auto tx = _win.edit_unwrap();
-        tx.push_edit(std::move(maybe_edit), IGNORE_CURSOR);
-        _curr_sample = new_sample;
     }
 
     void import_at_begin() {

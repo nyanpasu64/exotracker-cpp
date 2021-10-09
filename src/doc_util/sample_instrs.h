@@ -34,6 +34,20 @@ inline uint8_t brr_header(uint8_t gain, uint8_t filter, bool end, bool loop) {
 
 constexpr Chromatic A440_MIDI = 69;
 
+static Sample silence() {
+    return Sample {
+        .name = "Silence",
+        .brr = {brr_header(11, 0, true, true),
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        },
+        .loop_byte = 0,
+        .tuning = SampleTuning {
+            .sample_rate = 440 * 16,
+            .root_key = A440_MIDI,
+        },
+    };
+}
+
 inline Sample pulse_12_5() {
     return Sample {
         .name = "12.5%",
@@ -66,6 +80,20 @@ inline Sample pulse_50() {
     return Sample {
         .name = "50%",
         .brr = {brr_header(11, 0, true, true),
+            0x44, 0x44, 0x44, 0x44, 0xcc, 0xcc, 0xcc, 0xcc,
+        },
+        .loop_byte = 0,
+        .tuning = SampleTuning {
+            .sample_rate = 440 * 16,
+            .root_key = A440_MIDI,
+        },
+    };
+}
+
+static Sample pulse_50_quiet() {
+    return Sample {
+        .name = "50%",
+        .brr = {brr_header(10, 0, true, true),
             0x44, 0x44, 0x44, 0x44, 0xcc, 0xcc, 0xcc, 0xcc,
         },
         .loop_byte = 0,

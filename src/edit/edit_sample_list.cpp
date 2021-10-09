@@ -60,7 +60,7 @@ static Sample new_sample() {
 }
 
 std::tuple<MaybeEditBox, SampleIndex> try_add_sample(
-    Document const& doc, SampleIndex begin_idx
+    Document const& doc, SampleIndex begin_idx, doc::Sample sample
 ) {
     auto maybe_empty_idx = get_empty_idx(doc.samples, begin_idx);
     if (!maybe_empty_idx) {
@@ -69,9 +69,25 @@ std::tuple<MaybeEditBox, SampleIndex> try_add_sample(
     SampleIndex empty_idx = *maybe_empty_idx;
 
     return {
-        make_command(AddRemoveSample {empty_idx, new_sample()}),
+        make_command(AddRemoveSample {empty_idx, std::move(sample)}),
         empty_idx,
     };
+}
+
+struct ReplaceSample {
+    SampleIndex index;
+    std::optional<Sample> sample;
+
+    void apply_swap(Document & doc) {
+        std::swap(sample, doc.samples[index]);
+    }
+
+    static constexpr ModifiedFlags _modified = ModifiedFlags::SamplesEdited;
+    using Impl = ImplEditCommand<ReplaceSample, Override::None>;
+};
+
+EditBox replace_sample(Document const& doc, SampleIndex idx, doc::Sample sample) {
+    return make_command(ReplaceSample {idx, std::move(sample)});
 }
 
 std::tuple<MaybeEditBox, SampleIndex> try_clone_sample(

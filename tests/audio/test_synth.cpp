@@ -6,6 +6,7 @@
 #include "cmd_queue.h"
 #include "timing_common.h"
 #include "doc_util/sample_instrs.h"
+#include "edit/edit_sample_list.h"
 #include "test_utils/parameterize.h"
 
 #include <fmt/core.h>
@@ -346,6 +347,143 @@ TEST_CASE("Ensure that stopping playback works") {
     }
 }
 
-// TODO Ensure that editing samples mutes audio but allows further notes to play normally (in all channels)
+static doc::Document sample_idx_document(
+    Spc700ChannelID which_channel, SampleIndex sample_idx
+) {
+    using namespace doc;
+
+    Samples samples;
+
+    Instruments instruments;
+    instruments[0] = Instrument {
+        .name = "50%",
+        .keysplit = {InstrumentPatch {
+            .sample_idx = sample_idx,
+            .adsr = INFINITE,
+        }}
+    };
+
+    ChipList chips{ChipKind::Spc700};
+
+    Timeline timeline;
+
+    timeline.push_back([&]() -> TimelineFrame {
+        EventList one_note {TimedRowEvent{0, RowEvent{60, 0}}};
+        EventList blank {};
+
+        std::vector<TimelineCell> channel_cells;
+        for (size_t i = 0; i < enum_count<Spc700ChannelID>; i++) {
+            if (which_channel == Spc700ChannelID(i)) {
+                channel_cells.push_back(TimelineCell{TimelineBlock::from_events(one_note)});
+            } else {
+                channel_cells.push_back(TimelineCell{});
+            }
+        }
+
+        return TimelineFrame {
+            .nbeats = 1,
+            .chip_channel_cells = {move(channel_cells)},
+        };
+    }());
+
+    return DocumentCopy {
+        .sequencer_options = SequencerOptions{
+            .target_tempo = 100,
+        },
+        .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
+        .samples = move(samples),
+        .instruments = move(instruments),
+        .chips = chips,
+        .chip_channel_settings = spc_chip_channel_settings(),
+        .timeline = move(timeline),
+    };
+}
+
+using namespace edit::edit_sample_list;
+
+TEST_CASE("Ensure that editing samples mutes playing notes") {
+    using audio::synth::STEREO_NCHAN;
+
+    Spc700ChannelID which_channel;
+    PICK(all_channels(which_channel));
+
+    CommandQueue /*mut*/ play_commands;
+
+    // Create a document where instrument 0 uses sample 1.
+    auto doc = sample_idx_document(which_channel, 1);
+    doc.samples[0] = silence();
+    doc.samples[1] = pulse_50();
+
+    auto synth = audio::synth::OverallSynth(
+        STEREO_NCHAN,
+        SAMPLES_PER_S_IDEAL,
+        doc.clone(),
+        play_commands.begin(),
+        FAST_RESAMPLER);
+
+    constexpr size_t NSAMP = 1000;
+
+    Amplitude orig_min, orig_max;
+    auto buffer = std::vector<Amplitude>(NSAMP * STEREO_NCHAN);
+    {
+        // Play audio from start.
+        play_commands.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+        synth.synthesize_overall(buffer, NSAMP);
+
+        orig_min = *std::min_element(buffer.begin(), buffer.end());
+        orig_max = *std::max_element(buffer.begin(), buffer.end());
+    }
+
+    // Delete sample 0. This should stop the playing note and move sample 1
+    // over sample 0.
+    {
+        auto maybe_command = std::get<0>(try_remove_sample(doc, 0));
+        release_assert(maybe_command);
+        play_commands.push(maybe_command->clone_for_audio(doc));
+        maybe_command->apply_swap(doc);
+    }
+    // Replace sample 1 with a quieter version. (TODO either try_replace_sample
+    // or delete sample 1 first)
+    {
+        auto command = replace_sample(doc, 1, pulse_50_quiet());
+        play_commands.push(command->clone_for_audio(doc));
+        command->apply_swap(doc);
+    }
+
+    {
+        // The output doesn't stop immediately,
+        // because OverallSynth only checks for new commands once per tick.
+        // So run the synth for a bit first, then check that it's silent afterwards.
+        synth.synthesize_overall(buffer, NSAMP);
+        synth.synthesize_overall(buffer, NSAMP);
+
+        Amplitude min = *std::min_element(buffer.begin(), buffer.end());
+        Amplitude max = *std::max_element(buffer.begin(), buffer.end());
+        CHECK(min == 0);
+        CHECK(max == 0);
+    }
+
+    {
+        // Run the synth for the rest of 1 second, and make sure it begins
+        // playing the new quieter sample.
+        uint32_t nsamp = SAMPLES_PER_S_IDEAL - 3 * NSAMP;
+        buffer.resize(2 * nsamp);
+        synth.synthesize_overall(buffer, nsamp);
+
+        auto target_min = doctest::Approx(orig_min / 2).epsilon(0.001);
+        auto target_max = doctest::Approx(orig_max / 2).epsilon(0.001);
+
+        Amplitude min = *std::min_element(buffer.begin(), buffer.end());
+        Amplitude max = *std::max_element(buffer.begin(), buffer.end());
+        CAPTURE(target_min);
+        CAPTURE(min);
+        CAPTURE(target_max);
+        CAPTURE(max);
+
+        CHECK(min == target_min);
+        CHECK(max == target_max);
+    }
+}
 
 // TODO add RapidCheck for randomized testing?

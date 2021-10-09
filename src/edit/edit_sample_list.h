@@ -11,13 +11,17 @@ using doc::SampleIndex;
 // Adding/removing samples.
 
 /// Searches for an empty slot starting at `begin_idx` (which may be zero),
-/// and adds an empty sample in the first empty slot found.
+/// and adds the sample to the first empty slot found.
 /// Returns {command, new sample index}.
 /// If all slots starting at `begin_idx` are full, returns {nullptr, 0}.
 [[nodiscard]]
 std::tuple<MaybeEditBox, SampleIndex> try_add_sample(
-    Document const& doc, SampleIndex begin_idx
+    Document const& doc, SampleIndex begin_idx, doc::Sample sample
 );
+
+/// Adds the sample to the slot, replacing the existing sample if present.
+[[nodiscard]]
+EditBox replace_sample(Document const& doc, SampleIndex idx, doc::Sample sample);
 
 /// Searches for an empty slot starting at `begin_idx` (which may be zero),
 /// and clones sample `old_idx` into the first empty slot found.
