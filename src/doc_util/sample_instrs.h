@@ -76,6 +76,20 @@ inline Sample pulse_50() {
     };
 }
 
+static Sample pulse_50_quiet() {
+    return Sample {
+        .name = "50 quiet%",
+        .brr = {brr_header(10, 0, true, true),
+            0x44, 0x44, 0x44, 0x44, 0xcc, 0xcc, 0xcc, 0xcc,
+        },
+        .loop_byte = 0,
+        .tuning = SampleTuning {
+            .sample_rate = 440 * 16,
+            .root_key = A440_MIDI,
+        },
+    };
+}
+
 inline Sample triangle() {
     return Sample {
         .name = "triangle",
