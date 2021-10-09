@@ -10,6 +10,7 @@
 
 #include <fmt/core.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <optional>
@@ -71,7 +72,7 @@ static doc::Document one_note_document(MaybeChannelID which_channel, doc::Note p
     return DocumentCopy {
         .sequencer_options = SequencerOptions{
             .target_tempo = 100,
-            },
+        },
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
         .samples = move(samples),
@@ -117,7 +118,6 @@ static std::vector<Amplitude> run_new_synth(
     CAPTURE(smp_per_s);
     CAPTURE(nsamp);
 
-    // (int stereo_nchan, int smp_per_s, locked_doc::GetDocument &/*'a*/ document)
     audio::synth::OverallSynth synth{
         STEREO_NCHAN, smp_per_s, document.clone(), stub_command, FAST_RESAMPLER
     };
@@ -234,10 +234,8 @@ TEST_CASE("Send random values into AudioInstance and look for assertion errors")
 
 #define INCREASE(x)  x = (x) * 3 / 2 + 3
 
-    // Setting smp_per_s to small numbers breaks blip_buffer's internal invariants.
-    // >assert( length_ == msec ); // ensure length is same as that passed in
-    // The largest failing value is 873.
-    // Not all values fail. As smp_per_s decreases, it becomes more likely to fail.
+    // Blip_Buffer had a minimum sample rate of around 1000 Hz. I've replaced it with
+    // libsamplerate, but let's keep 1000 Hz as a minimum sample rate to test.
     for (uint32_t smp_per_s = 1000; smp_per_s <= 250'000; INCREASE(smp_per_s)) {
         // smp_per_s * 0.25 second
         run_new_synth(document, smp_per_s, smp_per_s / 4, play_commands.begin());
@@ -262,5 +260,92 @@ TEST_CASE("Send all note pitches into AudioInstance and look for assertion error
         run_new_synth(document, 32000, 1000, play_commands.begin());
     }
 }
+
+// # Test how OverallSynth responds to AudioCommand (playback or edit messages).
+
+TEST_CASE("Ensure that restarting playback produces the same output range") {
+    // The actual output isn't exactly identical after you send a replay command,
+    // because OverallSynth only checks for new commands once per tick,
+    // causing the "replay" command to be processed partway through the audio block.
+    // As a quick workaround, check for an identical amplitude range.
+    using audio::synth::STEREO_NCHAN;
+
+    CommandQueue /*mut*/ play_commands;
+
+    auto synth = audio::synth::OverallSynth(
+        STEREO_NCHAN,
+        SAMPLES_PER_S_IDEAL,
+        one_note_document(Spc700ChannelID::Channel1, {60}),
+        play_commands.begin(),
+        FAST_RESAMPLER);
+
+    constexpr size_t NSAMP = 1000;
+    auto buffer = std::vector<Amplitude>(NSAMP * STEREO_NCHAN);
+
+    Amplitude play_min, play_max;
+    {
+        // Play audio from start.
+        play_commands.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+        synth.synthesize_overall(buffer, NSAMP);
+        play_min = *std::min_element(buffer.begin(), buffer.end());
+        play_max = *std::max_element(buffer.begin(), buffer.end());
+    }
+
+    Amplitude replay_min, replay_max;
+    {
+        // Replay audio from start.
+        play_commands.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+        synth.synthesize_overall(buffer, NSAMP);
+        replay_min = *std::min_element(buffer.begin(), buffer.end());
+        replay_max = *std::max_element(buffer.begin(), buffer.end());
+    }
+
+    CHECK(play_min == replay_min);
+    CHECK(play_max == replay_max);
+}
+
+TEST_CASE("Ensure that stopping playback works") {
+    using audio::synth::STEREO_NCHAN;
+
+    CommandQueue /*mut*/ play_commands;
+
+    auto synth = audio::synth::OverallSynth(
+        STEREO_NCHAN,
+        SAMPLES_PER_S_IDEAL,
+        one_note_document(Spc700ChannelID::Channel1, {60}),
+        play_commands.begin(),
+        FAST_RESAMPLER);
+
+    constexpr size_t NSAMP = 1000;
+    auto buffer = std::vector<Amplitude>(NSAMP * STEREO_NCHAN);
+    {
+        // Play audio from start.
+        play_commands.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+        synth.synthesize_overall(buffer, NSAMP);
+
+        Amplitude min = *std::min_element(buffer.begin(), buffer.end());
+        Amplitude max = *std::max_element(buffer.begin(), buffer.end());
+        CHECK(min < 0);
+        CHECK(max > 0);
+    }
+
+    {
+        // Stop audio playback.
+        play_commands.push(cmd_queue::StopPlayback{});
+
+        // The output doesn't stop immediately after you send a stop command,
+        // because OverallSynth only checks for new commands once per tick.
+        // So run the synth for a bit first, then check that it's silent afterwards.
+        synth.synthesize_overall(buffer, NSAMP);
+        synth.synthesize_overall(buffer, NSAMP);
+
+        Amplitude min = *std::min_element(buffer.begin(), buffer.end());
+        Amplitude max = *std::max_element(buffer.begin(), buffer.end());
+        CHECK(min == 0);
+        CHECK(max == 0);
+    }
+}
+
+// TODO Ensure that editing samples mutes audio but allows further notes to play normally (in all channels)
 
 // TODO add RapidCheck for randomized testing?
