@@ -316,13 +316,16 @@ void Spc700Driver::reset_state(
     *this = Spc700Driver();
     _freq_table = std::move(freq_table);
 
+    synth.reset();
+    restore_state(document, regs);
+
     // TODO store "initial" state as member state instead, so "reset synth" =
     // "reset state" + "setup synth". Then when samples are reloaded,
     // we can setup synth without resetting state.
 
     // Reset Spc700Synth, reinitialize _samples_valid and synth's ARAM,
     // and write default driver state to sound chips.
-    reload_samples(document, synth, regs);  // writes SAMPLE_DIR to $5D.
+    reload_samples_only(document, synth, regs);  // writes SAMPLE_DIR to $5D.
 }
 
 Spc700Driver::Spc700Driver()
@@ -405,9 +408,17 @@ void Spc700Driver::reload_samples(
     // Reset the APU (stops all notes), then rewrite the current volume/etc.
     // (but not notes) to the APU.
 
-    synth.reset();
-    restore_state(document, regs);
+    // Trigger soft reset, unmute amplifier, disable echo writes, set noise frequency to 0.
+    regs.write(SPC_DSP::r_flg, 0b101'00000);
+    regs.wait_write(CLOCKS_PER_TWO_SAMPLES / 2, SPC_DSP::r_flg, 0b001'00000);
+    reload_samples_only(document, synth, regs);
+}
 
+void Spc700Driver::reload_samples_only(
+    doc::Document const& document,
+    Spc700Synth & synth,
+    RegisterWriteQueue & regs)
+{
     std::fill(std::begin(_samples_valid), std::end(_samples_valid), false);
 
     bool samples_found = false;

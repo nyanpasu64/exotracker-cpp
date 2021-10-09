@@ -102,6 +102,10 @@ private:
         doc::Document const& document, RegisterWriteQueue & regs
     ) const;
 
+    void reload_samples_only(
+        doc::Document const& document, Spc700Synth & synth, RegisterWriteQueue & regs
+    );
+
 public:
     /// Called when samples are edited.
     void reload_samples(
