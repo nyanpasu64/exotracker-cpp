@@ -1,6 +1,7 @@
 #pragma once
 
 #include "edit_common.h"
+#include "edit/modified.h"  // ModifiedFlags
 #include "util/enum_flags.h"
 
 namespace edit::edit_impl {
