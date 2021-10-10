@@ -27,43 +27,58 @@ static Document empty() {
     constexpr SampleIndex TRIANGLE = 0;
     constexpr SampleIndex PULSE_25 = 1;
     constexpr SampleIndex PULSE_50 = 2;
-    constexpr SampleIndex LONG = 3;
+    constexpr SampleIndex SAW = 3;
+    constexpr SampleIndex NOISE = 4;
+    constexpr SampleIndex LONG = 5;
 
     Samples samples;
     samples[TRIANGLE] = triangle();
     samples[PULSE_25] = pulse_25();
     samples[PULSE_50] = pulse_50();
-    samples[LONG] = pulse_50();
-    samples[LONG]->name = "looooooooooooooooooooooooooooooong";
+    samples[SAW] = saw();
+    samples[NOISE] = periodic_noise();
+    samples[LONG] = long_silence();
 
     Instruments instruments;
-    instruments[0] = Instrument{"blank", {}};
-    instruments[1] = music_box(TRIANGLE);
-    instruments[2] = Instrument{
+    instruments[0] = music_box(TRIANGLE);
+    instruments[1] = Instrument{
         .name = "25%",
         .keysplit = { InstrumentPatch { .sample_idx = PULSE_25, .adsr = INFINITE }},
+    };
+    instruments[2] = Instrument{
+        .name = "50%",
+        .keysplit = { InstrumentPatch { .sample_idx = PULSE_50, .adsr = INFINITE }},
     };
     instruments[3] = Instrument{
         .name = "Keysplit",
         .keysplit = {
             InstrumentPatch {
                 .min_note = 0,
-                .sample_idx = PULSE_25,
+                .sample_idx = SAW,
                 .adsr = DEMO,
             },
             InstrumentPatch {
                 .min_note = 60,
-                .sample_idx = PULSE_50,
+                .sample_idx = PULSE_25,
                 .adsr = MUSIC_BOX,
             },
             InstrumentPatch {
                 .min_note = 72,
-                .sample_idx = TRIANGLE,
+                .sample_idx = PULSE_50,
                 .adsr = INFINITE,
             },
         },
     };
-    instruments[4] = Instrument {
+    instruments[4] = Instrument{
+        .name = "Periodic Noise",
+        .keysplit = { InstrumentPatch { .sample_idx = NOISE, .adsr = INFINITE }},
+    };
+    instruments[0x10] = Instrument{"blank", {}};
+    instruments[0x11] = Instrument{
+        .name = samples[LONG].value().name,
+        .keysplit = { InstrumentPatch { .sample_idx = LONG, .adsr = INFINITE }},
+    };
+    instruments[0x12] = Instrument {
         .name = "Invalid",
         .keysplit = {
             InstrumentPatch {
@@ -83,10 +98,6 @@ static Document empty() {
             },
         },
     };
-    instruments[0x10] = Instrument{
-        .name = "50%",
-        .keysplit = { InstrumentPatch { .sample_idx = PULSE_50, .adsr = INFINITE }},
-    };
 
     ChipList chips{ChipKind::Spc700};
 
@@ -94,30 +105,10 @@ static Document empty() {
 
     Timeline timeline;
 
-    timeline.push_back([]() -> TimelineFrame {
-        TimelineCell ch0{};
-
-        TimelineCell ch1{TimelineBlock::from_events({
-            // Events go here.
-        })};
-
-        TimelineCell ch2{TimelineBlock{0, BeatOrEnd(8),
-            Pattern{EventList{
-                // Events go here.
-            }}
-        }};
-
-        TimelineCell ch3{TimelineBlock{0, END_OF_GRID,
-            Pattern{EventList{
-                // Events go here.
-            }, 4}
-        }};
-
-        return TimelineFrame{
-            .nbeats = 16,
-            .chip_channel_cells = {{move(ch0), move(ch1), move(ch2), move(ch3), {}, {}, {}, {}}},
-        };
-    }());
+    timeline.push_back(TimelineFrame{
+        .nbeats = 16,
+        .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
+    });
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,

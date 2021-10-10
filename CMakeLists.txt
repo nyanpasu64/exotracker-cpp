@@ -189,6 +189,7 @@ add_library(exotracker-headless
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
     src/doc/validate.cpp
+    src/doc_util/sample_instrs.cpp
     src/serialize.cpp
     src/serialize/document.capnp.c++
     src/gui/history.cpp
