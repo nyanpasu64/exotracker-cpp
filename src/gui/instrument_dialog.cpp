@@ -851,8 +851,8 @@ public:
         reload_current_patch();
     }
 
-    /// does not emit change signals (which would invoke reload_current_patch()).
-    /// this should be fine, since when update_keysplit() is called by reload_state(),
+    /// Does not emit change signals (which would invoke reload_current_patch()).
+    /// This should be fine, since when update_keysplit() is called by reload_state(),
     /// reload_state subsequently calls reload_current_patch().
     ///
     /// If new_selection == -1, keeps old selection.
