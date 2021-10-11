@@ -100,8 +100,8 @@
 
 
 /// Add leaf widget to QBoxLayout.
-#define l__w(qwidget, ...) \
-    auto * w = new qwidget; \
+#define l__wptr(WIDGET_PTR, ...) \
+    auto * w = WIDGET_PTR; \
     l->addWidget(w VA_COMMA(__VA_ARGS__)); \
     HIDE(l) \
     \
@@ -110,12 +110,9 @@
 
 
 /// Add leaf widget to QBoxLayout.
-#define l__w_factory(qwidget_make, ...) \
-    auto * w = qwidget_make; \
-    l->addWidget(w VA_COMMA(__VA_ARGS__)); \
-    HIDE(l) \
-    \
-    require_semicolon
+#define l__w(QWIDGET, ...) \
+    l__wptr(new QWIDGET __VA_OPT__(,) __VA_ARGS__)
+
 
 /// Add QBoxLayout to QBoxLayout.
 #define l__l(qlayout, ...) \

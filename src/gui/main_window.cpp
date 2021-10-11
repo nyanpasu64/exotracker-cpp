@@ -436,7 +436,7 @@ struct MainWindowUi : MainWindow {
         {l__c_l(QGroupBox, QVBoxLayout)
             c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
             c->setTitle(tr("Timeline"));
-            {l__w_factory(TimelineEditor::make(this))
+            {l__wptr(TimelineEditor::make(this))
                 _timeline_editor = w;
             }
             {l__w(IconToolBar)
@@ -578,7 +578,7 @@ struct MainWindowUi : MainWindow {
     } }
 
     void instrument_list_panel(QBoxLayout * l) {
-        {l__w_factory(InstrumentList::make(this))
+        {l__wptr(InstrumentList::make(this))
             _instrument_list = w;
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         }

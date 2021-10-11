@@ -338,16 +338,16 @@ public:
 
         {l__c_l(QGroupBox(tr("All samples")), QVBoxLayout);
             {l__l(QHBoxLayout);
-                {l__w_factory(small_button("+"));
+                {l__wptr(small_button("+"));
                     _import = w;
                 }
-                {l__w_factory(small_button("x"));
+                {l__wptr(small_button("x"));
                     _remove = w;
                 }
-                {l__w_factory(small_button("C"));
+                {l__wptr(small_button("C"));
                     _clone = w;
                 }
-                {l__w_factory(small_button("_"));
+                {l__wptr(small_button("_"));
                     _show_empty = w;
                     w->setCheckable(true);
                 }

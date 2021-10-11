@@ -475,16 +475,16 @@ public:
         {l__c_l(QGroupBox(tr("Keysplit")), QVBoxLayout);
             {l__l(QHBoxLayout);
                 // TODO add icons
-                {l__w_factory(small_button("+"));
+                {l__wptr(small_button("+"));
                     _add_patch = w;
                 }
-                {l__w_factory(small_button("-"));
+                {l__wptr(small_button("-"));
                     _remove_patch = w;
                 }
-                {l__w_factory(small_button("↑"));
+                {l__wptr(small_button("↑"));
                     _move_patch_up  = w;
                 }
-                {l__w_factory(small_button("↓"));
+                {l__wptr(small_button("↓"));
                     _move_patch_down  = w;
                 }
                 append_stretch();
@@ -510,13 +510,13 @@ public:
             l->setContentsMargins(0, 0, 0, 0);
             // Top row.
             {l__l(QHBoxLayout);
-                {l__w_factory(qlabel(tr("Min Key"))); }
+                {l__wptr(qlabel(tr("Min Key"))); }
                 {l__w(NoteSpinBox(this));
                     _min_key = w;
                     w->setMaximum(doc::CHROMATIC_COUNT - 1);
                 }
 
-                {l__w_factory(qlabel(tr("Sample"))); }
+                {l__wptr(qlabel(tr("Sample"))); }
                 {l__w(QComboBox, 1);
                     _sample = w;
                     // Tie sample picker's width to available space, not the longest
@@ -609,7 +609,7 @@ public:
     ) {
         AdsrSlider * slider;
         SmallSpinBox * text;
-        {l__w_factory(label, 0, column, Qt::AlignHCenter);
+        {l__wptr(label, 0, column, Qt::AlignHCenter);
             w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         }
         {l__w(AdsrSlider(&_slider_snap, color), 1, column);
