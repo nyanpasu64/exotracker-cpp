@@ -285,6 +285,12 @@ using gui::lib::small_button::small_button;
 
 using main_window::StateComponent;
 
+static QSpinBox * wide_spinbox(QWidget * parent = nullptr) {
+    auto out = new QSpinBox(parent);
+    out->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+    return out;
+}
+
 static void set_value(QSpinBox * spin, int value) {
     auto b = QSignalBlocker(spin);
     spin->setValue(value);
@@ -361,22 +367,22 @@ public:
 
             {l__l(QHBoxLayout);
                 {l__form(QFormLayout);
-                    {form__label_w(tr("Loop point"), QSpinBox);
+                    {form__label_wptr(tr("Loop point"), wide_spinbox());
                         _loop_point = w;
                         w->setSingleStep(16);
                     }
-                    {form__label_w(tr("Sample rate"), QSpinBox);
+                    {form__label_wptr(tr("Sample rate"), wide_spinbox());
                         _sample_rate = w;
                         w->setMinimum(doc::MIN_SAMPLE_RATE);
                         w->setMaximum(doc::MAX_SAMPLE_RATE);
                     }
                     // TODO make NoteSpinBox independent of InstrumentDialogImpl
                     // and use it?
-                    {form__label_w(tr("Root key"), QSpinBox);
+                    {form__label_wptr(tr("Root key"), wide_spinbox());
                         _root_key = w;
                         w->setMaximum(doc::CHROMATIC_COUNT - 1);
                     }
-                    {form__label_w(tr("Detune"), QSpinBox);
+                    {form__label_wptr(tr("Detune"), wide_spinbox());
                         _detune = w;
                         w->setMinimum(-100);
                         w->setMaximum(100);

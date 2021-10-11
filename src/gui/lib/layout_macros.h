@@ -165,13 +165,17 @@
 
 
 /// Add label and leaf widget to QFormLayout.
-#define form__label_w(left_text, _right) \
-    auto * w = new _right; \
+#define form__label_wptr(LEFT_TEXT, RIGHT_PTR) \
+    auto * w = RIGHT_PTR; \
     \
-    form->addRow(left_text, w); \
+    form->addRow(LEFT_TEXT, w); \
     HIDE(form) \
     \
     require_semicolon
+
+
+#define form__label_w(LEFT_TEXT, RIGHT) \
+    form__label_wptr(LEFT_TEXT, new RIGHT)
 
 
 #define append_stretch(...) \
