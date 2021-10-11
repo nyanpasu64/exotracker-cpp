@@ -778,7 +778,9 @@ public:
 
         connect(
             _note_names, &QCheckBox::stateChanged,
-            this, &InstrumentDialogImpl::reload_state);
+            this, [this]() {
+                reload_state(false);
+            });
 
         auto connect_spin = [this](QSpinBox * spin, auto make_edit) {
             connect(
