@@ -1,4 +1,5 @@
 #include "note_spinbox.h"
+#include "gui/lib/format.h"
 #include "gui_common.h"
 #include "util/defer.h"
 
@@ -8,12 +9,30 @@
 
 namespace gui::lib::note_spinbox {
 
+using gui::lib::format::format_note_keysplit;
+
 NoteSpinBox::NoteSpinBox(FormatFn format, QWidget * parent)
     : QSpinBox(parent)
     , _format_note_name(std::move(format))
 {
     setMaximum(doc::CHROMATIC_COUNT - 1);
 }
+
+static QString format_note_name(doc::Chromatic note) {
+    // Relying on global state isn't *good*, but I don't care,
+    // and this doesn't couple the sound engine to the GUI,
+    // only the GUI to the main window.
+
+    auto & note_cfg = get_app().options().note_names;
+    auto & doc = win().state().document();
+
+    // I should rethink passing through 0 and 127 as numbers... but I don't care.
+    return format_note_keysplit(note_cfg, doc.accidental_mode, note);
+};
+
+NoteSpinBox::NoteSpinBox(QWidget * parent)
+    : NoteSpinBox(format_note_name, parent)
+{}
 
 static const QString LONGEST_STR = QStringLiteral("C#-1");
 

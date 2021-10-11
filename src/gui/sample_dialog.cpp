@@ -3,6 +3,7 @@
 #include "gui/lib/format.h"
 #include "gui/lib/layout_macros.h"
 #include "gui/lib/list_warnings.h"
+#include "gui/lib/note_spinbox.h"
 #include "gui/lib/small_button.h"
 #include "edit/edit_sample.h"
 #include "edit/edit_sample_list.h"
@@ -44,9 +45,11 @@ W_OBJECT_IMPL(SampleDialog)
 
 using doc::SampleIndex;
 using namespace gui::lib::list_warnings;
+using gui::lib::note_spinbox::NoteSpinBox;
 using main_window::MoveCursor_::IGNORE_CURSOR;
 
 using gui::lib::format::format_hex_2;
+using gui::lib::format::format_note_keysplit;
 
 namespace {
 enum class DragAction {
@@ -316,7 +319,7 @@ public:
     QLineEdit * _rename;
     QSpinBox * _loop_point;
     QSpinBox * _sample_rate;
-    QSpinBox * _root_key;
+    NoteSpinBox * _root_key;
     QSpinBox * _detune;
 
     bool _editing_loop_point = false;
@@ -376,11 +379,11 @@ public:
                         w->setMinimum(doc::MIN_SAMPLE_RATE);
                         w->setMaximum(doc::MAX_SAMPLE_RATE);
                     }
-                    // TODO make NoteSpinBox independent of InstrumentDialogImpl
-                    // and use it?
-                    {form__label_wptr(tr("Root key"), wide_spinbox());
+                    {form__label_w(tr("Root key"), NoteSpinBox);
                         _root_key = w;
-                        w->setMaximum(doc::CHROMATIC_COUNT - 1);
+                        w->setSizePolicy(
+                            QSizePolicy::MinimumExpanding, QSizePolicy::Fixed
+                        );
                     }
                     {form__label_wptr(tr("Detune"), wide_spinbox());
                         _detune = w;

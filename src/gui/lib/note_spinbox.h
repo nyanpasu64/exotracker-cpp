@@ -22,9 +22,12 @@ class NoteSpinBox : public QSpinBox {
     mutable ParseIntState _prev_state{};
 
 public:
+    /// Create a NoteSpinBox with a custom formatting function.
     explicit NoteSpinBox(
         std::function<QString(Chromatic)> format, QWidget * parent = nullptr
     );
+    /// Create a NoteSpinBox which always displays a note (rather than a number).
+    explicit NoteSpinBox(QWidget * parent = nullptr);
 
 // impl QSpinBox
 protected:
