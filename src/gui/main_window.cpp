@@ -310,6 +310,9 @@ struct MainWindowUi : MainWindow {
     QAction * _follow_playback;
     QAction * _compact_view;
 
+    // Instrument menu
+    QAction * _show_sample_dialog;
+
     // Panels
     TimelineEditor * _timeline_editor;
 
@@ -369,19 +372,19 @@ struct MainWindowUi : MainWindow {
                 _undo = m->addAction(tr("&Undo"));
                 _redo = m->addAction(tr("&Redo"));
 
-                {m__check(tr("&Overflow paste"));
+                {m__check(tr("&Overflow Paste"));
                     _overflow_paste = a;
                     a->setChecked(true);
                     a->setEnabled(false);
                 }
-                {m__check(tr("&Key repetition"));
+                {m__check(tr("&Key Repetition"));
                     _key_repeat = a;
                     a->setEnabled(false);
                 }
             }
 
             {m__m(tr("&View"));
-                {m__check(tr("&Follow playback"));
+                {m__check(tr("&Follow Playback"));
                     _follow_playback = a;
                     a->setChecked(true);
                     /* TODO finish implementing:
@@ -395,6 +398,10 @@ struct MainWindowUi : MainWindow {
                     _compact_view = a;
                     a->setEnabled(false);
                 }
+            }
+
+            {m__m(tr("&Instrument"));
+                _show_sample_dialog = m->addAction(tr("&Sample Manager"));
             }
         }
 
@@ -1037,6 +1044,12 @@ public:
 
         // TODO _exit->setShortcuts(QKeySequence::Quit);
         connect(_exit, &QAction::triggered, this, &QWidget::close);
+
+        connect(
+            _show_sample_dialog, &QAction::triggered,
+            this, [this]() {
+                show_sample_dialog({});
+            });
 
         auto connect_spin = [](QSpinBox * spin, auto * target, auto func) {
             connect(
