@@ -1,6 +1,6 @@
 # ExoTracker
 
-[![Appveyor build status](https://ci.appveyor.com/api/projects/status/02g6qu9deawagent/branch/master?svg=true)](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/master)
+[![Appveyor build status](https://ci.appveyor.com/api/projects/status/02g6qu9deawagent/branch/dev?svg=true)](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/dev)
 
 exotracker is an in-development cross-platform music tracker targeting the SNES SPC700 sound chip, possibly with other consoles being added later.
 
