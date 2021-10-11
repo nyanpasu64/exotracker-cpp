@@ -28,6 +28,7 @@
 
 #include <QDebug>
 #include <QEvent>
+#include <QMenu>
 #include <QProxyStyle>
 #include <QScreen>
 #include <QSignalBlocker>
@@ -669,6 +670,27 @@ public:
         return instr->keysplit[patch_idx].sample_idx;
     }
 
+    void on_sample_right_click(QPoint pos) {
+        auto index = _keysplit->indexAt(pos);
+        if (!index.isValid()) {
+            return;
+        }
+
+        auto menu = new QMenu(_keysplit);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+
+        auto add = menu->addAction(tr("&Edit Sample"));
+        connect(
+            add, &QAction::triggered,
+            this, &InstrumentDialogImpl::show_sample_dialog);
+
+        menu->popup(_keysplit->viewport()->mapToGlobal(pos));
+    }
+
+    void show_sample_dialog() {
+        _win->show_sample_dialog(curr_sample_index());
+    }
+
     template<typename F>
     void widget_changed(QWidget * widget, int value, F make_edit) {
         auto instr_idx = curr_instr_idx();
@@ -790,15 +812,28 @@ public:
             this, &InstrumentDialogImpl::on_move_patch_down);
 
         connect(
-            _note_names, &QCheckBox::stateChanged,
-            this, [this]() {
-                reload_state(false);
-            });
+            _keysplit, &QListWidget::currentItemChanged,
+            this, &InstrumentDialogImpl::reload_current_patch);
+
+        // Enable right-click menus for patch list.
+        _keysplit->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(
+            _keysplit, &QWidget::customContextMenuRequested,
+            this, &InstrumentDialogImpl::on_sample_right_click);
+
+        // When the user double-clicks the patch list, open the sample dialog.
+        connect(
+            _keysplit, &QListWidget::doubleClicked,
+            this, &InstrumentDialogImpl::show_sample_dialog);
 
         connect(
             _open_sample_dialog, &QPushButton::clicked,
+            this, &InstrumentDialogImpl::show_sample_dialog);
+
+        connect(
+            _note_names, &QCheckBox::stateChanged,
             this, [this]() {
-                _win->show_sample_dialog(curr_sample_index());
+                reload_state(false);
             });
 
         auto connect_spin = [this](QSpinBox * spin, auto make_edit) {
@@ -828,10 +863,6 @@ public:
             connect_slider(pair.slider, make_edit);
             connect_spin(pair.number, make_edit);
         };
-
-        connect(
-            _keysplit, &QListWidget::currentItemChanged,
-            this, &InstrumentDialogImpl::reload_current_patch);
 
         connect(
             _min_key, qOverload<int>(&QSpinBox::valueChanged),
