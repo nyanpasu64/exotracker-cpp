@@ -494,6 +494,7 @@ public:
 
             {l__w(QCheckBox(tr("Note names")));
                 _note_names = w;
+                w->setChecked(true);
             }
         }
     }
