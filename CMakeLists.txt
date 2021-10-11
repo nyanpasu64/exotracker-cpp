@@ -227,6 +227,7 @@ add_executable(exotracker-qt
     src/gui/lib/format.cpp  # Unfortunately tied to QString.
     src/gui/lib/instr_warnings.cpp
     src/gui/lib/list_warnings.cpp
+    src/gui/lib/note_spinbox.cpp
     src/gui/lib/parse_note.cpp
     src/gui/lib/painter_ext.cpp
     src/gui/lib/persistent_dialog.cpp
