@@ -519,6 +519,16 @@ public:
             list_select.select(idx, QItemSelectionModel::ClearAndSelect);
         }
 
+        // Hack to avoid scrolling a widget before it's shown
+        // (which causes broken layout and crashes).
+        // This probably won't have any bad effects,
+        // since when the app starts, the instrument number is always 0,
+        // and even if it was nonzero, only the scrolling will be wrong,
+        // not the actual selected instrument (which could cause a desync).
+        if (isVisible()) {
+            _list->scrollTo(idx);
+        }
+
         _remove->setEnabled(instr.has_value());
         _edit->setEnabled(instr.has_value());
         _clone->setEnabled(instr.has_value());
@@ -534,16 +544,6 @@ public:
             } else {
                 _rename->clear();
             }
-        }
-
-        // Hack to avoid scrolling a widget before it's shown
-        // (which causes broken layout and crashes).
-        // This probably won't have any bad effects,
-        // since when the app starts, the instrument number is always 0,
-        // and even if it was nonzero, only the scrolling will be wrong,
-        // not the actual selected instrument (which could cause a desync).
-        if (isVisible()) {
-            _list->scrollTo(idx);
         }
     }
 

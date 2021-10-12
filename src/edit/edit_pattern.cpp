@@ -1,6 +1,5 @@
 #include "edit_pattern.h"
 #include "edit_impl.h"
-#include "edit/modified.h"
 #include "timeline_iter.h"
 #include "doc_util/event_search.h"
 #include "util/release_assert.h"

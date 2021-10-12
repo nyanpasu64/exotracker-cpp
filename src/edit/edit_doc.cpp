@@ -1,6 +1,5 @@
 #include "edit_doc.h"
 #include "edit_impl.h"
-#include "edit/modified.h"
 #include "doc.h"
 #include "util/typeid_cast.h"
 #include "util/release_assert.h"

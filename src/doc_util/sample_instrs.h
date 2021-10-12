@@ -107,6 +107,9 @@ inline Sample saw() {
     };
 }
 
+Sample periodic_noise();
+Sample long_silence();
+
 /// Fast attack, no decay, lasts forever.
 constexpr Adsr INFINITE = { 0xf, 0x0, 0x7, 0x00 };
 

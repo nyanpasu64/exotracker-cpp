@@ -1,6 +1,5 @@
 #include "edit_instr_list.h"
 #include "edit_impl.h"
-#include "modified.h"
 #include "doc.h"
 #include "util/compare.h"
 #include "util/expr.h"

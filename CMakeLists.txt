@@ -189,6 +189,7 @@ add_library(exotracker-headless
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
     src/doc/validate.cpp
+    src/doc_util/sample_instrs.cpp
     src/serialize.cpp
     src/serialize/document.capnp.c++
     src/gui/history.cpp
@@ -226,6 +227,7 @@ add_executable(exotracker-qt
     src/gui/lib/list_warnings.cpp
     src/gui/lib/parse_note.cpp
     src/gui/lib/painter_ext.cpp
+    src/gui/lib/persistent_dialog.cpp
     src/gui/pattern_editor.cpp
     src/gui/timeline_editor.cpp
     src/gui/instrument_list.cpp

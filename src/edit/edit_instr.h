@@ -3,7 +3,6 @@
 #include "edit_common.h"
 #include "doc.h"
 
-#include <optional>
 #include <tuple>
 
 namespace edit::edit_instr {

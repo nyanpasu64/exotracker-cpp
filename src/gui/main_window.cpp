@@ -944,15 +944,6 @@ public:
         clamp_cursor(tx);
     }
 
-    void show_instr_dialog() override {
-        if (!_maybe_instr_dialog) {
-            _maybe_instr_dialog = InstrumentDialog::make(this);
-            _maybe_instr_dialog->show();
-        } else {
-            _maybe_instr_dialog->activateWindow();
-        }
-    }
-
     // private methods
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindowUi(std::move(document), parent)
@@ -1166,6 +1157,25 @@ public:
 
         // Initialize GUI state.
         edit_unwrap().update_all();
+    }
+
+    static void focus_dialog(QWidget * widget) {
+        // Un-minimize.
+        widget->showNormal();
+        // Bring to top. (Unnecessary on KWin X11.)
+        widget->raise();
+        // Focus.
+        widget->activateWindow();
+    }
+
+    InstrumentDialog * show_instr_dialog() override {
+        if (!_maybe_instr_dialog) {
+            _maybe_instr_dialog = InstrumentDialog::make(this);
+            _maybe_instr_dialog->show();
+        } else {
+            focus_dialog(_maybe_instr_dialog);
+        }
+        return _maybe_instr_dialog;
     }
 
     void on_open() {
@@ -1660,6 +1670,7 @@ CursorAndSelection & StateTransaction::cursor_mut() {
 
 void StateTransaction::set_instrument(int instrument) {
     _queued_updates |= E::InstrumentSwitched;
+    release_assert((size_t) instrument < doc::MAX_INSTRUMENTS);
     state_mut()._instrument = instrument;
 }
 

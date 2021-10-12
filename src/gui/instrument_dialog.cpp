@@ -35,11 +35,23 @@
 #include <QWheelEvent>
 
 #include <utility>  // std::move
+#include <vector>
 
 namespace gui::instrument_dialog {
 
-class ListWidget : public QListWidget {
-    QSize viewportSizeHint() const {
+class ColumnListWidget : public QListWidget {
+public:
+    ColumnListWidget(QWidget * parent = nullptr)
+        : QListWidget(parent)
+    {
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+
+        // Tie width to viewportSizeHint() (smaller, scales with font size).
+        setSizeAdjustPolicy(QListView::AdjustToContents);
+    }
+
+protected:
+    QSize viewportSizeHint() const override {
         const int w = qMax(4, fontMetrics().averageCharWidth());
         return QSize(20 * w, 0);
     }
@@ -340,18 +352,6 @@ static void set_value(QSpinBox * spin, int value) {
     spin->setValue(value);
 }
 
-static void reload_samples(
-    QComboBox * list, doc::Document const& doc, doc::InstrumentPatch const& patch
-) {
-    auto b = QSignalBlocker(list);
-
-    list->clear();
-    for (size_t sample_idx = 0; sample_idx < doc::MAX_SAMPLES; sample_idx++) {
-        list->addItem(sample_text(doc.samples, sample_idx));
-    }
-    list->setCurrentIndex(patch.sample_idx);
-}
-
 static void tab_by_row(QGridLayout & l) {
     QWidget * prev = nullptr;
     int nrow = l.rowCount();
@@ -444,17 +444,13 @@ class InstrumentDialogImpl final : public InstrumentDialog {
 
     // Updated by reload_keysplit().
     size_t _keysplit_size = 0;
+    std::vector<int> _visible_to_sample_idx;
 
 public:
     InstrumentDialogImpl(MainWindow * parent_win)
         : InstrumentDialog(parent_win)
         , _win(parent_win)
     {
-        setAttribute(Qt::WA_DeleteOnClose);
-
-        // Hide contextual-help button in the title bar.
-        setWindowFlags(windowFlags().setFlag(Qt::WindowContextHelpButtonHint, false));
-
         _warning_icon = warning_icon();
 
         build_ui();
@@ -492,12 +488,8 @@ public:
                 append_stretch();
             }
 
-            {l__w(ListWidget);
+            {l__w(ColumnListWidget);
                 _keysplit = w;
-                w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
-
-                // Make keysplit widget smaller and scale with font size
-                w->setSizeAdjustPolicy(QListWidget::AdjustToContents);
             }
 
             {l__w(QCheckBox(tr("Note names")));
@@ -524,6 +516,13 @@ public:
                 {l__w_factory(qlabel(tr("Sample"))); }
                 {l__w(QComboBox, 1);
                     _sample = w;
+                    // Tie sample picker's width to available space, not the longest
+                    // sample name (which causes long names to stretch the dialog's
+                    // width). If the dropdown is too short to show a full name,
+                    // the user can resize the dialog.
+                    w->setSizeAdjustPolicy(
+                        QComboBox::AdjustToMinimumContentsLengthWithIcon
+                    );
                 }
             }
 
@@ -764,7 +763,9 @@ public:
 
         connect(
             _note_names, &QCheckBox::stateChanged,
-            this, &InstrumentDialogImpl::reload_state);
+            this, [this]() {
+                reload_state(false);
+            });
 
         auto connect_spin = [this](QSpinBox * spin, auto make_edit) {
             connect(
@@ -784,14 +785,10 @@ public:
                 Qt::UniqueConnection
             );
         };
-        auto connect_combo = [this](QComboBox * combo, auto make_edit) {
+        auto connect_combo = [this](QComboBox * combo, auto func) {
             connect(
                 combo, qOverload<int>(&QComboBox::currentIndexChanged),
-                this, [this, combo, make_edit](int value) {
-                    widget_changed(combo, value, make_edit);
-                },
-                Qt::UniqueConnection
-            );
+                this, func);
         };
         auto connect_pair = [&](Control pair, auto make_edit) {
             connect_slider(pair.slider, make_edit);
@@ -806,7 +803,15 @@ public:
             _min_key, qOverload<int>(&QSpinBox::valueChanged),
             this, &InstrumentDialogImpl::on_set_min_key);
 
-        connect_combo(_sample, edit_instr::set_sample_idx);
+        connect_combo(
+            _sample,
+            [this](int visible_int) {
+                auto visible = (size_t) visible_int;
+                release_assert(visible < _visible_to_sample_idx.size());
+                widget_changed(
+                    _sample, _visible_to_sample_idx[visible], edit_instr::set_sample_idx
+                );
+            });
         connect_pair(_attack, edit_instr::set_attack);
         connect_pair(_decay, edit_instr::set_decay);
         connect_pair(_sustain, edit_instr::set_sustain);
@@ -837,8 +842,8 @@ public:
         reload_current_patch();
     }
 
-    /// does not emit change signals (which would invoke reload_current_patch()).
-    /// this should be fine, since when update_keysplit() is called by reload_state(),
+    /// Does not emit change signals (which would invoke reload_current_patch()).
+    /// This should be fine, since when update_keysplit() is called by reload_state(),
     /// reload_state subsequently calls reload_current_patch().
     ///
     /// If new_selection == -1, keeps old selection.
@@ -933,7 +938,7 @@ public:
 
         set_value(_min_key, patch.min_note);
 
-        reload_samples(_sample, doc, patch);
+        reload_samples(doc, patch);
 
         _attack.set_value(patch.adsr.attack_rate);
         _decay.set_value(patch.adsr.decay_rate);
@@ -941,6 +946,26 @@ public:
         _decay2.set_value(patch.adsr.decay_2);
 
         _adsr_graph->set_adsr(patch.adsr);
+    }
+
+    void reload_samples(doc::Document const& doc, doc::InstrumentPatch const& patch) {
+        auto list = _sample;
+        auto b = QSignalBlocker(list);
+
+        size_t current_visible = 0;
+
+        _visible_to_sample_idx.clear();
+        list->clear();
+        for (size_t sample_idx = 0; sample_idx < doc::MAX_SAMPLES; sample_idx++) {
+            if (sample_idx == patch.sample_idx) {
+                current_visible = _visible_to_sample_idx.size();
+            }
+            if (sample_idx == patch.sample_idx || doc.samples[sample_idx]) {
+                _visible_to_sample_idx.push_back((int) sample_idx);
+                list->addItem(sample_text(doc.samples, sample_idx));
+            }
+        }
+        list->setCurrentIndex((int) current_visible);
     }
 };
 

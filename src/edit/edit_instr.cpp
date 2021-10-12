@@ -1,6 +1,5 @@
 #include "edit_instr.h"
 #include "edit_impl.h"
-#include "edit/modified.h"
 #include "util/release_assert.h"
 #include "util/compare.h"
 #include "util/typeid_cast.h"
