@@ -1194,6 +1194,10 @@ public:
         return _maybe_instr_dialog;
     }
 
+    SampleDialog * maybe_sample_dialog() const override {
+        return _maybe_sample_dialog;
+    }
+
     SampleDialog * show_sample_dialog(std::optional<doc::SampleIndex> sample) override {
         if (!_maybe_sample_dialog) {
             _maybe_sample_dialog = SampleDialog::make(sample.value_or(0), this, this);

@@ -1,6 +1,7 @@
 #include "instrument_dialog.h"
 #include "instrument_dialog/adsr_graph.h"
 #include "gui_common.h"
+#include "gui/sample_dialog.h"
 #include "gui/lib/docs_palette.h"
 #include "gui/lib/format.h"
 #include "gui/lib/instr_warnings.h"
@@ -414,6 +415,8 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     // Updated by reload_keysplit().
     size_t _keysplit_size = 0;
     std::vector<int> _visible_to_sample_idx;
+    size_t _curr_patch = 0;
+    std::optional<doc::SampleIndex> _prev_sample_index;
 
 public:
     InstrumentDialogImpl(MainWindow * parent_win)
@@ -621,7 +624,7 @@ public:
 
         connect(
             _keysplit, &QListWidget::currentItemChanged,
-            this, &InstrumentDialogImpl::reload_current_patch);
+            this, &InstrumentDialogImpl::on_patch_changed);
 
         // Enable right-click menus for patch list.
         _keysplit->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -720,7 +723,7 @@ public:
     }
 
     size_t curr_patch_idx() const {
-        return (size_t) current_row(*_keysplit);
+        return _curr_patch;
     }
 
     std::optional<doc::SampleIndex> curr_sample_index() const {
@@ -774,17 +777,21 @@ public:
             )
         );
 
-        // TODO keep selection iff instrument id unchanged
-        reload_keysplit(*instr, instrument_switched ? 0 : -1);
+        reload_keysplit(*instr, instrument_switched ? std::optional(0) : std::nullopt);
         reload_current_patch();
     }
 
+    /// Reloads the _keysplit QListWidget, optionally selects a new patch,
+    /// and updates _curr_patch to the currently selected patch.
+    /// If the selected patch or sample has changed, focuses the current sample
+    /// in the sample dialog.
+    ///
     /// Does not emit change signals (which would invoke reload_current_patch()).
     /// This should be fine, since when update_keysplit() is called by reload_state(),
     /// reload_state subsequently calls reload_current_patch().
-    ///
-    /// If new_selection == -1, keeps old selection.
-    void reload_keysplit(doc::Instrument const& instr, int new_selection) {
+    void reload_keysplit(
+        doc::Instrument const& instr, std::optional<int> move_selection
+    ) {
         using gui::lib::instr_warnings::KeysplitWarningIter;
 
         QListWidget & list = *_keysplit;
@@ -792,10 +799,9 @@ public:
         auto const& doc = _win->state().document();
         doc::Samples const& samples = doc.samples;
 
-        // TODO ensure we always have exactly 1 element selected.
-        // TODO how to handle 0 keysplits? create a dummy keysplit pointing to sample 0?
-        if (new_selection < 0) {
-            new_selection = current_row(list);
+        size_t prev_patch = _curr_patch;
+        if (move_selection) {
+            _curr_patch = (size_t) *move_selection;
         }
         list.clear();
 
@@ -837,7 +843,27 @@ public:
         }
 
         if (n > 0) {
-            list.setCurrentRow(std::min(new_selection, int(n) - 1));
+            list.setCurrentRow((int) std::min(_curr_patch, n - 1));
+        }
+        // If we remove a patch, clamp the current patch in-bounds.
+        _curr_patch = (size_t) list.currentRow();
+
+        bool patch_changed = _curr_patch != prev_patch;
+        bool sample_changed = curr_sample_index() != _prev_sample_index;
+        if (move_selection || patch_changed || sample_changed) {
+            update_sample_dialog();
+        }
+    }
+
+    void update_sample_dialog() {
+        // nullopt if current instrument has zero patches
+        auto sample_index = curr_sample_index();
+        _prev_sample_index = sample_index;
+
+        if (auto dlg = _win->maybe_sample_dialog()) {
+            if (sample_index) {
+                dlg->reload_state(sample_index);
+            }
         }
     }
 
@@ -903,6 +929,12 @@ public:
             }
         }
         combo->setCurrentIndex((int) current_visible);
+    }
+
+    void on_patch_changed() {
+        _curr_patch = (size_t) current_row(*_keysplit);
+        update_sample_dialog();
+        reload_current_patch();
     }
 
     void on_sample_right_click(QPoint pos) {

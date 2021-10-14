@@ -346,6 +346,8 @@ public:
 
     virtual instrument_dialog::InstrumentDialog * show_instr_dialog() = 0;
 
+    virtual sample_dialog::SampleDialog * maybe_sample_dialog() const = 0;
+
     virtual sample_dialog::SampleDialog * show_sample_dialog(
         std::optional<doc::SampleIndex> sample
     ) = 0;
