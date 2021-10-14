@@ -605,167 +605,6 @@ public:
         }
     }
 
-    doc::Document const& document() const {
-        return _win->state().document();
-    }
-
-    size_t curr_instr_idx() const {
-        return (size_t) _win->state().instrument();
-    }
-
-    size_t curr_patch_idx() const {
-        return (size_t) current_row(*_keysplit);
-    }
-
-    std::optional<doc::SampleIndex> curr_sample_index() const {
-        auto const& doc = document();
-        auto const& instr = doc.instruments[curr_instr_idx()];
-
-        // If instruments[curr_instr_idx()] is absent, the instrument dialog should
-        // close, making this code unreachable. If instruments[curr_instr_idx()]
-        // is absent anyway, assert on debug builds and return "no sample found" on
-        // release builds.
-        assert(instr);
-        if (!instr) {
-            return {};
-        }
-
-        size_t patch_idx = curr_patch_idx();
-        // In case of empty instrument with a single "no patches found" row,
-        // return "no sample found".
-        if (patch_idx >= instr->keysplit.size()) {
-            return {};
-        }
-        return instr->keysplit[patch_idx].sample_idx;
-    }
-
-    void on_sample_right_click(QPoint pos) {
-        auto index = _keysplit->indexAt(pos);
-        if (!index.isValid()) {
-            return;
-        }
-
-        auto menu = new QMenu(_keysplit);
-        menu->setAttribute(Qt::WA_DeleteOnClose);
-
-        auto add = menu->addAction(tr("&Edit Sample"));
-        connect(
-            add, &QAction::triggered,
-            this, &InstrumentDialogImpl::show_sample_dialog);
-
-        menu->popup(_keysplit->viewport()->mapToGlobal(pos));
-    }
-
-    void show_sample_dialog() {
-        _win->show_sample_dialog(curr_sample_index());
-    }
-
-    template<typename F>
-    void widget_changed(QWidget * widget, int value, F make_edit) {
-        auto instr_idx = curr_instr_idx();
-        auto const& doc = document();
-
-        if (!doc.instruments[instr_idx]) {
-            return;
-        }
-        if (doc.instruments[instr_idx]->keysplit.empty()) {
-            return;
-        }
-
-        edit::EditBox cmd =
-            make_edit(doc, instr_idx, curr_patch_idx(), Narrow(value));
-
-        auto b = QSignalBlocker(widget);
-        auto tx = _win->edit_unwrap();
-        tx.push_edit(std::move(cmd), MoveCursor::IGNORE_CURSOR);
-    }
-
-    void on_set_min_key(int value) {
-        auto instr_idx = curr_instr_idx();
-        auto const& doc = document();
-
-        if (!doc.instruments[instr_idx]) {
-            return;
-        }
-        if (doc.instruments[instr_idx]->keysplit.empty()) {
-            return;
-        }
-
-        auto [cmd, new_patch_idx] =
-            edit_instr::set_min_key(doc, instr_idx, curr_patch_idx(), Narrow(value));
-
-        {
-            auto b = QSignalBlocker(_min_key);
-            auto tx = _win->edit_unwrap();
-            tx.push_edit(std::move(cmd), MoveCursor::IGNORE_CURSOR);
-            reload_keysplit(*doc.instruments[instr_idx], (int) new_patch_idx);
-        }
-    }
-
-    void on_add_patch() {
-        auto instr_idx = curr_instr_idx();
-        auto const& doc = document();
-
-        // Insert a patch at the end of the instrument's keysplit (`_keysplit_size`).
-        // `_keysplit->count()` is wrong, since if the instrument's keysplit has no
-        // patches, the `_keysplit` list widget contains a "No keysplits found" item.
-        auto patch_idx = _keysplit_size;
-
-        if (auto edit = edit_instr::try_add_patch(doc, instr_idx, patch_idx)) {
-            auto tx = _win->edit_unwrap();
-            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
-            reload_keysplit(*doc.instruments[instr_idx], (int) patch_idx);
-            // TODO move ~StateTransaction() logic to StateTransaction::commit()
-        }
-    }
-
-    void on_remove_patch() {
-        auto instr_idx = curr_instr_idx();
-        auto const& doc = document();
-
-        if (auto edit = edit_instr::try_remove_patch(
-            doc, instr_idx, curr_patch_idx()
-        )) {
-            auto tx = _win->edit_unwrap();
-            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
-            // leave current row unchanged, let reload_keysplit() truncate it
-        }
-    }
-
-    void on_move_patch_up() {
-        auto instr_idx = curr_instr_idx();
-        auto const& doc = document();
-        auto patch_idx = curr_patch_idx();
-
-        if (auto edit = edit_instr::try_move_patch_up(doc, instr_idx, patch_idx)) {
-            auto tx = _win->edit_unwrap();
-            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
-            reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx - 1));
-        }
-    }
-
-    void on_move_patch_down() {
-        auto instr_idx = curr_instr_idx();
-        auto const& doc = document();
-        auto patch_idx = curr_patch_idx();
-
-        if (auto edit = edit_instr::try_move_patch_down(doc, instr_idx, patch_idx)) {
-            auto tx = _win->edit_unwrap();
-            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
-            reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx + 1));
-        }
-    }
-
-    QString format_note_name(doc::Chromatic note) const {
-        if (_note_names->isChecked()) {
-            auto & note_cfg = get_app().options().note_names;
-            auto & doc = document();
-            return format_note_keysplit(note_cfg, doc.accidental_mode, note);
-        } else {
-            return QString::number(note);
-        }
-    }
-
     void connect_ui() {
         connect(
             _add_patch, &QToolButton::clicked,
@@ -805,6 +644,15 @@ public:
                 reload_state(false);
             });
 
+        connect(
+            _min_key, qOverload<int>(&QSpinBox::valueChanged),
+            this, &InstrumentDialogImpl::on_set_min_key);
+
+        auto connect_combo = [this](QComboBox * combo, auto func) {
+            connect(
+                combo, qOverload<int>(&QComboBox::currentIndexChanged),
+                this, func);
+        };
         auto connect_spin = [this](QSpinBox * spin, auto make_edit) {
             connect(
                 spin, qOverload<int>(&QSpinBox::valueChanged),
@@ -823,19 +671,10 @@ public:
                 Qt::UniqueConnection
             );
         };
-        auto connect_combo = [this](QComboBox * combo, auto func) {
-            connect(
-                combo, qOverload<int>(&QComboBox::currentIndexChanged),
-                this, func);
-        };
         auto connect_pair = [&](Control pair, auto make_edit) {
             connect_slider(pair.slider, make_edit);
             connect_spin(pair.number, make_edit);
         };
-
-        connect(
-            _min_key, qOverload<int>(&QSpinBox::valueChanged),
-            this, &InstrumentDialogImpl::on_set_min_key);
 
         connect_combo(
             _sample,
@@ -850,6 +689,70 @@ public:
         connect_pair(_decay, edit_instr::set_decay);
         connect_pair(_sustain, edit_instr::set_sustain);
         connect_pair(_decay2, edit_instr::set_decay2);
+    }
+
+    template<typename F>
+    void widget_changed(QWidget * widget, int value, F make_edit) {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+
+        if (!doc.instruments[instr_idx]) {
+            return;
+        }
+        if (doc.instruments[instr_idx]->keysplit.empty()) {
+            return;
+        }
+
+        edit::EditBox cmd =
+            make_edit(doc, instr_idx, curr_patch_idx(), Narrow(value));
+
+        auto b = QSignalBlocker(widget);
+        auto tx = _win->edit_unwrap();
+        tx.push_edit(std::move(cmd), MoveCursor::IGNORE_CURSOR);
+    }
+
+    doc::Document const& document() const {
+        return _win->state().document();
+    }
+
+    size_t curr_instr_idx() const {
+        return (size_t) _win->state().instrument();
+    }
+
+    size_t curr_patch_idx() const {
+        return (size_t) current_row(*_keysplit);
+    }
+
+    std::optional<doc::SampleIndex> curr_sample_index() const {
+        auto const& doc = document();
+        auto const& instr = doc.instruments[curr_instr_idx()];
+
+        // If instruments[curr_instr_idx()] is absent, the instrument dialog should
+        // close, making this code unreachable. If instruments[curr_instr_idx()]
+        // is absent anyway, assert on debug builds and return "no sample found" on
+        // release builds.
+        assert(instr);
+        if (!instr) {
+            return {};
+        }
+
+        size_t patch_idx = curr_patch_idx();
+        // In case of empty instrument with a single "no patches found" row,
+        // return "no sample found".
+        if (patch_idx >= instr->keysplit.size()) {
+            return {};
+        }
+        return instr->keysplit[patch_idx].sample_idx;
+    }
+
+    QString format_note_name(doc::Chromatic note) const {
+        if (_note_names->isChecked()) {
+            auto & note_cfg = get_app().options().note_names;
+            auto & doc = document();
+            return format_note_keysplit(note_cfg, doc.accidental_mode, note);
+        } else {
+            return QString::number(note);
+        }
     }
 
     void reload_state(bool instrument_switched) override {
@@ -1000,6 +903,103 @@ public:
             }
         }
         combo->setCurrentIndex((int) current_visible);
+    }
+
+    void on_sample_right_click(QPoint pos) {
+        auto index = _keysplit->indexAt(pos);
+        if (!index.isValid()) {
+            return;
+        }
+
+        auto menu = new QMenu(_keysplit);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+
+        auto add = menu->addAction(tr("&Edit Sample"));
+        connect(
+            add, &QAction::triggered,
+            this, &InstrumentDialogImpl::show_sample_dialog);
+
+        menu->popup(_keysplit->viewport()->mapToGlobal(pos));
+    }
+
+    void show_sample_dialog() {
+        _win->show_sample_dialog(curr_sample_index());
+    }
+
+    void on_set_min_key(int value) {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+
+        if (!doc.instruments[instr_idx]) {
+            return;
+        }
+        if (doc.instruments[instr_idx]->keysplit.empty()) {
+            return;
+        }
+
+        auto [cmd, new_patch_idx] =
+            edit_instr::set_min_key(doc, instr_idx, curr_patch_idx(), Narrow(value));
+
+        {
+            auto b = QSignalBlocker(_min_key);
+            auto tx = _win->edit_unwrap();
+            tx.push_edit(std::move(cmd), MoveCursor::IGNORE_CURSOR);
+            reload_keysplit(*doc.instruments[instr_idx], (int) new_patch_idx);
+        }
+    }
+
+    void on_add_patch() {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+
+        // Insert a patch at the end of the instrument's keysplit (`_keysplit_size`).
+        // `_keysplit->count()` is wrong, since if the instrument's keysplit has no
+        // patches, the `_keysplit` list widget contains a "No keysplits found" item.
+        auto patch_idx = _keysplit_size;
+
+        if (auto edit = edit_instr::try_add_patch(doc, instr_idx, patch_idx)) {
+            auto tx = _win->edit_unwrap();
+            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
+            reload_keysplit(*doc.instruments[instr_idx], (int) patch_idx);
+            // TODO move ~StateTransaction() logic to StateTransaction::commit()
+        }
+    }
+
+    void on_remove_patch() {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+
+        if (auto edit = edit_instr::try_remove_patch(
+            doc, instr_idx, curr_patch_idx()
+        )) {
+            auto tx = _win->edit_unwrap();
+            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
+            // leave current row unchanged, let reload_keysplit() truncate it
+        }
+    }
+
+    void on_move_patch_up() {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+        auto patch_idx = curr_patch_idx();
+
+        if (auto edit = edit_instr::try_move_patch_up(doc, instr_idx, patch_idx)) {
+            auto tx = _win->edit_unwrap();
+            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
+            reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx - 1));
+        }
+    }
+
+    void on_move_patch_down() {
+        auto instr_idx = curr_instr_idx();
+        auto const& doc = document();
+        auto patch_idx = curr_patch_idx();
+
+        if (auto edit = edit_instr::try_move_patch_down(doc, instr_idx, patch_idx)) {
+            auto tx = _win->edit_unwrap();
+            tx.push_edit(std::move(edit), MoveCursor::IGNORE_CURSOR);
+            reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx + 1));
+        }
     }
 };
 
