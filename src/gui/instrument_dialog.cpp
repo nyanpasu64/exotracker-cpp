@@ -656,7 +656,9 @@ public:
                 combo, qOverload<int>(&QComboBox::currentIndexChanged),
                 this, func);
         };
-        auto connect_spin = [this](QSpinBox * spin, auto make_edit) {
+        auto connect_pair = [&](Control pair, auto make_edit) {
+            auto * spin = pair.number;
+            auto * slider = pair.slider;
             connect(
                 spin, qOverload<int>(&QSpinBox::valueChanged),
                 this, [this, spin, make_edit](int value) {
@@ -664,8 +666,6 @@ public:
                 },
                 Qt::UniqueConnection
             );
-        };
-        auto connect_slider = [this](QSlider * slider, auto make_edit) {
             connect(
                 slider, &QSlider::valueChanged,
                 this, [this, slider, make_edit](int value) {
@@ -673,10 +673,6 @@ public:
                 },
                 Qt::UniqueConnection
             );
-        };
-        auto connect_pair = [&](Control pair, auto make_edit) {
-            connect_slider(pair.slider, make_edit);
-            connect_spin(pair.number, make_edit);
         };
 
         connect_combo(
@@ -709,7 +705,6 @@ public:
         edit::EditBox cmd =
             make_edit(doc, instr_idx, curr_patch_idx(), Narrow(value));
 
-        auto b = QSignalBlocker(widget);
         auto tx = _win->edit_unwrap();
         tx.push_edit(std::move(cmd), MoveCursor::IGNORE_CURSOR);
     }
