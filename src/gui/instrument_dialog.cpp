@@ -949,23 +949,23 @@ public:
     }
 
     void reload_samples(doc::Document const& doc, doc::InstrumentPatch const& patch) {
-        auto list = _sample;
-        auto b = QSignalBlocker(list);
+        auto combo = _sample;
+        auto b = QSignalBlocker(combo);
 
         size_t current_visible = 0;
 
         _visible_to_sample_idx.clear();
-        list->clear();
+        combo->clear();
         for (size_t sample_idx = 0; sample_idx < doc::MAX_SAMPLES; sample_idx++) {
             if (sample_idx == patch.sample_idx) {
                 current_visible = _visible_to_sample_idx.size();
             }
             if (sample_idx == patch.sample_idx || doc.samples[sample_idx]) {
                 _visible_to_sample_idx.push_back((int) sample_idx);
-                list->addItem(sample_text(doc.samples, sample_idx));
+                combo->addItem(sample_text(doc.samples, sample_idx));
             }
         }
-        list->setCurrentIndex((int) current_visible);
+        combo->setCurrentIndex((int) current_visible);
     }
 };
 
