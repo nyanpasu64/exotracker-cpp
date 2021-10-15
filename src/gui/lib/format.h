@@ -7,10 +7,11 @@
 
 #include <QString>
 #include <QStringLiteral>
-#include <QKeyEvent>
 
 #include <cstdint>
 #include <cstdlib>  // div
+
+class QKeyEvent;
 
 namespace gui::lib::format {
 
