@@ -231,6 +231,7 @@ add_executable(exotracker-qt
     src/gui/lib/parse_note.cpp
     src/gui/lib/painter_ext.cpp
     src/gui/lib/persistent_dialog.cpp
+    src/gui/lib/sample_text.cpp
     src/gui/pattern_editor.cpp
     src/gui/timeline_editor.cpp
     src/gui/instrument_list.cpp

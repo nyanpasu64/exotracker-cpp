@@ -9,6 +9,7 @@
 #include "gui/lib/list_warnings.h"
 #include "gui/lib/note_spinbox.h"
 #include "gui/lib/parse_note.h"
+#include "gui/lib/sample_text.h"
 #include "gui/lib/small_button.h"
 #include "edit/edit_instr.h"
 #include "util/defer.h"
@@ -296,18 +297,7 @@ static int current_row(QListWidget const& view) {
 
 using gui::lib::format::format_hex_2;
 using gui::lib::format::format_note_keysplit;
-
-static QString sample_text(doc::Samples const& samples, size_t sample_idx) {
-    assert(sample_idx < samples.size());
-    auto const& maybe_sample = samples[sample_idx];
-    if (maybe_sample) {
-        QString name = QString::fromStdString(maybe_sample->name);
-        return QLatin1String("%1 - %2").arg(format_hex_2(sample_idx), name);
-    } else {
-        return InstrumentDialog::tr("%1 (none)")
-            .arg(format_hex_2(sample_idx));
-    }
-}
+using gui::lib::sample_text::sample_text;
 
 /// Create a QLabel with a fixed horizontal width.
 static QLabel * qlabel(QString text) {

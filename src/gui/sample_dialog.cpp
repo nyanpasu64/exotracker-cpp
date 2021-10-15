@@ -4,6 +4,7 @@
 #include "gui/lib/layout_macros.h"
 #include "gui/lib/list_warnings.h"
 #include "gui/lib/note_spinbox.h"
+#include "gui/lib/sample_text.h"
 #include "gui/lib/small_button.h"
 #include "edit/edit_sample.h"
 #include "edit/edit_sample_list.h"
@@ -50,6 +51,8 @@ using main_window::MoveCursor_::IGNORE_CURSOR;
 
 using gui::lib::format::format_hex_2;
 using gui::lib::format::format_note_keysplit;
+using gui::lib::sample_text::sample_text;
+using gui::lib::sample_text::sample_title;
 
 namespace {
 enum class DragAction {
@@ -139,13 +142,7 @@ public:
 
         switch (role) {
         case Qt::DisplayRole:
-            if (samples[row]) {
-                return QStringLiteral("%1 - %2").arg(
-                    format_hex_2(row), QString::fromStdString(samples[row]->name)
-                );
-            } else {
-                return format_hex_2(row);
-            }
+            return sample_text(samples, (size_t) row);
 
         case Qt::DecorationRole:
             if (has_warning(row)) {
@@ -500,19 +497,12 @@ public:
 
     void reload_current_sample() {
         auto sample_idx = curr_sample_idx();
-        auto const& maybe_sample = document().samples[sample_idx];
+        auto const& doc = document();
+        auto const& maybe_sample = doc.samples[sample_idx];
         bool valid_sample = maybe_sample.has_value();
 
         // Update window title.
-        if (maybe_sample) {
-            setWindowTitle(
-                tr("Sample %1 - %2").arg(
-                    format_hex_2(sample_idx),
-                    QString::fromStdString(maybe_sample->name))
-            );
-        } else {
-            setWindowTitle(tr("Sample %1").arg(format_hex_2(sample_idx)));
-        }
+        setWindowTitle(sample_title(doc.samples, (size_t) sample_idx));
 
         // Update sample list selection.
         auto idx = _model.index((int) sample_idx, 0);
