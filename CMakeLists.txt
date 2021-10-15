@@ -186,6 +186,8 @@ add_library(exotracker-headless
     src/edit/edit_instr.cpp
     src/edit/edit_instr_list.cpp
     src/edit/edit_pattern.cpp
+    src/edit/edit_sample.cpp
+    src/edit/edit_sample_list.cpp
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
     src/doc/validate.cpp
@@ -225,9 +227,11 @@ add_executable(exotracker-qt
     src/gui/lib/format.cpp  # Unfortunately tied to QString.
     src/gui/lib/instr_warnings.cpp
     src/gui/lib/list_warnings.cpp
+    src/gui/lib/note_spinbox.cpp
     src/gui/lib/parse_note.cpp
     src/gui/lib/painter_ext.cpp
     src/gui/lib/persistent_dialog.cpp
+    src/gui/lib/sample_text.cpp
     src/gui/pattern_editor.cpp
     src/gui/timeline_editor.cpp
     src/gui/instrument_list.cpp
@@ -235,6 +239,7 @@ add_executable(exotracker-qt
     src/gui/tempo_dialog.cpp
     src/gui/instrument_dialog.cpp
     src/gui/instrument_dialog/adsr_graph.cpp
+    src/gui/sample_dialog.cpp
 
     # Resources
     res/exotracker.qrc

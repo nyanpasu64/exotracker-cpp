@@ -1,12 +1,15 @@
 #include "instrument_dialog.h"
 #include "instrument_dialog/adsr_graph.h"
 #include "gui_common.h"
+#include "gui/sample_dialog.h"
 #include "gui/lib/docs_palette.h"
 #include "gui/lib/format.h"
 #include "gui/lib/instr_warnings.h"
 #include "gui/lib/layout_macros.h"
 #include "gui/lib/list_warnings.h"
+#include "gui/lib/note_spinbox.h"
 #include "gui/lib/parse_note.h"
+#include "gui/lib/sample_text.h"
 #include "gui/lib/small_button.h"
 #include "edit/edit_instr.h"
 #include "util/defer.h"
@@ -19,6 +22,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPushButton>
 #include <QSpinBox>
 #include <QToolButton>
 
@@ -27,6 +31,7 @@
 
 #include <QDebug>
 #include <QEvent>
+#include <QMenu>
 #include <QProxyStyle>
 #include <QScreen>
 #include <QSignalBlocker>
@@ -58,42 +63,7 @@ protected:
 };
 
 using gui::lib::parse_note::ParseIntState;
-
-class InstrumentDialogImpl;
-class NoteSpinBox final : public QSpinBox {
-    // We cannot use parent(), because placing NoteSpinBox in a widget
-    // within a InstrumentDialogImpl means the NoteSpinBox's parent
-    // is no longer a InstrumentDialogImpl but some other QWidget.
-    // We *can* use window(), but that is risky.
-    InstrumentDialogImpl * _dlg;
-
-    mutable bool _show_longest_str = false;
-    mutable QString _prev_text;
-    mutable ParseIntState _prev_state{};
-
-public:
-    explicit NoteSpinBox(InstrumentDialogImpl * parent);
-
-// impl QSpinBox
-protected:
-    QString textFromValue(int value) const override;
-    QValidator::State validate(QString &text, int &pos) const override;
-    int valueFromText(const QString &text) const override;
-
-    static inline const QLatin1String LONGEST_STR = QLatin1String("C#-1");
-
-    QSize sizeHint() const override {
-        _show_longest_str = true;
-        defer { _show_longest_str = false; };
-        return QSpinBox::sizeHint();
-    }
-
-    QSize minimumSizeHint() const override {
-        _show_longest_str = true;
-        defer { _show_longest_str = false; };
-        return QSpinBox::minimumSizeHint();
-    }
-};
+using gui::lib::note_spinbox::NoteSpinBox;
 
 class SmallSpinBox final : public QSpinBox {
     /// The longest possible value this widget can display without overflowing.
@@ -327,18 +297,7 @@ static int current_row(QListWidget const& view) {
 
 using gui::lib::format::format_hex_2;
 using gui::lib::format::format_note_keysplit;
-
-static QString sample_text(doc::Samples const& samples, size_t sample_idx) {
-    assert(sample_idx < samples.size());
-    auto const& maybe_sample = samples[sample_idx];
-    if (maybe_sample) {
-        QString name = QString::fromStdString(maybe_sample->name);
-        return QLatin1String("%1 - %2").arg(format_hex_2(sample_idx), name);
-    } else {
-        return InstrumentDialog::tr("%1 (none)")
-            .arg(format_hex_2(sample_idx));
-    }
-}
+using gui::lib::sample_text::sample_text;
 
 /// Create a QLabel with a fixed horizontal width.
 static QLabel * qlabel(QString text) {
@@ -433,6 +392,7 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     QWidget * _patch_panel;
     QSpinBox * _min_key;
     QComboBox * _sample;
+    QPushButton * _open_sample_dialog;
     Control _attack;
     Control _decay;
     Control _sustain;
@@ -445,6 +405,8 @@ class InstrumentDialogImpl final : public InstrumentDialog {
     // Updated by reload_keysplit().
     size_t _keysplit_size = 0;
     std::vector<int> _visible_to_sample_idx;
+    size_t _curr_patch = 0;
+    std::optional<doc::SampleIndex> _prev_sample_index;
 
 public:
     InstrumentDialogImpl(MainWindow * parent_win)
@@ -473,16 +435,16 @@ public:
         {l__c_l(QGroupBox(tr("Keysplit")), QVBoxLayout);
             {l__l(QHBoxLayout);
                 // TODO add icons
-                {l__w_factory(small_button("+"));
+                {l__wptr(small_button("+"));
                     _add_patch = w;
                 }
-                {l__w_factory(small_button("-"));
+                {l__wptr(small_button("-"));
                     _remove_patch = w;
                 }
-                {l__w_factory(small_button("↑"));
+                {l__wptr(small_button("↑"));
                     _move_patch_up  = w;
                 }
-                {l__w_factory(small_button("↓"));
+                {l__wptr(small_button("↓"));
                     _move_patch_down  = w;
                 }
                 append_stretch();
@@ -494,6 +456,7 @@ public:
 
             {l__w(QCheckBox(tr("Note names")));
                 _note_names = w;
+                w->setChecked(true);
             }
         }
     }
@@ -501,19 +464,22 @@ public:
     void build_patch_editor(QBoxLayout * l) {
         using doc::Adsr;
 
+        auto format_note_name = [this](doc::Chromatic note) -> QString {
+            return this->format_note_name(note);
+        };
+
         // TODO add tabs
         {l__c_l(QWidget, QVBoxLayout, 1);
             _patch_panel = c;
             l->setContentsMargins(0, 0, 0, 0);
             // Top row.
             {l__l(QHBoxLayout);
-                {l__w_factory(qlabel(tr("Min Key"))); }
-                {l__w(NoteSpinBox(this));
+                {l__wptr(qlabel(tr("Min Key"))); }
+                {l__w(NoteSpinBox(format_note_name, this));
                     _min_key = w;
-                    w->setMaximum(doc::CHROMATIC_COUNT - 1);
                 }
 
-                {l__w_factory(qlabel(tr("Sample"))); }
+                {l__wptr(qlabel(tr("Sample"))); }
                 {l__w(QComboBox, 1);
                     _sample = w;
                     // Tie sample picker's width to available space, not the longest
@@ -523,6 +489,9 @@ public:
                     w->setSizeAdjustPolicy(
                         QComboBox::AdjustToMinimumContentsLengthWithIcon
                     );
+                }
+                {l__w(QPushButton(tr("&Edit Samples")));
+                    _open_sample_dialog = w;
                 }
             }
 
@@ -603,7 +572,7 @@ public:
     ) {
         AdsrSlider * slider;
         SmallSpinBox * text;
-        {l__w_factory(label, 0, column, Qt::AlignHCenter);
+        {l__wptr(label, 0, column, Qt::AlignHCenter);
             w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         }
         {l__w(AdsrSlider(&_slider_snap, color), 1, column);
@@ -629,16 +598,86 @@ public:
         }
     }
 
-    doc::Document const& document() const {
-        return _win->state().document();
-    }
+    void connect_ui() {
+        connect(
+            _add_patch, &QToolButton::clicked,
+            this, &InstrumentDialogImpl::on_add_patch);
+        connect(
+            _remove_patch, &QToolButton::clicked,
+            this, &InstrumentDialogImpl::on_remove_patch);
+        connect(
+            _move_patch_up, &QToolButton::clicked,
+            this, &InstrumentDialogImpl::on_move_patch_up);
+        connect(
+            _move_patch_down, &QToolButton::clicked,
+            this, &InstrumentDialogImpl::on_move_patch_down);
 
-    size_t curr_instr_idx() const {
-        return (size_t) _win->state().instrument();
-    }
+        connect(
+            _keysplit, &QListWidget::currentItemChanged,
+            this, &InstrumentDialogImpl::on_patch_changed);
 
-    size_t curr_patch_idx() const {
-        return (size_t) current_row(*_keysplit);
+        // Enable right-click menus for patch list.
+        _keysplit->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(
+            _keysplit, &QWidget::customContextMenuRequested,
+            this, &InstrumentDialogImpl::on_sample_right_click);
+
+        // When the user double-clicks the patch list, open the sample dialog.
+        connect(
+            _keysplit, &QListWidget::doubleClicked,
+            this, &InstrumentDialogImpl::show_sample_dialog);
+
+        connect(
+            _open_sample_dialog, &QPushButton::clicked,
+            this, &InstrumentDialogImpl::show_sample_dialog);
+
+        connect(
+            _note_names, &QCheckBox::stateChanged,
+            this, [this]() {
+                reload_state(false);
+            });
+
+        connect(
+            _min_key, qOverload<int>(&QSpinBox::valueChanged),
+            this, &InstrumentDialogImpl::on_set_min_key);
+
+        auto connect_combo = [this](QComboBox * combo, auto func) {
+            connect(
+                combo, qOverload<int>(&QComboBox::currentIndexChanged),
+                this, func);
+        };
+        auto connect_pair = [&](Control pair, auto make_edit) {
+            auto * spin = pair.number;
+            auto * slider = pair.slider;
+            connect(
+                spin, qOverload<int>(&QSpinBox::valueChanged),
+                this, [this, spin, make_edit](int value) {
+                    widget_changed(spin, value, make_edit);
+                },
+                Qt::UniqueConnection
+            );
+            connect(
+                slider, &QSlider::valueChanged,
+                this, [this, slider, make_edit](int value) {
+                    widget_changed(slider, value, make_edit);
+                },
+                Qt::UniqueConnection
+            );
+        };
+
+        connect_combo(
+            _sample,
+            [this](int visible_int) {
+                auto visible = (size_t) visible_int;
+                release_assert(visible < _visible_to_sample_idx.size());
+                widget_changed(
+                    _sample, _visible_to_sample_idx[visible], edit_instr::set_sample_idx
+                );
+            });
+        connect_pair(_attack, edit_instr::set_attack);
+        connect_pair(_decay, edit_instr::set_decay);
+        connect_pair(_sustain, edit_instr::set_sustain);
+        connect_pair(_decay2, edit_instr::set_decay2);
     }
 
     template<typename F>
@@ -656,9 +695,252 @@ public:
         edit::EditBox cmd =
             make_edit(doc, instr_idx, curr_patch_idx(), Narrow(value));
 
-        auto b = QSignalBlocker(widget);
         auto tx = _win->edit_unwrap();
         tx.push_edit(std::move(cmd), MoveCursor::IGNORE_CURSOR);
+    }
+
+    doc::Document const& document() const {
+        return _win->state().document();
+    }
+
+    size_t curr_instr_idx() const {
+        return (size_t) _win->state().instrument();
+    }
+
+    size_t curr_patch_idx() const {
+        return _curr_patch;
+    }
+
+    std::optional<doc::SampleIndex> curr_sample_index() const {
+        auto const& doc = document();
+        auto const& instr = doc.instruments[curr_instr_idx()];
+
+        // If instruments[curr_instr_idx()] is absent, the instrument dialog should
+        // close, making this code unreachable. If instruments[curr_instr_idx()]
+        // is absent anyway, assert on debug builds and return "no sample found" on
+        // release builds.
+        assert(instr);
+        if (!instr) {
+            return {};
+        }
+
+        size_t patch_idx = curr_patch_idx();
+        // In case of empty instrument with a single "no patches found" row,
+        // return "no sample found".
+        if (patch_idx >= instr->keysplit.size()) {
+            return {};
+        }
+        return instr->keysplit[patch_idx].sample_idx;
+    }
+
+    QString format_note_name(doc::Chromatic note) const {
+        if (_note_names->isChecked()) {
+            auto & note_cfg = get_app().options().note_names;
+            auto & doc = document();
+            return format_note_keysplit(note_cfg, doc.accidental_mode, note);
+        } else {
+            return QString::number(note);
+        }
+    }
+
+    void reload_state(bool instrument_switched) override {
+        auto const& state = _win->state();
+        auto const& doc = state.document();
+
+        auto instr_idx = curr_instr_idx();
+        release_assert(instr_idx < doc.instruments.size());
+
+        auto const& instr = doc.instruments[instr_idx];
+        if (!instr) {
+            close();
+            return;
+        }
+
+        setWindowTitle(
+            tr("Instrument %1 - %2").arg(
+                format_hex_2(instr_idx), QString::fromStdString(instr->name)
+            )
+        );
+
+        reload_keysplit(*instr, instrument_switched ? std::optional(0) : std::nullopt);
+        reload_current_patch();
+    }
+
+    /// Reloads the _keysplit QListWidget, optionally selects a new patch,
+    /// and updates _curr_patch to the currently selected patch.
+    /// If the selected patch or sample has changed, focuses the current sample
+    /// in the sample dialog.
+    ///
+    /// Does not emit change signals (which would invoke reload_current_patch()).
+    /// This should be fine, since when update_keysplit() is called by reload_state(),
+    /// reload_state subsequently calls reload_current_patch().
+    void reload_keysplit(
+        doc::Instrument const& instr, std::optional<int> move_selection
+    ) {
+        using gui::lib::instr_warnings::KeysplitWarningIter;
+
+        QListWidget & list = *_keysplit;
+        auto b = QSignalBlocker(&list);
+        auto const& doc = _win->state().document();
+        doc::Samples const& samples = doc.samples;
+
+        size_t prev_patch = _curr_patch;
+        if (move_selection) {
+            _curr_patch = (size_t) *move_selection;
+        }
+        list.clear();
+
+        auto & keysplit = instr.keysplit;
+        QColor warning_color = warning_bg();
+
+        // Fractional DPI scaling would be nice, but it's hard to subscribe to
+        // font/DPI changes (good luck getting a QWindow), and Qt's regular toolbars
+        // don't have fractionally scaled icons either.
+        list.setIconSize(ICON_SIZE);
+
+        auto warning_iter = KeysplitWarningIter(doc, instr);
+
+        size_t n = keysplit.size();
+        _keysplit_size = n;
+        for (size_t patch_idx = 0; patch_idx < n; patch_idx++) {
+            doc::InstrumentPatch const& patch = keysplit[patch_idx];
+            QString name = sample_text(samples, patch.sample_idx);
+
+            auto text = QString("%1: %2")
+                .arg(format_note_name(patch.min_note), name);
+            // TODO for single-key drum patch, print "=%1: %2"
+
+            auto item = new QListWidgetItem(text, &list);
+
+            auto warnings = warning_iter.next().value().warnings;
+            QString tooltip = warning_tooltip(warnings);
+            if (!tooltip.isEmpty()) {
+                item->setToolTip(std::move(tooltip));
+                item->setIcon(_warning_icon);
+                item->setBackground(warning_color);
+            }
+        }
+
+        if (n == 0) {
+            auto item = new QListWidgetItem(tr("No keysplits found"), &list);
+            item->setIcon(_warning_icon);
+            item->setBackground(warning_color);
+        }
+
+        if (n > 0) {
+            list.setCurrentRow((int) std::min(_curr_patch, n - 1));
+        }
+        // If we remove a patch, clamp the current patch in-bounds.
+        _curr_patch = (size_t) list.currentRow();
+
+        bool patch_changed = _curr_patch != prev_patch;
+        bool sample_changed = curr_sample_index() != _prev_sample_index;
+        if (move_selection || patch_changed || sample_changed) {
+            update_sample_dialog();
+        }
+    }
+
+    void update_sample_dialog() {
+        // nullopt if current instrument has zero patches
+        auto sample_index = curr_sample_index();
+        _prev_sample_index = sample_index;
+
+        if (auto dlg = _win->maybe_sample_dialog()) {
+            if (sample_index) {
+                dlg->reload_state(sample_index);
+            }
+        }
+    }
+
+    void reload_current_patch() {
+        auto const& state = _win->state();
+        auto const& doc = state.document();
+
+        auto instr_idx = curr_instr_idx();
+        auto const& instr = doc.instruments[instr_idx];
+        if (!instr) {
+            close();
+            return;
+        }
+
+        doc::InstrumentPatch patch;
+        patch.adsr = {0, 0, 0, 0};
+
+        auto patch_idx = curr_patch_idx();
+        if (!instr->keysplit.empty()) {
+            assert(patch_idx < instr->keysplit.size());
+        }
+
+        // out-of-bounds patch_idx should only happen in blank instruments,
+        // which should either be prohibited or treated as a no-op.
+        bool valid_patch = patch_idx < instr->keysplit.size();
+
+        if (valid_patch) {
+            patch = instr->keysplit[patch_idx];
+        }
+
+        _patch_panel->setEnabled(valid_patch);
+        _remove_patch->setEnabled(valid_patch);
+        _move_patch_up->setEnabled(valid_patch);
+        _move_patch_down->setEnabled(valid_patch);
+
+        set_value(_min_key, patch.min_note);
+
+        reload_samples(doc, patch);
+
+        _attack.set_value(patch.adsr.attack_rate);
+        _decay.set_value(patch.adsr.decay_rate);
+        _sustain.set_value(patch.adsr.sustain_level);
+        _decay2.set_value(patch.adsr.decay_2);
+
+        _adsr_graph->set_adsr(patch.adsr);
+    }
+
+    void reload_samples(doc::Document const& doc, doc::InstrumentPatch const& patch) {
+        auto combo = _sample;
+        auto b = QSignalBlocker(combo);
+
+        size_t current_visible = 0;
+
+        _visible_to_sample_idx.clear();
+        combo->clear();
+        for (size_t sample_idx = 0; sample_idx < doc::MAX_SAMPLES; sample_idx++) {
+            if (sample_idx == patch.sample_idx) {
+                current_visible = _visible_to_sample_idx.size();
+            }
+            if (sample_idx == patch.sample_idx || doc.samples[sample_idx]) {
+                _visible_to_sample_idx.push_back((int) sample_idx);
+                combo->addItem(sample_text(doc.samples, sample_idx));
+            }
+        }
+        combo->setCurrentIndex((int) current_visible);
+    }
+
+    void on_patch_changed() {
+        _curr_patch = (size_t) current_row(*_keysplit);
+        update_sample_dialog();
+        reload_current_patch();
+    }
+
+    void on_sample_right_click(QPoint pos) {
+        auto index = _keysplit->indexAt(pos);
+        if (!index.isValid()) {
+            return;
+        }
+
+        auto menu = new QMenu(_keysplit);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+
+        auto add = menu->addAction(tr("&Edit Sample"));
+        connect(
+            add, &QAction::triggered,
+            this, &InstrumentDialogImpl::show_sample_dialog);
+
+        menu->popup(_keysplit->viewport()->mapToGlobal(pos));
+    }
+
+    void show_sample_dialog() {
+        _win->show_sample_dialog(curr_sample_index());
     }
 
     void on_set_min_key(int value) {
@@ -736,278 +1018,7 @@ public:
             reload_keysplit(*doc.instruments[instr_idx], (int) (patch_idx + 1));
         }
     }
-
-    QString format_note_name(doc::Chromatic note) const {
-        if (_note_names->isChecked()) {
-            auto & note_cfg = get_app().options().note_names;
-            auto & doc = document();
-            return format_note_keysplit(note_cfg, doc.accidental_mode, note);
-        } else {
-            return QString::number(note);
-        }
-    }
-
-    void connect_ui() {
-        connect(
-            _add_patch, &QToolButton::clicked,
-            this, &InstrumentDialogImpl::on_add_patch);
-        connect(
-            _remove_patch, &QToolButton::clicked,
-            this, &InstrumentDialogImpl::on_remove_patch);
-        connect(
-            _move_patch_up, &QToolButton::clicked,
-            this, &InstrumentDialogImpl::on_move_patch_up);
-        connect(
-            _move_patch_down, &QToolButton::clicked,
-            this, &InstrumentDialogImpl::on_move_patch_down);
-
-        connect(
-            _note_names, &QCheckBox::stateChanged,
-            this, [this]() {
-                reload_state(false);
-            });
-
-        auto connect_spin = [this](QSpinBox * spin, auto make_edit) {
-            connect(
-                spin, qOverload<int>(&QSpinBox::valueChanged),
-                this, [this, spin, make_edit](int value) {
-                    widget_changed(spin, value, make_edit);
-                },
-                Qt::UniqueConnection
-            );
-        };
-        auto connect_slider = [this](QSlider * slider, auto make_edit) {
-            connect(
-                slider, &QSlider::valueChanged,
-                this, [this, slider, make_edit](int value) {
-                    widget_changed(slider, value, make_edit);
-                },
-                Qt::UniqueConnection
-            );
-        };
-        auto connect_combo = [this](QComboBox * combo, auto func) {
-            connect(
-                combo, qOverload<int>(&QComboBox::currentIndexChanged),
-                this, func);
-        };
-        auto connect_pair = [&](Control pair, auto make_edit) {
-            connect_slider(pair.slider, make_edit);
-            connect_spin(pair.number, make_edit);
-        };
-
-        connect(
-            _keysplit, &QListWidget::currentItemChanged,
-            this, &InstrumentDialogImpl::reload_current_patch);
-
-        connect(
-            _min_key, qOverload<int>(&QSpinBox::valueChanged),
-            this, &InstrumentDialogImpl::on_set_min_key);
-
-        connect_combo(
-            _sample,
-            [this](int visible_int) {
-                auto visible = (size_t) visible_int;
-                release_assert(visible < _visible_to_sample_idx.size());
-                widget_changed(
-                    _sample, _visible_to_sample_idx[visible], edit_instr::set_sample_idx
-                );
-            });
-        connect_pair(_attack, edit_instr::set_attack);
-        connect_pair(_decay, edit_instr::set_decay);
-        connect_pair(_sustain, edit_instr::set_sustain);
-        connect_pair(_decay2, edit_instr::set_decay2);
-    }
-
-    void reload_state(bool instrument_switched) override {
-        auto const& state = _win->state();
-        auto const& doc = state.document();
-
-        auto instr_idx = curr_instr_idx();
-        release_assert(instr_idx < doc.instruments.size());
-
-        auto const& instr = doc.instruments[instr_idx];
-        if (!instr) {
-            close();
-            return;
-        }
-
-        setWindowTitle(
-            tr("Instrument %1 - %2").arg(
-                format_hex_2(instr_idx), QString::fromStdString(instr->name)
-            )
-        );
-
-        // TODO keep selection iff instrument id unchanged
-        reload_keysplit(*instr, instrument_switched ? 0 : -1);
-        reload_current_patch();
-    }
-
-    /// Does not emit change signals (which would invoke reload_current_patch()).
-    /// This should be fine, since when update_keysplit() is called by reload_state(),
-    /// reload_state subsequently calls reload_current_patch().
-    ///
-    /// If new_selection == -1, keeps old selection.
-    void reload_keysplit(doc::Instrument const& instr, int new_selection) {
-        using gui::lib::instr_warnings::KeysplitWarningIter;
-
-        QListWidget & list = *_keysplit;
-        auto b = QSignalBlocker(&list);
-        auto const& doc = _win->state().document();
-        doc::Samples const& samples = doc.samples;
-
-        // TODO ensure we always have exactly 1 element selected.
-        // TODO how to handle 0 keysplits? create a dummy keysplit pointing to sample 0?
-        if (new_selection < 0) {
-            new_selection = current_row(list);
-        }
-        list.clear();
-
-        auto & keysplit = instr.keysplit;
-        QColor warning_color = warning_bg();
-
-        // Fractional DPI scaling would be nice, but it's hard to subscribe to
-        // font/DPI changes (good luck getting a QWindow), and Qt's regular toolbars
-        // don't have fractionally scaled icons either.
-        list.setIconSize(ICON_SIZE);
-
-        auto warning_iter = KeysplitWarningIter(doc, instr);
-
-        size_t n = keysplit.size();
-        _keysplit_size = n;
-        for (size_t patch_idx = 0; patch_idx < n; patch_idx++) {
-            doc::InstrumentPatch const& patch = keysplit[patch_idx];
-            QString name = sample_text(samples, patch.sample_idx);
-
-            auto text = QString("%1: %2")
-                .arg(format_note_name(patch.min_note), name);
-            // TODO for single-key drum patch, print "=%1: %2"
-
-            auto item = new QListWidgetItem(text, &list);
-
-            auto warnings = warning_iter.next().value().warnings;
-            QString tooltip = warning_tooltip(warnings);
-            if (!tooltip.isEmpty()) {
-                item->setToolTip(std::move(tooltip));
-                item->setIcon(_warning_icon);
-                item->setBackground(warning_color);
-            }
-        }
-
-        if (n == 0) {
-            auto item = new QListWidgetItem(tr("No keysplits found"), &list);
-            item->setIcon(_warning_icon);
-            item->setBackground(warning_color);
-        }
-
-        if (n > 0) {
-            list.setCurrentRow(std::min(new_selection, int(n) - 1));
-        }
-    }
-
-    void reload_current_patch() {
-        auto const& state = _win->state();
-        auto const& doc = state.document();
-
-        auto instr_idx = curr_instr_idx();
-        auto const& instr = doc.instruments[instr_idx];
-        if (!instr) {
-            close();
-            return;
-        }
-
-        doc::InstrumentPatch patch;
-        patch.adsr = {0, 0, 0, 0};
-
-        auto patch_idx = curr_patch_idx();
-        if (!instr->keysplit.empty()) {
-            assert(patch_idx < instr->keysplit.size());
-        }
-
-        // out-of-bounds patch_idx should only happen in blank instruments,
-        // which should either be prohibited or treated as a no-op.
-        bool valid_patch = patch_idx < instr->keysplit.size();
-
-        if (valid_patch) {
-            patch = instr->keysplit[patch_idx];
-        }
-
-        _patch_panel->setEnabled(valid_patch);
-        _remove_patch->setEnabled(valid_patch);
-        _move_patch_up->setEnabled(valid_patch);
-        _move_patch_down->setEnabled(valid_patch);
-
-        set_value(_min_key, patch.min_note);
-
-        reload_samples(doc, patch);
-
-        _attack.set_value(patch.adsr.attack_rate);
-        _decay.set_value(patch.adsr.decay_rate);
-        _sustain.set_value(patch.adsr.sustain_level);
-        _decay2.set_value(patch.adsr.decay_2);
-
-        _adsr_graph->set_adsr(patch.adsr);
-    }
-
-    void reload_samples(doc::Document const& doc, doc::InstrumentPatch const& patch) {
-        auto list = _sample;
-        auto b = QSignalBlocker(list);
-
-        size_t current_visible = 0;
-
-        _visible_to_sample_idx.clear();
-        list->clear();
-        for (size_t sample_idx = 0; sample_idx < doc::MAX_SAMPLES; sample_idx++) {
-            if (sample_idx == patch.sample_idx) {
-                current_visible = _visible_to_sample_idx.size();
-            }
-            if (sample_idx == patch.sample_idx || doc.samples[sample_idx]) {
-                _visible_to_sample_idx.push_back((int) sample_idx);
-                list->addItem(sample_text(doc.samples, sample_idx));
-            }
-        }
-        list->setCurrentIndex((int) current_visible);
-    }
 };
-
-NoteSpinBox::NoteSpinBox(InstrumentDialogImpl * parent)
-    : QSpinBox(parent)
-    , _dlg(parent)
-{}
-
-QString NoteSpinBox::textFromValue(int value) const {
-    // It's OK (for now) to return different values during sizeHint(),
-    // because Q[Abstract]SpinBox doesn't cache textFromValue()'s return value...
-    // yay fragile base classes
-    if (_show_longest_str) {
-        return LONGEST_STR;
-    }
-
-    return _dlg->format_note_name((doc::Chromatic) value);
-}
-
-using gui::lib::parse_note::parse_note_name;
-
-QValidator::State NoteSpinBox::validate(QString & text, int & pos) const  {
-    if (_prev_text == text && !text.isEmpty()) {
-        return _prev_state.state;
-    }
-
-    _prev_text = text;
-    _prev_state = parse_note_name(get_app().options().note_names, text, pos);
-    return _prev_state.state;
-}
-
-int NoteSpinBox::valueFromText(const QString & text) const {
-    if (_prev_text == text && !text.isEmpty()) {
-        return _prev_state.value;
-    }
-
-    QString copy = text;
-    int pos = lineEdit()->cursorPosition();
-    _prev_text = copy;
-    _prev_state = parse_note_name(get_app().options().note_names, copy, pos);
-    return _prev_state.value;
-}
 
 InstrumentDialog * InstrumentDialog::make(MainWindow * parent_win) {
     return new InstrumentDialogImpl(parent_win);

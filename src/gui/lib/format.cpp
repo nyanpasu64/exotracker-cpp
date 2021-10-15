@@ -1,5 +1,7 @@
 #include "format.h"
 
+#include <QKeyEvent>
+
 namespace gui::lib::format {
 
 namespace detail {

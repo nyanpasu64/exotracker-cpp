@@ -6,6 +6,7 @@
 #include "gui/timeline_editor.h"
 #include "gui/instrument_dialog.h"
 #include "gui/instrument_list.h"
+#include "gui/sample_dialog.h"
 #include "gui/tempo_dialog.h"
 #include "gui/lib/icon_toolbar.h"
 // Other
@@ -309,6 +310,9 @@ struct MainWindowUi : MainWindow {
     QAction * _follow_playback;
     QAction * _compact_view;
 
+    // Instrument menu
+    QAction * _show_sample_dialog;
+
     // Panels
     TimelineEditor * _timeline_editor;
 
@@ -368,19 +372,19 @@ struct MainWindowUi : MainWindow {
                 _undo = m->addAction(tr("&Undo"));
                 _redo = m->addAction(tr("&Redo"));
 
-                {m__check(tr("&Overflow paste"));
+                {m__check(tr("&Overflow Paste"));
                     _overflow_paste = a;
                     a->setChecked(true);
                     a->setEnabled(false);
                 }
-                {m__check(tr("&Key repetition"));
+                {m__check(tr("&Key Repetition"));
                     _key_repeat = a;
                     a->setEnabled(false);
                 }
             }
 
             {m__m(tr("&View"));
-                {m__check(tr("&Follow playback"));
+                {m__check(tr("&Follow Playback"));
                     _follow_playback = a;
                     a->setChecked(true);
                     /* TODO finish implementing:
@@ -394,6 +398,10 @@ struct MainWindowUi : MainWindow {
                     _compact_view = a;
                     a->setEnabled(false);
                 }
+            }
+
+            {m__m(tr("&Instrument"));
+                _show_sample_dialog = m->addAction(tr("&Sample Manager"));
             }
         }
 
@@ -435,7 +443,7 @@ struct MainWindowUi : MainWindow {
         {l__c_l(QGroupBox, QVBoxLayout)
             c->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
             c->setTitle(tr("Timeline"));
-            {l__w_factory(TimelineEditor::make(this))
+            {l__wptr(TimelineEditor::make(this))
                 _timeline_editor = w;
             }
             {l__w(IconToolBar)
@@ -577,7 +585,7 @@ struct MainWindowUi : MainWindow {
     } }
 
     void instrument_list_panel(QBoxLayout * l) {
-        {l__w_factory(InstrumentList::make(this))
+        {l__wptr(InstrumentList::make(this))
             _instrument_list = w;
             w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         }
@@ -856,6 +864,7 @@ public:
 
 using tempo_dialog::TempoDialog;
 using instrument_dialog::InstrumentDialog;
+using sample_dialog::SampleDialog;
 
 // module-private
 class MainWindowImpl : public MainWindowUi {
@@ -867,6 +876,7 @@ public:
     QTimer _gui_refresh_timer;
     QErrorMessage _error_dialog{this};
     QPointer<InstrumentDialog> _maybe_instr_dialog;
+    QPointer<SampleDialog> _maybe_sample_dialog;
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
@@ -1035,6 +1045,12 @@ public:
         // TODO _exit->setShortcuts(QKeySequence::Quit);
         connect(_exit, &QAction::triggered, this, &QWidget::close);
 
+        connect(
+            _show_sample_dialog, &QAction::triggered,
+            this, [this]() {
+                show_sample_dialog({});
+            });
+
         auto connect_spin = [](QSpinBox * spin, auto * target, auto func) {
             connect(
                 spin, qOverload<int>(&QSpinBox::valueChanged),
@@ -1176,6 +1192,23 @@ public:
             focus_dialog(_maybe_instr_dialog);
         }
         return _maybe_instr_dialog;
+    }
+
+    SampleDialog * maybe_sample_dialog() const override {
+        return _maybe_sample_dialog;
+    }
+
+    SampleDialog * show_sample_dialog(std::optional<doc::SampleIndex> sample) override {
+        if (!_maybe_sample_dialog) {
+            _maybe_sample_dialog = SampleDialog::make(sample.value_or(0), this, this);
+            _maybe_sample_dialog->show();
+        } else {
+            focus_dialog(_maybe_sample_dialog);
+            if (sample) {
+                _maybe_sample_dialog->reload_state(sample);
+            }
+        }
+        return _maybe_sample_dialog;
     }
 
     void on_open() {
@@ -1616,6 +1649,12 @@ StateTransaction::~StateTransaction() noexcept(false) {
         }
     }
 
+    if (_win->_maybe_sample_dialog) {
+        if (e & E::DocumentEdited) {
+            _win->_maybe_sample_dialog->reload_state(_sample_index);
+        }
+    }
+
     auto const& history = state.history();
 
     _win->_undo->setEnabled(history.can_undo());
@@ -1672,6 +1711,10 @@ void StateTransaction::set_instrument(int instrument) {
     _queued_updates |= E::InstrumentSwitched;
     release_assert((size_t) instrument < doc::MAX_INSTRUMENTS);
     state_mut()._instrument = instrument;
+}
+
+void StateTransaction::set_sample_index(doc::SampleIndex sample) {
+    _sample_index = sample;
 }
 
 // public

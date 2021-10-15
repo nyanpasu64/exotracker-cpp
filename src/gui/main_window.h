@@ -24,6 +24,9 @@
 namespace gui::instrument_dialog {
     class InstrumentDialog;
 }
+namespace gui::sample_dialog {
+    class SampleDialog;
+}
 
 namespace gui::main_window {
 #ifndef main_window_INTERNAL
@@ -257,6 +260,7 @@ private:
 
     /// Which part of the GUI needs to be redrawn due to events.
     StateUpdateFlags _queued_updates = StateUpdateFlag::None;
+    std::optional<doc::SampleIndex> _sample_index;
 
 // impl
 private:
@@ -306,6 +310,10 @@ public:
     CursorAndSelection & cursor_mut();
 
     void set_instrument(int instrument);
+
+    /// Only called by the sample dialog when editing the sample list.
+    /// Only affects the sample dialog, not StateComponent.
+    void set_sample_index(doc::SampleIndex sample);
 };
 
 
@@ -337,6 +345,12 @@ public:
     virtual StateTransaction edit_unwrap() = 0;
 
     virtual instrument_dialog::InstrumentDialog * show_instr_dialog() = 0;
+
+    virtual sample_dialog::SampleDialog * maybe_sample_dialog() const = 0;
+
+    virtual sample_dialog::SampleDialog * show_sample_dialog(
+        std::optional<doc::SampleIndex> sample
+    ) = 0;
 
 // constructors
     static std::unique_ptr<MainWindow> make(
