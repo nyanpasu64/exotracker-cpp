@@ -9,13 +9,11 @@ using spc700_synth::Spc700Synth;
 using impl_chip::ImplChipInstance;
 
 std::unique_ptr<ChipInstance> make_Spc700Instance(
-    chip_common::ChipIndex chip_index,
-    NsampT samples_per_sec,
-    doc::FrequenciesRef frequencies)
-{
+    chip_common::ChipIndex chip_index, doc::FrequenciesRef frequencies
+) {
     return std::make_unique<ImplChipInstance<Spc700Driver, Spc700Synth>>(
         chip_index,
-        Spc700Driver(samples_per_sec, frequencies),
+        Spc700Driver(frequencies),
         Spc700Synth());
 }
 

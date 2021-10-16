@@ -196,7 +196,7 @@ OverallSynth::OverallSynth(
         switch (chip_kind) {
             case ChipKind::Spc700: {
                 auto instance = spc700::make_Spc700Instance(
-                   chip_index, SAMPLES_PER_S_IDEAL, _document.frequency_table
+                   chip_index, _document.frequency_table
                 );
 
                 instance->reload_samples(_document);
@@ -315,6 +315,12 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
         } else if (total_modified & ModifiedFlags::Patterns) {
             for (auto & chip : _chip_instances) {
                 chip->doc_edited(_document);
+            }
+        }
+
+        if (total_modified & ModifiedFlags::SamplesEdited) {
+            for (auto & chip : _chip_instances) {
+                chip->reload_samples(_document);
             }
         }
     }

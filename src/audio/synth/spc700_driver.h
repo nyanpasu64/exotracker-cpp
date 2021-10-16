@@ -29,11 +29,15 @@ struct Spc700ChipFlags {
     uint8_t koff = 0;
 };
 
+using spc700_synth::Spc700Synth;
 class Spc700Driver;
 
 class Spc700ChannelDriver {
     uint8_t _channel_id;
 
+    // Volume 32 out of [-128..127] is an acceptable default.
+    // 64 results in clipping when playing many channels at once.
+    uint8_t _prev_volume = 0x20;
     doc::Chromatic _prev_note = 0;
     bool _note_playing = false;
 
@@ -44,16 +48,24 @@ class Spc700ChannelDriver {
 public:
     Spc700ChannelDriver(uint8_t channel_id);
 
+    /// When samples are edited, this gets called after APU has been reset.
+    /// Writes current volume/etc. to the sound chip, but not currently playing note
+    /// (since the sample has changed or moved).
+    void restore_state(doc::Document const& document, RegisterWriteQueue & regs) const;
+
+private:
+    void write_volume(RegisterWriteQueue & regs) const;
+
+public:
+    // TODO make naming consistent (tick_tempo vs. sequencer_ticked).
     void run_driver(
         doc::Document const& document,
         Spc700Driver const& chip_driver,
         bool sequencer_ticked,
         EventsRef events,
-        RegisterWriteQueue &/*mut*/ register_writes,
+        RegisterWriteQueue &/*mut*/ regs,
         Spc700ChipFlags & flags);
 };
-
-using spc700_synth::Spc700Synth;
 
 class Spc700Driver {
 private:
@@ -70,29 +82,39 @@ private:
 public:
     using ChannelID = chip_kinds::Spc700ChannelID;
 
-    Spc700Driver(NsampT samples_per_sec, FrequenciesRef frequencies);
+    explicit Spc700Driver(FrequenciesRef frequencies);
     DISABLE_COPY(Spc700Driver)
     DEFAULT_MOVE(Spc700Driver)
 
-    // RegisterWriteQueue is currently unused.
+    /// Called when beginning playback from a clean slate.
     void reset_state(
-        doc::Document const& document,
-        Spc700Synth & synth,
-        RegisterWriteQueue & register_writes);
+        doc::Document const& document, Spc700Synth & synth, RegisterWriteQueue & regs
+    );
 
-    // RegisterWriteQueue is currently unused.
+private:
+    // Only used in reset_state().
+    Spc700Driver();
+
+    /// When samples are edited, this gets called after APU has been reset.
+    /// Reinitialize SPC700 and write current volume/etc. to the sound chip,
+    /// but not currently playing notes (since the samples have changed or moved).
+    void restore_state(
+        doc::Document const& document, RegisterWriteQueue & regs
+    ) const;
+
+public:
+    /// Called when samples are edited.
     void reload_samples(
-        doc::Document const& document,
-        Spc700Synth & synth,
-        RegisterWriteQueue & register_writes);
+        doc::Document const& document, Spc700Synth & synth, RegisterWriteQueue & regs
+    );
 
-    void stop_playback(RegisterWriteQueue /*mut*/& register_writes);
+    void stop_playback(RegisterWriteQueue /*mut*/& regs);
 
     void run_driver(
         doc::Document const& document,
         bool tick_tempo,
         EnumMap<ChannelID, EventsRef> const& channel_events,
-        RegisterWriteQueue &/*mut*/ register_writes);
+        RegisterWriteQueue &/*mut*/ regs);
 
     friend class Spc700ChannelDriver;
 };
