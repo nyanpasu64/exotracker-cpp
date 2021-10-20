@@ -2,7 +2,7 @@
 
 [![Appveyor build status](https://ci.appveyor.com/api/projects/status/02g6qu9deawagent/branch/dev?svg=true)](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/dev)
 
-exotracker is an in-development cross-platform music tracker targeting the SNES SPC700 sound chip, possibly with other consoles being added later.
+exotracker is an in-development cross-platform music tracker targeting the SNES SPC700 sound chip.
 
 exotracker will not exactly match the tracker paradigm. Like trackers, it will have 1 note per channel, vertical channels, and note/effect columns. Unlike trackers, there is no concept of a row duration. Notes will not "take up" rows, but will be triggered at points in time (consisting of beat fraction + tick offset). This makes it easier, more self-documenting, and less hacky (compared to other trackers) to achieve dense rhythms (over 1 note per row), triplets, and early notes.
 
@@ -10,13 +10,13 @@ I have a [Google Drive folder of exploratory design notes](https://drive.google.
 
 ## Branches
 
-To get the most up-to-date code, checkout and follow the `dev` branch. Note that it may be force-pushed to fix bugs, which complicates `git pull`. `master` will not be force-pushed, but it is pushed infrequently and lags 1-2 weeks behind `dev`.
+To get the most up-to-date code, checkout and follow the `dev` branch. Note that it may be force-pushed to fix bugs, which complicates `git pull`. `stable` will not be force-pushed, but it is pushed infrequently and lags 1-2 weeks behind `dev`.
 
 At the moment, I primarily develop on local HEAD and branches, instead of using pull requests to update the GitHub/GitLab repository. I may switch to pull requests to prevent merge conflicts, if more people start contributing to this repository.
 
 ## Download
 
-Pre-built development binaries are available at Appveyor ([master](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/master), [dev](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/dev)). On Windows, you will need the Universal C Runtime to run these programs. It is installed by default on some machines, or can be downloaded from [Microsoft](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads#section-2).
+Pre-built development binaries are available at Appveyor ([stable](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/stable), [dev](https://ci.appveyor.com/project/nyanpasu64/exotracker-cpp/branch/dev)). On Windows, you will need the Universal C Runtime to run these programs. It is installed by default on some machines, or can be downloaded from [Microsoft](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads#section-2).
 
 ## Building
 
@@ -34,8 +34,12 @@ I use Qt Creator and CLion IDEs for this project. You can import it into Visual 
 exotracker-cpp requires a compiler with C++20 support. MSVC, GCC 10+, and Clang 10+ are supported.
 
 - On Linux, I've had good results with GCC 10 and Clang 10 through 12 (older versions lack support for `operator<=>` and defaulting `operator==`).
+	- You can speed up builds if you install lld and use it instead of ld.
+	- On Clang, enable lld using `-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld`
+	- On GCC, enable lld using `-DCMAKE_C_FLAGS=-fuse-ld=lld -DCMAKE_CXX_FLAGS=-fuse-ld=lld`
 - On Windows, I recommend using MSVC or Clang (not clang-cl). MinGW/GCC works, but is not recommended.
 	- MinGW-w64 produces larger binaries, and requires either linking libc statically into the binary (even larger binaries) or bundling glibc DLLs (since unlike Universal CRT, most people don't have mingw-w64 in PATH).
+		- Additionally, MinGW-w64 builds slowly due to a slow linker. You may have better results using lld instead of ld, but I have not tested it yet.
 	- If you plan to use MinGW, I recommend using MSYS2 to install GCC and Qt (`pacman -Syu mingw-w64-x86_64-gcc mingw-w64-x86_64-gdb mingw-w64-x86_64-qt5`).
 	- Using Qt's web installer to install MinGW Qt is discouraged, since installing MinGW Qt also installs MinGW GCC 8.1.0, which is too old to compile exotracker. (If you try uninstalling MinGW, it removes MinGW Qt as well.) You have to keep GCC 8.1.0 around (but avoid using it), then use MSYS2 to install mingw-w64 GCC separately, use MSYS2's compiler to build exotracker, and use MSYS2's DLLs to run exotracker. You're better off installing GCC and Qt through MSYS2, which works by default.
 	- Do not use Win-builds to install MinGW! It ships GCC 4.8.3 and Qt 5.3.1, which were released in 2014 and are far too outdated for exotracker.
