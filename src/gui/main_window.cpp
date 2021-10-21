@@ -47,9 +47,11 @@
 #include <QDebug>
 #include <QErrorMessage>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFlags>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QMessageBox>
 #include <QPointer>
 #include <QScreen>
 #include <QTextCursor>
@@ -898,6 +900,8 @@ public:
     // Global actions:
     QAction _restart_audio;
 
+    QString _file_title;
+    QString _file_path;
     AudioComponent _audio;
 
     // utility methods
@@ -1211,8 +1215,38 @@ public:
         return _maybe_sample_dialog;
     }
 
+    void reload_title() {
+        auto calc_title = [this]() -> QString {
+            if (!_file_path.isEmpty()) {
+                return QFileInfo(_file_path).fileName();
+            } else {
+                return tr("Untitled");
+            }
+        };
+
+        _file_title = calc_title();
+        QString dirty_marker;
+        if (_state.history().is_dirty()) {
+            dirty_marker = QStringLiteral("*");
+        }
+
+        // TODO define app name in a single translatable location
+        setWindowTitle(QStringLiteral("%1%2 - %3").arg(
+            _file_title, dirty_marker, "ExoTracker"
+        ));
+    }
+
+    // TODO on_new()
+
     void on_open() {
         using serialize::ErrorType;
+
+        if (_state.history().is_dirty()) {
+            // TODO
+//            if (!prompt_if_unsaved(tr("Open"))) {
+//                return;
+//            }
+        }
 
         // TODO save recent dirs, using SQLite or QSettings
         auto path = QFileDialog::getOpenFileName(
@@ -1225,8 +1259,6 @@ public:
             return;
         }
 
-        // TODO prompt if document dirty.
-
         auto result = serialize::load_from_path(path.toUtf8());
         if (result.v) {
             // If document loaded successfully, load it into the program.
@@ -1238,6 +1270,8 @@ public:
                 StateTransaction tx = edit_unwrap();
                 // Probably redundant, but do it just to be safe.
                 tx.update_all();
+
+                tx.set_file_path(path);
 
                 tx.cursor_mut() = {};
 
@@ -1301,6 +1335,8 @@ public:
         }
     }
 
+    // TODO on_save
+
     void on_save_as() {
         using serialize::Metadata;
 
@@ -1329,6 +1365,10 @@ public:
             cursor.insertText(tr("Failed to save file:\n"));
             cursor.insertText(QString::fromStdString(*error));
             _error_dialog.showMessage(document.toHtml());
+        } else {
+            auto tx = edit_unwrap();
+            tx.set_file_path(path);
+            tx.clear_dirty();
         }
     }
 
@@ -1655,6 +1695,11 @@ StateTransaction::~StateTransaction() noexcept(false) {
         }
     }
 
+    // TODO also check DirtyCleared or Saved?
+    if (e & (E::DocumentEdited | E::TitleChanged)) {
+        _win->reload_title();
+    }
+
     auto const& history = state.history();
 
     _win->_undo->setEnabled(history.can_undo());
@@ -1687,6 +1732,17 @@ using E = StateUpdateFlag;
 history::History & StateTransaction::history_mut() {
     _queued_updates |= E::DocumentEdited;
     return state_mut()._history;
+}
+
+void StateTransaction::set_file_path(QString path) {
+    _queued_updates |= E::TitleChanged;
+    _win->_file_path = std::move(path);
+}
+
+void StateTransaction::clear_dirty() {
+    _queued_updates |= E::TitleChanged;
+    // Is it safe to not call history_mut() and set DocumentEdited?
+    state_mut()._history.clear_dirty();
 }
 
 void StateTransaction::push_edit(edit::EditBox command, MoveCursor cursor_move) {

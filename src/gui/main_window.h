@@ -243,6 +243,10 @@ enum class StateUpdateFlag : uint32_t {
     CursorMoved = 0x2,
     InstrumentSwitched = 0x4,
 
+    // Metadata/undo flags.
+    TitleChanged = 0x1,
+
+    // Flags which close windows.
     DocumentReplaced = 0x100,
     InstrumentDeleted = 0x200,
 };
@@ -297,6 +301,13 @@ public:
     /// (Exception: AudioComponent::undo()/redo() call this as well.)
     History & history_mut();
 
+    void set_file_path(QString path);
+    void clear_dirty();
+
+    // Don't use set_dirty(), but instead rely on set_document() and push_edit()
+    // to manage dirty bit. And clearing the dirty bit (upon saving)
+    // can be achieved through MainWindow without creating a StateTransaction.
+
     /// move_to() or move_to_here() saves and moves the cursor (for pattern edits).
     /// MoveCursor_::IGNORE_CURSOR doesn't move the cursor on undo/redo (for
     /// non-pattern edits).
@@ -305,6 +316,8 @@ public:
     /// Close the instrument dialog if open.
     void instrument_deleted();
 
+    /// Clear history and replace it with a new document, marking the current state
+    /// as clean.
     void set_document(doc::Document document);
 
     CursorAndSelection & cursor_mut();

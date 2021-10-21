@@ -37,6 +37,8 @@ private:
     std::vector<UndoFrame> _undo_stack;
     std::vector<UndoFrame> _redo_stack;
 
+    bool _dirty = false;
+
 public:
     History(doc::Document initial_state);
     DISABLE_COPY(History)
@@ -46,6 +48,14 @@ public:
     /// To modify the document, use EditBox/CursorEdit.
     doc::Document const& get_document() const noexcept {
         return _document;
+    }
+
+    bool is_dirty() const {
+        return _dirty;
+    }
+    void clear_dirty() {
+        // TODO store "dirty" in each undo frame, rather than being permanent.
+        _dirty = false;
     }
 
     /// Clears redo stack, mutates document, pushes command into undo history.
