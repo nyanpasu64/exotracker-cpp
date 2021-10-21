@@ -44,6 +44,7 @@
 #include <QFormLayout>
 // Other
 #include <QAction>
+#include <QCloseEvent>
 #include <QDebug>
 #include <QErrorMessage>
 #include <QFileDialog>
@@ -1241,10 +1242,44 @@ public:
         ));
     }
 
+    /// Called when closing the document (new/open).
+    /// If the document has unsaved changes, asks the user to save, discard, or cancel.
+    /// Returns false if the user cancels closing or saving the document.
+    bool should_close_document(QString action) {
+        using Msg = QMessageBox;
+
+        if (!_state.history().is_dirty()) {
+            return true;
+        }
+
+        QString message = tr("Save changes to %1?").arg(_file_title);
+        Msg::StandardButton should_close = Msg::question(
+            this, action, message, Msg::Save | Msg::Discard | Msg::Cancel
+        );
+
+        if (should_close == Msg::Cancel) {
+            return false;
+        } else if (should_close == Msg::Discard) {
+            return true;
+        } else {
+            return on_save();
+        }
+
+        // TODO if we add extra steps (like cancelling a non-modal render),
+        // move above logic into a lambda, move "cancel render" into another lambda,
+        // and check if each returns true.
+    }
+
     // TODO on_new()
 
     void on_open() {
         using serialize::ErrorType;
+
+        if (_state.history().is_dirty()) {
+            if (!should_close_document(tr("Open"))) {
+                return;
+            }
+        }
 
         // TODO save recent dirs, using SQLite or QSettings
         auto path = QFileDialog::getOpenFileName(
@@ -1256,8 +1291,6 @@ public:
         if (path.isEmpty()) {
             return;
         }
-
-        // TODO prompt if document dirty.
 
         auto result = serialize::load_from_path(path.toUtf8());
         if (result.v) {
@@ -1390,6 +1423,14 @@ public:
             tx.mark_saved();
 
             return true;
+        }
+    }
+
+    void closeEvent(QCloseEvent * event) override {
+        if (should_close_document(tr("Quit"))) {
+            event->accept();
+        } else {
+            event->ignore();
         }
     }
 
