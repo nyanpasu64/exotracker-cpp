@@ -1231,15 +1231,29 @@ public:
         };
 
         _file_title = calc_title();
-        QString dirty_marker;
-        if (_state.history().is_dirty()) {
-            dirty_marker = QStringLiteral("*");
-        }
 
-        // TODO define app name in a single translatable location
-        setWindowTitle(QStringLiteral("%1%2 - %3").arg(
-            _file_title, dirty_marker, "ExoTracker"
+        // Don't rely on Qt generating a window title based off
+        // QWidget::setWindowFilePath(), since it won't say "Untitled"
+        // if _file_path is empty.
+        setWindowTitle(QStringLiteral("%1[*] - %2").arg(
+            _file_title, get_app().app_name()
         ));
+
+        // > on macOS, this... sets the proxy icon for the window,
+        // > assuming that the file path exists.
+        // ...
+        // > Apple Hid the Proxy Icon in Big Sur’s Finder
+        setWindowFilePath(_file_path);
+
+        // > On macOS the close button will have a modified look;
+        // > on other platforms, the window title will have an '*' (asterisk).
+        setWindowModified(_state.history().is_dirty());
+
+        // Don't call QGuiApplication::setApplicationDisplayName().
+        // It appends the app name onto every window not already ending with it.
+        // This causes more problems than it solves, since you can't tell Qt to
+        // always/never add the app name onto specific windows.
+        // Additionally it uses hyphens on Windows but en dashes on Linux.
     }
 
     /// Called when closing the document (new/open).

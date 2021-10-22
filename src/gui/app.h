@@ -53,6 +53,8 @@ public:
     void set_options(Options options) {
         _options = options;
     }
+
+    QString app_name() const;
 };
 
 }
