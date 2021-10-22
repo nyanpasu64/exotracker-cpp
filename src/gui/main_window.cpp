@@ -1307,7 +1307,7 @@ public:
         // TODO save recent dirs, using SQLite or QSettings
         auto path = QFileDialog::getSaveFileName(
             this,
-            tr("Open File"),
+            tr("Save As"),
             QString(),
             tr("ExoTracker modules (*.etm);;All files (*)"));
 
@@ -1315,19 +1315,19 @@ public:
             return;
         }
 
-        auto result = serialize::save_to_path(
+        auto error = serialize::save_to_path(
             get_document(),
             Metadata {
                 .zoom_level = (uint16_t) _zoom_level->value(),
             },
             path.toUtf8());
 
-        if (result) {
+        if (error) {
             QTextDocument document;
             auto cursor = QTextCursor(&document);
 
             cursor.insertText(tr("Failed to save file:\n"));
-            cursor.insertText(QString::fromStdString(*result));
+            cursor.insertText(QString::fromStdString(*error));
             _error_dialog.showMessage(document.toHtml());
         }
     }
