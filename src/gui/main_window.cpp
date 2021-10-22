@@ -1241,16 +1241,43 @@ public:
         ));
     }
 
+    /// Called when closing the document (new/open).
+    /// If the document has unsaved changes, asks the user to save, discard, or cancel.
+    /// Returns false if the user cancels closing or saving the document.
+    bool should_close_document(QString action) {
+        using Msg = QMessageBox;
+
+        if (!_state.history().is_dirty()) {
+            return true;
+        }
+
+        QString message = tr("Save changes to %1?").arg(_file_title);
+        Msg::StandardButton should_close = Msg::question(
+            this, action, message, Msg::Save | Msg::Discard | Msg::Cancel
+        );
+
+        if (should_close == Msg::Cancel) {
+            return false;
+        } else if (should_close == Msg::Discard) {
+            return true;
+        } else {
+            return on_save();
+        }
+
+        // TODO if we add extra steps (like cancelling a non-modal render),
+        // move above logic into a lambda, move "cancel render" into another lambda,
+        // and check if each returns true.
+    }
+
     // TODO on_new()
 
     void on_open() {
         using serialize::ErrorType;
 
         if (_state.history().is_dirty()) {
-            // TODO
-//            if (!prompt_if_unsaved(tr("Open"))) {
-//                return;
-//            }
+            if (!should_close_document(tr("Open"))) {
+                return;
+            }
         }
 
         // TODO save recent dirs, using SQLite or QSettings
@@ -1340,15 +1367,15 @@ public:
         }
     }
 
-    void on_save() {
+    bool on_save() {
         if (_file_path.isEmpty()) {
-            on_save_as();
+            return on_save_as();
         } else {
-            save_impl(_file_path);
+            return save_impl(_file_path);
         }
     }
 
-    void on_save_as() {
+    bool on_save_as() {
         using serialize::Metadata;
 
         // TODO save recent dirs, using SQLite or QSettings
@@ -1359,13 +1386,13 @@ public:
             tr("ExoTracker modules (*.etm);;All files (*)"));
 
         if (path.isEmpty()) {
-            return;
+            return false;
         } else {
-            save_impl(path);
+            return save_impl(path);
         }
     }
 
-    void save_impl(QString path) {
+    bool save_impl(QString path) {
         using serialize::Metadata;
 
         auto error = serialize::save_to_path(
@@ -1382,6 +1409,8 @@ public:
             cursor.insertText(tr("Failed to save file:\n"));
             cursor.insertText(QString::fromStdString(*error));
             _error_dialog.showMessage(document.toHtml());
+
+            return false;
         } else {
             auto tx = edit_unwrap();
 
@@ -1391,6 +1420,8 @@ public:
             // upon an IO error, so only call set_file_path() in this branch.
             tx.set_file_path(path);
             tx.clear_dirty();
+
+            return true;
         }
     }
 
