@@ -2,6 +2,7 @@
 #include "gui/history.h"
 #include "gui/app.h"
 #include "sample_docs.h"
+#include "util/expr.h"
 
 #include <CLI/CLI.hpp>
 #include <fmt/core.h>
@@ -36,7 +37,7 @@ struct Arguments {
     static std::variant<Arguments, ReturnCode> parse(int argc, char *argv[]) {
         CLI::App app;
 
-        std::string doc_name = sample_docs::DEFAULT_DOC;
+        std::string doc_name;
 
         app.add_option("doc_name", /*mut*/ doc_name, "Name of sample document to load");
         app.failure_message(CLI::FailureMessage::help);
@@ -80,16 +81,25 @@ int main(int argc, char *argv[]) {
     }
     auto arg = std::get<Arguments>(std::move(maybe_arg));
 
+    bool use_new_document = (arg.doc_name.empty());
+
     using sample_docs::DOCUMENTS;
-    if (!DOCUMENTS.count(arg.doc_name)) {
+    if (!use_new_document && !DOCUMENTS.count(arg.doc_name)) {
         fmt::print(
             stderr, "Invalid document name \"{}\". Valid names are:\n\n", arg.doc_name
         );
         fmt::print("{}", list_documents());
         return 1;
     }
-    auto const & document = sample_docs::DOCUMENTS.at(arg.doc_name);
-    unique_ptr<MainWindow> w = MainWindow::make(document.clone());
+    auto document = EXPR(
+        if (use_new_document) {
+            return sample_docs::new_document();
+        } else {
+            return sample_docs::DOCUMENTS.at(arg.doc_name).clone();
+        }
+    );
+
+    unique_ptr<MainWindow> w = MainWindow::make(std::move(document));
     w->show();
 
     return a.exec();
