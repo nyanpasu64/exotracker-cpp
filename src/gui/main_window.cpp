@@ -44,6 +44,7 @@
 #include <QFormLayout>
 // Other
 #include <QAction>
+#include <QCloseEvent>
 #include <QDebug>
 #include <QErrorMessage>
 #include <QFileDialog>
@@ -1430,6 +1431,14 @@ public:
             tx.clear_dirty();
 
             return true;
+        }
+    }
+
+    void closeEvent(QCloseEvent * event) override {
+        if (should_close_document(tr("Quit"))) {
+            event->accept();
+        } else {
+            event->ignore();
         }
     }
 
