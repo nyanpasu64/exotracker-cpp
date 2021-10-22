@@ -254,6 +254,7 @@ void serialize_event(
     auto effects = span(v.effects);
     // v.effects is a fixed-size array span, this is guaranteed to not truncate.
     auto num_effects = (uint) leading_size(effects);
+    effects = effects.subspan(0, num_effects);
     if (num_effects) {
         serialize_all(effects, gen_event.initEffects(num_effects), [](
             MaybeEffect const& effect, gen::MaybeEffect::Builder gen_effect
