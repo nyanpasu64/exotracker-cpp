@@ -67,7 +67,11 @@ int main(int argc, char *argv[]) {
         Qt::HighDpiScaleFactorRoundingPolicy::RoundPreferFloor
     );
     GuiApp a(argc, argv);
-    a.setApplicationDisplayName(GuiApp::tr("ExoTracker"));
+    // Don't call QGuiApplication::setApplicationDisplayName()
+    // to append the app name to windows.
+    // It can't be turned off for instrument dialogs,
+    // uses hyphens on Windows but en dashes on Linux (and you can't tell which),
+    // and disappears when a file or instrument is named ExoTracker.
 
     // Parse command-line arguments.
     auto maybe_arg = Arguments::parse(argc, argv);

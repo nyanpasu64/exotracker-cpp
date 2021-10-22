@@ -1234,7 +1234,9 @@ public:
         // QWidget::setWindowFilePath() and QGuiApplication::setApplicationDisplayName()
         // is *almost* good enough to skip calling QWidget::setWindowTitle()...
         // except you have to do it anyway to print "Untitled" if no file is saved.
-        setWindowTitle(_file_title + "[*]");
+        setWindowTitle(QStringLiteral("%1[*] - %2").arg(
+            _file_title, get_app().app_name()
+        ));
 
         // > on macOS, this... sets the proxy icon for the window,
         // > assuming that the file path exists.

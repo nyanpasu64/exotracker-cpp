@@ -100,4 +100,8 @@ GuiApp::GuiApp(int &argc, char **argv, int flags)
     hook_all_screens(*this);
 }
 
+QString GuiApp::app_name() const {
+    return tr("ExoTracker");
+}
+
 }
