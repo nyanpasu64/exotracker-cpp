@@ -299,6 +299,7 @@ struct MainWindowUi : MainWindow {
 
     // File menu
     QAction * _open;
+    QAction * _save;
     QAction * _save_as;
     QAction * _exit;
 
@@ -365,6 +366,7 @@ struct MainWindowUi : MainWindow {
 
             {m__m(tr("&File"));
                 _open = m->addAction(tr("&Open"));
+                _save = m->addAction(tr("&Save"));
                 _save_as = m->addAction(tr("Save &As"));
                 m->addSeparator();
                 _exit = m->addAction(tr("E&xit"));
@@ -1043,6 +1045,9 @@ public:
         _open->setShortcuts(QKeySequence::Open);
         connect(_open, &QAction::triggered, this, &MainWindowImpl::on_open);
 
+        _save->setShortcuts(QKeySequence::Save);
+        connect(_save, &QAction::triggered, this, &MainWindowImpl::on_save);
+
         _save_as->setShortcuts(QKeySequence::SaveAs);
         connect(_save_as, &QAction::triggered, this, &MainWindowImpl::on_save_as);
 
@@ -1330,9 +1335,15 @@ public:
         }
     }
 
-    // TODO on_save
+    bool on_save() {
+        if (_file_path.isEmpty()) {
+            return on_save_as();
+        } else {
+            return save_impl(_file_path);
+        }
+    }
 
-    void on_save_as() {
+    bool on_save_as() {
         using serialize::Metadata;
 
         // TODO save recent dirs, using SQLite or QSettings
@@ -1343,8 +1354,14 @@ public:
             tr("ExoTracker modules (*.etm);;All files (*)"));
 
         if (path.isEmpty()) {
-            return;
+            return false;
+        } else {
+            return save_impl(path);
         }
+    }
+
+    bool save_impl(QString path) {
+        using serialize::Metadata;
 
         auto error = serialize::save_to_path(
             get_document(),
@@ -1360,10 +1377,19 @@ public:
             cursor.insertText(tr("Failed to save file:\n"));
             cursor.insertText(QString::fromStdString(*error));
             _error_dialog.showMessage(document.toHtml());
+
+            return false;
         } else {
             auto tx = edit_unwrap();
+
+            // Unnecessary unless you "save as", but not a big slowdown.
+            // It seems most users expect "save as" to only set the file path
+            // if the save succeeds, and most programs don't set the file path
+            // upon an IO error, so only call set_file_path() in this branch.
             tx.set_file_path(path);
             tx.mark_saved();
+
+            return true;
         }
     }
 
