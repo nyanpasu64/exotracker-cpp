@@ -25,14 +25,16 @@ static Document empty() {
     SequencerOptions sequencer_options{.target_tempo = 150, .ticks_per_beat = 48};
 
     constexpr SampleIndex TRIANGLE = 0;
-    constexpr SampleIndex PULSE_25 = 1;
-    constexpr SampleIndex PULSE_50 = 2;
-    constexpr SampleIndex SAW = 3;
-    constexpr SampleIndex NOISE = 4;
-    constexpr SampleIndex LONG = 5;
+    constexpr SampleIndex PULSE_12_5 = 1;
+    constexpr SampleIndex PULSE_25 = 2;
+    constexpr SampleIndex PULSE_50 = 3;
+    constexpr SampleIndex SAW = 4;
+    constexpr SampleIndex NOISE = 5;
+    constexpr SampleIndex LONG = 6;
 
     Samples samples;
     samples[TRIANGLE] = triangle();
+    samples[PULSE_12_5] = pulse_12_5();
     samples[PULSE_25] = pulse_25();
     samples[PULSE_50] = pulse_50();
     samples[SAW] = saw();
@@ -42,14 +44,18 @@ static Document empty() {
     Instruments instruments;
     instruments[0] = music_box(TRIANGLE);
     instruments[1] = Instrument{
+        .name = "12.5%",
+        .keysplit = { InstrumentPatch { .sample_idx = PULSE_12_5, .adsr = INFINITE }},
+    };
+    instruments[2] = Instrument{
         .name = "25%",
         .keysplit = { InstrumentPatch { .sample_idx = PULSE_25, .adsr = INFINITE }},
     };
-    instruments[2] = Instrument{
+    instruments[3] = Instrument{
         .name = "50%",
         .keysplit = { InstrumentPatch { .sample_idx = PULSE_50, .adsr = INFINITE }},
     };
-    instruments[3] = Instrument{
+    instruments[4] = Instrument{
         .name = "Keysplit",
         .keysplit = {
             InstrumentPatch {
@@ -69,7 +75,7 @@ static Document empty() {
             },
         },
     };
-    instruments[4] = Instrument{
+    instruments[5] = Instrument{
         .name = "Periodic Noise",
         .keysplit = { InstrumentPatch { .sample_idx = NOISE, .adsr = INFINITE }},
     };

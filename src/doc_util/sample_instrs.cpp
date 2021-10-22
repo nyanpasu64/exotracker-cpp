@@ -1,7 +1,155 @@
 #include "sample_instrs.h"
+#include "util/release_assert.h"
+
+#include <cstdint>
 #include <random>
+#include <vector>
 
 namespace doc_util::sample_instrs {
+
+/// Create a BRR header loop byte:
+/// - gain should be between 0 (silent) and 12 (loudest, may clip) inclusive.
+/// - filter should be between 0 and 3. 0 is direct 4-bit PCM,
+///   and 1-3 are various IIR filters/predictors.
+/// - end and loop control whether this is the last BRR block, and if so,
+///   whether to loop or stop.
+static uint8_t brr_header(uint8_t gain, uint8_t filter, bool end, bool loop) {
+    BEGIN_BITFIELD_TYPE(BrrHeader, uint8_t)
+        ADD_BITFIELD_MEMBER(gain, 4, 4)
+        ADD_BITFIELD_MEMBER(filter, 2, 2)
+        ADD_BITFIELD_MEMBER(end, 1, 1)
+        ADD_BITFIELD_MEMBER(loop, 0, 1)
+    END_BITFIELD_TYPE()
+
+    BrrHeader out = 0;
+    out.gain = gain;
+    out.filter = filter;
+    out.end = end;
+    out.loop = loop;
+    return out;
+}
+
+constexpr Chromatic A440_MIDI = 69;
+
+static Sample data_to_looped_sample(
+    std::string name, std::vector<uint8_t> data, uint8_t gain
+) {
+    auto nsamp = data.size() * 2;
+
+    release_assert(data.size() % 8 == 0);
+    auto nblocks = data.size() / 8;
+
+    std::vector<uint8_t> brr;
+    brr.reserve(nblocks * 9);
+
+    auto data_ptr = data.data();
+
+    // Each block is 9 bytes long, containing 1 header byte and 8 data bytes.
+    for (size_t block = 0; block < nblocks; block++) {
+        bool end = (block + 1 == nblocks);
+        bool loop = end;
+        brr.push_back(brr_header(gain, 0, end, loop));
+
+        brr.insert(brr.end(), data_ptr, data_ptr + 8);
+        data_ptr += 8;
+    }
+
+    return Sample {
+        .name = std::move(name),
+        .brr = std::move(brr),
+        .loop_byte = 0,
+        .tuning = SampleTuning {
+            .sample_rate = 440 * (uint32_t) nsamp,
+            .root_key = A440_MIDI,
+        },
+    };
+}
+
+Sample pulse_12_5() {
+    return data_to_looped_sample(
+        "12.5%",
+        {
+            0x77, 0x77, 0x77, 0x77,
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff,
+        },
+        11);
+}
+
+Sample pulse_25() {
+    return data_to_looped_sample(
+        "25%",
+        {
+            0x66, 0x66, 0x66, 0x66,
+            0x66, 0x66, 0x66, 0x66,
+            0xee, 0xee, 0xee, 0xee,
+            0xee, 0xee, 0xee, 0xee,
+            0xee, 0xee, 0xee, 0xee,
+            0xee, 0xee, 0xee, 0xee,
+            0xee, 0xee, 0xee, 0xee,
+            0xee, 0xee, 0xee, 0xee,
+        },
+        11);
+}
+
+Sample pulse_50() {
+    return data_to_looped_sample(
+        "50%",
+        {
+            0x44, 0x44, 0x44, 0x44,
+            0x44, 0x44, 0x44, 0x44,
+            0x44, 0x44, 0x44, 0x44,
+            0x44, 0x44, 0x44, 0x44,
+            0xcc, 0xcc, 0xcc, 0xcc,
+            0xcc, 0xcc, 0xcc, 0xcc,
+            0xcc, 0xcc, 0xcc, 0xcc,
+            0xcc, 0xcc, 0xcc, 0xcc,
+        },
+        11);
+}
+
+Sample pulse_50_quiet() {
+    return data_to_looped_sample(
+        "50% quiet",
+        {
+            0x44, 0x44, 0x44, 0x44,
+            0x44, 0x44, 0x44, 0x44,
+            0x44, 0x44, 0x44, 0x44,
+            0x44, 0x44, 0x44, 0x44,
+            0xcc, 0xcc, 0xcc, 0xcc,
+            0xcc, 0xcc, 0xcc, 0xcc,
+            0xcc, 0xcc, 0xcc, 0xcc,
+            0xcc, 0xcc, 0xcc, 0xcc,
+        },
+        10);
+}
+
+Sample triangle() {
+    // Has a slight DC offset.
+    return data_to_looped_sample(
+        "Triangle",
+        {
+            0x01, 0x23, 0x45, 0x67, 0x76, 0x54, 0x32, 0x10,
+            0xfe, 0xdc, 0xba, 0x98, 0x89, 0xab, 0xcd, 0xef,
+        },
+        11);
+}
+
+Sample saw() {
+    // Has a slight DC offset.
+    return data_to_looped_sample(
+        "Saw",
+        {
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+        },
+        11);
+}
 
 Sample periodic_noise() {
     auto rng = std::minstd_rand();
@@ -9,29 +157,13 @@ Sample periodic_noise() {
     // or MSVC's headers.
     auto rand_u8 = std::uniform_int_distribution<uint16_t>(0, 0xff);
 
-    std::vector<uint8_t> brr;
-
-    // 128 samples / 16 samples/block = 8 blocks
-    constexpr size_t NBLOCK = 8;
-    for (size_t i = 0; i < NBLOCK; i++) {
-        bool last = (i + 1 == NBLOCK);
-        brr.push_back(brr_header(11, 0, last, last));
-
-        // 8 bytes/block
-        for (size_t j = 0; j < 8; j++) {
-            brr.push_back((uint8_t) rand_u8(rng));
-        }
+    std::vector<uint8_t> data;
+    data.reserve(128);
+    for (size_t i = 0; i < 128; i++) {
+        data.push_back((uint8_t) rand_u8(rng));
     }
 
-    return Sample {
-        .name = "periodic noise",
-        .brr = std::move(brr),
-        .loop_byte = 0,
-        .tuning = SampleTuning {
-            .sample_rate = 440 * 128,
-            .root_key = A440_MIDI,
-        },
-    };
+    return data_to_looped_sample("Periodic Noise", std::move(data), 11);
 }
 
 Sample long_silence() {
