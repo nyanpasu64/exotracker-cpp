@@ -1230,15 +1230,21 @@ public:
         };
 
         _file_title = calc_title();
-        QString dirty_marker;
-        if (_state.history().is_dirty()) {
-            dirty_marker = QStringLiteral("*");
-        }
 
-        // TODO define app name in a single translatable location
-        setWindowTitle(QStringLiteral("%1%2 - %3").arg(
-            _file_title, dirty_marker, "ExoTracker"
-        ));
+        // QWidget::setWindowFilePath() and QGuiApplication::setApplicationDisplayName()
+        // is *almost* good enough to skip calling QWidget::setWindowTitle()...
+        // except you have to do it anyway to print "Untitled" if no file is saved.
+        setWindowTitle(_file_title + "[*]");
+
+        // > on macOS, this... sets the proxy icon for the window,
+        // > assuming that the file path exists.
+        // ...
+        // > Apple Hid the Proxy Icon in Big Sur’s Finder
+        setWindowFilePath(_file_path);
+
+        // > On macOS the close button will have a modified look;
+        // > on other platforms, the window title will have an '*' (asterisk).
+        setWindowModified(_state.history().is_dirty());
     }
 
     /// Called when closing the document (new/open).

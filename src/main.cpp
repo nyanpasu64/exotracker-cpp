@@ -60,12 +60,14 @@ struct Arguments {
 };
 
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
+    using gui::app::GuiApp;
+
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
         Qt::HighDpiScaleFactorRoundingPolicy::RoundPreferFloor
     );
-    gui::app::GuiApp a(argc, argv);
+    GuiApp a(argc, argv);
+    a.setApplicationDisplayName(GuiApp::tr("ExoTracker"));
 
     // Parse command-line arguments.
     auto maybe_arg = Arguments::parse(argc, argv);
