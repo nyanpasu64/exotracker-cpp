@@ -1418,7 +1418,7 @@ LoadDocumentResult::LoadDocumentResult(
 namespace serialize {
 
 static Document default_doc() {
-    return DocumentCopy(sample_docs::DOCUMENTS.at(sample_docs::DEFAULT_DOC));
+    return DocumentCopy(sample_docs::DOCUMENTS.at("dream-fragments"));
 }
 
 using namespace std::string_literals;

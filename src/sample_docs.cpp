@@ -17,6 +17,49 @@ using Ev = EventBuilder;
 using std::move;
 using std::nullopt;
 
+Document new_document() {
+    SequencerOptions sequencer_options{.target_tempo = 150, .ticks_per_beat = 48};
+
+    constexpr SampleIndex PULSE_12_5 = 0;
+    constexpr SampleIndex PULSE_25 = 1;
+    constexpr SampleIndex PULSE_50 = 2;
+    constexpr SampleIndex TRIANGLE = 3;
+
+    Samples samples;
+    samples[PULSE_12_5] = pulse_12_5();
+    samples[PULSE_25] = pulse_25();
+    samples[PULSE_50] = pulse_50();
+    samples[TRIANGLE] = triangle();
+
+    Instruments instruments;
+    instruments[0] = Instrument{
+        .name = "25%",
+        .keysplit = { InstrumentPatch { .sample_idx = PULSE_25, .adsr = INFINITE }},
+    };
+
+    ChipList chips{ChipKind::Spc700};
+
+    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
+
+    Timeline timeline;
+
+    timeline.push_back(TimelineFrame{
+        .nbeats = 16,
+        .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
+    });
+
+    return DocumentCopy{
+        .sequencer_options = sequencer_options,
+        .frequency_table = equal_temperament(),
+        .accidental_mode = AccidentalMode::Sharp,
+        .samples = move(samples),
+        .instruments = move(instruments),
+        .chips = move(chips),
+        .chip_channel_settings = move(chip_channel_settings),
+        .timeline = move(timeline),
+    };
+}
+
 /// Empty document with one grid cell.
 /// Channel 0 has a block/pattern without events, and Channel 1 has no pattern.
 ///
@@ -652,8 +695,6 @@ static Document block_test() {
 }
 
 #endif
-
-std::string const DEFAULT_DOC = "empty";
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
     std::map<std::string, doc::Document> out;
