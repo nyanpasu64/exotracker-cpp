@@ -668,6 +668,7 @@ public:
                     .arg(file.errorString()));
             return;
         }
+        file.close();
 
         doc::Document const& doc = document();
         doc::Sample sample;
