@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2020, University of Cincinnati, developed by Henry Schreiner
+// Copyright (c) 2017-2021, University of Cincinnati, developed by Henry Schreiner
 // under NSF AWARD 1414736 and by the respective contributors.
 // All rights reserved.
 //
@@ -9,28 +9,28 @@
 // CLI Library includes
 // Order is important for combiner script
 
-#include "CLI/Version.hpp"
+#include "Version.hpp"
 
-#include "CLI/Macros.hpp"
+#include "Macros.hpp"
 
-#include "CLI/StringTools.hpp"
+#include "StringTools.hpp"
 
-#include "CLI/Error.hpp"
+#include "Error.hpp"
 
-#include "CLI/TypeTools.hpp"
+#include "TypeTools.hpp"
 
-#include "CLI/Split.hpp"
+#include "Split.hpp"
 
-#include "CLI/ConfigFwd.hpp"
+#include "ConfigFwd.hpp"
 
-#include "CLI/Validators.hpp"
+#include "Validators.hpp"
 
-#include "CLI/FormatterFwd.hpp"
+#include "FormatterFwd.hpp"
 
-#include "CLI/Option.hpp"
+#include "Option.hpp"
 
-#include "CLI/App.hpp"
+#include "App.hpp"
 
-#include "CLI/Config.hpp"
+#include "Config.hpp"
 
-#include "CLI/Formatter.hpp"
+#include "Formatter.hpp"
