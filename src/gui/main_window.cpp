@@ -1408,14 +1408,20 @@ public:
     bool on_save_as() {
         using serialize::Metadata;
 
+        // TODO default to recent module dir, if no file currently open
+        QString starting_dir;
+        if (!_file_path.isEmpty()) {
+            starting_dir = QFileInfo(_file_path).dir().path();
+        }
+
         retry:
-        // TODO save recent dirs, using SQLite or QSettings
         auto path = QFileDialog::getSaveFileName(
             this,
             tr("Save File"),
-            QString(),
+            starting_dir,
             tr("ExoTracker modules (*.etm);;All files (*)"));
 
+        // TODO save recent dirs, using SQLite or QSettings
         if (path.isEmpty()) {
             return false;
         } else {
