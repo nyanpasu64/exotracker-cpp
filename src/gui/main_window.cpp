@@ -1392,6 +1392,7 @@ public:
             cursor.insertBlock();
             cursor.setBlockFormat(non_list_format);
 
+            _error_dialog.close();
             _error_dialog.showMessage(document.toHtml());
         }
     }
@@ -1407,6 +1408,7 @@ public:
     bool on_save_as() {
         using serialize::Metadata;
 
+        retry:
         // TODO save recent dirs, using SQLite or QSettings
         auto path = QFileDialog::getSaveFileName(
             this,
@@ -1417,7 +1419,15 @@ public:
         if (path.isEmpty()) {
             return false;
         } else {
-            return save_impl(path);
+            if (!save_impl(path)) {
+                // save_impl() pops up an error message on failure.
+                // Wait for the user to acknowledge it, then ask to save again.
+                // It's hacky to *assume* save_impl() pops up a dialog, but it works.
+                _error_dialog.exec();
+                goto retry;
+            } else {
+                return true;
+            }
         }
     }
 
@@ -1437,6 +1447,7 @@ public:
 
             cursor.insertText(tr("Failed to save file:\n"));
             cursor.insertText(QString::fromStdString(*error));
+            _error_dialog.close();
             _error_dialog.showMessage(document.toHtml());
 
             return false;
