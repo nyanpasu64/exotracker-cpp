@@ -127,6 +127,8 @@ using main_window::MainWindow;
 using main_window::StateTransaction;
 using history::GetDocument;
 
+constexpr int DEFAULT_ZOOM_LEVEL = 4;
+
 class PatternEditor : public QWidget
 {
     W_OBJECT(PatternEditor)
@@ -161,7 +163,7 @@ pattern_editor_INTERNAL:
     bool _edit_mode = false;
 
     // # Editing state, set by user interactions.
-    int _zoom_level = 4;
+    int _zoom_level = DEFAULT_ZOOM_LEVEL;
     int _octave = 5;
     int _step = 1;  // can't remember if it will be saved on close, or defaulted via settings dialog
     StepDirection _step_direction = StepDirection::RightEffect;

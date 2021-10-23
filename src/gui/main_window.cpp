@@ -16,6 +16,7 @@
 #include "cmd_queue.h"
 #include "edit/edit_doc.h"
 #include "serialize.h"
+#include "sample_docs.h"
 #include "util/defer.h"
 #include "util/math.h"
 #include "util/release_assert.h"
@@ -299,6 +300,7 @@ struct MainWindowUi : MainWindow {
     QMenuBar * _menu_bar;
 
     // File menu
+    QAction * _new;
     QAction * _open;
     QAction * _save;
     QAction * _save_as;
@@ -366,6 +368,7 @@ struct MainWindowUi : MainWindow {
             _menu_bar = m;
 
             {m__m(tr("&File"));
+                _new = m->addAction(tr("&New"));
                 _open = m->addAction(tr("&Open"));
                 _save = m->addAction(tr("&Save"));
                 _save_as = m->addAction(tr("Save &As"));
@@ -1043,6 +1046,9 @@ public:
         _pattern_editor->setFocus();
 
         // TODO look into unifying with reload_shortcuts().
+        _new->setShortcuts(QKeySequence::New);
+        connect(_new, &QAction::triggered, this, &MainWindowImpl::on_new);
+
         _open->setShortcuts(QKeySequence::Open);
         connect(_open, &QAction::triggered, this, &MainWindowImpl::on_open);
 
@@ -1284,15 +1290,58 @@ public:
         // and check if each returns true.
     }
 
-    // TODO on_new()
+    using Metadata = serialize::Metadata;
+
+    void open_document(doc::Document document, Metadata metadata, QString path) {
+        // Replace the GUI state with the new file.
+        // Hopefully I didn't miss anything.
+        {
+            StateTransaction tx = edit_unwrap();
+            // Probably redundant, but do it just to be safe.
+            tx.update_all();
+
+            tx.set_file_path(path);
+
+            tx.cursor_mut() = {};
+
+            // This *technically* doesn't result in the audio thread accessing freed memory,
+            // since this only overwrites _state._history
+            // and the audio thread only reads from _command_queue.
+            //
+            // However this is still easy to get wrong,
+            // since the GUI is operating on the new document
+            // and the audio thread is still operating on the old one.
+            // If you fail to reload the audio thread with the new document
+            // (_audio.restart_audio_thread()),
+            // you end up in an inconsistent state upon editing or playback.
+            tx.set_document(std::move(document));
+            tx.set_instrument(0);
+        }
+
+        _zoom_level->setValue(metadata.zoom_level);
+
+        // Restart the audio thread with the new document.
+        _audio.restart_audio_thread(_state);
+    }
+
+    void on_new() {
+        if (!should_close_document(tr("Open"))) {
+            return;
+        }
+
+        open_document(
+            sample_docs::new_document(),
+            Metadata {
+                .zoom_level = pattern_editor::DEFAULT_ZOOM_LEVEL,
+            },
+            "");
+    }
 
     void on_open() {
         using serialize::ErrorType;
 
-        if (_state.history().is_dirty()) {
-            if (!should_close_document(tr("Open"))) {
-                return;
-            }
+        if (!should_close_document(tr("Open"))) {
+            return;
         }
 
         // TODO save recent dirs, using SQLite or QSettings
@@ -1310,36 +1359,7 @@ public:
         if (result.v) {
             // If document loaded successfully, load it into the program.
             auto & [document, metadata] = *result.v;
-
-            // Replace the GUI state with the new file.
-            // Hopefully I didn't miss anything.
-            {
-                StateTransaction tx = edit_unwrap();
-                // Probably redundant, but do it just to be safe.
-                tx.update_all();
-
-                tx.set_file_path(path);
-
-                tx.cursor_mut() = {};
-
-                // This *technically* doesn't result in the audio thread accessing freed memory,
-                // since this only overwrites _state._history
-                // and the audio thread only reads from _command_queue.
-                //
-                // However this is still easy to get wrong,
-                // since the GUI is operating on the new document
-                // and the audio thread is still operating on the old one.
-                // If you fail to reload the audio thread with the new document
-                // (_audio.restart_audio_thread()),
-                // you end up in an inconsistent state upon editing or playback.
-                tx.set_document(std::move(document));
-                tx.set_instrument(0);
-            }
-
-            _zoom_level->setValue(metadata.zoom_level);
-
-            // Restart the audio thread with the new document.
-            _audio.restart_audio_thread(_state);
+            open_document(std::move(document), metadata, std::move(path));
         } else {
             // Document failed to load. There should be an error message explaining why.
             assert(!result.errors.empty());
