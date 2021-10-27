@@ -14,6 +14,7 @@ void History::push(UndoFrame command) {
 
     // Move new state into current.
     command.edit->apply_swap(_document);
+    _dirty = true;
 
     if (_undo_stack.size()) {
         auto & prev = _undo_stack.back();
@@ -62,6 +63,7 @@ MaybeCursorEdit History::try_undo() {
 
     // Apply to document.
     command.edit->apply_swap(_document);
+    _dirty = true;
 
     // Push to redo.
     _redo_stack.push_back(std::move(command));
@@ -86,6 +88,7 @@ MaybeCursorEdit History::try_redo() {
 
     // Apply to document.
     command.edit->apply_swap(_document);
+    _dirty = true;
 
     // Push to undo.
     _undo_stack.push_back(std::move(command));

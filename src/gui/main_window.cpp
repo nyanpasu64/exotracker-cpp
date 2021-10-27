@@ -16,6 +16,7 @@
 #include "cmd_queue.h"
 #include "edit/edit_doc.h"
 #include "serialize.h"
+#include "sample_docs.h"
 #include "util/defer.h"
 #include "util/math.h"
 #include "util/release_assert.h"
@@ -44,12 +45,15 @@
 #include <QFormLayout>
 // Other
 #include <QAction>
+#include <QCloseEvent>
 #include <QDebug>
 #include <QErrorMessage>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFlags>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QMessageBox>
 #include <QPointer>
 #include <QScreen>
 #include <QTextCursor>
@@ -296,7 +300,9 @@ struct MainWindowUi : MainWindow {
     QMenuBar * _menu_bar;
 
     // File menu
+    QAction * _new;
     QAction * _open;
+    QAction * _save;
     QAction * _save_as;
     QAction * _exit;
 
@@ -362,7 +368,9 @@ struct MainWindowUi : MainWindow {
             _menu_bar = m;
 
             {m__m(tr("&File"));
+                _new = m->addAction(tr("&New"));
                 _open = m->addAction(tr("&Open"));
+                _save = m->addAction(tr("&Save"));
                 _save_as = m->addAction(tr("Save &As"));
                 m->addSeparator();
                 _exit = m->addAction(tr("E&xit"));
@@ -898,6 +906,8 @@ public:
     // Global actions:
     QAction _restart_audio;
 
+    QString _file_title;
+    QString _file_path;
     AudioComponent _audio;
 
     // utility methods
@@ -1036,8 +1046,14 @@ public:
         _pattern_editor->setFocus();
 
         // TODO look into unifying with reload_shortcuts().
+        _new->setShortcuts(QKeySequence::New);
+        connect(_new, &QAction::triggered, this, &MainWindowImpl::on_new);
+
         _open->setShortcuts(QKeySequence::Open);
         connect(_open, &QAction::triggered, this, &MainWindowImpl::on_open);
+
+        _save->setShortcuts(QKeySequence::Save);
+        connect(_save, &QAction::triggered, this, &MainWindowImpl::on_save);
 
         _save_as->setShortcuts(QKeySequence::SaveAs);
         connect(_save_as, &QAction::triggered, this, &MainWindowImpl::on_save_as);
@@ -1211,8 +1227,122 @@ public:
         return _maybe_sample_dialog;
     }
 
+    void reload_title() {
+        auto calc_title = [this]() -> QString {
+            if (!_file_path.isEmpty()) {
+                return QFileInfo(_file_path).fileName();
+            } else {
+                return tr("Untitled");
+            }
+        };
+
+        _file_title = calc_title();
+
+        // Don't rely on Qt generating a window title based off
+        // QWidget::setWindowFilePath(), since it won't say "Untitled"
+        // if _file_path is empty.
+        setWindowTitle(QStringLiteral("%1[*] - %2").arg(
+            _file_title, get_app().app_name()
+        ));
+
+        // > on macOS, this... sets the proxy icon for the window,
+        // > assuming that the file path exists.
+        // ...
+        // > Apple Hid the Proxy Icon in Big Sur’s Finder
+        setWindowFilePath(_file_path);
+
+        // > On macOS the close button will have a modified look;
+        // > on other platforms, the window title will have an '*' (asterisk).
+        setWindowModified(_state.history().is_dirty());
+
+        // Don't call QGuiApplication::setApplicationDisplayName().
+        // It appends the app name onto every window not already ending with it.
+        // This causes more problems than it solves, since you can't tell Qt to
+        // always/never add the app name onto specific windows.
+        // Additionally it uses hyphens on Windows but en dashes on Linux.
+    }
+
+    /// Called when closing the document (new/open).
+    /// If the document has unsaved changes, asks the user to save, discard, or cancel.
+    /// Returns false if the user cancels closing or saving the document.
+    bool should_close_document(QString action) {
+        using Msg = QMessageBox;
+
+        if (!_state.history().is_dirty()) {
+            return true;
+        }
+
+        QString message = tr("Save changes to %1?").arg(_file_title);
+        Msg::StandardButton should_close = Msg::question(
+            this, action, message, Msg::Save | Msg::Discard | Msg::Cancel
+        );
+
+        if (should_close == Msg::Cancel) {
+            return false;
+        } else if (should_close == Msg::Discard) {
+            return true;
+        } else {
+            return on_save();
+        }
+
+        // TODO if we add extra steps (like cancelling a non-modal render),
+        // move above logic into a lambda, move "cancel render" into another lambda,
+        // and check if each returns true.
+    }
+
+    using Metadata = serialize::Metadata;
+
+    void open_document(doc::Document document, Metadata metadata, QString path) {
+        // Replace the GUI state with the new file.
+        // Hopefully I didn't miss anything.
+        {
+            StateTransaction tx = edit_unwrap();
+            // Probably redundant, but do it just to be safe.
+            tx.update_all();
+
+            tx.set_file_path(path);
+
+            tx.cursor_mut() = {};
+
+            // This *technically* doesn't result in the audio thread accessing freed memory,
+            // since this only overwrites _state._history
+            // and the audio thread only reads from _command_queue.
+            //
+            // However this is still easy to get wrong,
+            // since the GUI is operating on the new document
+            // and the audio thread is still operating on the old one.
+            // If you fail to reload the audio thread with the new document
+            // (_audio.restart_audio_thread()),
+            // you end up in an inconsistent state upon editing or playback.
+            tx.set_document(std::move(document));
+            tx.set_instrument(0);
+        }
+
+        _zoom_level->setValue(metadata.zoom_level);
+
+        // Restart the audio thread with the new document.
+        _audio.restart_audio_thread(_state);
+    }
+
+    void on_new() {
+        if (!should_close_document(tr("Open"))) {
+            return;
+        }
+
+        open_document(
+            sample_docs::new_document(),
+            Metadata {
+                .zoom_level = pattern_editor::DEFAULT_ZOOM_LEVEL,
+            },
+            "");
+    }
+
     void on_open() {
         using serialize::ErrorType;
+
+        if (!should_close_document(tr("Open"))) {
+            return;
+        }
 
         // TODO save recent dirs, using SQLite or QSettings
         auto path = QFileDialog::getOpenFileName(
@@ -1225,40 +1355,11 @@ public:
             return;
         }
 
-        // TODO prompt if document dirty.
-
         auto result = serialize::load_from_path(path.toUtf8());
         if (result.v) {
             // If document loaded successfully, load it into the program.
             auto & [document, metadata] = *result.v;
-
-            // Replace the GUI state with the new file.
-            // Hopefully I didn't miss anything.
-            {
-                StateTransaction tx = edit_unwrap();
-                // Probably redundant, but do it just to be safe.
-                tx.update_all();
-
-                tx.cursor_mut() = {};
-
-                // This *technically* doesn't result in the audio thread accessing freed memory,
-                // since this only overwrites _state._history
-                // and the audio thread only reads from _command_queue.
-                //
-                // However this is still easy to get wrong,
-                // since the GUI is operating on the new document
-                // and the audio thread is still operating on the old one.
-                // If you fail to reload the audio thread with the new document
-                // (_audio.restart_audio_thread()),
-                // you end up in an inconsistent state upon editing or playback.
-                tx.set_document(std::move(document));
-                tx.set_instrument(0);
-            }
-
-            _zoom_level->setValue(metadata.zoom_level);
-
-            // Restart the audio thread with the new document.
-            _audio.restart_audio_thread(_state);
+            open_document(std::move(document), metadata, std::move(path));
         } else {
             // Document failed to load. There should be an error message explaining why.
             assert(!result.errors.empty());
@@ -1297,38 +1398,84 @@ public:
             cursor.insertBlock();
             cursor.setBlockFormat(non_list_format);
 
+            _error_dialog.close();
             _error_dialog.showMessage(document.toHtml());
         }
     }
 
-    void on_save_as() {
+    bool on_save() {
+        if (_file_path.isEmpty()) {
+            return on_save_as();
+        } else {
+            return save_impl(_file_path);
+        }
+    }
+
+    bool on_save_as() {
         using serialize::Metadata;
 
+        retry:
         // TODO save recent dirs, using SQLite or QSettings
         auto path = QFileDialog::getSaveFileName(
             this,
-            tr("Open File"),
+            tr("Save As"),
             QString(),
             tr("ExoTracker modules (*.etm);;All files (*)"));
 
         if (path.isEmpty()) {
-            return;
+            return false;
+        } else {
+            if (!save_impl(path)) {
+                // save_impl() pops up an error message on failure.
+                // Wait for the user to acknowledge it, then ask to save again.
+                // It's hacky to *assume* save_impl() pops up a dialog, but it works.
+                _error_dialog.exec();
+                goto retry;
+            } else {
+                return true;
+            }
         }
+    }
 
-        auto result = serialize::save_to_path(
+    bool save_impl(QString path) {
+        using serialize::Metadata;
+
+        auto error = serialize::save_to_path(
             get_document(),
             Metadata {
                 .zoom_level = (uint16_t) _zoom_level->value(),
             },
             path.toUtf8());
 
-        if (result) {
+        if (error) {
             QTextDocument document;
             auto cursor = QTextCursor(&document);
 
             cursor.insertText(tr("Failed to save file:\n"));
-            cursor.insertText(QString::fromStdString(*result));
+            cursor.insertText(QString::fromStdString(*error));
+            _error_dialog.close();
             _error_dialog.showMessage(document.toHtml());
+
+            return false;
+        } else {
+            auto tx = edit_unwrap();
+
+            // Unnecessary unless you "save as", but not a big slowdown.
+            // It seems most users expect "save as" to only set the file path
+            // if the save succeeds, and most programs don't set the file path
+            // upon an IO error, so only call set_file_path() in this branch.
+            tx.set_file_path(path);
+            tx.mark_saved();
+
+            return true;
+        }
+    }
+
+    void closeEvent(QCloseEvent * event) override {
+        if (should_close_document(tr("Quit"))) {
+            event->accept();
+        } else {
+            event->ignore();
         }
     }
 
@@ -1641,18 +1788,25 @@ StateTransaction::~StateTransaction() noexcept(false) {
     // https://docs.google.com/document/d/1xSXmtB4-9Wa11Bo9jWp3cpMvIWSbl6DNN3gojpW-NhE/edit#heading=h.68ro9bhgsp2w
     if (_win->_maybe_instr_dialog) {
         if (e & E::InstrumentDeleted) {
-            // closes dialog, nulls out pointer later on.
+            // Closes dialog, nulls out pointer later on.
             _win->_maybe_instr_dialog->close();
         } else if (e & (E::DocumentEdited | E::InstrumentSwitched)) {
-            // may close dialog and null out pointer later on.
+            // May close dialog and null out pointer later on.
             _win->_maybe_instr_dialog->reload_state(e & E::InstrumentSwitched);
         }
     }
 
     if (_win->_maybe_sample_dialog) {
-        if (e & E::DocumentEdited) {
+        if (e & E::DocumentReplaced) {
+            // Closes dialog, nulls out pointer later on.
+            _win->_maybe_sample_dialog->close();
+        } else if (e & E::DocumentEdited) {
             _win->_maybe_sample_dialog->reload_state(_sample_index);
         }
+    }
+
+    if (e & (E::DocumentEdited | E::TitleChanged)) {
+        _win->reload_title();
     }
 
     auto const& history = state.history();
@@ -1687,6 +1841,17 @@ using E = StateUpdateFlag;
 history::History & StateTransaction::history_mut() {
     _queued_updates |= E::DocumentEdited;
     return state_mut()._history;
+}
+
+void StateTransaction::set_file_path(QString path) {
+    _queued_updates |= E::TitleChanged;
+    _win->_file_path = std::move(path);
+}
+
+void StateTransaction::mark_saved() {
+    _queued_updates |= E::TitleChanged;
+    // Is it safe to not call history_mut() (which would set DocumentEdited)?
+    state_mut()._history.mark_saved();
 }
 
 void StateTransaction::push_edit(edit::EditBox command, MoveCursor cursor_move) {

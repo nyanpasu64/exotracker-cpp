@@ -243,6 +243,12 @@ enum class StateUpdateFlag : uint32_t {
     CursorMoved = 0x2,
     InstrumentSwitched = 0x4,
 
+    // Metadata/undo flags.
+    /// Set if filename changed, or document was edited or saved.
+    /// Ignored if DocumentEdited is set.
+    TitleChanged = 0x10,
+
+    // Flags which close windows.
     DocumentReplaced = 0x100,
     InstrumentDeleted = 0x200,
 };
@@ -297,6 +303,18 @@ public:
     /// (Exception: AudioComponent::undo()/redo() call this as well.)
     History & history_mut();
 
+    // Functions which change the window title.
+    void set_file_path(QString path);
+
+    /// Called when we successfully save the document.
+    /// Marks the current history state as "no unsaved changes",
+    /// so when the user closes the document, they won't get prompted to save.
+    void mark_saved();
+
+    // There is no function to set the dirty bit. Instead,
+    // History::push()/try_undo()/try_redo() set the dirty bit,
+    // and StateTransaction::set_document()/mark_saved() clears it.
+
     /// move_to() or move_to_here() saves and moves the cursor (for pattern edits).
     /// MoveCursor_::IGNORE_CURSOR doesn't move the cursor on undo/redo (for
     /// non-pattern edits).
@@ -305,6 +323,8 @@ public:
     /// Close the instrument dialog if open.
     void instrument_deleted();
 
+    /// Clear history and replace it with a new document, marking the current state
+    /// as clean.
     void set_document(doc::Document document);
 
     CursorAndSelection & cursor_mut();
