@@ -1788,16 +1788,19 @@ StateTransaction::~StateTransaction() noexcept(false) {
     // https://docs.google.com/document/d/1xSXmtB4-9Wa11Bo9jWp3cpMvIWSbl6DNN3gojpW-NhE/edit#heading=h.68ro9bhgsp2w
     if (_win->_maybe_instr_dialog) {
         if (e & E::InstrumentDeleted) {
-            // closes dialog, nulls out pointer later on.
+            // Closes dialog, nulls out pointer later on.
             _win->_maybe_instr_dialog->close();
         } else if (e & (E::DocumentEdited | E::InstrumentSwitched)) {
-            // may close dialog and null out pointer later on.
+            // May close dialog and null out pointer later on.
             _win->_maybe_instr_dialog->reload_state(e & E::InstrumentSwitched);
         }
     }
 
     if (_win->_maybe_sample_dialog) {
-        if (e & E::DocumentEdited) {
+        if (e & E::DocumentReplaced) {
+            // Closes dialog, nulls out pointer later on.
+            _win->_maybe_sample_dialog->close();
+        } else if (e & E::DocumentEdited) {
             _win->_maybe_sample_dialog->reload_state(_sample_index);
         }
     }
