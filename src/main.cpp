@@ -11,7 +11,6 @@
 
 #include <variant>
 
-using std::unique_ptr;
 using gui::main_window::MainWindow;
 
 
@@ -171,17 +170,21 @@ int main(int argc, char *argv[]) {
         fmt::print(stderr, "{}", list_documents());
         return 1;
     }
-    auto document = EXPR(
-        if (has(arg.filename)) {
-            bail_only("TODO implement file path loading");
-        } else if (has(arg.sample_doc)) {
-            return sample_docs::DOCUMENTS.at(arg.sample_doc).clone();
-        } else {
-            return sample_docs::new_document();
-        }
-    );
 
-    unique_ptr<MainWindow> w = MainWindow::make(std::move(document));
+    std::unique_ptr<MainWindow> w;
+    if (has(arg.filename)) {
+        w = MainWindow::new_with_path(std::move(arg.filename));
+    } else {
+        auto document = EXPR(
+            if (has(arg.sample_doc)) {
+                return sample_docs::DOCUMENTS.at(arg.sample_doc).clone();
+            } else {
+                return sample_docs::new_document();
+            }
+        );
+
+        w = MainWindow::make(std::move(document));
+    }
     w->show();
 
     return a.exec();
