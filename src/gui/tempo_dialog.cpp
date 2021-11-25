@@ -28,6 +28,8 @@
 #include <limits>  // std::numeric_limits<>
 #include <utility>  // std::move
 
+
+#include <QDebug>
 namespace gui::tempo_dialog {
 
 namespace {
@@ -237,7 +239,6 @@ public:
 
         auto l = new QHBoxLayout();
         setLayout(l);
-        l->setSizeConstraint(QLayout::SetFixedSize);
 
         // Add extra gap between form label and widget, for breathing room.
         // TODO scale with DPI?
@@ -358,6 +359,11 @@ public:
 
     /// Recompute the output widgets showing the rounded tempo.
     void update_state() {
+        static bool a = false;
+        qDebug() << layout()->sizeConstraint();
+        layout()->setSizeConstraint(a ? QLayout::SetFixedSize : QLayout::SetDefaultConstraint);
+        a = !a;
+
         namespace tempo = audio::tempo_calc;
         using tempo::calc_sequencer_rate;
         using tempo::calc_clocks_per_timer;
