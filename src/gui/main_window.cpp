@@ -1395,9 +1395,6 @@ public:
                     .arg(QString::fromStdString(err.description));
                 cursor.insertText(line);
             }
-            // This ends the list.
-            cursor.insertBlock();
-            cursor.setBlockFormat(non_list_format);
 
             _error_dialog.close();
             _error_dialog.showMessage(document.toHtml());
