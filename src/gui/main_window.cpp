@@ -252,11 +252,7 @@ static void setup_error_dialog(QErrorMessage & dialog) {
 
 W_OBJECT_IMPL(MainWindow)
 
-static MainWindow * instance;
-
 MainWindow::MainWindow(doc::Document document, QWidget *parent)
-    // I kinda regret using the same name for namespace "history" and member variable "history".
-    // But it's only a problem since C++ lacks pervasive `self`.
     : QMainWindow(parent)
     , _state(std::move(document))
 {}
@@ -1338,8 +1334,6 @@ public:
     }
 
     void on_open() {
-        using serialize::ErrorType;
-
         if (!should_close_document(tr("Open"))) {
             return;
         }
@@ -1354,6 +1348,13 @@ public:
         if (path.isEmpty()) {
             return;
         }
+
+        open_path(std::move(path));
+    }
+
+public:
+    void open_path(QString path) {
+        using serialize::ErrorType;
 
         auto result = serialize::load_from_path(path.toUtf8());
         if (result.v) {
@@ -1394,15 +1395,13 @@ public:
                     .arg(QString::fromStdString(err.description));
                 cursor.insertText(line);
             }
-            // This ends the list.
-            cursor.insertBlock();
-            cursor.setBlockFormat(non_list_format);
 
             _error_dialog.close();
             _error_dialog.showMessage(document.toHtml());
         }
     }
 
+private:
     bool on_save() {
         if (_file_path.isEmpty()) {
             return on_save_as();
@@ -1882,6 +1881,8 @@ void StateTransaction::set_sample_index(doc::SampleIndex sample) {
     _sample_index = sample;
 }
 
+static MainWindowImpl * instance;
+
 // public
 std::unique_ptr<MainWindow> MainWindow::make(doc::Document document, QWidget * parent) {
     if (instance) {
@@ -1889,6 +1890,21 @@ std::unique_ptr<MainWindow> MainWindow::make(doc::Document document, QWidget * p
     }
     auto out = make_unique<MainWindowImpl>(std::move(document), parent);
     instance = &*out;
+    return out;
+}
+
+std::unique_ptr<MainWindow> MainWindow::new_with_path(QString path, QWidget *parent) {
+    // Construct the main window with an empty document.
+    auto out = make(sample_docs::new_document());
+    auto out_impl = (MainWindowImpl *) out.get();
+
+    // Replace it with a file loaded from path.
+    // If the load fails, keeps the empty document.
+    out_impl->open_path(path);
+    // This is wasteful in that we unnecessarily start and stop
+    // an audio thread with the default document,
+    // but this was the easiest way to make CLI file loading work.
+
     return out;
 }
 

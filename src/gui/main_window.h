@@ -377,6 +377,10 @@ public:
         doc::Document document, QWidget * parent = nullptr
     );
 
+    static std::unique_ptr<MainWindow> new_with_path(
+        QString path, QWidget * parent = nullptr
+    );
+
     virtual ~MainWindow();
 
 main_window_INTERNAL:
