@@ -22,13 +22,15 @@ private:
 
     Running `QApplication::setFont(QApplication::font("QMessageBox"))` fixes this,
     but the code must run after QApplication is constructed (otherwise MS Sans Serif),
-    but before we construct and save any QFonts.
+    but before we construct and save any QFonts based off the default font.
+    This isn't usually a problem, except that Options is constructed before
+    GuiApp() runs, and contains some QFont (which in the future, may be based off
+    the default font). So we need to either initialize `QApplication::setFont`
+    in a base class or field constructed before GuiApp's fields, or not store options
+    in GuiApp's fields, or initialize the options later on.
 
-    This is a hard problem.
-    Set the font using a SetFont empty-base-class constructed before Options.
-
-    Ideally I'd store Options in some sort of "global context" singleton
-    not bound through inheritance to QApplication.
+    Another option is to store Options in some sort of "global context" singleton,
+    either initialized by GuiApp() or separately.
     */
 
     Options _options;
