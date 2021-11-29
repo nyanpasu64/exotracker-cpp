@@ -97,6 +97,7 @@ GuiApp::GuiApp(int &argc, char **argv, int flags)
     : QApplication(argc, argv, flags)
 {
     win32_set_font();
+    _options = Options();
     hook_all_screens(*this);
 }
 
