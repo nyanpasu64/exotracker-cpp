@@ -255,7 +255,6 @@ enum class StateUpdateFlag : uint32_t {
 Q_DECLARE_FLAGS(StateUpdateFlags, StateUpdateFlag)
 Q_DECLARE_OPERATORS_FOR_FLAGS(StateUpdateFlags)
 
-class MainWindow;
 class MainWindowImpl;
 
 class [[nodiscard]] StateTransaction {

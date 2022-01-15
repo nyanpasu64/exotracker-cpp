@@ -65,14 +65,13 @@ set(options-3rdparty $<$<CXX_COMPILER_ID:MSVC>:/W3>)
 set(
     options
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-        -Wall -Wextra -Wconversion -Wsign-conversion
+        -Wall -Wextra -Wconversion -Wsign-conversion -Wtype-limits
         -Wmissing-declarations  # See !52 for explanation.
         -Wsuggest-override
         -Wno-unused-function -Wno-unused-parameter
         -Werror=return-type
     >
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
-        -Wtautological-unsigned-zero-compare
         -Wmissing-variable-declarations  # See !52 for explanation.
     >
     $<$<CXX_COMPILER_ID:MSVC>:
