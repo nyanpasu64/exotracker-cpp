@@ -36,7 +36,6 @@
 #include <QScreen>
 #include <QSignalBlocker>
 #include <QStyleHints>
-#include <QTextDocument>
 #include <QWheelEvent>
 
 #include <utility>  // std::move
