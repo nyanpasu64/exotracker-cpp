@@ -161,10 +161,18 @@ add_library(exotracker-core
     src/timeline_iter.cpp
     src/timing_common.cpp
     src/util/format.cpp
+
+    # Module loading files
+    src/doc/validate.cpp
+    src/serialize.cpp
+    src/serialize/document.capnp.c++
 )
 target_compile_options(exotracker-core PRIVATE "${options}")
-target_link_libraries(exotracker-core PRIVATE snes9x-dsp)
-target_link_libraries(exotracker-core PUBLIC fmt::fmt samplerate)
+target_link_libraries(exotracker-core
+    PRIVATE snes9x-dsp
+    PRIVATE capnp kj  # Don't #include Cap'n Proto in the public interface!
+    PUBLIC fmt::fmt samplerate
+)
 
 if(USE_PCH)
     target_precompile_headers(exotracker-core PRIVATE
@@ -189,10 +197,7 @@ add_library(exotracker-headless
     src/edit/edit_sample_list.cpp
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
-    src/doc/validate.cpp
     src/doc_util/sample_instrs.cpp
-    src/serialize.cpp
-    src/serialize/document.capnp.c++
     src/gui/history.cpp
 
     # Pattern editor backend
@@ -201,7 +206,6 @@ add_library(exotracker-headless
 target_compile_options(exotracker-headless PRIVATE "${options}")
 target_link_libraries(exotracker-headless
     PRIVATE rtaudio
-    PRIVATE capnp kj  # Don't #include Cap'n Proto in the public interface!
     PUBLIC exotracker-core
 )
 if(USE_PCH)
