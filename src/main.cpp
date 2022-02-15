@@ -49,7 +49,7 @@ static bool has(QString const& s) {
 }
 
 /// Returns the default help text, followed by a list of sample document names.
-QString help_text(QCommandLineParser & parser) {
+static QString help_text(QCommandLineParser & parser) {
     auto text = parser.helpText();
     text += QStringLiteral("\n%1\n%2").arg(
         gtr("main", "Sample document names:"),
