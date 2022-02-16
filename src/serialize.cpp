@@ -795,7 +795,9 @@ optional<ChipList> load_chips(ErrorState & state, GenChips gen_chips) {
             PUSH_FATAL(err, "[{}]=ChipKind::UNKNOWN, cannot load", i);
             continue;
         default:
-            PUSH_FATAL(err, "[{}]={} (unknown chip kind), cannot load", i, gen_chip);
+            PUSH_FATAL(err,
+                "[{}]={} (unknown chip kind), cannot load", i, (size_t) gen_chip
+            );
             continue;
         }
 
@@ -1234,7 +1236,7 @@ LoadDocumentResult load_impl(kj::InputStream & stream, ErrorState & state) {
         default:
             PUSH_WARNING(state,
                 "accidental_mode={} unrecognized (should be Sharp or Flat), defaulting to Sharp",
-                gen_accidental_mode
+                (size_t) gen_accidental_mode
             );
             return AccidentalMode::Sharp;
     });

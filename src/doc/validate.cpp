@@ -252,7 +252,7 @@ optional<size_t> validate_nchan_matches(
     if (gen_nchan != metadata.nchan) {
         PUSH_ERROR(state,
             "[{0}].size()={1} != chips[{0}]={2}'s channel count ({3})",
-            chip_idx, gen_nchan, metadata.chip_kind, metadata.nchan
+            chip_idx, gen_nchan, (size_t) metadata.chip_kind, metadata.nchan
         );
         return {};
     }
