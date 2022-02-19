@@ -60,11 +60,11 @@ Document new_document() {
     };
 }
 
-/// Empty document with one grid cell.
+/// Empty document with one grid cell and test samples/instruments.
 /// Channel 0 has a block/pattern without events, and Channel 1 has no pattern.
 ///
 /// Use as a template for porting other documents.
-static Document empty() {
+static Document instruments() {
     SequencerOptions sequencer_options{.target_tempo = 150, .ticks_per_beat = 48};
 
     constexpr SampleIndex TRIANGLE = 0;
@@ -291,7 +291,7 @@ static Document all_channels() {
         std::vector<TimelineCell> channels;
         for (int i = 0; i < 8; i++) {
             channels.push_back({TimelineBlock::from_events({
-                Ev(BeatFraction(i, 4), Note(Chromatic(60 + i))).instr(0)
+                Ev(BeatFraction(i, 4), Note(Chromatic(60 + 2 * i))).instr(0)
             })});
         }
         return TimelineFrame{
@@ -698,7 +698,7 @@ static Document block_test() {
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
     std::map<std::string, doc::Document> out;
-    out.insert({"empty", empty()});
+    out.insert({"instruments", instruments()});
     out.insert({"dream-fragments", dream_fragments()});
     out.insert({"all-channels", all_channels()});
     // out.insert({"world-revolution", world_revolution()});

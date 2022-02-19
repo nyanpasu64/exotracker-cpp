@@ -63,7 +63,7 @@ exotracker-cpp depends on Qt 5. All other libraries are bundled, compiled, and l
 - Try passing in names of sample documents as command-line arguments. Listed in order from most to least useful:
 	- Partial songs: `dream-fragments`
 	- `all-channels` (default song) (sounds bad, tests that all audio channels play properly)
-	- `empty` (add your own notes)
+	- `instruments` (add your own notes)
 - Some sample documents have short and/or looped blocks (the gray rectangles to the left of each channel), intended as a DAW-inspired system of looping and reuse. But right now, users can only create full-grid blocks, and cannot delete blocks.
 	- The block system is powerful, but unfortunately not editable through the UI yet, so you can't try it out to see useful it is.
 	- Pattern reuse is not implemented.

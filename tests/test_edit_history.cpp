@@ -35,7 +35,7 @@ namespace ep = edit::edit_pattern;
 /// Applying edits a and b on a document (which may/not have an existing block),
 /// assert that merging does not occur.
 void test_pattern_edits(bool start_with_block, GetEdit a, GetEdit b) {
-    auto h = History(sample_docs::DOCUMENTS.at("empty").clone());
+    auto h = History(sample_docs::new_document());
 
     if (start_with_block) {
         // Create a block, so both a and b operate on an existing block.
@@ -136,7 +136,7 @@ TEST_CASE("Check that instrument edits are not merged") {
 }
 
 TEST_CASE("Check that undo and redo work") {
-    auto h = History(sample_docs::DOCUMENTS.at("empty").clone());
+    auto h = History(sample_docs::new_document());
     auto const before = h.get_document().clone();
 
     CHECK_FALSE(h.can_undo());
