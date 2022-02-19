@@ -103,8 +103,10 @@ public:
 
     /// See #define PUSH().
     template <typename... Args>
-    void push(ErrorState & state, Args&&... args) const {
-        fmt::format_to(state.msg, std::forward<Args>(args)...);
+    void push(
+        ErrorState & state, fmt::format_string<Args...> str, Args&&... args
+    ) const {
+        fmt::format_to(std::back_inserter(state.msg), str, std::forward<Args>(args)...);
     }
 
     /// See #define PUSH_LITERAL().
@@ -146,11 +148,11 @@ public:
 ///
 /// See #define PUSH_WARNING() and PUSH_ERROR().
 template <ErrorType type, typename... Args>
-void push_err_fmt(ErrorState & state, Args&&... args) {
+void push_err_fmt(ErrorState & state, fmt::format_string<Args...> str, Args&&... args) {
     size_t prefix = state.msg.size();
 
     // push to end
-    fmt::format_to(state.msg, std::forward<Args>(args)...);
+    fmt::format_to(std::back_inserter(state.msg), str, std::forward<Args>(args)...);
 
     // read message
     state.err.push_back(Error{
