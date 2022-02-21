@@ -31,24 +31,26 @@ ninja
 
 I use Qt Creator and CLion IDEs for this project. You can import it into Visual Studio 2019 as a CMake project, but profiling will be tricky-to-impossible to set up. Telling CMake to generate Visual Studio .sln projects will probably not work (switching build types in Visual Studio will not change flags, and I don't know how to use Clang with .vcxproj).
 
-exotracker-cpp requires a compiler with C++20 support. MSVC, GCC 10+, and Clang 10+ are supported.
+### Compilers
 
-- On Linux, I've had good results with GCC 10 and Clang 10 through 12 (older versions lack support for `operator<=>` and defaulting `operator==`).
-	- You can speed up builds if you install lld and use it instead of ld.
-	- On Clang, enable lld using `-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld`
+exotracker-cpp requires a compiler with C++20 support. MSVC and GCC 10 are supported. Clang currently fails to build unit tests (it errors out when  doctest's `CAPTURE()` lambdas capture structured bindings).
+
+- On Linux, I've had good results with GCC 10-11 (Clang can't compile unit tests). Older compilers lack support for `operator<=>` and defaulting `operator==`.
+	- You can speed up builds if you install lld or the Linux-only mold, and use it instead of ld.
 	- On GCC, enable lld using `-DCMAKE_C_FLAGS=-fuse-ld=lld -DCMAKE_CXX_FLAGS=-fuse-ld=lld`
-- On Windows, I recommend using MSVC or Clang (not clang-cl). MinGW/GCC works, but is not recommended.
-	- MinGW-w64 produces larger binaries, and requires either linking libc statically into the binary (even larger binaries) or bundling glibc DLLs (since unlike Universal CRT, most people don't have mingw-w64 in PATH).
-		- Additionally, MinGW-w64 builds slowly due to a slow linker. You may have better results using lld instead of ld, but I have not tested it yet.
+	- On Clang, enable lld using `-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld`
+- On Windows, I recommend using MSVC (Clang can't compile unit tests) (not clang-cl). MinGW/GCC works, but is not recommended.
+	- MinGW-w64 produces larger binaries, ships with much larger Qt DLLs (stripping might help), and requires either linking libc statically into the binary (even larger binaries) or bundling glibc DLLs (since unlike Universal CRT, most people don't have mingw-w64 in PATH).
+		- Additionally, MinGW-w64 builds slowly due to a slow linker. To workaround this, you can install `mingw-w64-x86_64-lld` and use `lld` instead.
 	- If you plan to use MinGW, I recommend using MSYS2 to install GCC and Qt (`pacman -Syu mingw-w64-x86_64-gcc mingw-w64-x86_64-gdb mingw-w64-x86_64-qt5`).
 	- Using Qt's web installer to install MinGW Qt is discouraged, since installing MinGW Qt also installs MinGW GCC 8.1.0, which is too old to compile exotracker. (If you try uninstalling MinGW, it removes MinGW Qt as well.) You have to keep GCC 8.1.0 around (but avoid using it), then use MSYS2 to install mingw-w64 GCC separately, use MSYS2's compiler to build exotracker, and use MSYS2's DLLs to run exotracker. You're better off installing GCC and Qt through MSYS2, which works by default.
 	- Do not use Win-builds to install MinGW! It ships GCC 4.8.3 and Qt 5.3.1, which were released in 2014 and are far too outdated for exotracker.
-	- MSYS2 also offers Clang with MinGW ABI (`mingw-w64-x86_64-clang`). This works as of 2021-04, but is not regularly tested.
-- On Mac, it compiles using XCode's Clang. I haven't tried other compilers.
+	- MSYS2 also offers Clang with MinGW ABI (`mingw-w64-x86_64-clang`), UCRT64, and CLANG64 ([link](https://www.msys2.org/docs/environments/)). These are untested, but I encourage you to test UCRT64.
+- On Intel Mac, the program compiled at one point using XCode's Clang. Building on/for M1 Mac is unsupported until exotracker adds Qt 6 support.
 
 ### Build Dependencies
 
-exotracker-cpp depends on Qt. All other libraries are bundled, compiled, and linked statically. On Linux, to obtain audio, you need to install ALSA/PulseAudio/JACK headers (whichever one you want to use). Most Linux distributions use PulseAudio, but RtAudio's PulseAudio backend may be more stuttery (due to mutexes) than ALSA.
+exotracker-cpp depends on Qt 5. All other libraries are bundled, compiled, and linked statically. On Linux, to obtain audio, you need to install ALSA/PulseAudio/JACK headers (whichever one you want to use). Most Linux distributions use PulseAudio, but RtAudio's PulseAudio backend may be more stuttery (due to mutexes) than ALSA.
 
 ## Usage
 
