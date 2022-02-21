@@ -37,12 +37,12 @@ clone_depth: 3 # clone entire repository history if not defined
 environment:
   APPVEYOR_YML_DISABLE_PS_LINUX: true
   matrix:
-    - APPVEYOR_JOB_NAME: Windows Clang 64
+    - APPVEYOR_JOB_NAME: Windows MSVC 64
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
 
       # Used by CMake
-      CC: clang
-      CXX: clang++
+      CC: cl
+      CXX: cl
       Qt5_DIR: C:/Qt/5.15/msvc2019_64
 
 #---------------------------------#
