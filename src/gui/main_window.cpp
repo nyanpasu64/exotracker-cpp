@@ -1418,7 +1418,7 @@ private:
         auto path = QFileDialog::getSaveFileName(
             this,
             tr("Save As"),
-            QString(),
+            _file_path,
             tr("ExoTracker modules (*.etm);;All files (*)"));
 
         if (path.isEmpty()) {
