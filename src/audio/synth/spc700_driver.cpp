@@ -87,6 +87,7 @@ static uint16_t calc_tuning(
 static doc::InstrumentPatch const* find_patch(
     gsl::span<doc::InstrumentPatch const> keysplit, doc::Chromatic note
 ) {
+    // NOTE: Keep in sync with spc_export.cpp#instr::InstrumentMap::amk_instrument().
     int curr_min_note = -1;
     doc::InstrumentPatch const* matching = nullptr;
 
