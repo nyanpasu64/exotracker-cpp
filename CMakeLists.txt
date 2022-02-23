@@ -198,6 +198,7 @@ add_library(exotracker-headless
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
     src/doc_util/sample_instrs.cpp
+    src/spc_export/driver.cpp
     src/gui/history.cpp
 
     # Pattern editor backend
