@@ -16,8 +16,10 @@
 #include "cmd_queue.h"
 #include "edit/edit_doc.h"
 #include "serialize.h"
+#include "spc_export.h"
 #include "sample_docs.h"
 #include "util/defer.h"
+#include "util/expr.h"
 #include "util/math.h"
 #include "util/release_assert.h"
 #include "util/reverse.h"
@@ -300,6 +302,9 @@ struct MainWindowUi : MainWindow {
     QAction * _open;
     QAction * _save;
     QAction * _save_as;
+
+    QAction * _export_spc;
+
     QAction * _exit;
 
     // Edit menu
@@ -368,6 +373,8 @@ struct MainWindowUi : MainWindow {
                 _open = m->addAction(tr("&Open"));
                 _save = m->addAction(tr("&Save"));
                 _save_as = m->addAction(tr("Save &As"));
+                m->addSeparator();
+                _export_spc = m->addAction(tr("&Export SPC"));
                 m->addSeparator();
                 _exit = m->addAction(tr("E&xit"));
             }
@@ -1054,6 +1061,9 @@ public:
         _save_as->setShortcuts(QKeySequence::SaveAs);
         connect(_save_as, &QAction::triggered, this, &MainWindowImpl::on_save_as);
 
+        _export_spc->setShortcut(tr("Ctrl+E"));
+        connect(_export_spc, &QAction::triggered, this, &MainWindowImpl::on_export_spc);
+
         // TODO _exit->setShortcuts(QKeySequence::Quit);
         connect(_exit, &QAction::triggered, this, &QWidget::close);
 
@@ -1467,6 +1477,78 @@ private:
             tx.mark_saved();
 
             return true;
+        }
+    }
+
+    void on_export_spc() {
+        using serialize::ErrorType;
+
+        // TODO should we track "most recent .spc folder" rather than the current
+        // document? Not sure.
+        auto name = EXPR(
+            if (!_file_path.isEmpty()) {
+                auto orig_path = QFileInfo(_file_path);
+                return orig_path.dir().absoluteFilePath(orig_path.completeBaseName());
+            } else {
+                return tr("Untitled");
+            }
+        );
+        auto spc_name = name + QStringLiteral(".spc");
+
+        // Pick filename.
+        auto path = QFileDialog::getSaveFileName(
+            this,
+            tr("Export SPC"),
+            spc_name,
+            tr("SPC files (*.spc);;All files (*)"));
+
+        if (path.isEmpty()) {
+            return;
+        }
+
+        // Write SPC file.
+        auto result = spc_export::export_spc(get_document(), path.toUtf8());
+
+        if (result.ok) {
+            // Once we add metadata (eg. ARAM usage breakdown), we'll have to display it
+            // upon non-error export.
+        } else {
+            // Document failed to load. There should be an error message explaining why.
+            assert(!result.errors.empty());
+        }
+
+        // Show warnings or errors.
+        if (!result.ok || !result.errors.empty()) {
+            QTextDocument document;
+            auto cursor = QTextCursor(&document);
+            cursor.beginEditBlock();
+
+            if (result.ok) {
+                cursor.insertText(tr("SPC file exported with warnings:"));
+            } else {
+                cursor.insertText(tr("Failed to export SPC file:"));
+            }
+
+            // https://stackoverflow.com/a/51864380
+            QTextList* list = nullptr;
+            QTextBlockFormat non_list_format = cursor.blockFormat();
+            for (auto const& err : result.errors) {
+                if (!list) {
+                    // create list with 1 item
+                    list = cursor.insertList(QTextListFormat::ListDisc);
+                } else {
+                    // append item to list
+                    cursor.insertBlock();
+                }
+
+                QString line = QLatin1String("%1: %2")
+                    .arg((err.type == ErrorType::Error) ? tr("Error") : tr("Warning"))
+                    .arg(QString::fromStdString(err.description));
+                cursor.insertText(line);
+            }
+
+            _error_dialog.close();
+            _error_dialog.showMessage(document.toHtml());
         }
     }
 
