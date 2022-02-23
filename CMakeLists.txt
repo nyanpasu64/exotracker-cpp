@@ -166,6 +166,11 @@ add_library(exotracker-core
     src/doc/validate.cpp
     src/serialize.cpp
     src/serialize/document.capnp.c++
+
+    # SPC export files
+    src/spc_export.cpp
+    src/spc_export/driver.cpp
+    src/spc_export/link.cpp
 )
 target_compile_options(exotracker-core PRIVATE "${options}")
 target_link_libraries(exotracker-core
@@ -198,7 +203,6 @@ add_library(exotracker-headless
     src/doc/gui_traits.cpp
     src/doc_util/event_search.cpp
     src/doc_util/sample_instrs.cpp
-    src/spc_export/driver.cpp
     src/gui/history.cpp
 
     # Pattern editor backend
@@ -206,8 +210,8 @@ add_library(exotracker-headless
 )
 target_compile_options(exotracker-headless PRIVATE "${options}")
 target_link_libraries(exotracker-headless
-    PRIVATE rtaudio
     PUBLIC exotracker-core
+    PRIVATE rtaudio
 )
 if(USE_PCH)
     target_precompile_headers(exotracker-headless PRIVATE
@@ -310,6 +314,7 @@ add_executable(exotracker-tests
     src/audio/synth/spc700_driver.cpp
     src/audio/synth/volume_calc_common.cpp
     src/doc/timeline.cpp
+    src/spc_export.cpp
 )
 target_compile_options(exotracker-tests PRIVATE "${options}")
 target_include_directories(exotracker-tests PUBLIC tests)
