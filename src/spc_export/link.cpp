@@ -6,21 +6,18 @@
 
 namespace spc_export::link {
 
-/// Should be little endian. Is only correct on little-endian CPUs.
+/// Cast to register width and force unsigned full-width arithmetic.
+#define REG(x)  (size_t) (x)
+
 static inline uint16_t get_u16(gsl::span<const uint8_t> data, size_t addr) {
     // Bounds-check. Ignore integer overflow.
     if (addr + 2 > data.size()) {
         throw std::out_of_range(fmt::format("get_u16({}) out of range", addr));
     }
 
-    // This is wrong on big-endian CPUs.
-    uint16_t out;
-    memcpy(&out, &data[addr], 2);
-
-    return out;
+    return (uint16_t) (REG(data[addr]) | REG(data[addr + 1]) << 8);
 }
 
-/// Should be little endian. Is only correct on little-endian CPUs.
 static inline void set_u16(gsl::span<uint8_t> data, size_t addr, uint16_t value) {
     // Bounds-check. Ignore integer overflow.
     if (addr + 2 > data.size()) {
@@ -29,8 +26,8 @@ static inline void set_u16(gsl::span<uint8_t> data, size_t addr, uint16_t value)
         ));
     }
 
-    // This is wrong on big-endian CPUs.
-    memcpy(&data[addr], &value, 2);
+    data[addr] = (uint8_t) REG(value);
+    data[addr + 1] = (uint8_t) (REG(value) >> 8);
 }
 
 
