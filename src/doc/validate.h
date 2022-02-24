@@ -56,6 +56,9 @@ struct ErrorState {
     /// All current error messages.
     Errors err;
 
+    /// True if no errors have been pushed.
+    bool ok = true;
+
     /// A memory buffer used for holding the current error message or prefix
     /// (eg. "timeline[1].chip_channel_cells").
     /// Gets pushed or popped whenever a load_*() function gets called or returns,
@@ -149,6 +152,10 @@ public:
 /// See #define PUSH_WARNING() and PUSH_ERROR().
 template <ErrorType type, typename... Args>
 void push_err_fmt(ErrorState & state, fmt::format_string<Args...> str, Args&&... args) {
+    if constexpr (type == ErrorType::Error) {
+        state.ok = false;
+    }
+
     size_t prefix = state.msg.size();
 
     // push to end
