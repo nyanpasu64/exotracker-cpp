@@ -219,15 +219,15 @@ KeyCode toKeycode(QKeyEvent *ev)
         // we cannot tell if theleft or right modifier was pressed, so assume left.
         switch (qtKey) {
         case Qt::Key_Shift:
-            dom_code = static_cast<int>(KeyCode::SHIFT_LEFT); break;
+            dom_code = KeyCode::SHIFT_LEFT; break;
         case Qt::Key_Meta:
-            dom_code = static_cast<int>(KeyCode::META_LEFT); break;
+            dom_code = KeyCode::META_LEFT; break;
         case Qt::Key_Control:
-            dom_code = static_cast<int>(KeyCode::CONTROL_LEFT); break;
+            dom_code = KeyCode::CONTROL_LEFT; break;
         case Qt::Key_Alt:
-            dom_code = static_cast<int>(KeyCode::ALT_LEFT); break;
+            dom_code = KeyCode::ALT_LEFT; break;
         case Qt::Key_CapsLock:
-            dom_code = static_cast<int>(KeyCode::CAPS_LOCK); break;
+            dom_code = KeyCode::CAPS_LOCK; break;
         default:
             // Don't know which key... too bad :(
             break;
