@@ -6,6 +6,7 @@
 #include "gui/lib/instr_warnings.h"
 #include "gui/lib/layout_macros.h"
 #include "gui/lib/list_warnings.h"
+#include "gui/lib/qt6.h"
 #include "util/unwrap.h"
 #include "edit/edit_instr_list.h"
 
@@ -25,6 +26,7 @@
 #include <QAbstractListModel>
 #include <QAction>
 #include <QDebug>
+#include <QIODevice>
 #include <QMimeData>
 #include <QSignalBlocker>
 
@@ -333,7 +335,12 @@ public:
     static constexpr int MAX_WIDTH = 128;
 
     void doItemsLayout() override {
+#if QT6
+        QStyleOptionViewItem option;
+        initViewItemOption(&option);
+#else
         QStyleOptionViewItem option = viewOptions();
+#endif
         auto model = this->model();
         if (!model || !itemDelegate()) {
             return QListView::doItemsLayout();
@@ -348,7 +355,12 @@ public:
                 continue;
             }
             auto index = model->index(row, 0);
-            auto delegate = itemDelegate(index);
+            auto delegate =
+#if QT6
+                itemDelegateForIndex(index);
+#else
+                itemDelegate(index);
+#endif
 
             size = size.expandedTo(delegate->sizeHint(option, index));
         }

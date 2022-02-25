@@ -9,6 +9,7 @@
 #include "gui/lib/list_warnings.h"
 #include "gui/lib/note_spinbox.h"
 #include "gui/lib/parse_note.h"
+#include "gui/lib/qt6.h"
 #include "gui/lib/sample_text.h"
 #include "gui/lib/small_button.h"
 #include "edit/edit_instr.h"
@@ -237,7 +238,11 @@ protected:
         }
     }
 
+#if QT6
+    void enterEvent(QEnterEvent * event) override {
+#else
     void enterEvent(QEvent * event) override {
+#endif
         if (event->type() == QEvent::Enter) {
             _hovered = true;
             update_color();

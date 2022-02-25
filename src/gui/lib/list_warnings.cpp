@@ -1,10 +1,13 @@
 #include "list_warnings.h"
 #include "gui/lib/docs_palette.h"
+#include "gui/lib/color.h"
 
 #include <QTextCursor>
 #include <QTextDocument>
 
 namespace gui::lib::list_warnings {
+
+using gui::lib::color::ColorF;
 
 QIcon warning_icon() {
     return QIcon(QStringLiteral("://icons/warning-sign.svg"));
@@ -14,7 +17,7 @@ namespace pal = gui::lib::docs_palette;
 
 QColor warning_bg() {
     QColor color = pal::get_color(pal::Hue::Yellow, pal::Shade::Light1);
-    color.setAlphaF(0.4);
+    color.setAlphaF((ColorF) 0.4);
     return color;
 }
 

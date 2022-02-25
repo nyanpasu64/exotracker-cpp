@@ -222,6 +222,37 @@ static void setup_shortcuts(PatternEditor & self) {
     #undef X
 }
 
+static void create_image(PatternEditor & self) {
+    /*
+    https://www.qt.io/blog/2009/12/16/qt-graphics-and-performance-an-overview
+
+    QImage is designed and optimized for I/O,
+    and for direct pixel access and manipulation,
+    while QPixmap is designed and optimized for showing images on screen.
+
+    I've measured ARGB32_Premultiplied onto RGB32 to be about 2-4x faster
+    than drawing an ARGB32 non-premultiplied depending on the usecase.
+
+    By default a QPixmap is treated as opaque.
+    When doing QPixmap::fill(Qt::transparent),
+    it will be made into a pixmap with alpha channel which is slower to draw.
+
+    Before moving onto something else, I'll just give a small warning
+    on the functions setAlphaChannel and setMask
+    and the innocently looking alphaChannel() and mask().
+    These functions are part of the Qt 3 legacy
+    that we didn't quite manage to clean up when moving to Qt 4.
+    In the past the alpha channel of a pixmap, or its mask,
+    was stored separately from the pixmap data.
+    */
+
+    QPixmap pixmap{QSize{1, 1}};
+    // On Windows, it's QImage::Format_RGB32.
+    auto format = pixmap.toImage().format();
+    self._image = QImage(self.geometry().size(), format);
+    self._temp_image = QImage(self.geometry().size(), format);
+}
+
 static PatternFontMetrics calc_single_font_metrics(QFont const & font) {
     auto & visual = get_app().options().visual;
     QFontMetrics metrics{font};
@@ -271,37 +302,6 @@ static void calc_font_metrics(PatternEditor & self) {
             + visual.font_tweaks.pixels_below_text,
         1
     );
-}
-
-static void create_image(PatternEditor & self) {
-    /*
-    https://www.qt.io/blog/2009/12/16/qt-graphics-and-performance-an-overview
-
-    QImage is designed and optimized for I/O,
-    and for direct pixel access and manipulation,
-    while QPixmap is designed and optimized for showing images on screen.
-
-    I've measured ARGB32_Premultiplied onto RGB32 to be about 2-4x faster
-    than drawing an ARGB32 non-premultiplied depending on the usecase.
-
-    By default a QPixmap is treated as opaque.
-    When doing QPixmap::fill(Qt::transparent),
-    it will be made into a pixmap with alpha channel which is slower to draw.
-
-    Before moving onto something else, I'll just give a small warning
-    on the functions setAlphaChannel and setMask
-    and the innocently looking alphaChannel() and mask().
-    These functions are part of the Qt 3 legacy
-    that we didn't quite manage to clean up when moving to Qt 4.
-    In the past the alpha channel of a pixmap, or its mask,
-    was stored separately from the pixmap data.
-    */
-
-    QPixmap pixmap{QSize{1, 1}};
-    // On Windows, it's QImage::Format_RGB32.
-    auto format = pixmap.toImage().format();
-    self._image = QImage(self.geometry().size(), format);
-    self._temp_image = QImage(self.geometry().size(), format);
 }
 
 PatternEditor::PatternEditor(MainWindow * win, QWidget * parent)
@@ -752,9 +752,9 @@ static void draw_header(
         // You need to assign the color map afterwards.
         // List of QPalette colors at https://doc.qt.io/qt-5/qpalette.html#ColorRole-enum
         grad.setStops(QGradientStops{
-            QPair{0., self.palette().button().color()},
-            QPair{0.4, self.palette().light().color()},
-            QPair{1., self.palette().button().color().darker(135)},
+            {0., self.palette().button().color()},
+            {0.4, self.palette().light().color()},
+            {1., self.palette().button().color().darker(135)},
         });
 
         // Then cast it into a QBrush, and draw the background.
@@ -1077,8 +1077,8 @@ static QLinearGradient make_gradient(
     bottom_color.setAlpha(bottom_alpha);
 
     grad.setStops(QGradientStops{
-        QPair{0., top_color},
-        QPair{1., bottom_color},
+        {0., top_color},
+        {1., bottom_color},
     });
 
     return grad;
@@ -1742,7 +1742,7 @@ static void draw_pattern_foreground(
                 auto draw_cells = [&draw_char](
                     QString const& text, gsl::span<qreal const> cell_centers
                 ) {
-                    int nchar = text.size();
+                    auto nchar = text.size();
                     release_assert_equal((size_t) nchar, cell_centers.size());
 
                     for (int i = 0; i < nchar; i++) {
@@ -1757,11 +1757,11 @@ static void draw_pattern_foreground(
                 auto draw_text = [
                     &draw_char, width_per_char = self._pattern_font_metrics.width
                 ] (QString const& text, qreal center_x) {
-                    int nchar = text.size();
+                    auto nchar = text.size();
                     if (!(nchar >= 1)) return;
 
                     // Compute the center x of the leftmost character.
-                    qreal char_center_x = center_x - (nchar - 1) * width_per_char / qreal(2);
+                    qreal char_center_x = center_x - qreal(nchar - 1) * width_per_char / qreal(2);
 
                     // One would think you could draw a character using a QPainter
                     // without performing a heap allocation...

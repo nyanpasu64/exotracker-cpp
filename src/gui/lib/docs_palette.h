@@ -44,6 +44,8 @@ using Hue_::Hue;
 constexpr size_t HUE_COUNT = Hue::COUNT;  // 9
 constexpr size_t HUE_MAX = Hue::MAX;  // 8
 
+using gui::lib::color::ColorF;
+
 namespace detail {
     extern QColor const GRAYS[SHADE_COUNT];
     extern QColor const COLORS[HUE_COUNT][SHADE_COUNT];
@@ -79,7 +81,7 @@ namespace detail {
             size_t shade_floor = (size_t) std::floor(shade);
             auto shade_frac = shade - std::floor(shade);
             return lerp_colors(
-                palette[shade_floor], palette[shade_floor + 1], shade_frac
+                palette[shade_floor], palette[shade_floor + 1], (ColorF) shade_frac
             );
         }
     }
@@ -104,7 +106,7 @@ QColor get_color(Hue hue, auto shade, Saturation saturation = true) {
             std::is_floating_point_v<Saturation>,
             "invalid saturation type, must be bool(true) or floating");
         auto gray = detail::index_shade(detail::GRAYS, shade);
-        return lerp_colors(gray, color, saturation);
+        return lerp_colors(gray, color, (ColorF) saturation);
     }
 }
 
