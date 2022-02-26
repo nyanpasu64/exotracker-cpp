@@ -34,6 +34,110 @@ static Address calc_voice_reg(size_t channel_id, Address v_reg) {
     return channel_addr + v_reg;
 }
 
+struct ChannelVolume {
+    uint8_t volume;
+    uint8_t velocity;
+};
+
+struct StereoVolume {
+    // The DSP interprets as two's complement signed.
+    // Use unsigned for consistent UB-free behavior.
+    uint8_t left;
+    uint8_t right;
+};
+
+// Utilities
+
+#define REG(x)  ((size_t) (x))
+
+/// Equivalent to SPC700 `mul ya` followed by discarding a and keeping y.
+static inline uint8_t mul_hi(uint8_t a, uint8_t b) {
+    return (uint8_t) ((REG(a) * REG(b)) >> 8);
+}
+
+struct BytePair {
+    uint8_t lower;
+    uint8_t upper;
+};
+
+static inline uint16_t merge(uint8_t lower, uint8_t upper) {
+    return (uint16_t) (REG(lower) | REG(upper) << 8);
+}
+
+static inline BytePair split(uint16_t x) {
+    return BytePair {
+        .lower = (uint8_t) x,
+        .upper = (uint8_t) (x >> 8),
+    };
+}
+
+// Volume calculations
+
+/// Indexes 0..20 are valid, and 21 may be read in some cases.
+static const uint8_t PAN_TABLE[22] = {
+    0x00, 0x01, 0x03, 0x07, 0x0D, 0x15, 0x1E, 0x29, 0x34, 0x42,
+    0x51, 0x5E, 0x67, 0x6E, 0x73, 0x77, 0x7A, 0x7C, 0x7D, 0x7E,
+    0x7F,
+    0x7F,
+};
+
+/// Will be changeable in the future.
+constexpr uint8_t MASTER_VOLUME = 0xC0;
+
+static StereoVolume calc_volume_reg(
+    ChannelVolume volume, PanState pan, SurroundState surround
+) {
+    // Based on AddMusicKFF L_1013 (https://github.com/KungFuFurby/AddMusicKFF/blob/ce5316f4c99ae5fa37820a2944376cabf8295543/asm/main.asm#L2627).
+
+    // call L_124D
+    uint8_t temp_vol = mul_hi(volume.velocity, volume.volume);
+    temp_vol = mul_hi(temp_vol, MASTER_VOLUME);
+    temp_vol = mul_hi(temp_vol, temp_vol);
+
+    // L_1019:
+    // Ignore pan fade for now.
+    // TODO who writes to $5C and determines which channels have volumes rewritten?
+
+    // Skip L_102D.
+
+    // L_103B/CalcChanVolume:
+    auto calc_lr_volume = [temp_vol](BytePair pan, bool invert) -> uint8_t {
+        uint8_t curr = PAN_TABLE[pan.upper];
+        uint8_t next = PAN_TABLE[pan.upper + 1];
+
+        auto multiplier = (uint8_t) (curr + mul_hi(next - curr, pan.lower));
+
+        uint8_t out = mul_hi(multiplier, temp_vol);
+        // I'm not implementing AMK's volume multiplier which would go here.
+        // We've already lost a lot of resolution by this point.
+
+        if (invert) {
+            // lol inverting an unsigned quantity... The ASM does ^$FF, +1.
+            // We write an unsigned quantity (representing two's complement signed)
+            // to the DSP, which interprets it as two's complement signed,
+            // so it works out in the end.
+            out = -out;
+        }
+
+        return out;
+    };
+
+    uint16_t pan_u16 = merge(pan.fraction, pan.value);
+
+    static constexpr uint16_t MAX_PAN = 20 * 0x100;
+    // TODO warn on invalid pan?
+    if (pan_u16 > MAX_PAN) {
+        pan_u16 = MAX_PAN;
+    }
+
+    uint8_t left = calc_lr_volume(split(pan_u16), surround.left_invert);
+    uint8_t right = calc_lr_volume(split(0x100 * 20 - pan_u16), surround.right_invert);
+    return StereoVolume {
+        .left = left,
+        .right = right,
+    };
+}
+
 void Spc700ChannelDriver::restore_state(
     doc::Document const& document, RegisterWriteQueue & regs
 ) const {
@@ -46,9 +150,19 @@ void Spc700ChannelDriver::restore_state(
 void Spc700ChannelDriver::write_volume(RegisterWriteQueue & regs) const {
     DEBUG_PRINT("    volume {}\n", _prev_volume);
 
+    // TODO how do we store current qXY value or actual velocity?
+    // TODO how do we switch velocity tables to change the interpretation of qXY?
+    auto volume = ChannelVolume {
+        .volume = _prev_volume,
+        .velocity = 0xB3,
+    };
+
+    // TODO access master volume in Spc700Driver const&?
+    StereoVolume vol_regs = calc_volume_reg(volume, _prev_pan, _surround);
+
     // TODO stereo
-    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_voll), _prev_volume);
-    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_volr), _prev_volume);
+    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_voll), vol_regs.left);
+    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_volr), vol_regs.right);
 }
 
 constexpr double CENTS_PER_OCTAVE = 1200.;
