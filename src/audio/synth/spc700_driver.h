@@ -29,15 +29,26 @@ struct Spc700ChipFlags {
     uint8_t koff = 0;
 };
 
+struct PanState {
+    uint8_t value = 10;
+    uint8_t fraction = 0;
+};
+
+struct SurroundState {
+    bool left_invert = false;
+    bool right_invert = false;
+};
+
 using spc700_synth::Spc700Synth;
 class Spc700Driver;
 
 class Spc700ChannelDriver {
     uint8_t _channel_id;
 
-    // Volume 32 out of [-128..127] is an acceptable default.
-    // 64 results in clipping when playing many channels at once.
-    uint8_t _prev_volume = 0x20;
+    uint8_t _prev_volume = 0xFF;
+    PanState _prev_pan;
+    SurroundState _surround;
+
     doc::Chromatic _prev_note = 0;
     bool _note_playing = false;
 
