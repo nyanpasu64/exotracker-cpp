@@ -2,6 +2,7 @@
 #include "spc700_synth.h"
 #include "chip_instance_common.h"
 #include "doc.h"
+#include "doc/effect_names.h"
 #include "util/release_assert.h"
 
 #include <SPC_DSP.h>  // for register enums
@@ -73,8 +74,11 @@ static inline BytePair split(uint16_t x) {
 
 // Volume calculations
 
-/// Indexes 0..20 are valid, and 21 may be read in some cases.
-static const uint8_t PAN_TABLE[22] = {
+constexpr size_t PAN_MAX = 20;
+
+/// Indexes 0..20 are valid, and 21 (out of bounds) is read by the SPC assembly
+/// on full-scale pan. So we need to store 22 pan table items.
+static const uint8_t PAN_TABLE[PAN_MAX + 2] = {
     0x00, 0x01, 0x03, 0x07, 0x0D, 0x15, 0x1E, 0x29, 0x34, 0x42,
     0x51, 0x5E, 0x67, 0x6E, 0x73, 0x77, 0x7A, 0x7C, 0x7D, 0x7E,
     0x7F,
@@ -124,14 +128,14 @@ static StereoVolume calc_volume_reg(
 
     uint16_t pan_u16 = merge(pan.fraction, pan.value);
 
-    static constexpr uint16_t MAX_PAN = 20 * 0x100;
+    static constexpr uint16_t MAX_PAN16 = PAN_MAX * 0x100;
     // TODO warn on invalid pan?
-    if (pan_u16 > MAX_PAN) {
-        pan_u16 = MAX_PAN;
+    if (pan_u16 > MAX_PAN16) {
+        pan_u16 = MAX_PAN16;
     }
 
     uint8_t left = calc_lr_volume(split(pan_u16), surround.left_invert);
-    uint8_t right = calc_lr_volume(split(0x100 * 20 - pan_u16), surround.right_invert);
+    uint8_t right = calc_lr_volume(split(MAX_PAN16 - pan_u16), surround.right_invert);
     return StereoVolume {
         .left = left,
         .right = right,
@@ -232,6 +236,8 @@ constexpr ClockT CLOCKS_PER_TWO_SAMPLES = 64;
 // If we set a high enough timer rate, then we may not wait 2 samples per tick,
 // and ChipInstance::run_chip_for() will truncate our register write
 // to prevent it from overflowing the tick.
+
+using doc::effect_names::eff_name;
 
 void Spc700ChannelDriver::run_driver(
     doc::Document const& document,
@@ -343,6 +349,9 @@ void Spc700ChannelDriver::run_driver(
         _note_playing = false;
     };
 
+    // TODO test AMK driver to see when volumes are reevaluated ($5C)
+    bool volumes_changed = false;
+
     for (doc::RowEvent const& ev : events) {
         if (ev.instr) {
             DEBUG_PRINT(
@@ -388,9 +397,23 @@ void Spc700ChannelDriver::run_driver(
         if (ev.volume) {
             DEBUG_PRINT("channel {}, volume {}\n", _channel_id, *ev.volume);
             _prev_volume = *ev.volume;
-            write_volume(regs);
+            volumes_changed = true;
         }
-        // TODO ev.effects
+        for (doc::MaybeEffect const& effect : ev.effects) {
+            if (!effect) continue;
+
+            if (effect->name == eff_name('Y')) {
+                _prev_pan = PanState {
+                    .value = effect->value,
+                    .fraction = 0,
+                };
+                volumes_changed = true;
+            }
+        }
+    }
+
+    if (volumes_changed) {
+        write_volume(regs);
     }
 }
 
