@@ -2753,14 +2753,16 @@ static void add_effect_char(
     tx.push_edit(std::move(box), move_cursor);
 }
 
+using qkeycode::KeyCode;
+
 /// Handles events based on physical layout rather than shortcuts.
 /// Basically note and effect/hex input only.
 void PatternEditor::keyPressEvent(QKeyEvent * event) {
     auto const& document = get_document();
-    auto keycode = qkeycode::toKeycode(event);
+    KeyCode keycode = qkeycode::toKeycode(event);
     DEBUG_PRINT(
         "KeyPress {}=\"{}\", modifier {}, repeat? {}\n",
-        keycode,
+        (size_t) keycode,
         qkeycode::KeycodeConverter::DomCodeToCodeString(keycode),
         event->modifiers(),
         event->isAutoRepeat()
@@ -2848,10 +2850,10 @@ void PatternEditor::keyPressEvent(QKeyEvent * event) {
 }
 
 void PatternEditor::keyReleaseEvent(QKeyEvent * event) {
-    auto dom_code = qkeycode::toKeycode(event);
+    KeyCode dom_code = qkeycode::toKeycode(event);
     DEBUG_PRINT(
         "KeyRelease {}=\"{}\", modifier {}, repeat? {}\n",
-        dom_code,
+        (size_t) dom_code,
         qkeycode::KeycodeConverter::DomCodeToCodeString(dom_code),
         event->modifiers(),
         event->isAutoRepeat()

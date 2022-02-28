@@ -184,7 +184,11 @@ static std::optional<quint32> nativeKeyCodeForKeyEvent(const QKeyEvent *ev)
     // Distinguishing left/right modifiers requires a change to Qt (qnsview_keys.mm)
     // to set QKeyEvent::native...() to their proper values.
 
-    if (keyboardDriver() == KeyboardDriver::Cocoa && ev->nativeScanCode() != 0) {
+    // BUG: On Qt 6.2.3 on macOS 12 on non-virtualized Mac,
+    // ev->nativeScanCode() is always 0 even for real keypresses.
+    // So just always return it.
+
+    if (keyboardDriver() == KeyboardDriver::Cocoa) {
         return ev->nativeVirtualKey();
     } else {
         return std::nullopt;
@@ -197,44 +201,42 @@ static std::optional<quint32> nativeKeyCodeForKeyEvent(const QKeyEvent *ev)
 
 KeyCode toKeycode(QKeyEvent *ev)
 {
-    int qtKey = qtKeyForKeyEvent(ev);
-
-    auto nativeKeyCodeMaybe = nativeKeyCodeForKeyEvent(ev);
-
     // The dom_code field should contain the USB keycode of the *physical* key
     // that was pressed. Physical meaning independent of layout and modifiers.
     // Since this information is not available from QKeyEvent in portable form,
     // we try to compute it from the native key code.
     auto dom_code = KeyCode::NONE;
 
-    if (nativeKeyCodeMaybe) {
-        dom_code = ui::KeycodeConverter::NativeKeycodeToDomCode(*nativeKeyCodeMaybe);
-    } else {
 #if defined(Q_OS_MACOS)
-        // On Mac, - (void)flagsChanged:(NSEvent *)nsevent
-        // converts certain NSEventModifierFlag into Qt::Key.
-        // Convert the corresponding Qt::Key to keycodes.
-        //
-        // As discussed in nativeKeyCodeForKeyEvent(),
-        // we cannot tell if theleft or right modifier was pressed, so assume left.
-        switch (qtKey) {
-        case Qt::Key_Shift:
-            dom_code = static_cast<int>(KeyCode::SHIFT_LEFT); break;
-        case Qt::Key_Meta:
-            dom_code = static_cast<int>(KeyCode::META_LEFT); break;
-        case Qt::Key_Control:
-            dom_code = static_cast<int>(KeyCode::CONTROL_LEFT); break;
-        case Qt::Key_Alt:
-            dom_code = static_cast<int>(KeyCode::ALT_LEFT); break;
-        case Qt::Key_CapsLock:
-            dom_code = static_cast<int>(KeyCode::CAPS_LOCK); break;
-        default:
-            // Don't know which key... too bad :(
-            break;
-        }
-#else
-        Q_UNUSED(qtKey)
+    int qtKey = qtKeyForKeyEvent(ev);
+    // On Mac, - (void)flagsChanged:(NSEvent *)nsevent
+    // converts certain NSEventModifierFlag into Qt::Key.
+    // Convert the corresponding Qt::Key to keycodes.
+    //
+    // As discussed in nativeKeyCodeForKeyEvent(),
+    // we cannot tell if the left or right modifier was pressed, so assume left.
+    switch (qtKey) {
+    case Qt::Key_Shift:
+        dom_code = KeyCode::SHIFT_LEFT; break;
+    case Qt::Key_Meta:
+        dom_code = KeyCode::META_LEFT; break;
+    case Qt::Key_Control:
+        dom_code = KeyCode::CONTROL_LEFT; break;
+    case Qt::Key_Alt:
+        dom_code = KeyCode::ALT_LEFT; break;
+    case Qt::Key_CapsLock:
+        dom_code = KeyCode::CAPS_LOCK; break;
+    default:
+        // Don't know which key... too bad :(
+        break;
+    }
 #endif
+
+    if (dom_code == KeyCode::NONE) {
+        if (auto nativeKeyCodeMaybe = nativeKeyCodeForKeyEvent(ev)) {
+            dom_code =
+                ui::KeycodeConverter::NativeKeycodeToDomCode(*nativeKeyCodeMaybe);
+        }
     }
 
     // The original QtWebEngine code synthesized dom_code from windows_key_code
