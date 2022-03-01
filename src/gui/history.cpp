@@ -9,34 +9,52 @@ History::History(doc::Document initial_state)
 {}
 
 void History::push(UndoFrame command) {
-    // Do I add support for tree-undo?
-    _redo_stack.clear();
+    // Preconditions: `_document` holds the initial state, and `command` holds the new
+    // state.
 
-    // TODO if HistoryFrame.can_merge(current.load()), store to current and discard old value.
-
-    // Move new state into current.
+    // Apply the `command` edit. This swaps `_document` and `command`'s states.
     command.edit->apply_swap(_document);
+    // Now `command` holds the initial state, and `_document` holds the new state.
+
+    // Mark document as edited. (Currently undoing changes doesn't mark document as
+    // clean.)
     _dirty = true;
 
-    if (!command.edit->save_in_history()) {
-        return;
-    }
-    if (_undo_stack.size()) {
-        auto & prev = _undo_stack.back();
+    if (command.edit->save_in_history()) {
+        // Clear `_redo_stack` regardless if `command` is pushed to `_undo_stack` or
+        // merged into `prev`. We *could* only clear the redo stack if the command is
+        // pushed, but then undoing and changing the tempo would *sometimes* clear the
+        // redo stack based on whether the next older undo command is a tempo change or
+        // not.
+        _redo_stack.clear();
 
-        // Only true if:
-        // - prev and command should be combined in undo history.
-        // - prev and command mutate the same state,
-        //   so History can discard command entirely after calling apply_swap().
-        if (command.edit->can_merge(*prev.edit)) {
-            prev.after_cursor = command.after_cursor;
+        bool command_merged = false;
+        if (_undo_stack.size()) {
+            // `prev` holds previous state (before initial).
+            auto & prev = _undo_stack.back();
 
-            // Discard current state. We only keep new state and previous state.
-            return;
+            // In some cases (like repeatedly adjusting tempo), we want to keep the
+            // previous and new states but discard the initial state, and merge
+            // `command` and `prev` into a single undo command.
+            //
+            // If `prev` and `command` mutate the same field, History can discard the
+            // initial state (stored in the `command` we applied), and only keep the
+            // previous and new states (stored in `prev` and `_document`).
+            if (command.edit->can_merge(*prev.edit)) {
+                command_merged = true;
+
+                // `prev.after_cursor` currently holds part of the initial state.
+                // Replace it with the new state (`command.after_cursor`).
+                prev.after_cursor = command.after_cursor;
+            }
+        }
+
+        // If we want to preserve the initial state as an undo step, push the `command`
+        // we applied onto the undo stack.
+        if (!command_merged) {
+            _undo_stack.push_back(std::move(command));
         }
     }
-    // Move current state into undo stack.
-    _undo_stack.push_back(std::move(command));
 }
 
 bool History::can_undo() const {
