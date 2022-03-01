@@ -74,11 +74,15 @@ inline namespace visual {
             .cell_top_alpha = 96,
             .cell_bottom_alpha = 96,
 
-            .pattern_font = EXPR(
+            .pattern_font = [&] {
+                #if __APPLE__
+                QFont out{"Menlo", 12};
+                #else
                 QFont out{"dejavu sans mono", 9};
+                #endif
                 out.setStyleHint(QFont::TypeWriter);
                 return out;
-            ),
+            }(),
 
             .font_tweaks = FontTweaks {
                 .width_adjust = 0,

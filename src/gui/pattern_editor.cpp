@@ -1,6 +1,7 @@
 #define pattern_editor_INTERNAL public
 #include "pattern_editor.h"
 
+#include "gui/lib/dpi.h"
 #include "gui/lib/format.h"
 #include "gui/lib/painter_ext.h"
 #include "gui/cursor.h"
@@ -52,6 +53,7 @@
 
 namespace gui::pattern_editor {
 
+namespace dpi = gui::lib::dpi;
 using gui::lib::color::lerp;
 using gui::lib::color::lerp_colors;
 
@@ -223,34 +225,13 @@ static void setup_shortcuts(PatternEditor & self) {
 }
 
 static void create_image(PatternEditor & self) {
-    /*
-    https://www.qt.io/blog/2009/12/16/qt-graphics-and-performance-an-overview
+    // If we need transparency, switch to Format_ARGB32_Premultiplied.
+    auto format = QImage::Format_RGB32;
 
-    QImage is designed and optimized for I/O,
-    and for direct pixel access and manipulation,
-    while QPixmap is designed and optimized for showing images on screen.
+    int ratio = dpi::iRatio(self);
 
-    I've measured ARGB32_Premultiplied onto RGB32 to be about 2-4x faster
-    than drawing an ARGB32 non-premultiplied depending on the usecase.
-
-    By default a QPixmap is treated as opaque.
-    When doing QPixmap::fill(Qt::transparent),
-    it will be made into a pixmap with alpha channel which is slower to draw.
-
-    Before moving onto something else, I'll just give a small warning
-    on the functions setAlphaChannel and setMask
-    and the innocently looking alphaChannel() and mask().
-    These functions are part of the Qt 3 legacy
-    that we didn't quite manage to clean up when moving to Qt 4.
-    In the past the alpha channel of a pixmap, or its mask,
-    was stored separately from the pixmap data.
-    */
-
-    QPixmap pixmap{QSize{1, 1}};
-    // On Windows, it's QImage::Format_RGB32.
-    auto format = pixmap.toImage().format();
-    self._image = QImage(self.geometry().size(), format);
-    self._temp_image = QImage(self.geometry().size(), format);
+    self._image = dpi::scaledQImage(self.geometry().size(), format, ratio);
+    self._temp_image = dpi::scaledQImage(self.geometry().size(), format, ratio);
 }
 
 static PatternFontMetrics calc_single_font_metrics(QFont const & font) {
@@ -2017,7 +1998,9 @@ static void draw_pattern(PatternEditor & self) {
     {
         auto painter = QPainter(&self._image);
 
-        GridRect canvas_rect = self._image.rect();
+        auto canvas_rect = GridRect(
+            QPoint(0, 0), self._image.size() / self._image.devicePixelRatio()
+        );
 
         ColumnLayout columns = gen_column_layout(self, document);
 
