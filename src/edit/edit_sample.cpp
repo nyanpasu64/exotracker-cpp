@@ -22,9 +22,6 @@ static Sample & get_sample_mut(doc::Document & doc, size_t sample_idx) {
     return const_cast<Sample &>(get_sample(doc, sample_idx));
 }
 
-/// It's only safe to merge multiple edits if they edit the same location,
-/// meaning that undoing the first edit produces the same document
-/// whether the second edit was undone or not.
 class SetSampleMetadata {
     SampleIndex _path;
     // .brr is empty to conserve RAM.
@@ -56,13 +53,7 @@ public:
         std::swap(patch.brr, _value.brr);
     }
 
-    using Impl = ImplEditCommand<SetSampleMetadata, Override::CanMerge>;
-    bool can_merge(BaseEditCommand & prev) const {
-        if (auto p = typeid_cast<Impl *>(&prev)) {
-            return p->_path == _path;
-        }
-        return false;
-    }
+    using Impl = ImplEditCommand<SetSampleMetadata, Override::SkipHistory>;
 };
 
 EditBox set_loop_byte(doc::Document const& doc, size_t sample_idx, uint16_t loop_byte) {

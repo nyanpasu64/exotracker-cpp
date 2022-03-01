@@ -61,6 +61,24 @@ public:
     /// After undoing, store it as a redoer.
     virtual void apply_swap(doc::Document & document) = 0;
 
+    /// If `save_in_history()` returns false, the edit command is untracked and does
+    /// not create an undo entry, making it permanent. We don't save undo states when
+    /// editing individual samples or instruments, in order to match FamiTracker
+    /// behavior and intuition. Additionally it's better than pushing sample/instrument
+    /// edits to the undo history, then letting the user undo/redo them but they don't
+    /// see what changed.
+    ///
+    /// If you follow a tracked command (create/clone/swap/rename an instrument or
+    /// sample) with an untracked change (edit the same instrument or sample), we still
+    /// want undo+redo to be a no-op. So we must ensure undoing and redoing the tracked
+    /// command is a no-op and preserves the untracked command's changes, and doesn't
+    /// revert to "after the initial apply" (eg. creating a freshly created/cloned
+    /// instrument). Luckily, our swap-based code makes undo+redo a no-op by default in
+    /// many cases.
+    ///
+    /// More at https://gitlab.com/exotracker/exotracker-cpp/-/issues/107#note_858245059 .
+    virtual bool save_in_history() const = 0;
+
     /// Upon initially pushing an operation `curr` into undo history,
     /// History calls curr.can_merge(prev) *after* calling curr.apply_swap().
     ///

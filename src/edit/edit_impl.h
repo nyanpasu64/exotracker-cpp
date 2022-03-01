@@ -11,6 +11,7 @@ enum Override {
     None = 0,
     CloneForAudio = 0x1,
     CanMerge = 0x2,
+    SkipHistory = 0x4,
 };
 }
 using Override_::Override;
@@ -38,6 +39,10 @@ struct ImplEditCommand : BaseEditCommand, Body {
 
     void apply_swap(doc::Document & document) override {
         return Body::apply_swap(document);
+    }
+
+    bool save_in_history() const override {
+        return !(OVERRIDE & Override::SkipHistory);
     }
 
     bool can_merge(BaseEditCommand & prev) const override {

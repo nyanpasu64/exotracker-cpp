@@ -31,21 +31,7 @@ for details.
 // Keysplit edits which add, remove, or reorder patches.
 
 /// Adding or removing a patch replaces the instrument's entire keysplit.
-/// The advantage is that SetKeysplit can merge with each other when desired.
-/// The disadvantage is that if a user adds 128 patches
-/// and then repeatedly removes/adds/reorders patches,
-/// storing the entire keysplit in each edit wastes RAM in the undo history.
-/// I don't care, because it's unlikely for a user to add so many patches,
-/// and it wastes less RAM than a user adding hundreds/thousands of events
-/// to a single pattern and then repeatedly editing it.
-///
-/// We could alternatively insert or remove a single patch,
-/// but that requires reserving MAX_KEYSPLITS (128) items
-/// in each instrument's keysplit in the audio thread,
-/// both when sending over a document and when inserting instruments later on.
-/// Reserving memory eats RAM even if you never add that many patches,
-/// and is easy to forget to pre-allocate memory.
-/// Additionally it's harder to implement and can't merge.
+/// This may or may not be replaced by fine-grained add/remove operations.
 struct SetKeysplit {
     InstrumentIndex _instr_idx;
     std::vector<InstrumentPatch> _keysplit;
@@ -68,15 +54,7 @@ struct SetKeysplit {
         std::swap(maybe_instr->keysplit, _keysplit);
     }
 
-    using Impl = ImplEditCommand<SetKeysplit, Override::CanMerge>;
-    bool can_merge(BaseEditCommand & prev) const {
-        if (auto p = typeid_cast<Impl *>(&prev)) {
-            return p->_instr_idx == _instr_idx
-                && p->_can_merge
-                && _can_merge;
-        }
-        return false;
-    }
+    using Impl = ImplEditCommand<SetKeysplit, Override::SkipHistory>;
 
     static constexpr ModifiedFlags _modified = ModifiedFlags::InstrumentsEdited;
 };
@@ -213,9 +191,6 @@ static InstrumentPatch & get_patch_mut(
     return const_cast<InstrumentPatch &>(get_patch(doc, instr_idx, patch_idx));
 }
 
-/// It's only safe to merge multiple edits if they edit the same location,
-/// meaning that undoing the first edit produces the same document
-/// whether the second edit was undone or not.
 struct EditLocation {
     InstrumentIndex instr;
     uint8_t patch;
@@ -244,13 +219,7 @@ public:
         std::swap(patch, _value);
     }
 
-    using Impl = ImplEditCommand<PatchSetter, Override::CanMerge>;
-    bool can_merge(BaseEditCommand & prev) const {
-        if (auto p = typeid_cast<Impl *>(&prev)) {
-            return p->_path == _path;
-        }
-        return false;
-    }
+    using Impl = ImplEditCommand<PatchSetter, Override::SkipHistory>;
 };
 
 EditBox set_sample_idx(

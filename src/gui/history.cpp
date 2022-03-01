@@ -16,6 +16,9 @@ void History::push(UndoFrame command) {
     command.edit->apply_swap(_document);
     _dirty = true;
 
+    if (!command.edit->save_in_history()) {
+        return;
+    }
     if (_undo_stack.size()) {
         auto & prev = _undo_stack.back();
 
