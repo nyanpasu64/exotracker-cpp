@@ -1,5 +1,7 @@
 #include "history.h"
 
+#include <utility>  // std::move, std::exchange
+
 namespace gui::history {
 
 History::History(doc::Document initial_state)
