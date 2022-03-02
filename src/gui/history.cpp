@@ -1,5 +1,6 @@
 #include "history.h"
 
+#include <cassert>
 #include <utility>  // std::move, std::exchange
 
 namespace gui::history {
@@ -20,16 +21,17 @@ void History::push(UndoFrame command) {
     // clean.)
     _dirty = true;
 
+    // If true, you can merge edits into `prev` (if applicable).
+    bool prev_newly_pushed = std::exchange(_newly_pushed, true);
+
     if (command.edit->save_in_history()) {
         // If `command` is undoable, clear `_redo_stack` before pushing to
-        // `_undo_stack` or altering `prev`. We *could* skip clearing the redo stack if
-        // `save_command` is false, but that would introduce an inconsistency (and I
-        // may eventually change the code to never merge edits if the redo stack is
-        // non-empty).
+        // `_undo_stack` or altering `prev`.
         _redo_stack.clear();
 
         bool save_command = true;
-        if (_undo_stack.size()) {
+        // If the user just edited `prev`, try merging the current command into it.
+        if (prev_newly_pushed && _undo_stack.size()) {
             // `prev` holds previous state (before initial).
             auto & prev = _undo_stack.back();
 
@@ -74,6 +76,8 @@ MaybeCursorEdit History::try_undo() {
         return {};
     }
 
+    _newly_pushed = false;
+
     // Pop undo command.
     UndoFrame command = std::move(_undo_stack.back());
     _undo_stack.pop_back();
@@ -98,6 +102,8 @@ MaybeCursorEdit History::try_redo() {
     if (_redo_stack.empty()) {
         return {};
     }
+
+    assert(_newly_pushed == false);
 
     // Pop redo command.
     UndoFrame command = std::move(_redo_stack.back());

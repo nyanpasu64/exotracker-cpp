@@ -38,6 +38,11 @@ private:
     std::vector<UndoFrame> _undo_stack;
     std::vector<UndoFrame> _redo_stack;
 
+    /// If true, you can merge edits into the most recent undo step (if applicable).
+    /// Set to true upon pushing edits, set to false upon undo, and should already be
+    /// false when a redo succeeds.
+    bool _newly_pushed = false;
+
     bool _dirty = false;
 
 public:
