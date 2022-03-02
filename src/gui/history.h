@@ -5,6 +5,7 @@
 #include "gui/cursor.h"
 #include "util/copy_move.h"
 
+#include <optional>
 #include <vector>
 
 namespace gui::history {
