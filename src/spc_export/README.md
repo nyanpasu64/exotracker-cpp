@@ -1,10 +1,10 @@
 # SPC export README
 
-To rebuild drivers:
+To rebuild SPC export drivers on Linux:
 
-- Clone [my fork of AddMusicKFF](https://github.com/nyanpasu64/AddMusicKFF/tree/all-custom-instruments) to the `all-custom-instruments` branch, then enter the folder.
-- Run `make -j4` or your CPU thread count.
-- Run `./addmusick -norom`. This generates a driver image with zero global songs and one local song (even when passing in zero .txt files).
-- Copy `mainLoopPos = ...` from the program's output and paste it into `driver.h` here.
-- Copy `asm/SNES/SPCBase.bin`, `asm/SNES/SPCDSPBase.bin`, and `asm/SNES/bin/main.bin` to `driver/...`.
-- Run `./generate-spc-driver.sh` to rebuild `driver/*.inc`.
+- Run `git submodule update --init --recursive` to initialize the `AddMusicKFF` submodule.
+- Enter the `AddMusicKFF/` folder.
+  - Install your distribution's `asar` package (the SNES assembler, not the Electron archive tool), which should create `/usr/bin/asar`. If your distribution doesn't have `asar`, build it yourself and copy/symlink the binary to `AddMusicKFF/asar` (overwriting the existing symlink).
+  - Run `make -j4` or your CPU thread count.
+- Go back to the parent folder, and run `./generate-spc-driver.sh` to rebuild `driver/*.{bin,inc}`.
+- In the program's output, find `mainLoopPos = 0x...` near the top, and copy and paste it into `driver.h` here.
