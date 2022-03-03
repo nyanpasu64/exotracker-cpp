@@ -136,8 +136,8 @@ static StereoVolume calc_volume_reg(
         pan_u16 = MAX_PAN16;
     }
 
-    uint8_t left = calc_lr_volume(split(pan_u16), surround.left_invert);
-    uint8_t right = calc_lr_volume(split(MAX_PAN16 - pan_u16), surround.right_invert);
+    uint8_t left = calc_lr_volume(split(MAX_PAN16 - pan_u16), surround.left_invert);
+    uint8_t right = calc_lr_volume(split(pan_u16), surround.right_invert);
     return StereoVolume {
         .left = left,
         .right = right,
