@@ -389,6 +389,10 @@ namespace music {
             channels[chan].push_u8(0x30);
             channels[chan].push_u8(0x7F);
 
+            // Set panning.
+            channels[chan].push_u8(0xDB);
+            channels[chan].push_u8((chan & 1) ? 20 : 0);
+
             // Add one note per channel.
             for (size_t beat = 0; beat < 8; beat++) {
                 if (beat == chan) {
