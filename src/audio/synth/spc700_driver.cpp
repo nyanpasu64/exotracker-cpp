@@ -74,15 +74,17 @@ static inline BytePair split(uint16_t x) {
 
 // Volume calculations
 
-constexpr size_t PAN_MAX = 20;
+// TODO implement switching between SMW pan table (0..20) and custom table ($00..$20).
+constexpr size_t PAN_MAX = 0x20;
 
-/// Indexes 0..20 are valid, and 21 (out of bounds) is read by the SPC assembly
-/// on full-scale pan. So we need to store 22 pan table items.
+/// Indexes 0..32 are valid, and 33 (out of bounds) is read by the SPC assembly
+/// on full-scale pan. So we need to store 34 pan table items.
 static const uint8_t PAN_TABLE[PAN_MAX + 2] = {
-    0x00, 0x01, 0x03, 0x07, 0x0D, 0x15, 0x1E, 0x29, 0x34, 0x42,
-    0x51, 0x5E, 0x67, 0x6E, 0x73, 0x77, 0x7A, 0x7C, 0x7D, 0x7E,
-    0x7F,
-    0x7F,
+      0,   1,   2,   3,   5,   8,  12,  16,
+     21,  27,  33,  40,  47,  55,  63,  72,
+     81,  89,  96, 102, 107, 111, 114, 117,
+    119, 121, 122, 123, 124, 125, 126, 126,
+    127, 127,
 };
 
 /// Will be changeable in the future.

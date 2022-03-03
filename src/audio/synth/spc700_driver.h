@@ -30,7 +30,7 @@ struct Spc700ChipFlags {
 };
 
 struct PanState {
-    uint8_t value = 10;
+    uint8_t value = 0x10;
     uint8_t fraction = 0;
 };
 
