@@ -12,7 +12,7 @@ DRIVER="$PWD/driver"
 cd AddMusicKFF
 
 # Prints mainLoopPos.
-./addmusick -norom
+MAIN_LOOP_POS=./addmusick -norom 2>&1 | tee >(grep mainLoopPos)
 cp asm/SNES/SPCBase.bin asm/SNES/SPCDSPBase.bin asm/SNES/bin/main.bin "$DRIVER/"
 
 ## Convert driver binaries into headers.
