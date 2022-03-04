@@ -390,10 +390,9 @@ namespace music {
 
             std::optional<uint8_t> amk_instr;
 
-            // Set volume to 192. (Volume 64 comes out to level 01 which is
-            // near-silent.)
+            // Set volume to 255.
             channels[chan].push_u8(0xE7);
-            channels[chan].push_u8(192);
+            channels[chan].push_u8(255);
 
             // Set note duration to 48 ticks and unquantized.
             // The quantization byte is necessary, otherwise notes don't play.
@@ -402,7 +401,13 @@ namespace music {
 
             // Set panning.
             channels[chan].push_u8(0xDB);
-            channels[chan].push_u8((chan & 1) ? 0x20 : 0x00);
+            {
+                auto pan = (uint8_t) (chan * (32 / 8));
+                if (pan > 16) {
+                    pan += 32 / 8;
+                }
+                channels[chan].push_u8(pan);
+            }
 
             // Add one note per channel.
             for (size_t beat = 0; beat < 8; beat++) {
