@@ -35,6 +35,8 @@ static Address calc_voice_reg(size_t channel_id, Address v_reg) {
     return channel_addr + v_reg;
 }
 
+constexpr uint8_t DEFAULT_VELOCITY = 0xFC;
+
 struct ChannelVolume {
     uint8_t volume;
     uint8_t velocity;
@@ -160,7 +162,7 @@ void Spc700ChannelDriver::write_volume(RegisterWriteQueue & regs) const {
     // TODO how do we switch velocity tables to change the interpretation of qXY?
     auto volume = ChannelVolume {
         .volume = _prev_volume,
-        .velocity = 0xB3,
+        .velocity = DEFAULT_VELOCITY,
     };
 
     // TODO store global volume in Spc700Driver and pass an object reference here?
@@ -737,6 +739,41 @@ TEST_CASE("Test that keysplits with out-of-order patches prefer earlier patches.
     CHECK_EQ(find_patch(keysplit, 71), &keysplit[0]);
     CHECK_EQ(find_patch(keysplit, 72), &keysplit[1]);
     CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), &keysplit[1]);
+}
+
+TEST_CASE("Test that calc_volume_reg() matches forked AMK driver behavior.") {
+    static_assert(PAN_MAX == 32);
+
+    // Actual volume levels recorded from forked AMKFF, at
+    // v234, y0..y32, default velocity.
+    // See https://github.com/nyanpasu64/AddMusicKFF/blob/exo-fork-test-2/music/volume.txt .
+    static const uint8_t AMK_VOLUMES[PAN_MAX + 1] = {
+        0x39, 0x39, 0x38, 0x38, 0x37, 0x36, 0x35, 0x34,
+        0x33, 0x31, 0x30, 0x2E, 0x2C, 0x2A, 0x28, 0x26,
+        0x23, 0x21, 0x1E, 0x1C, 0x1A, 0x17, 0x15, 0x12,
+        0x0F, 0x0D, 0x0A, 0x08, 0x06, 0x04, 0x02, 0x00,
+        0x00,
+    };
+
+    auto volume = ChannelVolume {
+        .volume = 234,
+        .velocity = DEFAULT_VELOCITY,
+    };
+
+    for (uint8_t pan = 0; pan <= 32; pan++) {
+        CAPTURE((int) pan);
+
+        auto pan_frac = PanState {
+            .value = pan,
+            .fraction = 0,
+        };
+        StereoVolume vol_regs = calc_volume_reg(volume, pan_frac, SurroundState{});
+        if (false) {
+            fmt::print("pan {}: {:02X}, {:02X}\n", pan, vol_regs.left, vol_regs.right);
+        }
+        CHECK(vol_regs.left == AMK_VOLUMES[pan]);
+        CHECK(vol_regs.right == AMK_VOLUMES[PAN_MAX - pan]);
+    }
 }
 
 }
