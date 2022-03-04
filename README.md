@@ -46,11 +46,13 @@ exotracker-cpp requires a compiler with C++20 support. MSVC and GCC 10 are suppo
 	- Using Qt's web installer to install MinGW Qt is discouraged, since installing MinGW Qt also installs MinGW GCC 8.1.0, which is too old to compile exotracker. (If you try uninstalling MinGW, it removes MinGW Qt as well.) You have to keep GCC 8.1.0 around (but avoid using it), then use MSYS2 to install mingw-w64 GCC separately, use MSYS2's compiler to build exotracker, and use MSYS2's DLLs to run exotracker. You're better off installing GCC and Qt through MSYS2, which works by default.
 	- Do not use Win-builds to install MinGW! It ships GCC 4.8.3 and Qt 5.3.1, which were released in 2014 and are far too outdated for exotracker.
 	- MSYS2 also offers Clang with MinGW ABI (`mingw-w64-x86_64-clang`), UCRT64, and CLANG64 ([link](https://www.msys2.org/docs/environments/)). These are untested, but I encourage you to test UCRT64.
-- On Intel Mac, the program compiled at one point using XCode's Clang. Building on/for M1 Mac is unsupported until exotracker adds Qt 6 support.
+- On Intel Mac, the program compiled at one point using XCode's Clang. Building and running on M1 Mac is possible with Qt 6 installed, if you exclude unit tests (which don't build on Clang).
 
 ### Build Dependencies
 
-exotracker-cpp depends on Qt 5. All other libraries are bundled, compiled, and linked statically. On Linux, to obtain audio, you need to install ALSA/PulseAudio/JACK headers (whichever one you want to use). Most Linux distributions use PulseAudio, but RtAudio's PulseAudio backend may be more stuttery (due to mutexes) than ALSA.
+exotracker-cpp depends on Qt 5.15 or 6.x. It defaults to 5.15 (if not found, it tries Qt 6), but you can set the `QT6` CMake option to force Qt 6. All other libraries are bundled, compiled, and linked statically.
+
+On Linux, to obtain audio, you need to install ALSA/PulseAudio/JACK headers (whichever one you want to use). Most Linux distributions use PulseAudio; on PipeWire I'm not sure which backend is ideal right now.
 
 ## Usage
 
