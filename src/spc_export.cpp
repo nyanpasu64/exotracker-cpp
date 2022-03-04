@@ -366,6 +366,17 @@ namespace music {
             Object(Symbol::Channel7),
         };
 
+        // Reserve echo buffer. This is actually a bad thing for songs without echo,
+        // since it causes AMK to start writing to ARAM FF00-FF03, which could
+        // otherwise be used to store sample data.
+        if (false) {
+            // TODO write echo length if echo enabled
+            channels[0].data().insert(channels[0].data().end(), {0xFA, 0x04, 0x00});
+        }
+
+        // Switch from SMW to N-SPC velocity table (to match #amk 2).
+        channels[0].data().insert(channels[0].data().end(), {0xFA, 0x06, 0x01});
+
         // Set song tempo to 60 SMW units.
         channels[0].push_u8(0xE2);
         channels[0].push_u8(60);
