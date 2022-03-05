@@ -21,6 +21,11 @@ using music_driver::RegisterWrite;
 constexpr size_t SPC_MEMORY_SIZE = 0x1'0000;
 
 struct Spc700Inner {
+    // Must be aligned, because SPC_DSP casts to a wide pointer and performs
+    // reads/writes (which technically violate strict aliasing even when aligned).
+    // Alignment is ensured by Spc700Synth holding a std::unique_ptr<Spc700Inner>.
+    //
+    // TODO modify SPC_DSP to not violate strict aliasing
     uint8_t ram_64k[SPC_MEMORY_SIZE] = {};
     SPC_DSP chip;
 
