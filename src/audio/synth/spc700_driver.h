@@ -30,13 +30,13 @@ struct Spc700ChipFlags {
 };
 
 struct PanState {
-    uint8_t value = 0x10;
-    uint8_t fraction = 0;
+    uint8_t value;
+    uint8_t fraction;
 };
 
 struct SurroundState {
-    bool left_invert = false;
-    bool right_invert = false;
+    bool left_invert;
+    bool right_invert;
 };
 
 using spc700_synth::Spc700Synth;
@@ -45,16 +45,16 @@ class Spc700Driver;
 class Spc700ChannelDriver {
     uint8_t _channel_id;
 
-    uint8_t _prev_volume = 0xFF;
+    uint8_t _prev_volume;
     PanState _prev_pan;
     SurroundState _surround;
 
-    doc::Chromatic _prev_note = 0;
-    bool _note_playing = false;
+    doc::Chromatic _prev_note;
+    bool _note_playing;
 
     // TODO how to handle "no instrument" state?
     // A separate "unset" state wastes RAM in SPC export.
-    std::optional<doc::InstrumentIndex> _prev_instr{};
+    std::optional<doc::InstrumentIndex> _prev_instr;
 
 public:
     Spc700ChannelDriver(uint8_t channel_id);

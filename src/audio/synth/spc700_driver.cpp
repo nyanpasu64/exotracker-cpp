@@ -24,6 +24,18 @@ namespace audio::synth::spc700_driver {
 
 Spc700ChannelDriver::Spc700ChannelDriver(uint8_t channel_id)
     : _channel_id(channel_id)
+    , _prev_volume(0xFF)
+    , _prev_pan {
+        .value = 0x10,
+        .fraction = 0,
+    }
+    , _surround {
+        .left_invert = false,
+        .right_invert = false,
+    }
+    , _prev_note(0)
+    , _note_playing(false)
+    , _prev_instr()
 {
     DEBUG_PRINT("initializing channel {}\n", _channel_id);
 }
