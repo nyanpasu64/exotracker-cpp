@@ -1,0 +1,4 @@
+[submodule "src/spc_export/AddMusicKFF"]
+	path = src/spc_export/AddMusicKFF
+	url = git@github.com:nyanpasu64/AddMusicKFF.git
+	branch = all-custom-instruments

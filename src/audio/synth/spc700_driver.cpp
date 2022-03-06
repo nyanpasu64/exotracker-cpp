@@ -2,6 +2,7 @@
 #include "spc700_synth.h"
 #include "chip_instance_common.h"
 #include "doc.h"
+#include "doc/effect_names.h"
 #include "util/release_assert.h"
 
 #include <SPC_DSP.h>  // for register enums
@@ -23,6 +24,18 @@ namespace audio::synth::spc700_driver {
 
 Spc700ChannelDriver::Spc700ChannelDriver(uint8_t channel_id)
     : _channel_id(channel_id)
+    , _prev_volume(0xFF)
+    , _prev_pan {
+        .value = 0x10,
+        .fraction = 0,
+    }
+    , _surround {
+        .left_invert = false,
+        .right_invert = false,
+    }
+    , _prev_note(0)
+    , _note_playing(false)
+    , _prev_instr()
 {
     DEBUG_PRINT("initializing channel {}\n", _channel_id);
 }
@@ -32,6 +45,117 @@ static Address calc_voice_reg(size_t channel_id, Address v_reg) {
     auto channel_addr = Address(channel_id << 4);
     release_assert(v_reg <= 0x09);  // the largest SPC_DSP::v_... value.
     return channel_addr + v_reg;
+}
+
+constexpr uint8_t DEFAULT_VELOCITY = 0xFC;
+
+struct ChannelVolume {
+    uint8_t volume;
+    uint8_t velocity;
+};
+
+struct StereoVolume {
+    // The DSP interprets as two's complement signed.
+    // Use unsigned for consistent UB-free behavior.
+    uint8_t left;
+    uint8_t right;
+};
+
+// Utilities
+
+#define REG(x)  ((size_t) (x))
+
+/// Equivalent to SPC700 `mul ya` followed by discarding a and keeping y.
+static inline uint8_t mul_hi(uint8_t a, uint8_t b) {
+    return (uint8_t) ((REG(a) * REG(b)) >> 8);
+}
+
+struct BytePair {
+    uint8_t lower;
+    uint8_t upper;
+};
+
+static inline uint16_t merge(uint8_t lower, uint8_t upper) {
+    return (uint16_t) (REG(lower) | REG(upper) << 8);
+}
+
+static inline BytePair split(uint16_t x) {
+    return BytePair {
+        .lower = (uint8_t) x,
+        .upper = (uint8_t) (x >> 8),
+    };
+}
+
+// Volume calculations
+
+// TODO implement switching between SMW pan table (0..20) and custom table ($00..$20).
+constexpr size_t PAN_MAX = 0x20;
+
+/// Indexes 0..32 are valid, and 33 (out of bounds) is read by the SPC assembly
+/// on full-scale pan. So we need to store 34 pan table items.
+static const uint8_t PAN_TABLE[PAN_MAX + 2] = {
+    0x7F, 0x7F, 0x7E, 0x7D, 0x7C, 0x7A, 0x78, 0x75,
+    0x72, 0x6F, 0x6B, 0x67, 0x63, 0x5F, 0x5A, 0x55,
+    0x50, 0x4B, 0x45, 0x40, 0x3A, 0x34, 0x2F, 0x29,
+    0x23, 0x1E, 0x18, 0x13, 0x0E, 0x0A, 0x06, 0x02,
+    0x00, 0x00,
+};
+
+/// Will be changeable in the future.
+constexpr uint8_t GLOBAL_VOLUME = 0xC0;
+
+static StereoVolume calc_volume_reg(
+    ChannelVolume volume, PanState pan, SurroundState surround
+) {
+    // Based on AddMusicKFF L_1013 (https://github.com/KungFuFurby/AddMusicKFF/blob/ce5316f4c99ae5fa37820a2944376cabf8295543/asm/main.asm#L2627).
+
+    // call L_124D
+    uint8_t temp_vol = mul_hi(volume.velocity, volume.volume);
+    temp_vol = mul_hi(temp_vol, GLOBAL_VOLUME);
+    temp_vol = mul_hi(temp_vol, temp_vol);
+
+    // L_1019:
+    // Ignore pan fade for now.
+    // TODO who writes to $5C and determines which channels have volumes rewritten?
+
+    // Skip L_102D.
+
+    // L_103B/CalcChanVolume:
+    auto calc_lr_volume = [temp_vol](BytePair pan, bool invert) -> uint8_t {
+        uint8_t curr = PAN_TABLE[pan.upper];
+        uint8_t next = PAN_TABLE[pan.upper + 1];
+
+        auto multiplier = (uint8_t) (curr + mul_hi(next - curr, pan.lower));
+
+        uint8_t out = mul_hi(multiplier, temp_vol);
+        // I'm not implementing AMK's volume multiplier which would go here.
+        // We've already lost a lot of resolution by this point.
+
+        if (invert) {
+            // lol inverting an unsigned quantity... The ASM does ^$FF, +1.
+            // We write an unsigned quantity (representing two's complement signed)
+            // to the DSP, which interprets it as two's complement signed,
+            // so it works out in the end.
+            out = -out;
+        }
+
+        return out;
+    };
+
+    uint16_t pan_u16 = merge(pan.fraction, pan.value);
+
+    static constexpr uint16_t MAX_PAN16 = PAN_MAX * 0x100;
+    // TODO warn on invalid pan?
+    if (pan_u16 > MAX_PAN16) {
+        pan_u16 = MAX_PAN16;
+    }
+
+    uint8_t left = calc_lr_volume(split(pan_u16), surround.left_invert);
+    uint8_t right = calc_lr_volume(split(MAX_PAN16 - pan_u16), surround.right_invert);
+    return StereoVolume {
+        .left = left,
+        .right = right,
+    };
 }
 
 void Spc700ChannelDriver::restore_state(
@@ -46,9 +170,18 @@ void Spc700ChannelDriver::restore_state(
 void Spc700ChannelDriver::write_volume(RegisterWriteQueue & regs) const {
     DEBUG_PRINT("    volume {}\n", _prev_volume);
 
-    // TODO stereo
-    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_voll), _prev_volume);
-    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_volr), _prev_volume);
+    // TODO how do we store current qXY value or actual velocity?
+    // TODO how do we switch velocity tables to change the interpretation of qXY?
+    auto volume = ChannelVolume {
+        .volume = _prev_volume,
+        .velocity = DEFAULT_VELOCITY,
+    };
+
+    // TODO store global volume in Spc700Driver and pass an object reference here?
+    StereoVolume vol_regs = calc_volume_reg(volume, _prev_pan, _surround);
+
+    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_voll), vol_regs.left);
+    regs.write(calc_voice_reg(_channel_id, SPC_DSP::v_volr), vol_regs.right);
 }
 
 constexpr double CENTS_PER_OCTAVE = 1200.;
@@ -119,6 +252,8 @@ constexpr ClockT CLOCKS_PER_TWO_SAMPLES = 64;
 // If we set a high enough timer rate, then we may not wait 2 samples per tick,
 // and ChipInstance::run_chip_for() will truncate our register write
 // to prevent it from overflowing the tick.
+
+using doc::effect_names::eff_name;
 
 void Spc700ChannelDriver::run_driver(
     doc::Document const& document,
@@ -230,6 +365,9 @@ void Spc700ChannelDriver::run_driver(
         _note_playing = false;
     };
 
+    // TODO test AMK driver to see when volumes are reevaluated ($5C)
+    bool volumes_changed = false;
+
     for (doc::RowEvent const& ev : events) {
         if (ev.instr) {
             DEBUG_PRINT(
@@ -275,9 +413,23 @@ void Spc700ChannelDriver::run_driver(
         if (ev.volume) {
             DEBUG_PRINT("channel {}, volume {}\n", _channel_id, *ev.volume);
             _prev_volume = *ev.volume;
-            write_volume(regs);
+            volumes_changed = true;
         }
-        // TODO ev.effects
+        for (doc::MaybeEffect const& effect : ev.effects) {
+            if (!effect) continue;
+
+            if (effect->name == eff_name('Y')) {
+                _prev_pan = PanState {
+                    .value = effect->value,
+                    .fraction = 0,
+                };
+                volumes_changed = true;
+            }
+        }
+    }
+
+    if (volumes_changed) {
+        write_volume(regs);
     }
 }
 
@@ -599,6 +751,41 @@ TEST_CASE("Test that keysplits with out-of-order patches prefer earlier patches.
     CHECK_EQ(find_patch(keysplit, 71), &keysplit[0]);
     CHECK_EQ(find_patch(keysplit, 72), &keysplit[1]);
     CHECK_EQ(find_patch(keysplit, CHROMATIC_COUNT - 1), &keysplit[1]);
+}
+
+TEST_CASE("Test that calc_volume_reg() matches forked AMK driver behavior.") {
+    static_assert(PAN_MAX == 32);
+
+    // Actual volume levels recorded from forked AMKFF, at
+    // v234, y0..y32, default velocity.
+    // See https://github.com/nyanpasu64/AddMusicKFF/blob/exo-fork-test-2/music/volume.txt .
+    static const uint8_t AMK_VOLUMES[PAN_MAX + 1] = {
+        0x39, 0x39, 0x38, 0x38, 0x37, 0x36, 0x35, 0x34,
+        0x33, 0x31, 0x30, 0x2E, 0x2C, 0x2A, 0x28, 0x26,
+        0x23, 0x21, 0x1E, 0x1C, 0x1A, 0x17, 0x15, 0x12,
+        0x0F, 0x0D, 0x0A, 0x08, 0x06, 0x04, 0x02, 0x00,
+        0x00,
+    };
+
+    auto volume = ChannelVolume {
+        .volume = 234,
+        .velocity = DEFAULT_VELOCITY,
+    };
+
+    for (uint8_t pan = 0; pan <= 32; pan++) {
+        CAPTURE((int) pan);
+
+        auto pan_frac = PanState {
+            .value = pan,
+            .fraction = 0,
+        };
+        StereoVolume vol_regs = calc_volume_reg(volume, pan_frac, SurroundState{});
+        if (false) {
+            fmt::print("pan {}: {:02X}, {:02X}\n", pan, vol_regs.left, vol_regs.right);
+        }
+        CHECK(vol_regs.left == AMK_VOLUMES[pan]);
+        CHECK(vol_regs.right == AMK_VOLUMES[PAN_MAX - pan]);
+    }
 }
 
 }

@@ -366,6 +366,17 @@ namespace music {
             Object(Symbol::Channel7),
         };
 
+        // Reserve echo buffer. This is actually a bad thing for songs without echo,
+        // since it causes AMK to start writing to ARAM FF00-FF03, which could
+        // otherwise be used to store sample data.
+        if (false) {
+            // TODO write echo length if echo enabled
+            channels[0].data().insert(channels[0].data().end(), {0xFA, 0x04, 0x00});
+        }
+
+        // Switch from SMW to N-SPC velocity table (to match #amk 2).
+        channels[0].data().insert(channels[0].data().end(), {0xFA, 0x06, 0x01});
+
         // Set song tempo to 60 SMW units.
         channels[0].push_u8(0xE2);
         channels[0].push_u8(60);
@@ -379,15 +390,24 @@ namespace music {
 
             std::optional<uint8_t> amk_instr;
 
-            // Set volume to 192. (Volume 64 comes out to level 01 which is
-            // near-silent.)
+            // Set volume to 255.
             channels[chan].push_u8(0xE7);
-            channels[chan].push_u8(192);
+            channels[chan].push_u8(255);
 
             // Set note duration to 48 ticks and unquantized.
             // The quantization byte is necessary, otherwise notes don't play.
             channels[chan].push_u8(0x30);
             channels[chan].push_u8(0x7F);
+
+            // Set panning.
+            channels[chan].push_u8(0xDB);
+            {
+                auto pan = (uint8_t) (chan * (32 / 8));
+                if (pan > 16) {
+                    pan += 32 / 8;
+                }
+                channels[chan].push_u8(pan);
+            }
 
             // Add one note per channel.
             for (size_t beat = 0; beat < 8; beat++) {
