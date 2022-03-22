@@ -157,7 +157,6 @@ add_library(exotracker-core
     src/audio/synth.cpp
 
     # SPC700 audio
-    src/audio/synth/volume_calc_common.cpp
     src/audio/synth/spc700.cpp
     src/audio/synth/spc700_driver.cpp
     src/audio/synth/spc700_synth.cpp
@@ -321,7 +320,6 @@ add_executable(exotracker-tests
     src/gui/move_cursor.cpp
     # src/audio/synth/envelope.cpp
     src/audio/synth/spc700_driver.cpp
-    src/audio/synth/volume_calc_common.cpp
     src/doc/timeline.cpp
     src/spc_export.cpp
 )
