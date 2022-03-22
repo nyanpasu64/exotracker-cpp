@@ -140,44 +140,103 @@ add_subdirectory_optimized("3rdparty/libsamplerate" EXCLUDE_FROM_ALL)
 # No editing or command support.
 # (cmd_queue.cpp may be added later for playback commands.)
 add_library(exotracker-core
-    # Library (widely used, uncoupled)
-    src/audio/event_queue.cpp
+    # Libraries
+    src/util/box_array.h
+    src/util/compare.h
+    src/util/compare_impl.h
+    src/util/constinit.h
+    src/util/copy_move.h
+    src/util/defer.h
+    src/util/distance.h
+    src/util/enumerate.h
+    src/util/enum_flags.h
+    src/util/enum_map.h
+    src/util/expr.h
+    src/util/loop.h
+    src/util/macros.h
+    src/util/math.h
+    src/util/release_assert.h
+    src/util/reverse.h
+    src/util/safe_typedef.h
+    src/util/typeid_cast.h
+    src/util/unwrap.h
 
-    # Common files (tightly coupled)
-    src/audio/tempo_calc.cpp
-    src/audio/audio_common.cpp
-    src/audio/synth/chip_instance_common.cpp
-    src/audio/synth/envelope.cpp
-    src/audio/synth/sequencer.cpp
-    src/audio/synth/music_driver_common.cpp
-
+    # Document
+    src/chip_common.h
     src/chip_common.cpp
-
-    # Implementation files
-    src/audio/synth.cpp
-
-    # SPC700 audio
-    src/audio/synth/spc700.cpp
-    src/audio/synth/spc700_driver.cpp
-    src/audio/synth/spc700_synth.cpp
-
-    # Glue files
+    src/chip_kinds.h
+    src/doc_common.h
+    src/doc.h
     src/doc.cpp
+    src/doc/accidental_common.h
+    src/doc/event_list.h
+    src/doc/events.h
     src/doc/events.cpp
+    src/doc/instr.h
+    src/doc/sample.h
+    src/doc/timed_events.h
     src/doc/timed_events.cpp
+    src/doc/timeline.h
     src/doc/timeline.cpp
+
+    # Document-based types and libraries
+    src/audio/tempo_calc.h
+    src/audio/tempo_calc.cpp
+    src/doc/effect_names.h
+    src/doc/gui_traits.h
+    src/doc/gui_traits.cpp
+    src/doc/validate_common.h
+    src/doc/validate.h
+    src/doc/validate.cpp
+    src/timeline_iter.h
     src/timeline_iter.cpp
+    src/timing_common.h
     src/timing_common.cpp
+    src/util/format.h
     src/util/format.cpp
 
+    # GUI/audio communication
+    src/audio/callback.h
+    src/audio/audio_common.h
+    src/audio/audio_common.cpp
+
+    # Synth files
+    src/audio/event_queue.h
+    src/audio/event_queue.cpp
+    src/audio/synth_common.h
+    src/audio/synth.h
+    src/audio/synth.cpp
+    src/audio/synth/chip_instance_common.h
+    src/audio/synth/chip_instance_common.cpp
+    src/audio/synth/impl_chip_common.h
+    src/audio/synth/envelope.h
+    src/audio/synth/envelope.cpp
+    src/audio/synth/music_driver_common.h
+    src/audio/synth/music_driver_common.cpp
+    src/audio/synth/sequencer_driver_common.h
+    src/audio/synth/sequencer.h
+    src/audio/synth/sequencer.cpp
+
+    # SPC700 driver and synth
+    src/audio/synth/spc700.h
+    src/audio/synth/spc700.cpp
+    src/audio/synth/spc700_driver.h
+    src/audio/synth/spc700_driver.cpp
+    src/audio/synth/spc700_synth.h
+    src/audio/synth/spc700_synth.cpp
+
     # Module loading files
-    src/doc/validate.cpp
+    src/serialize.h
     src/serialize.cpp
+    src/serialize/document.capnp.h
     src/serialize/document.capnp.c++
 
     # SPC export files
+    src/spc_export.h
     src/spc_export.cpp
+    src/spc_export/driver.h
     src/spc_export/driver.cpp
+    src/spc_export/link.h
     src/spc_export/link.cpp
 )
 target_compile_options(exotracker-core PRIVATE "${options}")
@@ -196,24 +255,43 @@ endif()
 
 ## Qt-independent GUI libraries, used/tested by GUI and unit tests
 add_library(exotracker-headless
-    # GUI/audio communication
+    # Audio output, GUI/audio communication
+    src/audio/output.h
     src/audio/output.cpp
+    src/cmd_queue.h
     src/cmd_queue.cpp
 
     # Document editing code
-    src/sample_docs.cpp
-    src/edit/edit_doc.cpp
-    src/edit/edit_instr.cpp
-    src/edit/edit_instr_list.cpp
-    src/edit/edit_pattern.cpp
-    src/edit/edit_sample.cpp
-    src/edit/edit_sample_list.cpp
-    src/doc/gui_traits.cpp
+    src/doc_util/event_builder.h
+    src/doc_util/event_search.h
     src/doc_util/event_search.cpp
+    src/doc_util/sample_instrs.h
     src/doc_util/sample_instrs.cpp
-    src/gui/history.cpp
+    src/edit_common.h
+    src/edit/edit_impl.h
+    src/edit/modified_common.h
+    src/edit/modified.h
 
-    # Pattern editor backend
+    # Document edit types
+    src/sample_docs.h
+    src/sample_docs.cpp
+    src/edit/edit_doc.h
+    src/edit/edit_doc.cpp
+    src/edit/edit_instr.h
+    src/edit/edit_instr.cpp
+    src/edit/edit_instr_list.h
+    src/edit/edit_instr_list.cpp
+    src/edit/edit_pattern.h
+    src/edit/edit_pattern.cpp
+    src/edit/edit_sample.h
+    src/edit/edit_sample.cpp
+    src/edit/edit_sample_list.h
+    src/edit/edit_sample_list.cpp
+
+    # Qt-independent GUI libraries
+    src/gui/history.h
+    src/gui/history.cpp
+    src/gui/move_cursor.h
     src/gui/move_cursor.cpp
 )
 target_compile_options(exotracker-headless PRIVATE "${options}")
@@ -230,32 +308,69 @@ endif()
 
 ## GUI editor, uses Qt
 add_executable(exotracker-qt
-    # GUI
-    src/main.cpp
-    src/gui/app.cpp
-    src/gui/main_window.cpp
+    # GUI libraries and components
+    src/gui_common.h
+    src/gui/config.h
     src/gui/config.cpp
-    src/gui/lib/icons.cpp
-    src/gui/lib/icon_toolbar.cpp
-
+    src/gui/config/cursor_config.h
+    src/gui/cursor.h
+    src/gui/lib/color.h
     src/gui/lib/color.cpp
+    src/gui/lib/docs_palette.h
     src/gui/lib/docs_palette.cpp
+    src/gui/lib/dpi.h
+    src/gui/lib/format.h
     src/gui/lib/format.cpp  # Unfortunately tied to QString.
+    src/gui/lib/icons.h
+    src/gui/lib/icons.cpp
+    src/gui/lib/instr_warnings.h
     src/gui/lib/instr_warnings.cpp
+    src/gui/lib/layout_macros.h
+    src/gui/lib/list_warnings.h
     src/gui/lib/list_warnings.cpp
-    src/gui/lib/note_spinbox.cpp
     src/gui/lib/parse_note.cpp
+    src/gui/lib/painter_ext.h
     src/gui/lib/painter_ext.cpp
+    src/gui/lib/parse_note.h
+    src/gui/lib/persistent_dialog.h
     src/gui/lib/persistent_dialog.cpp
+    src/gui/lib/qt6.h
+    src/gui/lib/sample_text.h
     src/gui/lib/sample_text.cpp
-    src/gui/pattern_editor.cpp
-    src/gui/timeline_editor.cpp
-    src/gui/instrument_list.cpp
+    src/gui/lib/small_button.h
+    src/gui/lib/trace.h
 
-    src/gui/tempo_dialog.cpp
+    # Widget components
+    src/gui/lib/hv_line.h
+    src/gui/lib/icon_toolbar.h
+    src/gui/lib/icon_toolbar.cpp
+    src/gui/lib/note_spinbox.h
+    src/gui/lib/note_spinbox.cpp
+
+    # Panels
+    src/gui/instrument_list.h
+    src/gui/instrument_list.cpp
+    src/gui/pattern_editor.h
+    src/gui/pattern_editor.cpp
+    src/gui/timeline_editor.h
+    src/gui/timeline_editor.cpp
+
+    # Dialogs
+    src/gui/instrument_dialog.h
     src/gui/instrument_dialog.cpp
+    src/gui/instrument_dialog/adsr_graph.h
     src/gui/instrument_dialog/adsr_graph.cpp
+    src/gui/sample_dialog.h
     src/gui/sample_dialog.cpp
+    src/gui/tempo_dialog.h
+    src/gui/tempo_dialog.cpp
+
+    # GUI interfaces and implementation (sadly coupled)
+    src/main.cpp
+    src/gui/app.h
+    src/gui/app.cpp
+    src/gui/main_window.h
+    src/gui/main_window.cpp
 
     # Resources
     res/exotracker.qrc
