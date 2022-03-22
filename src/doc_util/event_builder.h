@@ -71,11 +71,11 @@ public:
     }
 };
 
-static BeatFraction at(int start, int num, int den) {
+inline BeatFraction at(int start, int num, int den) {
     return start + BeatFraction(num, den);
 }
 
-static Note pitch(int octave, int semitone) {
+inline Note pitch(int octave, int semitone) {
     return Note(Chromatic(
         std::clamp(12 * octave + semitone, 0, (int) CHROMATIC_COUNT - 1)
     ));
