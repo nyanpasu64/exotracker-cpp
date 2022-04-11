@@ -185,9 +185,6 @@ add_library(exotracker-core
     src/doc/effect_names.h
     src/doc/gui_traits.h
     src/doc/gui_traits.cpp
-    src/doc/validate_common.h
-    src/doc/validate.h
-    src/doc/validate.cpp
     src/timeline_iter.h
     src/timeline_iter.cpp
     src/timing_common.h
@@ -226,6 +223,9 @@ add_library(exotracker-core
     src/audio/synth/spc700_synth.cpp
 
     # Module loading files
+    src/doc/validate_common.h
+    src/doc/validate.h
+    src/doc/validate.cpp
     src/serialize.h
     src/serialize.cpp
     src/serialize/document.capnp.h
