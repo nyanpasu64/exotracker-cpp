@@ -4,25 +4,10 @@
         <file>icons/document-new-22.png</file>
         <file>icons/document-new-32.png</file>
         <file>icons/document-new-scalable.svg</file>
-        <file>icons/edit-copy-16.png</file>
-        <file>icons/edit-copy-22.png</file>
-        <file>icons/edit-copy-scalable.svg</file>
         <file>icons/edit-delete-16.png</file>
         <file>icons/edit-delete-22.png</file>
         <file>icons/edit-delete-32.png</file>
         <file>icons/edit-delete-scalable.svg</file>
-        <file>icons/go-down-16.png</file>
-        <file>icons/go-down-22.png</file>
-        <file>icons/go-down-32.png</file>
-        <file>icons/go-down-scalable.svg</file>
-        <file>icons/go-up-16.png</file>
-        <file>icons/go-up-22.png</file>
-        <file>icons/go-up-32.png</file>
-        <file>icons/go-up-scalable.svg</file>
-        <file>icons/tools-wizard-16.png</file>
-        <file>icons/tools-wizard-22.png</file>
-        <file>icons/tools-wizard-32.png</file>
-        <file>icons/tools-wizard-scalable.svg</file>
         <file>icons/warning-sign.svg</file>
     </qresource>
 </RCC>
