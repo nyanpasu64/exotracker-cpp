@@ -10,6 +10,7 @@
 #include "doc/gui_traits.h"
 #include "chip_kinds.h"
 #include "edit/edit_pattern.h"
+#include "doc_util/time_util.h"
 #include "util/distance.h"
 #include "util/enumerate.h"
 #include "util/expr.h"
@@ -1066,7 +1067,7 @@ static QLinearGradient make_gradient(
     return grad;
 }
 
-using CellIter = doc::TimelineCellIterRef;
+using FrameIter = doc_util::time_util::FramePatternIterRef;
 
 /// Computing colors may require blending with the background color.
 /// So cache the color for each timeline entry being drawn.
@@ -1280,7 +1281,7 @@ static void draw_pattern_background(
 
             auto timeline =
                 doc::TimelineChannelRef(document.timeline, col.chip, col.channel);
-            auto iter = CellIter(timeline[pos.grid]);
+            auto iter = FrameIter(timeline[pos.grid]);
 
             while (auto p = iter.next()) {
                 auto pattern = *p;
@@ -1931,7 +1932,7 @@ static void draw_pattern_foreground(
 
             auto timeline =
                 doc::TimelineChannelRef(document.timeline, col.chip, col.channel);
-            auto iter = CellIter(timeline[pos.grid]);
+            auto iter = FrameIter(timeline[pos.grid]);
 
             while (auto p = iter.next()) {
                 auto pattern = *p;

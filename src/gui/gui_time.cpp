@@ -1,4 +1,4 @@
-#include "timeline_iter.h"
+#include "gui_time.h"
 #include "util/enumerate.h"
 #include "util/format.h"
 #include "util/release_assert.h"
@@ -14,32 +14,9 @@
     #define DEBUG_PRINT(...)
 #endif
 
-namespace timeline_iter {
+namespace gui::gui_time {
 
-using CellIter = doc::TimelineCellIterRef;
-
-static
-std::tuple<doc::MaybePatternRef, CellIter> pattern_iter_seek(
-    doc::TimelineCellRef cell_ref, BeatFraction beat
-) {
-    auto iter = CellIter(cell_ref);
-
-    // The cursor remains at a fixed point.
-    // Each block occurs later than the previous block.
-    // Search for first block ending after the cursor, or OOB if none exists.
-    while (auto maybe_pattern = iter.next()) {
-        doc::PatternRef pattern = *maybe_pattern;
-        if (beat < pattern.end_time) {
-            return {pattern, iter};
-        }
-    }
-    return {{}, iter};
-}
-
-doc::PatternRef pattern_or_end(doc::TimelineCellRef cell_ref, BeatFraction beat) {
-    return std::get<0>(pattern_iter_seek(cell_ref, beat))
-        .value_or(doc::PatternRef{cell_ref.cell.size()});
-}
+using FrameIter = doc_util::time_util::FramePatternIterRef;
 
 #if 0
 GridAndBeat real_time(
@@ -57,10 +34,10 @@ GridAndBeat real_time(
 #endif
 
 
-// It might be useful for BlockIterator prev/next to return a different first value
+// It might be useful for GuiPatternIter prev/next to return a different first value
 // if now is between blocks. But that'll be done later.
 template<>
-ForwardBlockIterator ForwardBlockIterator::from_beat(
+FwdGuiPatternIter FwdGuiPatternIter::from_beat(
     doc::TimelineChannelRef timeline, GridAndBeat now
 ) {
     auto [pat, iter] = pattern_iter_seek(timeline[now.grid], now.beat);
@@ -74,7 +51,7 @@ ForwardBlockIterator ForwardBlockIterator::from_beat(
         cell_patterns.push_back(*pat);
     }
 
-    return BlockIterator {
+    return FwdGuiPatternIter {
         ._timeline = timeline,
 
         ._orig_grid = now.grid,
@@ -87,10 +64,10 @@ ForwardBlockIterator ForwardBlockIterator::from_beat(
 }
 
 template<>
-ReverseBlockIterator ReverseBlockIterator::from_beat(
+RevGuiPatternIter RevGuiPatternIter::from_beat(
     doc::TimelineChannelRef timeline, GridAndBeat now
 ) {
-    auto iter = CellIter(timeline[now.grid]);
+    auto iter = FrameIter(timeline[now.grid]);
 
     std::vector<doc::PatternRef> cell_patterns;
 
@@ -102,7 +79,7 @@ ReverseBlockIterator ReverseBlockIterator::from_beat(
         cell_patterns.push_back(*pat);
     }
 
-    return BlockIterator {
+    return RevGuiPatternIter {
         ._timeline = timeline,
 
         ._orig_grid = now.grid,
@@ -118,7 +95,7 @@ ReverseBlockIterator ReverseBlockIterator::from_beat(
 /// I don't know if it's better to separate out the "first call, invalid block"
 /// and "subsequent call" logic.
 template<>
-std::optional<BlockIteratorRef> ForwardBlockIterator::next() {
+std::optional<GuiPatternIterItem> FwdGuiPatternIter::next() {
     scrBegin;
 
     release_assert(_grid < _timeline.size());
@@ -129,7 +106,7 @@ std::optional<BlockIteratorRef> ForwardBlockIterator::next() {
             {
                 _cell_patterns.clear();
 
-                auto cell_iter = CellIter(_timeline[_grid]);
+                auto cell_iter = FrameIter(_timeline[_grid]);
                 while (auto p = cell_iter.next()) {
                     _cell_patterns.push_back(*p);
                 }
@@ -154,7 +131,7 @@ std::optional<BlockIteratorRef> ForwardBlockIterator::next() {
                     format_frac(pattern.end_time)
                 );
                 scrReturnEndScope((
-                    BlockIteratorRef{(Wrap) _wrap_count, _grid, pattern}
+                    GuiPatternIterItem{(Wrap) _wrap_count, _grid, pattern}
                 ));
             }
         }
@@ -166,11 +143,11 @@ std::optional<BlockIteratorRef> ForwardBlockIterator::next() {
     }
 
     scrFinishUnreachable;
-    throw std::logic_error("Reached end of ForwardBlockIterator::next()");
+    throw std::logic_error("Reached end of FwdTrackPatternWrap::next()");
 }
 
 template<>
-std::optional<BlockIteratorRef> ReverseBlockIterator::next() {
+std::optional<GuiPatternIterItem> RevGuiPatternIter::next() {
     scrBegin;
 
     release_assert(_grid < _timeline.size());
@@ -182,7 +159,7 @@ std::optional<BlockIteratorRef> ReverseBlockIterator::next() {
             {
                 _cell_patterns.clear();
 
-                auto cell_iter = CellIter(_timeline[_grid]);
+                auto cell_iter = FrameIter(_timeline[_grid]);
                 while (auto p = cell_iter.next()) {
                     _cell_patterns.push_back(*p);
                 }
@@ -208,7 +185,7 @@ std::optional<BlockIteratorRef> ReverseBlockIterator::next() {
                     format_frac(pattern.end_time)
                 );
                 scrReturnEndScope((
-                    BlockIteratorRef{(Wrap) _wrap_count, _grid, pattern}
+                    GuiPatternIterItem{(Wrap) _wrap_count, _grid, pattern}
                 ));
 
                 if (_pattern == 0) break;
@@ -226,7 +203,10 @@ std::optional<BlockIteratorRef> ReverseBlockIterator::next() {
     }
 
     scrFinishUnreachable;
-    throw std::logic_error("Reached end of ReverseBlockIterator::next()");
+    throw std::logic_error("Reached end of RevTrackPatternWrap::next()");
 }
+
+template class detail::GuiPatternIter<detail::Direction::Reverse>;
+template class detail::GuiPatternIter<detail::Direction::Forward>;
 
 }

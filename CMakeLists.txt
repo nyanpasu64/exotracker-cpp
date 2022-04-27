@@ -177,7 +177,6 @@ add_library(exotracker-core
     src/doc/timed_events.h
     src/doc/timed_events.cpp
     src/doc/timeline.h
-    src/doc/timeline.cpp
 
     # Document-based types and libraries
     src/audio/tempo_calc.h
@@ -185,8 +184,8 @@ add_library(exotracker-core
     src/doc/effect_names.h
     src/doc/gui_traits.h
     src/doc/gui_traits.cpp
-    src/timeline_iter.h
-    src/timeline_iter.cpp
+    src/doc_util/time_util.h
+    src/doc_util/time_util.cpp
     src/timing_common.h
     src/timing_common.cpp
     src/util/format.h
@@ -291,6 +290,10 @@ add_library(exotracker-headless
     # Qt-independent GUI libraries
     src/gui/history.h
     src/gui/history.cpp
+
+    # GUI timing code
+    src/gui/gui_time.h
+    src/gui/gui_time.cpp
     src/gui/move_cursor.h
     src/gui/move_cursor.cpp
 )
@@ -435,7 +438,7 @@ add_executable(exotracker-tests
     src/gui/move_cursor.cpp
     # src/audio/synth/envelope.cpp
     src/audio/synth/spc700_driver.cpp
-    src/doc/timeline.cpp
+    src/doc_util/time_util.cpp
     src/spc_export.cpp
 )
 target_compile_options(exotracker-tests PRIVATE "${options}")

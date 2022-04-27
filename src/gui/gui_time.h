@@ -4,13 +4,17 @@
 /// and extracting patterns from Timeline.
 
 #include "doc.h"
+#include "doc_util/time_util.h"
 #include "timing_common.h"
 
 #include <coroutine.h>
 
 #include <tuple>
 
-namespace timeline_iter {
+namespace gui::gui_time {
+
+// Public re-export.
+using namespace doc_util::time_util;
 
 using doc::ChipIndex;
 using doc::ChannelIndex;
@@ -21,19 +25,6 @@ using doc::BeatFraction;
 using timing::GridAndBeat;
 using timing::GridBlockBeat;
 using timing::GridAndBlock;
-
-
-// # Searching TimelineCell (only used in edit_pattern.cpp).
-
-/// Returns the first (block, pattern loop) where pattern.end_time > beat.
-///
-/// beat ∈ [prev_pattern.end_time, pattern.end_time).
-/// If beat ≥ pattern.begin, beat ∈ [pattern.begin_time, pattern.end_time).
-///
-/// If there exists no pattern where pattern.end > beat,
-/// returns (cell.size(), empty slice) which is out-of-bounds!
-[[nodiscard]]
-doc::PatternRef pattern_or_end(doc::TimelineCellRef cell_ref, BeatFraction beat);
 
 
 #if 0
@@ -66,7 +57,7 @@ enum class Wrap {
     Plus = +1,
 };
 
-struct BlockIteratorRef {
+struct GuiPatternIterItem {
     Wrap wrapped{};
     GridIndex grid;
     doc::PatternRef pattern;
@@ -83,7 +74,7 @@ namespace detail {
     /// Currently used for moving cursor to the next event
     /// (which may be on the current pattern, next, or even further).
     template<Direction direction>
-    class BlockIterator {
+    class GuiPatternIter {
     public:
         // Please don't poke this class's fields.
         // I'm marking them public to silence Clang warnings.
@@ -102,7 +93,7 @@ namespace detail {
     public:
 
         [[nodiscard]] static
-        BlockIterator from_beat(doc::TimelineChannelRef timeline, GridAndBeat now);
+        GuiPatternIter from_beat(doc::TimelineChannelRef timeline, GridAndBeat now);
 
         /// First call:
         /// - If original state is valid, return it as-is.
@@ -114,12 +105,13 @@ namespace detail {
         ///   behavior is unspecified and will enter nullopt state at some point.
         /// Nullopt state:
         /// - Return nullopt.
-        [[nodiscard]] std::optional<BlockIteratorRef> next();
+        [[nodiscard]] std::optional<GuiPatternIterItem> next();
     };
 }
 
-using ReverseBlockIterator = detail::BlockIterator<detail::Direction::Reverse>;
-using ForwardBlockIterator = detail::BlockIterator<detail::Direction::Forward>;
+// Do you need specialization *and* explicit instantiation?
+using RevGuiPatternIter = detail::GuiPatternIter<detail::Direction::Reverse>;
+using FwdGuiPatternIter = detail::GuiPatternIter<detail::Direction::Forward>;
 
 #ifdef UNITTEST
 

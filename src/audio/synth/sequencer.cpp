@@ -93,7 +93,7 @@ struct NextPattern {
     bool wrapped;
 
     doc::GridIndex grid;
-    TimelineCellIter pattern_iter_after;
+    FramePatternIter pattern_iter_after;
 
     /// If next grid cell is empty, returns no pattern.
     doc::MaybePatternRef pattern;
@@ -113,7 +113,7 @@ struct NextPattern {
 static NextPattern calc_next_pattern(
     doc::TimelineChannelRef timeline,
     doc::GridIndex grid,
-    TimelineCellIter pattern_iter
+    FramePatternIter pattern_iter
 ) {
     bool wrapped = false;
 
@@ -125,7 +125,7 @@ static NextPattern calc_next_pattern(
             wrapped = true;
         }
 
-        pattern_iter = TimelineCellIter();
+        pattern_iter = FramePatternIter();
         pattern = pattern_iter.next(timeline[grid]);
     }
 
@@ -498,7 +498,7 @@ void ChannelSequencer::seek(doc::Document const & document, GridAndBeat time) {
     _next_event = EventIterator{
         .prev_grid = {},
         .grid = time.grid,
-        .pattern_iter = TimelineCellIter(),
+        .pattern_iter = FramePatternIter(),
         .pattern = {},
         .event_idx = 0,
     };
@@ -713,7 +713,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
         _next_event = EventIterator{
             .prev_grid = {},
             .grid = grid,
-            .pattern_iter = TimelineCellIter(),
+            .pattern_iter = FramePatternIter(),
             .pattern = {},
             .event_idx = 0,
         };
@@ -726,7 +726,7 @@ void ChannelSequencer::doc_edited(doc::Document const & document) {
         _next_event = EventIterator{
             .prev_grid = prev_grid,
             .grid = grid,
-            .pattern_iter = TimelineCellIter(),
+            .pattern_iter = FramePatternIter(),
             .pattern = {},
             .event_idx = 0,
         };

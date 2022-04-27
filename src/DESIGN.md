@@ -197,7 +197,7 @@ Each block contains a single pattern, consisting of a list of events and an opti
 
 Eventually, patterns can be reused in multiple blocks at different times (and possibly different channels).
 
-[1] If a user shrinks a timeline entry, it may cause an timed-end block to end past the cell, or an "end of cell" block to have a size ≤ 0. To prevent this from breaking the GUI or sequencer, `TimelineCellIter` clamps block end times to the end of the cell, and skips blocks beginning at or past the end of the cell. However, out-of-bounds events and blocks are still stored in the document. I have not decided how to indicate these to the user.
+[1] If a user shrinks a timeline entry, it may cause an timed-end block to end past the cell, or an "end of cell" block to have a size ≤ 0. To prevent this from breaking the GUI or sequencer, `FramePatternIter` clamps block end times to the end of the cell, and skips blocks beginning at or past the end of the cell. However, out-of-bounds events and blocks are still stored in the document. I have not decided how to indicate these to the user.
 
 ### Motivation
 
@@ -213,11 +213,11 @@ The timeline code is implemented in `doc/timeline.h`. I added several helper cla
 
 `TimelineChannelRef` and `TimelineChannelRefMut` store a reference to a `Timeline` (all grid cells, all channels), and a chip and channel value. Timelines are currently stored as `[grid] [chip, channel] TimelineCell` to make adding/removing grid cells easy. But `TimelineChannelRef` can be indexed `[grid] TimelineCell`, to simplify code (like sequencers and cursor movement) that interacts with multiple grid/timeline cells, but only one channel.
 
-#### TimelineCellIter(Ref)
+#### FramePatternIter(Ref)
 
-I added classes `TimelineCellIter` and `TimelineCellIterRef` to step through a timeline cell's blocks, and loop each block's patterns for as long as it's playing. These classes (which act like coroutines/generators) are constructed with a `TimelineCell` and its duration, and yield `PatternRef` objects until exhausted.
+I added classes `FramePatternIter` and `TimelineCellIterRef` to step through a timeline cell's blocks, and loop each block's patterns for as long as it's playing. These classes (which act like coroutines/generators) are constructed with a `TimelineCell` and its duration, and yield `PatternRef` objects until exhausted.
 
-For each block in the cell, `TimelineCellIter(Ref)` will yield a `PatternRef` with the block's pattern either once (if the pattern doesn't loop), or once for each time the pattern loops within the block. The `PatternRef` stores the time the pattern plays within the grid cell, and a span (pointer, size) to the events that should be played (excluding all events past the block's end time, but currently not excluding events at the beginning).
+For each block in the cell, `FramePatternIter(Ref)` will yield a `PatternRef` with the block's pattern either once (if the pattern doesn't loop), or once for each time the pattern loops within the block. The `PatternRef` stores the time the pattern plays within the grid cell, and a span (pointer, size) to the events that should be played (excluding all events past the block's end time, but currently not excluding events at the beginning).
 
 To add support for starting playback partway through a pattern, a `PatternRef` would have to store a timestamp to subtract from all events when calculating the absolute time (relative to the grid cell) the events play at.
 

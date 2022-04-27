@@ -13,7 +13,6 @@
 #include "util/compare.h"
 #endif
 
-#include <coroutine.h>
 #include <gsl/span>
 
 #include <compare>
@@ -302,36 +301,5 @@ struct PatternRef {
 };
 
 using MaybePatternRef = std::optional<PatternRef>;
-
-/// Timeline iterator that yields one pattern per loop instance.
-class [[nodiscard]] TimelineCellIter {
-    scrDefine;
-
-    BlockIndex _block;
-
-    BeatIndex _loop_begin_time;
-    BeatFraction _block_end_time;
-
-    /// Where to truncate the event when looping.
-    event_list::EventIndex _loop_ev_idx;
-
-public:
-    TimelineCellIter() = default;
-
-    /// You must pass in the same unmodified cell on each iteration,
-    /// matching nbeats passed into the constructor.
-    [[nodiscard]] MaybePatternRef next(TimelineCellRef cell_ref);
-};
-
-/// Version of TimelineCellIter that holds onto a reference to the cell.
-class [[nodiscard]] TimelineCellIterRef {
-    TimelineCellRef _cell_ref;
-    TimelineCellIter _iter;
-
-public:
-    TimelineCellIterRef(TimelineCellRef cell_ref);
-
-    [[nodiscard]] MaybePatternRef next();
-};
 
 }

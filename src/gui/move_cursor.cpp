@@ -1,6 +1,6 @@
 #include "move_cursor.h"
 #include "doc_util/event_search.h"
-#include "timeline_iter.h"
+#include "gui_time.h"
 #include "util/compare_impl.h"
 #include "util/math.h"
 #include "util/release_assert.h"
@@ -55,9 +55,9 @@ using timing::GridBlockBeat;
 using doc::PatternRef;
 using doc_util::event_search::EventSearch;
 
-using timeline_iter::Wrap;
-using timeline_iter::ForwardBlockIterator;
-using timeline_iter::ReverseBlockIterator;
+using gui_time::Wrap;
+using gui_time::FwdGuiPatternIter;
+using gui_time::RevGuiPatternIter;
 
 struct MoveCursorResult {
     Wrap wrapped{};
@@ -81,7 +81,7 @@ static GridAndBeat pattern_to_abs_time(
 
     auto timeline = doc::TimelineChannelRef(document.timeline, chip, channel);
 
-    auto iter = ReverseBlockIterator::from_beat(timeline, cursor.y);
+    auto iter = RevGuiPatternIter::from_beat(timeline, cursor.y);
 
     bool first = true;
     while (true) {
@@ -132,7 +132,7 @@ static GridAndBeat pattern_to_abs_time(
 
     auto timeline = doc::TimelineChannelRef(document.timeline, chip, channel);
 
-    auto iter = ForwardBlockIterator::from_beat(timeline, cursor.y);
+    auto iter = FwdGuiPatternIter::from_beat(timeline, cursor.y);
 
     bool first = true;
     while (true) {
