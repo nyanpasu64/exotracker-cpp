@@ -93,15 +93,4 @@ namespace detail {
 using RevGuiPatternIter = detail::GuiPatternIter<detail::Direction::Reverse>;
 using FwdGuiPatternIter = detail::GuiPatternIter<detail::Direction::Forward>;
 
-#ifdef UNITTEST
-
-#include <ostream>
-
-inline std::ostream& operator<< (std::ostream& os, Wrap const & value) {
-    os << "Wrap(" << (int) value << ")";
-    return os;
-}
-
-#endif
-
 }
