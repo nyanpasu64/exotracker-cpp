@@ -44,21 +44,7 @@ using timing::GridAndBlock;
 
 // # Iterating over Timeline (only used in move_cursor.cpp).
 
-/// When moving the cursor around,
-/// we need to compare whether the next event or row is closer to the cursor.
-///
-/// Wrapping from the end to the beginning of the document
-/// is logically "later" than the end of the document,
-/// and returns MoveCursorResult{Wrap::Plus, begin}.
-/// This compares greater than MoveCursorResult{Wrap::Zero, end}.
-enum class Wrap {
-    Minus = -1,
-    None = 0,
-    Plus = +1,
-};
-
 struct GuiPatternIterItem {
-    Wrap wrapped{};
     GridIndex grid;
     doc::PatternRef pattern;
 };
@@ -81,10 +67,6 @@ namespace detail {
         scrDefine;
         doc::TimelineChannelRef _timeline;
 
-        GridIndex const _orig_grid;
-        BeatFraction const _orig_pattern_start;
-
-        int _wrap_count = 0;
         GridIndex _grid;
         std::vector<doc::PatternRef> _cell_patterns;
         size_t _pattern;
@@ -100,9 +82,7 @@ namespace detail {
         /// - If original state is invalid, search the document for the first valid block.
         ///   If none exist, enter nullopt state.
         /// Subsequent calls:
-        /// - Return the next block. Looping around the document is allowed.
-        ///   When we loop back to the first block returned,
-        ///   behavior is unspecified and will enter nullopt state at some point.
+        /// - Return the next block. At begin/end of document, enter nullopt state.
         /// Nullopt state:
         /// - Return nullopt.
         [[nodiscard]] std::optional<GuiPatternIterItem> next();

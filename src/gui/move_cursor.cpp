@@ -2,6 +2,7 @@
 #include "doc_util/event_search.h"
 #include "gui_time.h"
 #include "util/compare_impl.h"
+#include "util/expr.h"
 #include "util/math.h"
 #include "util/release_assert.h"
 
@@ -55,18 +56,16 @@ using timing::GridBlockBeat;
 using doc::PatternRef;
 using doc_util::event_search::EventSearch;
 
-using gui_time::Wrap;
 using gui_time::FwdGuiPatternIter;
 using gui_time::RevGuiPatternIter;
 
 struct MoveCursorResult {
-    Wrap wrapped{};
     GridAndBeat time{};
 
     COMPARABLE(MoveCursorResult)
 };
 
-COMPARABLE_IMPL(MoveCursorResult, (self.wrapped, self.time))
+COMPARABLE_IMPL(MoveCursorResult, (self.time))
 
 static GridAndBeat pattern_to_abs_time(
     GridIndex grid, PatternRef pattern, doc::TimedRowEvent const& ev
@@ -87,18 +86,18 @@ static GridAndBeat pattern_to_abs_time(
     while (true) {
         auto maybe_state = iter.next();
         if (!maybe_state) {
-            return MoveCursorResult{Wrap::Minus, cursor.y};
+            return MoveCursorResult{cursor.y};
         }
 
         // [Wrap, GridIndex, PatternRef]
-        auto [wrapped, grid, pattern] = *maybe_state;
+        auto [grid, pattern] = *maybe_state;
         doc::TimedEventsRef event_list = pattern.events;
         using Rev = doc::TimedEventsRef::reverse_iterator;
 
         // Out-of-bounds events from a long pattern in a short block
         // are properly excluded.
         // Using a long block in a short grid cell is not excluded yet.
-        if (first && wrapped == Wrap::None && grid == cursor.y.grid) {
+        if (first && grid == cursor.y.grid) {
             // We can compare timestamps directly.
             doc::BeatFraction rel_time = cursor.y.beat - pattern.begin_time;
 
@@ -108,7 +107,7 @@ static GridAndBeat pattern_to_abs_time(
             // Find nearest event before given time.
             if (ev != event_list.rend()) {
                 return MoveCursorResult{
-                    wrapped, pattern_to_abs_time(grid, pattern, *ev)
+                    pattern_to_abs_time(grid, pattern, *ev)
                 };
             }
 
@@ -116,7 +115,7 @@ static GridAndBeat pattern_to_abs_time(
             // Find last event.
             if (!event_list.empty()) {
                 return MoveCursorResult{
-                    wrapped, pattern_to_abs_time(grid, pattern, event_list.back())
+                    pattern_to_abs_time(grid, pattern, event_list.back())
                 };
             }
         }
@@ -138,17 +137,17 @@ static GridAndBeat pattern_to_abs_time(
     while (true) {
         auto maybe_state = iter.next();
         if (!maybe_state) {
-            return MoveCursorResult{Wrap::Plus, cursor.y};
+            return MoveCursorResult{cursor.y};
         }
 
         // [Wrap, GridIndex, PatternRef]
-        auto [wrapped, grid, pattern] = *maybe_state;
+        auto [grid, pattern] = *maybe_state;
         doc::TimedEventsRef event_list = pattern.events;
 
         // Out-of-bounds events from a long pattern in a short block
         // are properly excluded.
         // Using a long block in a short grid cell is not excluded yet.
-        if (first && wrapped == Wrap::None && grid == cursor.y.grid) {
+        if (first && grid == cursor.y.grid) {
             // We can compare timestamps directly.
             doc::BeatFraction rel_time = cursor.y.beat - pattern.begin_time;
 
@@ -158,7 +157,7 @@ static GridAndBeat pattern_to_abs_time(
             // Find first event past given time.
             if (ev != event_list.end()) {
                 return MoveCursorResult{
-                    wrapped, pattern_to_abs_time(grid, pattern, *ev)
+                    pattern_to_abs_time(grid, pattern, *ev)
                 };
             }
 
@@ -166,7 +165,7 @@ static GridAndBeat pattern_to_abs_time(
             // Find first event.
             if (!event_list.empty()) {
                 return MoveCursorResult{
-                    wrapped, pattern_to_abs_time(grid, pattern, event_list.front())
+                    pattern_to_abs_time(grid, pattern, event_list.front())
                 };
             }
         }
@@ -205,32 +204,24 @@ using util::math::frac_next;
     BeatFraction const orig_row = cursor_y.beat * rows_per_beat;
     FractionInt const raw_prev = frac_prev(orig_row);
     FractionInt prev_row;
-    auto wrapped = Wrap::None;
 
     if (raw_prev >= 0) {
+        // If we're not at row 0, go up.
         prev_row = raw_prev;
-
-    } else if (move_cfg.wrap_across_frames || move_cfg.wrap_cursor) {
-        if (move_cfg.wrap_across_frames) {
-            if (cursor_y.grid == doc::GridIndex(0)) {
-                wrapped = Wrap::Minus;
-            }
-            decrement_mod(
-                cursor_y.grid,
-                (GridIndex)document.timeline.size()
-            );
-        }
-
+    }
+    // We're at row 0.
+    else if (move_cfg.wrap_across_frames && cursor_y.grid > doc::GridIndex(0)) {
+        // If possible, go to previous frame.
+        cursor_y.grid--;
         auto nbeats = document.timeline[cursor_y.grid].nbeats;
         prev_row = frac_prev(nbeats * rows_per_beat);
-
     } else {
-        // Don't move the cursor.
-        return MoveCursorResult{Wrap::None, cursor_y};
+        // Remain at row 0 in our current frame.
+        return MoveCursorResult{cursor_y};
     }
 
     cursor_y.beat = BeatFraction{prev_row, rows_per_beat};
-    return MoveCursorResult{wrapped, cursor_y};
+    return MoveCursorResult{cursor_y};
 }
 
 [[nodiscard]] static MoveCursorResult next_row_impl(
@@ -242,34 +233,27 @@ using util::math::frac_next;
     BeatFraction const orig_row = cursor_y.beat * rows_per_beat;
     FractionInt const raw_next = frac_next(orig_row);
     FractionInt next_row;
-    auto wrapped = Wrap::None;
 
     auto nbeats = document.timeline[cursor_y.grid].nbeats;
     BeatFraction const num_rows = nbeats * rows_per_beat;
 
     if (raw_next < num_rows) {
+        // If we're not at end, go up.
         next_row = raw_next;
 
-    } else if (move_cfg.wrap_across_frames || move_cfg.wrap_cursor) {
-        if (move_cfg.wrap_across_frames) {
-            increment_mod(
-                cursor_y.grid,
-                (GridIndex)document.timeline.size()
-            );
-            if (cursor_y.grid == GridIndex(0)) {
-                wrapped = Wrap::Plus;
-            }
-        }
-
+    } else if (
+        move_cfg.wrap_across_frames
+        && cursor_y.grid + 1 < document.timeline.size()
+    ) {
+        cursor_y.grid++;
         next_row = 0;
-
     } else {
         // Don't move the cursor.
-        return MoveCursorResult{Wrap::None, cursor_y};
+        return MoveCursorResult{cursor_y};
     }
 
     cursor_y.beat = BeatFraction{next_row, rows_per_beat};
-    return MoveCursorResult{wrapped, cursor_y};
+    return MoveCursorResult{cursor_y};
 }
 
 GridAndBeat prev_beat(
@@ -391,10 +375,13 @@ GridAndBeat page_up(
 
     for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
         if (cursor_y.beat < 0) {
-            decrement_mod(
-                cursor_y.grid, (GridIndex) document.timeline.size()
-            );
-            cursor_y.beat += document.timeline[cursor_y.grid].nbeats;
+            if (cursor_y.grid.v > 0) {
+                cursor_y.grid--;
+                cursor_y.beat += document.timeline[cursor_y.grid].nbeats;
+            } else {
+                cursor_y.beat = 0;
+                break;
+            }
         } else {
             break;
         }
@@ -407,15 +394,20 @@ GridAndBeat page_down(
     GridAndBeat cursor_y,
     MovementConfig const& move_cfg)
 {
+    const auto orig_beat = cursor_y.beat;
     cursor_y.beat += move_cfg.page_down_distance;
 
     for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
         auto const & grid_cell = document.timeline[cursor_y.grid];
         if (cursor_y.beat >= grid_cell.nbeats) {
-            cursor_y.beat -= grid_cell.nbeats;
-            increment_mod(
-                cursor_y.grid, (GridIndex) document.timeline.size()
-            );
+            if (cursor_y.grid.v + 1 < document.timeline.size()) {
+                cursor_y.grid++;
+                cursor_y.beat -= grid_cell.nbeats;
+            } else {
+                // Kinda hacky, but will do.
+                cursor_y.beat = orig_beat;
+                break;
+            }
         } else {
             break;
         }

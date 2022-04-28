@@ -54,12 +54,9 @@ FwdGuiPatternIter FwdGuiPatternIter::from_beat(
     return FwdGuiPatternIter {
         ._timeline = timeline,
 
-        ._orig_grid = now.grid,
-        ._orig_pattern_start = (pat ? pat->begin_time : timeline[now.grid].nbeats),
-
         ._grid = now.grid,
         ._cell_patterns = std::move(cell_patterns),
-        ._pattern = 0,
+        ._pattern = 0,  // placeholder, overwritten
     };
 }
 
@@ -82,12 +79,9 @@ RevGuiPatternIter RevGuiPatternIter::from_beat(
     return RevGuiPatternIter {
         ._timeline = timeline,
 
-        ._orig_grid = now.grid,
-        ._orig_pattern_start = (cell_patterns.size() ? cell_patterns.back().begin_time : 0),
-
         ._grid = now.grid,
         ._cell_patterns = cell_patterns,
-        ._pattern = 0,
+        ._pattern = 0,  // placeholder, overwritten
     };
 }
 
@@ -101,42 +95,33 @@ std::optional<GuiPatternIterItem> FwdGuiPatternIter::next() {
     release_assert(_grid < _timeline.size());
     goto begin;
 
-    for (; _wrap_count <= 1; _wrap_count++) {
-        for (_grid = 0; _grid < _timeline.size(); _grid++) {
-            {
-                _cell_patterns.clear();
+    for (; _grid < _timeline.size(); _grid++) {
+        {
+            _cell_patterns.clear();
 
-                auto cell_iter = FrameIter(_timeline[_grid]);
-                while (auto p = cell_iter.next()) {
-                    _cell_patterns.push_back(*p);
-                }
-            }
-
-            begin:
-            DEBUG_PRINT("forward, patterns size {}\n", _cell_patterns.size());
-            for (_pattern = 0; _pattern < _cell_patterns.size(); _pattern++) {
-                scrBeginScope;
-                doc::PatternRef pattern = _cell_patterns[_pattern];
-                if (
-                    std::tuple(_wrap_count, _grid, pattern.begin_time)
-                    > std::tuple(1, _orig_grid, _orig_pattern_start)
-                ) {
-                    goto end;
-                }
-
-                DEBUG_PRINT(
-                    "forward, grid {}, time {} to {}\n",
-                    _grid,
-                    pattern.begin_time,
-                    format_frac(pattern.end_time)
-                );
-                scrReturnEndScope((
-                    GuiPatternIterItem{(Wrap) _wrap_count, _grid, pattern}
-                ));
+            auto cell_iter = FrameIter(_timeline[_grid]);
+            while (auto p = cell_iter.next()) {
+                _cell_patterns.push_back(*p);
             }
         }
-    }  // fallthrough to end
-    end:
+
+        begin:
+        DEBUG_PRINT("forward, patterns size {}\n", _cell_patterns.size());
+        for (_pattern = 0; _pattern < _cell_patterns.size(); _pattern++) {
+            scrBeginScope;
+            doc::PatternRef pattern = _cell_patterns[_pattern];
+
+            DEBUG_PRINT(
+                "forward, grid {}, time {} to {}\n",
+                _grid,
+                pattern.begin_time,
+                format_frac(pattern.end_time)
+            );
+            scrReturnEndScope((
+                GuiPatternIterItem{_grid, pattern}
+            ));
+        }
+    }
     while (true) {
         DEBUG_PRINT("forward, nullopt\n");
         scrReturn(std::nullopt);
@@ -153,50 +138,41 @@ std::optional<GuiPatternIterItem> RevGuiPatternIter::next() {
     release_assert(_grid < _timeline.size());
     goto begin;
 
-    for (; _wrap_count >= -1; _wrap_count--) {
-        if (_timeline.size())
-        for (_grid = _timeline.size() - 1; ; ) {
-            {
-                _cell_patterns.clear();
+    if (_timeline.size())
+    while (true) {
+        {
+            _cell_patterns.clear();
 
-                auto cell_iter = FrameIter(_timeline[_grid]);
-                while (auto p = cell_iter.next()) {
-                    _cell_patterns.push_back(*p);
-                }
+            auto cell_iter = FrameIter(_timeline[_grid]);
+            while (auto p = cell_iter.next()) {
+                _cell_patterns.push_back(*p);
             }
-
-            begin:
-            DEBUG_PRINT("reverse, patterns size {}\n", _cell_patterns.size());
-            if (_cell_patterns.size())
-            for (_pattern = _cell_patterns.size() - 1; ;) {
-                scrBeginScope;
-                doc::PatternRef pattern = _cell_patterns[_pattern];
-                if (
-                    std::tuple(_wrap_count, _grid, pattern.begin_time)
-                    < std::tuple(-1, _orig_grid, _orig_pattern_start)
-                ) {
-                    goto end;
-                }
-
-                DEBUG_PRINT(
-                    "reverse, grid {}, time {} to {}\n",
-                    _grid,
-                    pattern.begin_time,
-                    format_frac(pattern.end_time)
-                );
-                scrReturnEndScope((
-                    GuiPatternIterItem{(Wrap) _wrap_count, _grid, pattern}
-                ));
-
-                if (_pattern == 0) break;
-                _pattern--;
-            }
-
-            if (_grid == GridIndex(0)) break;
-            _grid--;
         }
-    }  // fallthrough to end
-    end:
+
+        begin:
+        DEBUG_PRINT("reverse, patterns size {}\n", _cell_patterns.size());
+        if (_cell_patterns.size())
+        for (_pattern = _cell_patterns.size() - 1; ;) {
+            scrBeginScope;
+            doc::PatternRef pattern = _cell_patterns[_pattern];
+
+            DEBUG_PRINT(
+                "reverse, grid {}, time {} to {}\n",
+                _grid,
+                pattern.begin_time,
+                format_frac(pattern.end_time)
+            );
+            scrReturnEndScope((
+                GuiPatternIterItem{_grid, pattern}
+            ));
+
+            if (_pattern == 0) break;
+            _pattern--;
+        }
+
+        if (_grid == GridIndex(0)) break;
+        _grid--;
+    }
     while (true) {
         DEBUG_PRINT("reverse, nullopt\n");
         scrReturn(std::nullopt);
