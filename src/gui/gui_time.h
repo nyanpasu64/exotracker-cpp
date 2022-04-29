@@ -23,23 +23,6 @@ using doc::GridIndex;
 using doc::BeatFraction;
 
 using timing::GridAndBeat;
-using timing::GridBlockBeat;
-using timing::GridAndBlock;
-
-
-#if 0
-/// Unused.
-/// Convert a block-relative timestamp to a grid timestamp.
-///
-/// Adds the block's begin time and the relative timestamp's beat offset.
-/// Then computes the correct grid cell containing the time.
-[[nodiscard]] GridAndBeat real_time(
-    doc::Document const& document,
-    ChipIndex chip,
-    ChannelIndex channel,
-    GridBlockBeat rel_time
-);
-#endif
 
 
 // # Iterating over Timeline (only used in move_cursor.cpp).

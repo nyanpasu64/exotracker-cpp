@@ -50,8 +50,6 @@ using ChannelList = std::vector<CursorChannel>;
 // # Moving cursor by events
 
 using doc::GridIndex;
-using timing::GridAndBlock;
-using timing::GridBlockBeat;
 
 using doc::PatternRef;
 using doc_util::event_search::EventSearch;

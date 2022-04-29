@@ -18,21 +18,6 @@ namespace gui::gui_time {
 
 using FrameIter = doc_util::time_util::FramePatternIterRef;
 
-#if 0
-GridAndBeat real_time(
-    doc::Document const& document,
-    ChipIndex chip,
-    ChannelIndex channel,
-    GridBlockBeat rel_time
-) {
-    // TODO test this
-    auto & block = document.chip_channel_timelines
-        [chip][channel][rel_time.grid]._raw_blocks[rel_time.block];
-
-    return GridAndBeat{rel_time.grid, block.begin_time + rel_time.beat};
-}
-#endif
-
 
 // It might be useful for GuiPatternIter prev/next to return a different first value
 // if now is between blocks. But that'll be done later.
