@@ -378,7 +378,135 @@ GridAndBeat cursor_step(
     return cursor.y;
 }
 
+/// To avoid an infinite loop,
+/// avoid scrolling more than _ patterns in a single Page Down keystroke.
+constexpr int MAX_PAGEDOWN_SCROLL = 16;
+
+GridAndBeat page_up(
+    doc::Document const& document,
+    GridAndBeat cursor_y,
+    MovementConfig const& move_cfg)
+{
+    cursor_y.beat -= move_cfg.page_down_distance;
+
+    for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
+        if (cursor_y.beat < 0) {
+            decrement_mod(
+                cursor_y.grid, (GridIndex) document.timeline.size()
+            );
+            cursor_y.beat += document.timeline[cursor_y.grid].nbeats;
+        } else {
+            break;
+        }
+    }
+    return cursor_y;
 }
+
+GridAndBeat page_down(
+    doc::Document const& document,
+    GridAndBeat cursor_y,
+    MovementConfig const& move_cfg)
+{
+    cursor_y.beat += move_cfg.page_down_distance;
+
+    for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
+        auto const & grid_cell = document.timeline[cursor_y.grid];
+        if (cursor_y.beat >= grid_cell.nbeats) {
+            cursor_y.beat -= grid_cell.nbeats;
+            increment_mod(
+                cursor_y.grid, (GridIndex) document.timeline.size()
+            );
+        } else {
+            break;
+        }
+    }
+    return cursor_y;
+}
+
+GridAndBeat frame_begin(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    MovementConfig const& move_cfg)
+{
+    if (move_cfg.home_end_switch_patterns && cursor.y.beat <= 0) {
+        if (cursor.y.grid.v > 0) {
+            cursor.y.grid--;
+        }
+    }
+
+    cursor.y.beat = 0;
+    return cursor.y;
+}
+
+GridAndBeat frame_end(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    MovementConfig const& move_cfg,
+    doc::BeatFraction bottom_padding)
+{
+    // TODO pick a way of handling edge cases.
+    //  We should use the same method of moving the cursor to end of pattern,
+    //  as switching patterns uses (switch_grid_index()).
+    //  calc_bottom() is dependent on selection's cached rows_per_beat (limitation)
+    //  but selects one pattern exactly (good).
+
+    auto calc_bottom = [&] (GridAndBeat cursor_y) -> BeatFraction {
+        return document.timeline[cursor_y.grid].nbeats - bottom_padding;
+    };
+
+    auto bottom_beat = calc_bottom(cursor.y);
+
+    if (move_cfg.home_end_switch_patterns && cursor.y.beat >= bottom_beat) {
+        if (cursor.y.grid + 1 < document.timeline.size()) {
+            cursor.y.grid++;
+            bottom_beat = calc_bottom(cursor.y);
+        }
+    }
+
+    cursor.y.beat = bottom_beat;
+
+    return cursor.y;
+}
+
+GridAndBeat prev_frame(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    int zoom_level)
+{
+    decrement_mod(cursor.y.grid, (GridIndex) document.timeline.size());
+
+    BeatFraction nbeats = document.timeline[cursor.y.grid].nbeats;
+
+    // If cursor is out of bounds, move to last row in frame.
+    if (cursor.y.beat >= nbeats) {
+        BeatFraction row_count = nbeats * zoom_level;
+        int last_row = util::math::frac_prev(row_count);
+        cursor.y.beat = BeatFraction{last_row, zoom_level};
+    }
+
+    return cursor.y;
+}
+
+GridAndBeat next_frame(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    int zoom_level)
+{
+    increment_mod(cursor.y.grid, (GridIndex) document.timeline.size());
+
+    BeatFraction nbeats = document.timeline[cursor.y.grid].nbeats;
+
+    // If cursor is out of bounds, move to last row in frame.
+    if (cursor.y.beat >= nbeats) {
+        BeatFraction row_count = nbeats * zoom_level;
+        int last_row = util::math::frac_prev(row_count);
+        cursor.y.beat = BeatFraction{last_row, zoom_level};
+    }
+
+    return cursor.y;
+}
+
+} // namespace
 
 #ifdef UNITTEST
 

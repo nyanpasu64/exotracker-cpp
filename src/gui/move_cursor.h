@@ -85,6 +85,40 @@ struct MoveCursorYArgs {
 );
 
 
+[[nodiscard]] GridAndBeat page_up(
+    doc::Document const& document,
+    GridAndBeat cursor_y,
+    MovementConfig const& move_cfg);
+
+[[nodiscard]] GridAndBeat page_down(
+    doc::Document const& document,
+    GridAndBeat cursor_y,
+    MovementConfig const& move_cfg);
+
+
+[[nodiscard]] GridAndBeat frame_begin(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    MovementConfig const& move_cfg);
+
+[[nodiscard]] GridAndBeat frame_end(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    MovementConfig const& move_cfg,
+    doc::BeatFraction bottom_padding);
+
+
+[[nodiscard]] GridAndBeat prev_frame(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    int zoom_level);
+
+[[nodiscard]] GridAndBeat next_frame(
+    doc::Document const& document,
+    cursor::Cursor cursor,
+    int zoom_level);
+
+
 struct CursorStepArgs {
     int rows_per_beat;
     int step;

@@ -12,6 +12,7 @@
 #include "edit/edit_pattern.h"
 #include "util/distance.h"
 #include "util/enumerate.h"
+#include "util/expr.h"
 #include "util/math.h"
 #include "util/release_assert.h"
 #include "util/reverse.h"
@@ -2065,7 +2066,7 @@ void PatternEditor::paintEvent(QPaintEvent * /*event*/) {
     draw_pattern(*this);
 }
 
-// # Cursor movement
+// # Vertical cursor movement
 
 void PatternEditor::up_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
@@ -2147,80 +2148,39 @@ void PatternEditor::next_event_pressed(StateTransaction & tx) {
 }
 
 
-/// To avoid an infinite loop,
-/// avoid scrolling more than _ patterns in a single Page Down keystroke.
-constexpr int MAX_PAGEDOWN_SCROLL = 16;
-
 void PatternEditor::scroll_prev_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
-    auto const & move_cfg = get_app().options().move_cfg;
-
+    auto const& move_cfg = get_app().options().move_cfg;
     auto cursor_y = get_cursor(*this).y;
 
-    cursor_y.beat -= move_cfg.page_down_distance;
-
-    for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
-        if (cursor_y.beat < 0) {
-            decrement_mod(
-                cursor_y.grid, (GridIndex) document.timeline.size()
-            );
-            cursor_y.beat += document.timeline[cursor_y.grid].nbeats;
-        } else {
-            break;
-        }
-    }
-
-    tx.cursor_mut().set_y(cursor_y);
+    tx.cursor_mut().set_y(move_cursor::page_up(document, cursor_y, move_cfg));
 }
 
 void PatternEditor::scroll_next_pressed(StateTransaction & tx) {
     doc::Document const & document = get_document();
-    auto const & move_cfg = get_app().options().move_cfg;
-
+    auto const& move_cfg = get_app().options().move_cfg;
     auto cursor_y = get_cursor(*this).y;
 
-    cursor_y.beat += move_cfg.page_down_distance;
-
-    for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
-        auto const & grid_cell = document.timeline[cursor_y.grid];
-        if (cursor_y.beat >= grid_cell.nbeats) {
-            cursor_y.beat -= grid_cell.nbeats;
-            increment_mod(
-                cursor_y.grid, (GridIndex) document.timeline.size()
-            );
-        } else {
-            break;
-        }
-    }
-
-    tx.cursor_mut().set_y(cursor_y);
+    tx.cursor_mut().set_y(move_cursor::page_down(document, cursor_y, move_cfg));
 }
 
 void PatternEditor::top_pressed(StateTransaction & tx) {
-    auto cursor_y = get_cursor(*this).y;
+    doc::Document const & document = get_document();
+    auto const& move_cfg = get_app().options().move_cfg;
+    Cursor cursor = get_cursor(*this);
 
-    if (get_app().options().move_cfg.home_end_switch_patterns && cursor_y.beat <= 0) {
-        if (cursor_y.grid.v > 0) {
-            cursor_y.grid--;
-        }
-    }
-
-    cursor_y.beat = 0;
-    tx.cursor_mut().set_y(cursor_y);
+    auto new_y = move_cursor::frame_begin(document, cursor, move_cfg);
+    tx.cursor_mut().set_y(new_y);
 }
 
 void PatternEditor::bottom_pressed(StateTransaction & tx) {
     doc::Document const& document = get_document();
-    auto raw_select = get_raw_sel(*this);
+    auto const& move_cfg = get_app().options().move_cfg;
+    Cursor cursor = get_cursor(*this);
 
-    // TODO pick a way of handling edge cases.
-    //  We should use the same method of moving the cursor to end of pattern,
-    //  as switching patterns uses (switch_grid_index()).
-    //  calc_bottom() is dependent on selection's cached rows_per_beat (limitation)
-    //  but selects one pattern exactly (good).
-
-    auto calc_bottom = [&] (GridAndBeat cursor_y) -> BeatFraction {
-        BeatFraction bottom_padding{1, _zoom_level};
+    // Move the cursor _ above the end of the current frame.
+    auto bottom_padding = EXPR(
+        auto raw_select = get_raw_sel(*this);
 
         /*
         If a selection is active and bottom_padding() == 0,
@@ -2235,53 +2195,33 @@ void PatternEditor::bottom_pressed(StateTransaction & tx) {
         This is a tradeoff. There is no perfect solution.
         */
         if (raw_select && raw_select->bottom_padding() > 0) {
-            bottom_padding = raw_select->bottom_padding();
+            return raw_select->bottom_padding();
+        } else {
+            return BeatFraction{1, _zoom_level};
         }
-        return document.timeline[cursor_y.grid].nbeats - bottom_padding;
-    };
+    );
 
-    auto cursor_y = get_cursor(*this).y;
-    auto bottom_beat = calc_bottom(cursor_y);
-
-    if (
-        get_app().options().move_cfg.home_end_switch_patterns
-        && cursor_y.beat >= bottom_beat
-    ) {
-        if (cursor_y.grid + 1 < document.timeline.size()) {
-            cursor_y.grid++;
-            bottom_beat = calc_bottom(cursor_y);
-        }
-    }
-
-    cursor_y.beat = bottom_beat;
-    tx.cursor_mut().set_y(cursor_y);
-}
-
-template<void alter_mod(GridIndex & x, GridIndex den)>
-inline void switch_grid_index(PatternEditor & self, StateTransaction & tx) {
-    doc::Document const & document = self.get_document();
-    auto cursor_y = get_cursor(self).y;
-
-    alter_mod(cursor_y.grid, (GridIndex) document.timeline.size());
-
-    BeatFraction nbeats = document.timeline[cursor_y.grid].nbeats;
-
-    // If cursor is out of bounds, move to last row in pattern.
-    if (cursor_y.beat >= nbeats) {
-        BeatFraction rows = nbeats * self._zoom_level;
-        int prev_row = util::math::frac_prev(rows);
-        cursor_y.beat = BeatFraction{prev_row, self._zoom_level};
-    }
-
-    tx.cursor_mut().set_y(cursor_y);
+    auto new_y = move_cursor::frame_end(document, cursor, move_cfg, bottom_padding);
+    tx.cursor_mut().set_y(new_y);
 }
 
 void PatternEditor::prev_pattern_pressed(StateTransaction & tx) {
-    switch_grid_index<decrement_mod>(*this, tx);
+    doc::Document const & document = get_document();
+    Cursor cursor = get_cursor(*this);
+
+    auto new_y = move_cursor::prev_frame(document, cursor, _zoom_level);
+    tx.cursor_mut().set_y(new_y);
 }
+
 void PatternEditor::next_pattern_pressed(StateTransaction & tx) {
-    switch_grid_index<increment_mod>(*this, tx);
+    doc::Document const & document = get_document();
+    Cursor cursor = get_cursor(*this);
+
+    auto new_y = move_cursor::next_frame(document, cursor, _zoom_level);
+    tx.cursor_mut().set_y(new_y);
 }
+
+// # Horizontal cursor movement
 
 static ColumnIndex ncol(ColumnList const& cols) {
     return (ColumnIndex) cols.size();
@@ -2290,6 +2230,7 @@ static ColumnIndex ncol(ColumnList const& cols) {
 static SubColumnIndex nsubcol(ColumnList const& cols, CursorX const& cursor_x) {
     return (SubColumnIndex) cols[cursor_x.column].subcolumns.size();
 }
+
 static CellIndex ncell(ColumnList const& cols, CursorX const& cursor_x) {
     return cols[cursor_x.column].subcolumns[cursor_x.subcolumn].ncell;
 }
