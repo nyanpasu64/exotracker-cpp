@@ -18,17 +18,6 @@ struct GridBlockBeat {
     COMPARABLE(GridBlockBeat)
 };
 
-struct GridAndBlock {
-    doc::GridIndex grid{0};
-    doc::BlockIndex block{0};
-
-    static GridAndBlock from(GridBlockBeat other) {
-        return GridAndBlock{other.grid, other.block};
-    }
-
-    COMPARABLE(GridAndBlock)
-};
-
 struct GridAndBeat {
     doc::GridIndex grid{0};
     doc::BeatFraction beat = 0;

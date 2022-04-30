@@ -1,12 +1,11 @@
-#include "timeline.h"
+#include "time_util.h"
 #include "doc_util/event_search.h"
 #include "util/release_assert.h"
 
 #include <algorithm>  // std::min
 
-namespace doc::timeline {
+namespace doc_util::time_util {
 
-using event_list::EventIndex;
 using doc_util::event_search::EventSearch;
 
 static EventIndex calc_end_ev(TimedEventsRef events, BeatFraction rel_end_time) {
@@ -14,7 +13,7 @@ static EventIndex calc_end_ev(TimedEventsRef events, BeatFraction rel_end_time) 
     return EventIndex(kv.beat_begin(rel_end_time) - events.begin());
 }
 
-MaybePatternRef TimelineCellIter::next(TimelineCellRef cell_ref) {
+MaybePatternRef FramePatternIter::next(TimelineCellRef cell_ref) {
     scrBegin;
 
     for (_block = 0; _block < cell_ref.cell.size(); _block++) {
@@ -103,18 +102,41 @@ MaybePatternRef TimelineCellIter::next(TimelineCellRef cell_ref) {
 
     scrFinishUnreachable;
 
-    throw std::logic_error("Reached end of TimelineCellIter");
+    throw std::logic_error("Reached end of FramePatternIter");
 }
 
-TimelineCellIterRef::TimelineCellIterRef(TimelineCellRef cell_ref)
+FramePatternIterRef::FramePatternIterRef(TimelineCellRef cell_ref)
     : _cell_ref(cell_ref)
 {}
 
-MaybePatternRef TimelineCellIterRef::next() {
+MaybePatternRef FramePatternIterRef::next() {
     return _iter.next(_cell_ref);
 }
 
+std::tuple<MaybePatternRef, FramePatternIterRef> pattern_iter_seek(
+    TimelineCellRef cell_ref, BeatFraction beat
+) {
+    auto iter = FramePatternIterRef(cell_ref);
+
+    // The cursor remains at a fixed point.
+    // Each block occurs later than the previous block.
+    // Search for first block ending after the cursor, or OOB if none exists.
+    while (auto maybe_pattern = iter.next()) {
+        PatternRef pattern = *maybe_pattern;
+        if (beat < pattern.end_time) {
+            return {pattern, iter};
+        }
+    }
+    return {{}, iter};
 }
+
+PatternRef pattern_or_end(TimelineCellRef cell_ref, BeatFraction beat) {
+    return std::get<0>(pattern_iter_seek(cell_ref, beat))
+        .value_or(PatternRef{cell_ref.cell.size()});
+}
+
+} // namespaces
+
 
 #ifdef UNITTEST
 
@@ -125,7 +147,7 @@ MaybePatternRef TimelineCellIterRef::next() {
 
 #include <doctest.h>
 
-namespace doc::timeline {
+namespace doc_util::time_util {
 TEST_SUITE_BEGIN("doc/timeline");
 
 using namespace doc::events;
@@ -155,7 +177,7 @@ static void verify_all(
     std::vector<PatternMetadata> expected_patterns
 ) {
     TimelineCellRef cell_ref{nbeats, cell};
-    TimelineCellIter iter;
+    FramePatternIter iter;
 
     for (auto [i_, expected] : enumerate<size_t>(expected_patterns)) {
         auto i = i_; CAPTURE(i);
@@ -189,19 +211,19 @@ static TimelineCell single_block(BeatOrEnd end_time) {
     }};
 }
 
-TEST_CASE("Check TimelineCellIter with a single block filling the entire grid cell") {
+TEST_CASE("Check FramePatternIter with a single block filling the entire grid cell") {
     verify_all(single_block(END_OF_GRID), 4, {PatternMetadata{
         .idx = 0, .t0 = 0, .t1 = 4, .first = true, .last = true, .nev = 1
     }});
 }
 
-TEST_CASE("Check TimelineCellIter with a single block ending before the grid cell") {
+TEST_CASE("Check FramePatternIter with a single block ending before the grid cell") {
     verify_all(single_block(4), 5, {PatternMetadata{
         .idx = 0, .t0 = 0, .t1 = 4, .first = true, .last = true, .nev = 4
     }});
 }
 
-TEST_CASE("Check TimelineCellIter with a single block overflowing the grid cell") {
+TEST_CASE("Check FramePatternIter with a single block overflowing the grid cell") {
     verify_all(single_block(4), 3, {PatternMetadata{
         .idx = 0, .t0 = 0, .t1 = 3, .first = true, .last = true, .nev = 3
     }});
@@ -219,7 +241,7 @@ static TimelineCell single_block_loop(BeatOrEnd end_time, uint32_t loop_modulo) 
 }
 
 // Looped block, END_OF_GRID.
-TEST_CASE("Check TimelineCellIter with a looped block filling the entire grid cell") {
+TEST_CASE("Check FramePatternIter with a looped block filling the entire grid cell") {
     verify_all(single_block_loop(END_OF_GRID, 1), 4, {
         PatternMetadata{.idx = 0, .t0 = 0, .t1 = 1, .first = true, .nev = 1},
         PatternMetadata{.idx = 0, .t0 = 1, .t1 = 2, .nev = 1},
@@ -229,7 +251,7 @@ TEST_CASE("Check TimelineCellIter with a looped block filling the entire grid ce
 }
 
 TEST_CASE(
-    "Check TimelineCellIter with a full-grid looped block truncated by the grid cell"
+    "Check FramePatternIter with a full-grid looped block truncated by the grid cell"
 ) {
     verify_all(single_block_loop(END_OF_GRID, 3), 4, {
         PatternMetadata{.idx = 0, .t0 = 0, .t1 = 3, .first = true, .nev = 3},
@@ -238,7 +260,7 @@ TEST_CASE(
 }
 
 // Looped block, fixed length.
-TEST_CASE("Check TimelineCellIter with a looped block ending before the grid cell") {
+TEST_CASE("Check FramePatternIter with a looped block ending before the grid cell") {
     verify_all(single_block_loop(4, 1), 5, {
         PatternMetadata{.idx = 0, .t0 = 0, .t1 = 1, .first = true, .nev = 1},
         PatternMetadata{.idx = 0, .t0 = 1, .t1 = 2, .nev = 1},
@@ -247,7 +269,7 @@ TEST_CASE("Check TimelineCellIter with a looped block ending before the grid cel
     });
 }
 
-TEST_CASE("Check TimelineCellIter with a looped block ending after the grid cell") {
+TEST_CASE("Check FramePatternIter with a looped block ending after the grid cell") {
     verify_all(single_block_loop(4, 1), 3, {
         PatternMetadata{.idx = 0, .t0 = 0, .t1 = 1, .first = true, .nev = 1},
         PatternMetadata{.idx = 0, .t0 = 1, .t1 = 2, .nev = 1},
@@ -255,14 +277,14 @@ TEST_CASE("Check TimelineCellIter with a looped block ending after the grid cell
     });
 }
 
-TEST_CASE("Check TimelineCellIter with a looped block truncated by its ending") {
+TEST_CASE("Check FramePatternIter with a looped block truncated by its ending") {
     verify_all(single_block_loop(4, 3), 100, {
         PatternMetadata{.idx = 0, .t0 = 0, .t1 = 3, .first = true, .nev = 3},
         PatternMetadata{.idx = 0, .t0 = 3, .t1 = 4, .last = true, .nev = 1},
     });
 }
 
-TEST_CASE("Check TimelineCellIter with a looped block truncated by the grid cell") {
+TEST_CASE("Check FramePatternIter with a looped block truncated by the grid cell") {
     verify_all(single_block_loop(5, 3), 4, {
         PatternMetadata{.idx = 0, .t0 = 0, .t1 = 3, .first = true, .nev = 3},
         PatternMetadata{.idx = 0, .t0 = 3, .t1 = 4, .last = true, .nev = 1},
@@ -286,7 +308,7 @@ static TimelineCell two_blocks() {
     };
 }
 
-TEST_CASE("Check TimelineCellIter with multiple in-bounds blocks") {
+TEST_CASE("Check FramePatternIter with multiple in-bounds blocks") {
     verify_all(two_blocks(), 10, {
         PatternMetadata{
             .idx = 0, .t0 = 0, .t1 = 4, .first = true, .last = true, .nev = 1
@@ -297,7 +319,7 @@ TEST_CASE("Check TimelineCellIter with multiple in-bounds blocks") {
     });
 }
 
-TEST_CASE("Check TimelineCellIter with multiple out-of-bounds blocks") {
+TEST_CASE("Check FramePatternIter with multiple out-of-bounds blocks") {
     verify_all(two_blocks(), 1, {
         PatternMetadata{
             .idx = 0, .t0 = 0, .t1 = 1, .first = true, .last = true, .nev = 1
@@ -321,7 +343,7 @@ static TimelineCell two_blocks_loop1() {
     };
 }
 
-TEST_CASE("Check TimelineCellIter with out-of-bounds looped blocks") {
+TEST_CASE("Check FramePatternIter with out-of-bounds looped blocks") {
     verify_all(two_blocks_loop1(), 3, {
         PatternMetadata{.idx = 0, .t0 = 0, .t1 = 1, .first = true, .nev = 1},
         PatternMetadata{.idx = 0, .t0 = 1, .t1 = 2, .nev = 1},
@@ -355,7 +377,7 @@ TEST_CASE("Check zero-length blocks before the end of the cell") {
         // Currently, zero-length blocks have their contents cleared.
         // This is because only events with time < end are kept,
         // which excludes events at time start (= end).
-        // TODO TimelineCellIter should special-case zero-length blocks
+        // TODO FramePatternIter should special-case zero-length blocks
         // and allow events taking place at the end (change this test to .nev = 1).
         PatternMetadata{
             .idx = 1, .t0 = 4, .t1 = 4, .first = true, .last = true, .nev = 0
@@ -386,6 +408,6 @@ TEST_CASE("Check zero-length blocks before the end of the cell") {
 }
 
 TEST_SUITE_END();
-}
+} // namespaces
 
 #endif

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "doc.h"
+#include "doc_util/time_util.h"
 #include "sequencer_driver_common.h"
 #include "chip_common.h"
 #include "timing_common.h"
@@ -50,7 +51,7 @@ struct RealTime {
     BeatPlusTick next_tick = {0, 0};
 };
 
-using doc::TimelineCellIter;
+using doc_util::time_util::FramePatternIter;
 
 /// Like doc::PatternRef but doesn't hold a persistent reference to the document
 /// (which will dangle if parts of the document are replaced during mutation).
@@ -95,13 +96,13 @@ struct EventIterator {
     Another factor is that adding/removing blocks from a grid can corrupt `block`,
     just like it corrupts `event_idx`. So we should reset block to 0.
 
-    The TimelineCellIter abstraction means that we no longer care about blocks at all!
+    The FramePatternIter abstraction means that we no longer care about blocks at all!
     */
 
     doc::MaybeGridIndex prev_grid = {};
 
     doc::GridIndex grid{0};
-    std::optional<doc::TimelineCellIter> pattern_iter{};
+    std::optional<FramePatternIter> pattern_iter{};
 
     /// If current and next grid cell are empty, don't hold onto a pattern.
     std::optional<PatternIndex> pattern = {};

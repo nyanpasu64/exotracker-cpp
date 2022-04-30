@@ -4,7 +4,6 @@
 namespace timing {
 
 COMPARABLE_IMPL(GridBlockBeat, (self.grid, self.block, self.beat))
-COMPARABLE_IMPL(GridAndBlock, (self.grid, self.block))
 COMPARABLE_IMPL(GridAndBeat, (self.grid, self.beat))
 
 EQUALABLE_IMPL(

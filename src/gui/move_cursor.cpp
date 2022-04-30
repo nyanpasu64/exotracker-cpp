@@ -1,7 +1,8 @@
 #include "move_cursor.h"
 #include "doc_util/event_search.h"
-#include "timeline_iter.h"
+#include "gui_time.h"
 #include "util/compare_impl.h"
+#include "util/expr.h"
 #include "util/math.h"
 #include "util/release_assert.h"
 
@@ -49,24 +50,20 @@ using ChannelList = std::vector<CursorChannel>;
 // # Moving cursor by events
 
 using doc::GridIndex;
-using timing::GridAndBlock;
-using timing::GridBlockBeat;
 
 using doc::PatternRef;
 using doc_util::event_search::EventSearch;
 
-using timeline_iter::Wrap;
-using timeline_iter::ForwardBlockIterator;
-using timeline_iter::ReverseBlockIterator;
+using gui_time::FwdGuiPatternIter;
+using gui_time::RevGuiPatternIter;
 
 struct MoveCursorResult {
-    Wrap wrapped{};
     GridAndBeat time{};
 
     COMPARABLE(MoveCursorResult)
 };
 
-COMPARABLE_IMPL(MoveCursorResult, (self.wrapped, self.time))
+COMPARABLE_IMPL(MoveCursorResult, (self.time))
 
 static GridAndBeat pattern_to_abs_time(
     GridIndex grid, PatternRef pattern, doc::TimedRowEvent const& ev
@@ -81,24 +78,24 @@ static GridAndBeat pattern_to_abs_time(
 
     auto timeline = doc::TimelineChannelRef(document.timeline, chip, channel);
 
-    auto iter = ReverseBlockIterator::from_beat(timeline, cursor.y);
+    auto iter = RevGuiPatternIter::from_beat(timeline, cursor.y);
 
     bool first = true;
     while (true) {
         auto maybe_state = iter.next();
         if (!maybe_state) {
-            return MoveCursorResult{Wrap::Minus, cursor.y};
+            return MoveCursorResult{cursor.y};
         }
 
         // [Wrap, GridIndex, PatternRef]
-        auto [wrapped, grid, pattern] = *maybe_state;
+        auto [grid, pattern] = *maybe_state;
         doc::TimedEventsRef event_list = pattern.events;
         using Rev = doc::TimedEventsRef::reverse_iterator;
 
         // Out-of-bounds events from a long pattern in a short block
         // are properly excluded.
         // Using a long block in a short grid cell is not excluded yet.
-        if (first && wrapped == Wrap::None && grid == cursor.y.grid) {
+        if (first && grid == cursor.y.grid) {
             // We can compare timestamps directly.
             doc::BeatFraction rel_time = cursor.y.beat - pattern.begin_time;
 
@@ -108,7 +105,7 @@ static GridAndBeat pattern_to_abs_time(
             // Find nearest event before given time.
             if (ev != event_list.rend()) {
                 return MoveCursorResult{
-                    wrapped, pattern_to_abs_time(grid, pattern, *ev)
+                    pattern_to_abs_time(grid, pattern, *ev)
                 };
             }
 
@@ -116,7 +113,7 @@ static GridAndBeat pattern_to_abs_time(
             // Find last event.
             if (!event_list.empty()) {
                 return MoveCursorResult{
-                    wrapped, pattern_to_abs_time(grid, pattern, event_list.back())
+                    pattern_to_abs_time(grid, pattern, event_list.back())
                 };
             }
         }
@@ -132,23 +129,23 @@ static GridAndBeat pattern_to_abs_time(
 
     auto timeline = doc::TimelineChannelRef(document.timeline, chip, channel);
 
-    auto iter = ForwardBlockIterator::from_beat(timeline, cursor.y);
+    auto iter = FwdGuiPatternIter::from_beat(timeline, cursor.y);
 
     bool first = true;
     while (true) {
         auto maybe_state = iter.next();
         if (!maybe_state) {
-            return MoveCursorResult{Wrap::Plus, cursor.y};
+            return MoveCursorResult{cursor.y};
         }
 
         // [Wrap, GridIndex, PatternRef]
-        auto [wrapped, grid, pattern] = *maybe_state;
+        auto [grid, pattern] = *maybe_state;
         doc::TimedEventsRef event_list = pattern.events;
 
         // Out-of-bounds events from a long pattern in a short block
         // are properly excluded.
         // Using a long block in a short grid cell is not excluded yet.
-        if (first && wrapped == Wrap::None && grid == cursor.y.grid) {
+        if (first && grid == cursor.y.grid) {
             // We can compare timestamps directly.
             doc::BeatFraction rel_time = cursor.y.beat - pattern.begin_time;
 
@@ -158,7 +155,7 @@ static GridAndBeat pattern_to_abs_time(
             // Find first event past given time.
             if (ev != event_list.end()) {
                 return MoveCursorResult{
-                    wrapped, pattern_to_abs_time(grid, pattern, *ev)
+                    pattern_to_abs_time(grid, pattern, *ev)
                 };
             }
 
@@ -166,7 +163,7 @@ static GridAndBeat pattern_to_abs_time(
             // Find first event.
             if (!event_list.empty()) {
                 return MoveCursorResult{
-                    wrapped, pattern_to_abs_time(grid, pattern, event_list.front())
+                    pattern_to_abs_time(grid, pattern, event_list.front())
                 };
             }
         }
@@ -205,32 +202,24 @@ using util::math::frac_next;
     BeatFraction const orig_row = cursor_y.beat * rows_per_beat;
     FractionInt const raw_prev = frac_prev(orig_row);
     FractionInt prev_row;
-    auto wrapped = Wrap::None;
 
     if (raw_prev >= 0) {
+        // If we're not at row 0, go up.
         prev_row = raw_prev;
-
-    } else if (move_cfg.wrap_across_frames || move_cfg.wrap_cursor) {
-        if (move_cfg.wrap_across_frames) {
-            if (cursor_y.grid == doc::GridIndex(0)) {
-                wrapped = Wrap::Minus;
-            }
-            decrement_mod(
-                cursor_y.grid,
-                (GridIndex)document.timeline.size()
-            );
-        }
-
+    }
+    // We're at row 0.
+    else if (move_cfg.wrap_across_frames && cursor_y.grid > doc::GridIndex(0)) {
+        // If possible, go to previous frame.
+        cursor_y.grid--;
         auto nbeats = document.timeline[cursor_y.grid].nbeats;
         prev_row = frac_prev(nbeats * rows_per_beat);
-
     } else {
-        // Don't move the cursor.
-        return MoveCursorResult{Wrap::None, cursor_y};
+        // Remain at row 0 in our current frame.
+        return MoveCursorResult{cursor_y};
     }
 
     cursor_y.beat = BeatFraction{prev_row, rows_per_beat};
-    return MoveCursorResult{wrapped, cursor_y};
+    return MoveCursorResult{cursor_y};
 }
 
 [[nodiscard]] static MoveCursorResult next_row_impl(
@@ -242,34 +231,27 @@ using util::math::frac_next;
     BeatFraction const orig_row = cursor_y.beat * rows_per_beat;
     FractionInt const raw_next = frac_next(orig_row);
     FractionInt next_row;
-    auto wrapped = Wrap::None;
 
     auto nbeats = document.timeline[cursor_y.grid].nbeats;
     BeatFraction const num_rows = nbeats * rows_per_beat;
 
     if (raw_next < num_rows) {
+        // If we're not at end, go up.
         next_row = raw_next;
 
-    } else if (move_cfg.wrap_across_frames || move_cfg.wrap_cursor) {
-        if (move_cfg.wrap_across_frames) {
-            increment_mod(
-                cursor_y.grid,
-                (GridIndex)document.timeline.size()
-            );
-            if (cursor_y.grid == GridIndex(0)) {
-                wrapped = Wrap::Plus;
-            }
-        }
-
+    } else if (
+        move_cfg.wrap_across_frames
+        && cursor_y.grid + 1 < document.timeline.size()
+    ) {
+        cursor_y.grid++;
         next_row = 0;
-
     } else {
         // Don't move the cursor.
-        return MoveCursorResult{Wrap::None, cursor_y};
+        return MoveCursorResult{cursor_y};
     }
 
     cursor_y.beat = BeatFraction{next_row, rows_per_beat};
-    return MoveCursorResult{wrapped, cursor_y};
+    return MoveCursorResult{cursor_y};
 }
 
 GridAndBeat prev_beat(
@@ -391,10 +373,13 @@ GridAndBeat page_up(
 
     for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
         if (cursor_y.beat < 0) {
-            decrement_mod(
-                cursor_y.grid, (GridIndex) document.timeline.size()
-            );
-            cursor_y.beat += document.timeline[cursor_y.grid].nbeats;
+            if (cursor_y.grid.v > 0) {
+                cursor_y.grid--;
+                cursor_y.beat += document.timeline[cursor_y.grid].nbeats;
+            } else {
+                cursor_y.beat = 0;
+                break;
+            }
         } else {
             break;
         }
@@ -407,15 +392,20 @@ GridAndBeat page_down(
     GridAndBeat cursor_y,
     MovementConfig const& move_cfg)
 {
+    const auto orig_beat = cursor_y.beat;
     cursor_y.beat += move_cfg.page_down_distance;
 
     for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
         auto const & grid_cell = document.timeline[cursor_y.grid];
         if (cursor_y.beat >= grid_cell.nbeats) {
-            cursor_y.beat -= grid_cell.nbeats;
-            increment_mod(
-                cursor_y.grid, (GridIndex) document.timeline.size()
-            );
+            if (cursor_y.grid.v + 1 < document.timeline.size()) {
+                cursor_y.grid++;
+                cursor_y.beat -= grid_cell.nbeats;
+            } else {
+                // Kinda hacky, but will do.
+                cursor_y.beat = orig_beat;
+                break;
+            }
         } else {
             break;
         }
@@ -630,25 +620,24 @@ TEST_CASE("Test next_event_impl()/prev_event_impl()") {
         GridAndBeat start;
         WhichFunction which_function;
         GridAndBeat end;
-        Wrap wrapped;
         char const * message;
     };
 
     TestCase test_cases[] {
         // next_event_impl()
-        {{0, 0}, NextEvent, {1, 1}, Wrap::None, "Ensure next_event_impl() moves to next pattern if current empty"},
-        {{1, 0}, NextEvent, {1, 1}, Wrap::None, "Ensure next_event_impl() works"},
-        {{1, 1}, NextEvent, {1, 2}, Wrap::None, "Ensure next_event_impl() skips current event"},
-        {{1, 2}, NextEvent, {1, 1}, Wrap::Plus, "Ensure next_event_impl() skips current event and wraps to same pattern"},
-        {{1, 3}, NextEvent, {1, 1}, Wrap::Plus, "Ensure next_event_impl() wraps to same pattern"},
-        {{2, 0}, NextEvent, {1, 1}, Wrap::Plus, "Ensure next_event_impl() wraps"},
+        {{0, 0}, NextEvent, {1, 1}, "Ensure next_event_impl() moves to next pattern if current empty"},
+        {{1, 0}, NextEvent, {1, 1}, "Ensure next_event_impl() works"},
+        {{1, 1}, NextEvent, {1, 2}, "Ensure next_event_impl() skips current event"},
+        {{1, 2}, NextEvent, {1, 2}, "Ensure next_event_impl() doesn't wrap (1)"},
+        {{1, 3}, NextEvent, {1, 3}, "Ensure next_event_impl() doesn't wrap (2)"},
+        {{2, 0}, NextEvent, {2, 0}, "Ensure next_event_impl() doesn't wrap (3)"},
         // prev_event_impl()
-        {{2, 0}, PrevEvent, {1, 2}, Wrap::None, "Ensure prev_event_impl() moves to next pattern if current empty"},
-        {{1, 3}, PrevEvent, {1, 2}, Wrap::None, "Ensure prev_event_impl() works"},
-        {{1, 2}, PrevEvent, {1, 1}, Wrap::None, "Ensure prev_event_impl() skips current event"},
-        {{1, 1}, PrevEvent, {1, 2}, Wrap::Minus, "Ensure prev_event_impl() skips current event and wraps to same pattern"},
-        {{1, 0}, PrevEvent, {1, 2}, Wrap::Minus, "Ensure prev_event_impl() wraps to same pattern"},
-        {{0, 0}, PrevEvent, {1, 2}, Wrap::Minus, "Ensure prev_event_impl() wraps"},
+        {{2, 0}, PrevEvent, {1, 2}, "Ensure prev_event_impl() moves to next pattern if current empty"},
+        {{1, 3}, PrevEvent, {1, 2}, "Ensure prev_event_impl() works"},
+        {{1, 2}, PrevEvent, {1, 1}, "Ensure prev_event_impl() skips current event"},
+        {{1, 1}, PrevEvent, {1, 1}, "Ensure prev_event_impl() doesn't wrap (1)"},
+        {{1, 0}, PrevEvent, {1, 0}, "Ensure prev_event_impl() doesn't wrap (2)"},
+        {{0, 0}, PrevEvent, {0, 0}, "Ensure prev_event_impl() doesn't wrap (3)"},
     };
 
     doc::Document document{doc::DocumentCopy{}};
@@ -665,7 +654,6 @@ TEST_CASE("Test next_event_impl()/prev_event_impl()") {
         }
 
         CHECK(out.time == test_case.end);
-        CHECK(out.wrapped == test_case.wrapped);
     }
 }
 
@@ -679,12 +667,10 @@ TEST_CASE("Test next_event_impl()/prev_event_impl() on empty document") {
     {
         MoveCursorResult out = next_event_impl(document, Cursor{x, {1, 2}});
         CHECK(out.time == GridAndBeat{1, 2});
-        CHECK(out.wrapped == Wrap::Plus);
     }
     {
         MoveCursorResult out = prev_event_impl(document, Cursor{x, {1, 2}});
         CHECK(out.time == GridAndBeat{1, 2});
-        CHECK(out.wrapped == Wrap::Minus);
     }
 }
 
@@ -697,7 +683,6 @@ TEST_CASE("Test prev_row_impl()/next_row_impl()") {
     int rows_per_beat = 4;
 
     MovementConfig move_cfg{
-        .wrap_cursor = true,
         .wrap_across_frames = true,
     };
 
@@ -734,7 +719,7 @@ TEST_CASE("Test prev_row_impl()/next_row_impl()") {
             out = prev_row_impl(document, test_case.start, rows_per_beat, move_cfg);
         }
 
-        CHECK(out == MoveCursorResult{Wrap::None, test_case.end});
+        CHECK(out == MoveCursorResult{test_case.end});
     }
 }
 
@@ -744,24 +729,10 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
     int rows_per_beat = 4;
 
     MovementConfig wrap_doc_1{
-        .wrap_cursor = true,
         .wrap_across_frames = true,
-    };
-
-    // In 0CC, if "wrap across frames" is true,
-    // vertical wrapping always happens and "wrap cursor" is ignored.
-    MovementConfig wrap_doc_2{
-        .wrap_cursor = false,
-        .wrap_across_frames = true,
-    };
-
-    MovementConfig wrap_pattern{
-        .wrap_cursor = true,
-        .wrap_across_frames = false,
     };
 
     MovementConfig no_wrap{
-        .wrap_cursor = false,
         .wrap_across_frames = false,
     };
 
@@ -786,12 +757,12 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
 
     BeatFraction end = time(3, 3, 4);
     TestCase test_cases[] {
-        {NextRow, {0, end}, {Wrap::None, {1, 0}}, {0, 0}, "Ensure that next_row_impl() wraps properly"},
-        {NextRow, {0, 100}, {Wrap::None, {1, 0}}, {0, 0}, "Ensure that next_row_impl() wraps on out-of-bounds"},
-        {NextRow, {3, end}, {Wrap::Plus, {0, 0}}, {3, 0}, "Ensure that next_row_impl() wraps around the document"},
-        {PrevRow, {1, 0}, {Wrap::None, {0, end}}, {1, end}, "Ensure that prev_row_impl() wraps properly"},
-        {PrevRow, {1, -1}, {Wrap::None, {0, end}}, {1, end}, "Ensure that prev_row_impl() wraps on out-of-bounds"},
-        {PrevRow, {0, 0}, {Wrap::Minus, {3, end}}, {0, end}, "Ensure that prev_row_impl() wraps around the document"},
+        {NextRow, {0, end}, {{1, 0}}, {0, 0}, "Ensure that next_row_impl() wraps properly"},
+        {NextRow, {0, 100}, {{1, 0}}, {0, 0}, "Ensure that next_row_impl() wraps on out-of-bounds"},
+        {NextRow, {3, end}, {{3, end}}, {3, 0}, "Ensure that next_row_impl() doesn't wrap around the document"},
+        {PrevRow, {1, 0}, {{0, end}}, {1, end}, "Ensure that prev_row_impl() wraps properly"},
+        {PrevRow, {1, -1}, {{0, end}}, {1, end}, "Ensure that prev_row_impl() wraps on out-of-bounds"},
+        {PrevRow, {0, 0}, {{0, 0}}, {0, end}, "Ensure that prev_row_impl() doesn't wrap around the document"},
     };
 
     for (TestCase test_case : test_cases) {
@@ -812,9 +783,7 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
         };
 
         verify("wrap_doc_1", wrap_doc_1, test_case.wrap_doc);
-        verify("wrap_doc_2", wrap_doc_2, test_case.wrap_doc);
-        verify("wrap_pattern", wrap_pattern, MoveCursorResult{Wrap::None, test_case.wrap_pattern});
-        verify("no_wrap", no_wrap, MoveCursorResult{Wrap::None, test_case.start});
+        verify("no_wrap", no_wrap, MoveCursorResult{test_case.start});
     }
 }
 

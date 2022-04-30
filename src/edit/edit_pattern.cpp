@@ -1,7 +1,7 @@
 #include "edit_pattern.h"
 #include "edit_impl.h"
-#include "timeline_iter.h"
 #include "doc_util/event_search.h"
+#include "doc_util/time_util.h"
 #include "util/release_assert.h"
 #include "util/typeid_cast.h"
 
@@ -111,6 +111,8 @@ struct EmptyBlock {
 };
 
 
+namespace time_util = doc_util::time_util;
+
 [[nodiscard]] static
 std::variant<GridBlockBeat, EmptyBlock> get_current_block(
     doc::Document const& document,
@@ -121,7 +123,7 @@ std::variant<GridBlockBeat, EmptyBlock> get_current_block(
     auto cell_ref = doc::TimelineChannelRef(document.timeline, chip, channel)[now.grid];
     doc::TimelineCell const& cell = cell_ref.cell;
 
-    doc::PatternRef pattern_or_end = timeline_iter::pattern_or_end(cell_ref, now.beat);
+    doc::PatternRef pattern_or_end = time_util::pattern_or_end(cell_ref, now.beat);
     if (pattern_or_end.block < cell.size()) {
         doc::PatternRef pattern = pattern_or_end;
         // block_or_end() is required to return a block where block.end_time > beat.
