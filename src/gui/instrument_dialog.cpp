@@ -657,16 +657,12 @@ public:
                 spin, qOverload<int>(&QSpinBox::valueChanged),
                 this, [this, spin, make_edit](int value) {
                     widget_changed(spin, value, make_edit);
-                },
-                Qt::UniqueConnection
-            );
+                });
             connect(
                 slider, &QSlider::valueChanged,
                 this, [this, slider, make_edit](int value) {
                     widget_changed(slider, value, make_edit);
-                },
-                Qt::UniqueConnection
-            );
+                });
         };
 
         connect_combo(

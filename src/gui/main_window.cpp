@@ -1073,20 +1073,20 @@ public:
                 show_sample_dialog({});
             });
 
+        // This function supports taking a lambda by value, so we can't use
+        // Qt::UniqueConnection. This is OK since on_startup() is only called once.
+        // Alternatively we could try:
+        // QObject::disconnect(myObject, qOverload<int>(&QSpinBox::valueChanged), nullptr, nullptr)
         auto connect_spin = [](QSpinBox * spin, auto * target, auto func) {
             connect(
                 spin, qOverload<int>(&QSpinBox::valueChanged),
-                target, func,
-                Qt::UniqueConnection
-            );
+                target, func);
         };
 
         auto connect_dspin = [](QDoubleSpinBox * spin, auto * target, auto func) {
             connect(
                 spin, qOverload<double>(&QDoubleSpinBox::valueChanged),
-                target, func,
-                Qt::UniqueConnection
-            );
+                target, func);
         };
 
         auto connect_check = [](QCheckBox * check, auto * target, auto func) {
@@ -1094,17 +1094,13 @@ public:
             // idk which is better.
             connect(
                 check, &QCheckBox::toggled,
-                target, func,
-                Qt::UniqueConnection
-            );
+                target, func);
         };
 
         auto connect_combo = [](QComboBox * combo, auto * target, auto func) {
             connect(
                 combo, qOverload<int>(&QComboBox::currentIndexChanged),
-                target, func,
-                Qt::UniqueConnection
-            );
+                target, func);
         };
 
         // Previously, BIND_SPIN(name) would use _##NAME to synthesize the field _name.
@@ -1600,7 +1596,9 @@ private:
         };
 
         auto connect_action = [this] (QAction * action, auto /*copied*/ func) {
-            connect(action, &QAction::triggered, this, func, Qt::UniqueConnection);
+            // Hopefully this doesn't break anything...
+            QObject::disconnect(action, &QAction::triggered, nullptr, nullptr);
+            connect(action, &QAction::triggered, this, func);
         };
 
         #define BIND_FROM_CONFIG(NAME) \
