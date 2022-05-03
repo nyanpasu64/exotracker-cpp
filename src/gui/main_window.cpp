@@ -1064,7 +1064,7 @@ public:
         _export_spc->setShortcut(tr("Ctrl+E"));
         connect(_export_spc, &QAction::triggered, this, &MainWindowImpl::on_export_spc);
 
-        // TODO _exit->setShortcuts(QKeySequence::Quit);
+        _exit->setShortcuts(QKeySequence::Quit);
         connect(_exit, &QAction::triggered, this, &QWidget::close);
 
         connect(
