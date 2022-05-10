@@ -218,6 +218,7 @@ add_library(exotracker-core
     src/audio/synth/spc700.cpp
     src/audio/synth/spc700_driver.h
     src/audio/synth/spc700_driver.cpp
+    src/audio/synth/spc700_math.h
     src/audio/synth/spc700_synth.h
     src/audio/synth/spc700_synth.cpp
 
