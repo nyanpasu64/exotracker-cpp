@@ -701,6 +701,12 @@ public:
             sample.brr = std::vector<uint8_t>(data.begin(), data.end());
         }
 
+        // Do NOT use `data` from now on! Instead use `sample.brr`.
+        // Spc700Driver::reload_samples() asserts that loop_byte < brr.size().
+        if (sample.loop_byte >= sample.brr.size()) {
+            sample.loop_byte = 0;
+        }
+
         edit::EditBox edit;
         SampleIndex new_idx;
         if (sample_idx) {
