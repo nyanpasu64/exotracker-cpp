@@ -314,6 +314,9 @@ public:
 
     QWidget * _sample_panel;
     QLineEdit * _rename;
+
+    // TODO replace with NumericViewer?
+    QLabel * _sample_length;
     QSpinBox * _loop_point;
     QSpinBox * _sample_rate;
     NoteSpinBox * _root_key;
@@ -367,6 +370,11 @@ public:
 
             {l__l(QHBoxLayout);
                 {l__form(QFormLayout);
+                    {form__label_w(tr("Length"), QLabel);
+                        _sample_length = w;
+                        w->setTextInteractionFlags(Qt::TextSelectableByMouse);
+                        w->setCursor(QCursor(Qt::IBeamCursor));
+                    }
                     {form__label_wptr(tr("Loop point"), wide_spinbox());
                         _loop_point = w;
                         w->setSingleStep(16);
@@ -538,6 +546,14 @@ public:
             }
         }
 
+        auto locale = this->locale();
+        locale.setNumberOptions(QLocale::OmitGroupSeparator);
+
+        // TODO add functions to convert between bytes, blocks, and samples?
+        // TODO use constants BRR_BLOCK_BYTES and BRR_BLOCK_SAMPLES?
+        auto num_blocks = int(sample.brr.size() / 9);
+        _sample_length->setText(locale.toString(num_blocks * 16));
+
         {
             auto b = QSignalBlocker(_loop_point);
 
@@ -545,7 +561,6 @@ public:
             // or 0 if no full blocks are present.
             // (Partial blocks can't be imported, but are ignored if present anyway.)
 
-            auto num_blocks = int(sample.brr.size() / 9);
             auto last_block = std::max(num_blocks - 1, 0);
             _loop_point->setMaximum(last_block * 16);
         }
