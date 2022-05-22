@@ -170,19 +170,17 @@ MaybeEditBox try_rename_instrument(
 }
 
 
-static void timeline_swap_instruments(
-    Timeline & timeline, InstrumentIndex a, InstrumentIndex b
+static void sequence_swap_instruments(
+    Sequence & sequence, InstrumentIndex a, InstrumentIndex b
 ) {
-    for (TimelineFrame & frame : timeline) {
-        for (auto & channel_cells : frame.chip_channel_cells) {
-            for (TimelineCell & cell : channel_cells) {
-                for (TimelineBlock & block : cell._raw_blocks) {
-                    for (auto & ev : block.pattern.events) {
-                        if (ev.v.instr == a) {
-                            ev.v.instr = b;
-                        } else if (ev.v.instr == b) {
-                            ev.v.instr = a;
-                        }
+    for (auto & channel_tracks : sequence) {
+        for (SequenceTrack & track : channel_tracks) {
+            for (TrackBlock & block : track.blocks) {
+                for (auto & ev : block.pattern.events) {
+                    if (ev.v.instr == a) {
+                        ev.v.instr = b;
+                    } else if (ev.v.instr == b) {
+                        ev.v.instr = a;
                     }
                 }
             }
@@ -206,7 +204,7 @@ struct SwapInstruments {
             "TODO add bounds checks");
 
         std::swap(doc.instruments[a], doc.instruments[b]);
-        timeline_swap_instruments(doc.timeline, a, b);
+        sequence_swap_instruments(doc.sequence, a, b);
 
         // TODO tell synth that instruments swapped?
     }
@@ -224,7 +222,7 @@ EditBox swap_instruments(InstrumentIndex a, InstrumentIndex b) {
 struct SwapInstrumentsCached {
     InstrumentIndex a;
     InstrumentIndex b;
-    Timeline timeline;
+    Sequence sequence;
 
     void apply_swap(Document & doc) {
         if (a == b) {
@@ -236,7 +234,7 @@ struct SwapInstrumentsCached {
             "TODO add bounds checks");
 
         std::swap(doc.instruments[a], doc.instruments[b]);
-        std::swap(doc.timeline, timeline);
+        std::swap(doc.sequence, sequence);
 
         // TODO tell synth that instruments swapped?
     }
@@ -246,9 +244,9 @@ struct SwapInstrumentsCached {
 };
 
 EditBox SwapInstruments::clone_for_audio(Document const& doc) const {
-    Timeline timeline = doc.timeline;  // Make a copy
-    timeline_swap_instruments(timeline, a, b);
-    return make_command(SwapInstrumentsCached{a, b, std::move(timeline)});
+    Sequence sequence = doc.sequence;  // Make a copy
+    sequence_swap_instruments(sequence, a, b);
+    return make_command(SwapInstrumentsCached{a, b, std::move(sequence)});
 }
 
 }

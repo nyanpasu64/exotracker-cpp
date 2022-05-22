@@ -110,11 +110,13 @@ inline void serialize_all(
 // gen::T::Builder is small and can be passed by value (akin to reborrowing).
 
 void serialize_sequencer_options(
-    SequencerOptions const& seq_options, gen::SequencerOptions::Builder gen_seq_options
+    SequencerOptions const& seq_options, gen::SequencerOptions::Builder gen_options
 ) {
-    gen_seq_options.setTargetTempo(seq_options.target_tempo);
-    gen_seq_options.setSpcTimerPeriod(seq_options.spc_timer_period);
-    gen_seq_options.setTicksPerBeat(seq_options.ticks_per_beat);
+    gen_options.setTargetTempo(seq_options.target_tempo);
+    gen_options.setNoteGapTicks((uint16_t) seq_options.note_gap_ticks);
+    gen_options.setTicksPerBeat((uint16_t) seq_options.ticks_per_beat);
+    gen_options.setBeatsPerMeasure((uint16_t) seq_options.beats_per_measure);
+    gen_options.setSpcTimerPeriod((uint16_t) seq_options.spc_timer_period);
 }
 
 void serialize_sample(
@@ -134,15 +136,6 @@ void serialize_sample(
             gen_tuning.setDetuneCents(tuning.detune_cents);
         }
     }
-}
-
-void serialize_samples(Samples const& samples_, gen::Document::Builder gen_doc) {
-    auto samples = samples_.dyn_span();
-    release_assert_equal(samples.size(), MAX_SAMPLES);
-
-    auto num_samples = (uint) leading_size(samples);
-    samples = samples.subspan(0, num_samples);
-    serialize_all(samples, gen_doc.initSamples(num_samples), serialize_sample);
 }
 
 void serialize_instrument(
@@ -181,63 +174,10 @@ void serialize_instrument(
     }
 }
 
-void serialize_instruments(
-    Instruments const& instruments_, gen::Document::Builder gen_doc
-) {
-    auto instruments = instruments_.dyn_span();
-    release_assert_equal(instruments.size(), MAX_INSTRUMENTS);
-
-    auto num_instr = (uint) leading_size(instruments);
-    instruments = instruments.subspan(0, num_instr);
-    serialize_all(
-        instruments,
-        gen_doc.initInstruments(num_instr),
-        serialize_instrument);
-}
-
-void serialize_chips(ChipList const& chips, gen::Document::Builder gen_doc) {
-    auto num_chips = (uint) chips.size();
-    auto gen_chips = gen_doc.initChips(num_chips);
-
-    // so close, yet so far, to getting a reusable abstraction.
-    for (uint i = 0; i < num_chips; i++) {
-        gen_chips.set(i, EXPR(switch (chips[i]) {
-            case ChipKind::Spc700: return gen::ChipKind::SPC700;
-            default:
-                assert(false && "Unrecognized ChipKind when serializing document");
-                return gen::ChipKind::UNKNOWN;
-        }));
-    }
-}
-
-void serialize_chip_channel_settings(
-    ChipChannelSettings const& cc_settings, gen::Document::Builder gen_doc
-) {
-    // We've already checked that this size is bounded.
-    auto num_chips = (uint) cc_settings.size();
-    auto gen_cc_settings = gen_doc.initChipChannelSettings(num_chips);
-
-    for (uint chip = 0; chip < num_chips; chip++) {
-        auto const& chan_settings = cc_settings[chip];
-
-        auto num_channels = chan_settings.size();
-        release_assert(num_channels <= chip_common::MAX_NCHAN_PER_CHIP);
-        auto gen_chan_to_settings = gen_cc_settings.init(chip, (uint) num_channels);
-
-        for (uint chan = 0; chan < num_channels; chan++) {
-            ChannelSettings const& settings = chan_settings[chan];
-            auto gen_settings = gen_chan_to_settings[chan];
-
-            gen_settings.setNEffectCol(settings.n_effect_col);
-        }
-    }
-}
-
 void serialize_event(
     TimedRowEvent const& event, gen::TimedRowEvent::Builder gen_event
 ) {
-    gen_event.setAnchorBeatNum(event.anchor_beat.numerator());
-    gen_event.setAnchorBeatDen(event.anchor_beat.denominator());
+    gen_event.setAnchorTick(event.anchor_tick);
 
     RowEvent const& v = event.v;
     if (v.note) {
@@ -250,7 +190,8 @@ void serialize_event(
         gen_event.getVolume().setSome(*v.volume);
     }
 
-    // TODO only serialize visible effect columns, based on ChipChannelSettings
+    // TODO only serialize visible effect columns, based on
+    // SequenceTrack/ChannelSettings
     auto effects = span(v.effects);
     // v.effects is a fixed-size array span, this is guaranteed to not truncate.
     auto num_effects = (uint) leading_size(effects);
@@ -273,72 +214,100 @@ void serialize_pattern(Pattern const& pattern, gen::Pattern::Builder gen_pattern
     auto num_events = events.size();
     release_assert(num_events <= MAX_EVENTS_PER_PATTERN);
 
-    serialize_all(events, gen_pattern.initEvents((uint) num_events), serialize_event);
+    gen_pattern.setLengthTicks(pattern.length_ticks);
 
-    gen_pattern.setLoopLength(pattern.loop_length);
+    serialize_all(events, gen_pattern.initEvents((uint) num_events), serialize_event);
 }
 
-void serialize_timeline_block(
-    TimelineBlock const& block, gen::TimelineBlock::Builder gen_block
+void serialize_track_block(
+    TrackBlock const& block, gen::TrackBlock::Builder gen_block
 ) {
-    gen_block.setBeginTime(block.begin_time);
-    gen_block.setEndTime(block.end_time);
+    gen_block.setBeginTick(block.begin_tick);
+    gen_block.setLoopCount(block.loop_count);
     serialize_pattern(block.pattern, gen_block.initPattern());
 }
 
-void serialize_timeline_cell(
-    TimelineCell const& timeline_cell, gen::TimelineCell::Builder gen_timeline_cell
+void serialize_track(
+    SequenceTrack const& track, gen::SequenceTrack::Builder gen_track
 ) {
-    gsl::span<TimelineBlock const> raw_blocks = timeline_cell._raw_blocks;
-    release_assert(raw_blocks.size() <= MAX_BLOCKS_PER_CELL);
-    auto num_blocks = (uint) raw_blocks.size();
+    gsl::span<TrackBlock const> blocks = track.blocks;
+    release_assert(blocks.size() <= MAX_BLOCKS_PER_TRACK);
+    auto num_blocks = (uint) blocks.size();
 
+    // SequenceTrack::blocks @0 :List(TrackBlock)
     serialize_all(
-        raw_blocks, gen_timeline_cell.initBlocks(num_blocks), serialize_timeline_block
+        blocks, gen_track.initBlocks(num_blocks), serialize_track_block
     );
-}
 
-void serialize_chip_channel_cells(
-    ChipChannelCells const& cc_cells, gen::TimelineFrame::Builder gen_item
-) {
-    auto num_chips = (uint) cc_cells.size();
-    auto gen_cc_cells = gen_item.initChipChannelCells(num_chips);
-
-    for (uint chip = 0; chip < num_chips; chip++) {
-        auto const& channel_cells = cc_cells[chip];
-
-        auto num_channels = channel_cells.size();
-        release_assert(num_channels <= chip_common::MAX_NCHAN_PER_CHIP);
-        auto gen_channel_cells = gen_cc_cells.init(chip, (uint) num_channels);
-
-        for (uint chan = 0; chan < num_channels; chan++) {
-            TimelineCell const& timeline_cell = channel_cells[chan];
-            auto gen_timeline_cell = gen_channel_cells[chan];
-
-            serialize_timeline_cell(timeline_cell, MUT gen_timeline_cell);
-        }
+    // SequenceTrack::nEffectCol @1 :UInt8
+    {
+        ChannelSettings const& settings = track.settings;
+        gen_track.setNEffectCol(settings.n_effect_col);
     }
 }
 
-void serialize_timeline_item(
-    TimelineFrame const& item, gen::TimelineFrame::Builder gen_item
-) {
-    FractionInt num = item.nbeats.numerator();
-    FractionInt den = item.nbeats.denominator();
-    release_assert(num > 0);
-    release_assert(den > 0);
+// Here are parts of serialize_impl() which allocate individual list fields of
+// gen::Document. These were extracted into subroutines to simplify the long function.
+// Do NOT move these functions further up; it causes confusion.
 
-    gen_item.setNbeatsNum((uint32_t) num);
-    gen_item.setNbeatsDen((uint32_t) den);
-    serialize_chip_channel_cells(item.chip_channel_cells, gen_item);
+void init_serialize_samples(Samples const& samples_, gen::Document::Builder gen_doc) {
+    auto samples = samples_.dyn_span();
+    release_assert_equal(samples.size(), MAX_SAMPLES);
+
+    auto num_samples = (uint) leading_size(samples);
+    samples = samples.subspan(0, num_samples);
+    serialize_all(samples, gen_doc.initSamples(num_samples), serialize_sample);
 }
 
-void serialize_timeline(Timeline const& timeline_, gen::Document::Builder gen_doc) {
-    auto timeline = span(timeline_);
-    release_assert(timeline.size() <= MAX_TIMELINE_FRAMES);
-    auto num_items = (uint) timeline.size();
+void init_serialize_instruments(
+    Instruments const& instruments_, gen::Document::Builder gen_doc
+) {
+    auto instruments = instruments_.dyn_span();
+    release_assert_equal(instruments.size(), MAX_INSTRUMENTS);
 
-    serialize_all(timeline, gen_doc.initTimeline(num_items), serialize_timeline_item);
+    auto num_instr = (uint) leading_size(instruments);
+    instruments = instruments.subspan(0, num_instr);
+    serialize_all(
+        instruments,
+        gen_doc.initInstruments(num_instr),
+        serialize_instrument);
+}
+
+void init_serialize_chips(ChipList const& chips, gen::Document::Builder gen_doc) {
+    auto num_chips = (uint) chips.size();
+    auto gen_chips = gen_doc.initChips(num_chips);
+
+    // so close, yet so far, to getting a reusable abstraction.
+    for (uint i = 0; i < num_chips; i++) {
+        gen_chips.set(i, EXPR(switch (chips[i]) {
+            case ChipKind::Spc700: return gen::ChipKind::SPC700;
+            default:
+                assert(false && "Unrecognized ChipKind when serializing document");
+                return gen::ChipKind::UNKNOWN;
+        }));
+    }
+}
+
+void init_serialize_sequence(
+    Sequence const& sequence, gen::Document::Builder gen_doc
+) {
+    auto num_chips = (uint) sequence.size();
+    auto gen_sequence = gen_doc.initSequence(num_chips);
+
+    for (uint chip = 0; chip < num_chips; chip++) {
+        auto const& channel_tracks = sequence[chip];
+
+        auto num_channels = channel_tracks.size();
+        release_assert(num_channels <= chip_common::MAX_NCHAN_PER_CHIP);
+        auto gen_channel_tracks = gen_sequence.init(chip, (uint) num_channels);
+
+        for (uint chan = 0; chan < num_channels; chan++) {
+            SequenceTrack const& track = channel_tracks[chan];
+            auto gen_track = gen_channel_tracks[chan];
+
+            serialize_track(track, MUT gen_track);
+        }
+    }
 }
 
 using ::capnp::MallocMessageBuilder;
@@ -389,32 +358,24 @@ void serialize_impl(
     }));
 
     // @4
-    gen_doc.setZoomLevel(metadata.zoom_level);
+    gen_doc.setTicksPerRow(metadata.ticks_per_row);
 
     // @5
     gen_doc.setEffectNameChars(doc.effect_name_chars);
 
     // @6 Document::samples
-    serialize_samples(doc.samples, MUT gen_doc);
+    init_serialize_samples(doc.samples, MUT gen_doc);
 
     // @7 Document::instruments
-    serialize_instruments(doc.instruments, MUT gen_doc);
+    init_serialize_instruments(doc.instruments, MUT gen_doc);
 
-    release_assert_equal(doc.chips.size(), doc.chip_channel_settings.size());
     release_assert(doc.chips.size() <= MAX_NCHIP);
 
     // @8 Document::chips
-    serialize_chips(doc.chips, MUT gen_doc);
+    init_serialize_chips(doc.chips, MUT gen_doc);
 
-    // @9 Document::chipChannelSettings
-
-    // When saving a document, we do not verify its chip/channel shape.
-    // This is probably OK, since any document being saved is trusted
-    // (whereas files being loaded could be corrupted/malicious).
-    serialize_chip_channel_settings(doc.chip_channel_settings, MUT gen_doc);
-
-    // @10 Document::timeline
-    serialize_timeline(doc.timeline, MUT gen_doc);
+    // @9 Document::sequence
+    init_serialize_sequence(doc.sequence, MUT gen_doc);
 
     return callback(builder);
 }
@@ -646,12 +607,14 @@ using namespace doc::validate;  // validate_*
 
 // # Loading functions
 SequencerOptions load_sequencer_options(
-    ErrorState & state, gen::SequencerOptions::Reader gen_seq_options
+    ErrorState & state, gen::SequencerOptions::Reader gen_options
 ) {
     return validate_sequencer_options(SequencerOptions {
-        .target_tempo = gen_seq_options.getTargetTempo(),
-        .spc_timer_period = gen_seq_options.getSpcTimerPeriod(),
-        .ticks_per_beat = gen_seq_options.getTicksPerBeat(),
+        .target_tempo = gen_options.getTargetTempo(),
+        .note_gap_ticks = gen_options.getNoteGapTicks(),
+        .ticks_per_beat = gen_options.getTicksPerBeat(),
+        .beats_per_measure = gen_options.getBeatsPerMeasure(),
+        .spc_timer_period = gen_options.getSpcTimerPeriod(),
     }, state);
 }
 
@@ -810,72 +773,6 @@ optional<ChipList> load_chips(ErrorState & state, GenChips gen_chips) {
     return {std::move(chips)};
 }
 
-ChannelSettings load_channel_settings(
-    ErrorState & state, gen::PerChannelSettings::Reader gen_settings
-) {
-    return validate_channel_settings(state, ChannelSettings {
-        .n_effect_col = gen_settings.getNEffectCol(),
-    });
-}
-
-using GenChipChannelSettings =
-    ::capnp::List< ::capnp::List< ::serialize::generated::PerChannelSettings, ::capnp::Kind::STRUCT>, ::capnp::Kind::LIST>::Reader;
-optional<ChipChannelSettings> load_chip_channel_settings(
-    ErrorState & state,
-    GenChipChannelSettings gen_cc_settings,
-    ChipMetadataRef chips_metadata)
-{
-    release_assert(!chips_metadata.empty());
-
-    auto prefix = ErrorPrefixer(state);
-    bool has_fatal = false;
-
-    auto maybe_nchip = validate_nchip_matches(
-        state, gen_cc_settings.size(), chips_metadata.size()
-    );
-    if (!maybe_nchip) {
-        return {};
-    }
-    auto nchip = *maybe_nchip;
-
-    ChipChannelSettings cc_settings;
-    cc_settings.reserve(nchip);
-
-    // Idea: split function into 3?
-    // (will have more isolated scopes from each other, good or bad?)
-    for (uint chip_idx = 0; chip_idx < nchip; chip_idx++) {
-        auto gen_chan_to_settings = gen_cc_settings[chip_idx];
-
-        auto maybe_nchan = validate_nchan_matches(
-            state, gen_chan_to_settings.size(), chips_metadata, chip_idx
-        );
-        if (!maybe_nchan) {
-            has_fatal = true;
-            continue;
-        }
-        auto nchan = *maybe_nchan;
-
-        std::vector<ChannelSettings> channel_to_settings;
-        channel_to_settings.reserve(nchan);
-
-        for (uint chan_idx = 0; chan_idx < nchan; chan_idx++) {
-            auto gen_settings = gen_chan_to_settings[chan_idx];
-
-            prefix.push(state, "[{}][{}]", chip_idx, chan_idx);
-            channel_to_settings.push_back(load_channel_settings(state, gen_settings));
-            prefix.pop(state);
-        }
-
-        cc_settings.push_back(move(channel_to_settings));
-    }
-
-    if (has_fatal) {
-        return {};
-    } else {
-        return {move(cc_settings)};
-    }
-}
-
 MaybeEffect load_effect(
     ErrorState & state, gen::MaybeEffect::Reader gen_effect
 ) {
@@ -895,18 +792,12 @@ MaybeEffect load_effect(
 optional<TimedRowEvent> load_event(
     ErrorState & state,
     gen::TimedRowEvent::Reader gen_event,
-    MaybeNonZero<uint32_t> loop_length)
+    TickT pattern_length)
 {
     // TODO validate that event lies within block length? (Requires a new parameter.)
     auto prefix = ErrorPrefixer(state);
 
-    auto maybe_anchor_beat = validate_anchor_beat(
-        state, gen_event.getAnchorBeatNum(), gen_event.getAnchorBeatDen()
-    );
-    if (!maybe_anchor_beat) {
-        return {};
-    }
-    auto anchor_beat = *maybe_anchor_beat;
+    auto anchor_tick = validate_anchor_tick(state, gen_event.getAnchorTick());
 
     auto gen_note = gen_event.getNote();
     optional<Note> note;
@@ -941,7 +832,7 @@ optional<TimedRowEvent> load_event(
     return validate_event(
         state,
         TimedRowEvent {
-            .anchor_beat = anchor_beat,
+            .anchor_tick = anchor_tick,
             .v = RowEvent {
                 .note = note,
                 .instr = instr,
@@ -949,21 +840,21 @@ optional<TimedRowEvent> load_event(
                 .effects = effects,
             }
         },
-        loop_length);
+        pattern_length);
 }
 
 optional<Pattern> load_pattern(ErrorState & state, gen::Pattern::Reader gen_pattern) {
     auto prefix = ErrorPrefixer(state);
     bool fatal = false;
 
-    MaybeNonZero<uint32_t> loop_length = gen_pattern.getLoopLength();
+    TickT length_ticks = gen_pattern.getLengthTicks();
 
     auto gen_events = gen_pattern.getEvents();
     auto size = truncate_events(state, gen_events.size());
     auto events = with_capacity<TimedRowEvent>(size);
     for (uint i = 0; i < size; i++) {
         PUSH(".events[{}]", i);
-        auto event = load_event(state, gen_events[i], loop_length);
+        auto event = load_event(state, gen_events[i], length_ticks);
         POP();
         if (!event) {
             fatal = true;
@@ -985,18 +876,18 @@ optional<Pattern> load_pattern(ErrorState & state, gen::Pattern::Reader gen_patt
     POP();
 
     return validate_pattern(state, Pattern {
+        .length_ticks = length_ticks,
         .events = move(events),
-        .loop_length = loop_length,
     });
 }
 
-optional<TimelineBlock> load_timeline_block(
-    ErrorState & state, gen::TimelineBlock::Reader gen_block
+optional<TrackBlock> load_track_block(
+    ErrorState & state, gen::TrackBlock::Reader gen_block
 ) {
     auto prefix = ErrorPrefixer(state);
 
-    int32_t begin_time = gen_block.getBeginTime();
-    uint32_t end_time = gen_block.getEndTime();
+    TickT begin_tick = gen_block.getBeginTick();
+    uint32_t loop_count = gen_block.getLoopCount();
 
     PUSH_LITERAL(".pattern");
     auto pattern = load_pattern(state, gen_block.getPattern());
@@ -1005,28 +896,35 @@ optional<TimelineBlock> load_timeline_block(
     if (!pattern) {
         return {};
     }
-    return validate_timeline_block(state, TimelineBlock {
-        .begin_time = begin_time,
-        .end_time = end_time,
+    return validate_track_block(state, TrackBlock {
+        .begin_tick = begin_tick,
+        .loop_count = loop_count,
         .pattern = move(*pattern),
     });
 }
 
-optional<TimelineCell> load_timeline_cell(
-    ErrorState & state, gen::TimelineCell::Reader gen_timeline_cell
+ChannelSettings load_channel_settings(
+    ErrorState & state, gen::SequenceTrack::Reader gen_track
+) {
+    return validate_channel_settings(state, ChannelSettings {
+        .n_effect_col = gen_track.getNEffectCol(),
+    });
+}
+optional<SequenceTrack> load_track(
+    ErrorState & state, gen::SequenceTrack::Reader gen_track
 ) {
     auto prefix = ErrorPrefixer(state);
     bool has_fatal = false;
 
-    auto gen_blocks = gen_timeline_cell.getBlocks();
+    auto gen_blocks = gen_track.getBlocks();
     auto size = truncate_blocks(state, gen_blocks.size());
-    auto blocks = with_capacity<TimelineBlock>(size);
+    auto blocks = with_capacity<TrackBlock>(size);
 
     for (uint b = 0; b < size; b++) {
         // TODO ensure block start times are monotonic and blocks don't overlap.
         // TODO ensure blocks are within frame bounds. This requires a new parameter.
         PUSH(".blocks[{}]", b);
-        auto block = load_timeline_block(state, gen_blocks[b]);
+        auto block = load_track_block(state, gen_blocks[b]);
         POP();
         if (block) {
             blocks.push_back(*block);
@@ -1035,34 +933,36 @@ optional<TimelineCell> load_timeline_cell(
         }
     }
 
+    ChannelSettings settings = load_channel_settings(state, gen_track);
+
     if (has_fatal) {
         return {};
     }
-    return {TimelineCell(move(blocks))};
+    return {SequenceTrack(move(blocks), settings)};
 }
 
-using GenChipChannelCells =
-    ::capnp::List< ::capnp::List< ::serialize::generated::TimelineCell,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Reader;
-optional<ChipChannelCells> load_chip_channel_cells(
-    ErrorState & state, GenChipChannelCells gen_cc_cells, ChipMetadataRef chips_metadata
+using GenSequence =
+    ::capnp::List< ::capnp::List< ::serialize::generated::SequenceTrack,  ::capnp::Kind::STRUCT>,  ::capnp::Kind::LIST>::Reader;
+optional<Sequence> load_sequence(
+    ErrorState & state, GenSequence gen_sequence, ChipMetadataRef chips_metadata
 ) {
     auto prefix = ErrorPrefixer(state);
     bool has_fatal = false;
 
     auto maybe_nchip =
-        validate_nchip_matches(state, gen_cc_cells.size(), chips_metadata.size());
+        validate_nchip_matches(state, gen_sequence.size(), chips_metadata.size());
     if (!maybe_nchip) {
         return {};
     }
     auto nchip = *maybe_nchip;
 
-    ChipChannelCells cc_cells;
-    cc_cells.reserve(nchip);
+    Sequence sequence;
+    sequence.reserve(nchip);
     for (uint chip_idx = 0; chip_idx < nchip; chip_idx++) {
-        auto gen_channel_cells = gen_cc_cells[chip_idx];
+        auto gen_channel_tracks = gen_sequence[chip_idx];
 
         auto maybe_nchan = validate_nchan_matches(
-            state, gen_channel_cells.size(), chips_metadata, chip_idx
+            state, gen_channel_tracks.size(), chips_metadata, chip_idx
         );
         if (!maybe_nchan) {
             has_fatal = true;
@@ -1070,79 +970,25 @@ optional<ChipChannelCells> load_chip_channel_cells(
         }
         auto nchan = *maybe_nchan;
 
-        auto channel_cells = with_capacity<TimelineCell>(nchan);
+        auto channel_tracks = with_capacity<SequenceTrack>(nchan);
         for (uint chan_idx = 0; chan_idx < nchan; chan_idx++) {
             PUSH("[{}][{}]", chip_idx, chan_idx);
-            auto timeline_cell = load_timeline_cell(state, gen_channel_cells[chan_idx]);
+            auto track = load_track(state, gen_channel_tracks[chan_idx]);
             POP();
-            if (timeline_cell) {
-                channel_cells.push_back(move(*timeline_cell));
+            if (track) {
+                channel_tracks.push_back(move(*track));
             } else {
                 has_fatal = true;
             }
         }
 
-        cc_cells.push_back(channel_cells);
+        sequence.push_back(channel_tracks);
     }
 
     if (has_fatal) {
         return {};
     }
-    return {move(cc_cells)};
-}
-
-optional<TimelineFrame> load_timeline_item(
-    ErrorState & state,
-    gen::TimelineFrame::Reader gen_item,
-    ChipMetadataRef chips_metadata)
-{
-    auto prefix = ErrorPrefixer(state);
-
-    auto maybe_nbeats =
-        validate_frame_nbeats(state, gen_item.getNbeatsNum(), gen_item.getNbeatsDen());
-
-    PUSH_LITERAL(".chip_channel_cells");
-    auto chip_channel_cells =
-        load_chip_channel_cells(state, gen_item.getChipChannelCells(), chips_metadata);
-    POP();
-
-    if (maybe_nbeats && chip_channel_cells) {
-        return TimelineFrame {
-            .nbeats = *maybe_nbeats,
-            .chip_channel_cells = move(*chip_channel_cells),
-        };
-    } else {
-        return {};
-    }
-}
-
-using GenTimeline = ::capnp::List< ::serialize::generated::TimelineFrame,  ::capnp::Kind::STRUCT>::Reader;
-optional<Timeline> load_timeline(
-    ErrorState & state, GenTimeline gen_timeline, ChipMetadataRef chips
-) {
-    auto prefix = ErrorPrefixer(state);
-    bool has_fatal = false;
-
-    auto size = truncate_timeline_frames(state, gen_timeline.size());
-    Timeline timeline;
-    timeline.reserve(size);
-
-    for (uint i = 0; i < size; i++) {
-        PUSH("[{}]", i);
-        auto item = load_timeline_item(state, gen_timeline[i], chips);
-        POP();
-        if (item) {
-            timeline.push_back(*item);
-        } else {
-            has_fatal = true;
-        }
-    }
-
-    if (!has_fatal) {
-        return {move(timeline)};
-    } else {
-        return {};
-    }
+    return {move(sequence)};
 }
 
 static std::string string_to_hex(gsl::span<const uint8_t> input) {
@@ -1216,7 +1062,7 @@ LoadDocumentResult load_impl(kj::InputStream & stream, ErrorState & state) {
     }
 
     auto metadata = Metadata {
-        .zoom_level = gen_doc.getZoomLevel(),
+        .ticks_per_row = gen_doc.getTicksPerRow(),
     };
 
     prefix.push(state, "sequencer_options");
@@ -1261,23 +1107,14 @@ LoadDocumentResult load_impl(kj::InputStream & stream, ErrorState & state) {
         chips_metadata = compute_chip_metadata(*chips);
     }
 
-    optional<ChipChannelSettings> chip_channel_settings = {};
+    optional<Sequence> sequence = {};
     if (chips) {
-        prefix.push(state, "chip_channel_settings");
-        chip_channel_settings = load_chip_channel_settings(
-            state, gen_doc.getChipChannelSettings(), chips_metadata
-        );
+        prefix.push(state, "sequence");
+        sequence = load_sequence(state, gen_doc.getSequence(), chips_metadata);
         prefix.pop(state);
     }
 
-    optional<Timeline> timeline = {};
-    if (chips) {
-        prefix.push(state, "timeline");
-        timeline = load_timeline(state, gen_doc.getTimeline(), chips_metadata);
-        prefix.pop(state);
-    }
-
-    if (chips && chip_channel_settings && timeline) {
+    if (chips && sequence) {
         return LoadDocumentResult::ok(
             doc::DocumentCopy{
                 .sequencer_options = move(sequencer_options),
@@ -1287,8 +1124,7 @@ LoadDocumentResult load_impl(kj::InputStream & stream, ErrorState & state) {
                 .samples = move(samples),
                 .instruments = move(instruments),
                 .chips = move(*chips),
-                .chip_channel_settings = move(*chip_channel_settings),
-                .timeline = move(*timeline),
+                .sequence = move(*sequence),
             },
             metadata,
             move(state.err));
@@ -1428,7 +1264,7 @@ using namespace std::string_literals;
 TEST_CASE("Serialize into memory.") {
     auto d = default_doc();
 
-    serialize_impl(d, Metadata { .zoom_level = 4 }, [](MallocMessageBuilder & builder) {
+    serialize_impl(d, Metadata { .ticks_per_row = 12 }, [](MallocMessageBuilder & builder) {
 
         auto arr = capnp::messageToFlatArray(builder);
         // borrows from arr
@@ -1446,7 +1282,7 @@ TEST_CASE("Ensure that opening a nonexistent path returns an error.") {
 
 TEST_CASE("Ensure that round-tripping to file works.") {
     auto doc = default_doc();
-    auto metadata = Metadata { .zoom_level = 4 };
+    auto metadata = Metadata { .ticks_per_row = 12 };
     auto path = "document-packed"s + MODULE_EXT;
 
     REQUIRE_UNARY(!save_to_path(doc, metadata, path.c_str()));
@@ -1465,7 +1301,7 @@ TEST_CASE("Ensure that round-tripping to file works.") {
 
 TEST_CASE("Ensure that loading a file with corrupted headers returns an error and no document.") {
     auto doc = default_doc();
-    auto metadata = Metadata { .zoom_level = 4 };
+    auto metadata = Metadata { .ticks_per_row = 12 };
     auto path = "document-packed"s + MODULE_EXT;
 
     REQUIRE_UNARY(!save_to_path(doc, metadata, path.c_str()));
@@ -1486,7 +1322,7 @@ TEST_CASE("Ensure that loading a file with corrupted headers returns an error an
 
 TEST_CASE("Ensure that loading a file with corrupted data returns an error and no document.") {
     auto doc = default_doc();
-    auto metadata = Metadata { .zoom_level = 4 };
+    auto metadata = Metadata { .ticks_per_row = 12 };
     auto path = "document-packed"s + MODULE_EXT;
 
     REQUIRE_UNARY(!save_to_path(doc, metadata, path.c_str()));

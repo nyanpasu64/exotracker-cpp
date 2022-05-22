@@ -60,8 +60,10 @@ doc::SequencerOptions validate_sequencer_options(
     doc::SequencerOptions options, ErrorState & state
 ) {
     CLAMP_WARN(options, target_tempo, MIN_TEMPO, MAX_TEMPO, state);
-    CLAMP_WARN(options, spc_timer_period, MIN_TIMER_PERIOD, MAX_TIMER_PERIOD, state);
+    CLAMP_WARN(options, note_gap_ticks, 0, 2, state);
     CLAMP_WARN(options, ticks_per_beat, MIN_TICKS_PER_BEAT, MAX_TICKS_PER_BEAT, state);
+    CLAMP_WARN(options, beats_per_measure, 1, MAX_BEATS_PER_MEASURE, state);
+    CLAMP_WARN(options, spc_timer_period, MIN_TIMER_PERIOD, MAX_TIMER_PERIOD, state);
     return options;
 }
 
@@ -203,13 +205,6 @@ optional<size_t> validate_nchip(ErrorState & state, size_t gen_nchip) {
     return gen_nchip;
 }
 
-ChannelSettings validate_channel_settings(
-    ErrorState & state, ChannelSettings settings
-) {
-    CLAMP_WARN(settings, n_effect_col, 1, MAX_EFFECTS_PER_EVENT, state);
-    return settings;
-}
-
 optional<size_t> validate_nchip_matches(
     ErrorState & state, size_t gen_nchip, size_t nchip
 ) {
@@ -282,47 +277,12 @@ doc::Effect validate_effect(ErrorState & state, doc::Effect effect) {
     return effect;
 }
 
-optional<BeatFraction> validate_anchor_beat(
-    ErrorState & state, FractionInt num, FractionInt den
-) {
-    if (num < 0 || den < 0) {
-        // IDK if the engine handles negative note positions.
-        // Even if negative note positions were allowed,
-        // there would have to be bounds checks (maximum allowed negative values),
-        // using duplicated comparisons instead of abs(), because abs(INT_MIN) is UB.
-        PUSH_ERROR(state,
-            ".anchor_beat={}/{} is negative, not currently supported", num, den
-        );
-        return {};
+TickT validate_anchor_tick(ErrorState & state, TickT time) {
+    if (time > MAX_TICK) {
+        PUSH_WARNING(state, ".anchor_tick={} too long, clamping", time);
+        return MAX_TICK;
     }
-    if (num > 0xff'ffff || den > 0xffff) {
-        PUSH_ERROR(state, ".anchor_beat={}/{} too long, rejecting", num, den);
-        return {};
-    }
-
-    // If the on-disk fraction is not in lowest terms,
-    // anchor_beat.numerator()/.denominator() will be less than
-    // the values read from the file.
-    return {BeatFraction(num, den)};
-}
-
-optional<BeatFraction> validate_frame_nbeats(
-    ErrorState & state, uint32_t num, uint32_t den
-) {
-    if (den > 1) {
-        PUSH_WARNING(state, ".nbeats denominator={} > 1, this is untested", den);
-    }
-    if (num > MAX_BEATS_PER_FRAME) {
-        PUSH_WARNING(state,
-            ".nbeats numerator={} > {}, this is untested",
-            num, MAX_BEATS_PER_FRAME
-        );
-    }
-    if (num > 0xff'ffff || den > 0xffff) {
-        PUSH_ERROR(state, ".nbeats={}/{} too long, rejecting", num, den);
-        return {};
-    }
-    return {BeatFraction((FractionInt) num, (FractionInt) den)};
+    return time;
 }
 
 size_t truncate_effects(ErrorState & state, size_t gen_neffect) {
@@ -336,13 +296,13 @@ size_t truncate_effects(ErrorState & state, size_t gen_neffect) {
 }
 
 TimedRowEvent validate_event(
-    ErrorState & state, TimedRowEvent timed_ev, MaybeNonZero<uint32_t> loop_length
+    ErrorState & state, TimedRowEvent timed_ev, TickT pattern_length
 ) {
-    auto anchor_beat = timed_ev.anchor_beat;
-    if (loop_length && anchor_beat >= loop_length) {
+    auto anchor_tick = timed_ev.anchor_tick;
+    if (anchor_tick >= pattern_length) {
         PUSH_WARNING(state,
-            ".anchor_beat={}/{} lies beyond loop length ({} beats), probably unintended",
-            anchor_beat.numerator(), anchor_beat.denominator(), loop_length
+            ".anchor_tick={} lies beyond pattern length ({} beats), invalid",
+            anchor_tick, pattern_length
         );
     }
 
@@ -358,85 +318,6 @@ TimedRowEvent validate_event(
     return timed_ev;
 }
 
-[[nodiscard]] EventList validate_events(ErrorState & state, EventList events) {
-    bool must_sort = false;
-    auto const n = events.size();
-
-    // Loop over all i where i and i + 1 are valid indices.
-    for (size_t i = 0; i + 1 < n; i++) {
-        if (events[i + 1].anchor_beat < events[i].anchor_beat) {
-            must_sort = true;
-            PUSH_WARNING(state,
-                "[{}].anchor_beat={}/{} < [{}].anchor_beat={}/{}, sorting",
-                i + 1,
-                events[i + 1].anchor_beat.numerator(),
-                events[i + 1].anchor_beat.denominator(),
-                i,
-                events[i].anchor_beat.numerator(),
-                events[i].anchor_beat.denominator());
-        }
-    }
-
-    if (must_sort) {
-        std::stable_sort(
-            events.begin(),
-            events.end(),
-            [](TimedRowEvent const& a, TimedRowEvent const& b) {
-                return a.anchor_beat < b.anchor_beat;
-            });
-    }
-
-    return events;
-}
-
-optional<TimelineBlock> validate_timeline_block(
-    ErrorState & state, TimelineBlock block
-) {
-    bool has_fatal = false;
-
-    auto const& begin_time = block.begin_time;
-    auto const& end_time = block.end_time.v;
-
-    if (begin_time < 0) {
-        PUSH_WARNING(state,
-            " starts before begin of frame, begin_time={} < 0, untested", begin_time
-        );
-    }
-
-    if (end_time > MAX_BEATS_PER_FRAME && end_time != END_OF_GRID.v) {
-        PUSH_WARNING(state,
-            ".end_time={} > {} (maximum frame length), probably not what you wanted",
-            begin_time, END_OF_GRID.v
-        );
-    }
-    // TODO add warnings for "block extends beyond end of frame"?
-    // This requires snaking state in (current frame's length).
-
-    if (int64_t(end_time) < int64_t(begin_time)) {
-        PUSH_ERROR(state,
-            ".end_time={} < begin_time{}, negative length", end_time, begin_time
-        );
-        has_fatal = true;
-    }
-    // TODO how to handle zero-length blocks?
-
-    if (has_fatal) {
-        return {};
-    } else {
-        return block;
-    }
-}
-
-size_t truncate_blocks(ErrorState & state, size_t gen_nblock) {
-    if (gen_nblock > MAX_BLOCKS_PER_CELL) {
-        PUSH_WARNING(state,
-            ".blocks too long, size()={} > {}, truncating",
-            gen_nblock, MAX_BLOCKS_PER_CELL
-        );
-    }
-    return std::min(gen_nblock, (size_t) MAX_BLOCKS_PER_CELL);
-}
-
 size_t truncate_events(ErrorState & state, size_t gen_nevent) {
     if (gen_nevent > MAX_EVENTS_PER_PATTERN) {
         PUSH_WARNING(state,
@@ -447,24 +328,128 @@ size_t truncate_events(ErrorState & state, size_t gen_nevent) {
     return std::min(gen_nevent, (size_t) MAX_EVENTS_PER_PATTERN);
 }
 
-Pattern validate_pattern(ErrorState & state, Pattern pattern) {
-    if (pattern.loop_length > MAX_BEATS_PER_FRAME) {
-        PUSH_WARNING(state,
-            ".loop_length={} > {} (maximum frame length), probably not what you wanted",
-            pattern.loop_length, END_OF_GRID.v
+EventList validate_events(ErrorState & state, EventList events) {
+    bool must_sort = false;
+    auto const n = events.size();
+
+    // Loop over all i where i and i + 1 are valid indices.
+    for (size_t i = 0; i + 1 < n; i++) {
+        if (events[i + 1].anchor_tick < events[i].anchor_tick) {
+            must_sort = true;
+            PUSH_WARNING(state,
+                "[{}].anchor_tick={} < [{}].anchor_tick={}, sorting",
+                i + 1,
+                events[i + 1].anchor_tick,
+                i,
+                events[i].anchor_tick);
+        }
+        // Should we warn on simultaneous events?
+    }
+
+    if (must_sort) {
+        std::stable_sort(
+            events.begin(),
+            events.end(),
+            [](TimedRowEvent const& a, TimedRowEvent const& b) {
+                return a.anchor_tick < b.anchor_tick;
+            });
+    }
+
+    return events;
+}
+
+optional<Pattern> validate_pattern(ErrorState & state, Pattern pattern) {
+    if (pattern.length_ticks < 0) {
+        PUSH_ERROR(state, ".length_ticks={} < 0, invalid", pattern.length_ticks);
+        return {};
+    }
+    if (pattern.length_ticks == 0) {
+        PUSH_WARNING(state, ".length_ticks=0, probably not what you wanted", pattern.length_ticks);
+    }
+    if (pattern.length_ticks > MAX_TICK) {
+        PUSH_ERROR(state,
+            ".length_ticks={} > {}, too high", pattern.length_ticks, MAX_TICK
         );
+        return {};
     }
 
     return pattern;
 }
 
-size_t truncate_timeline_frames(ErrorState & state, size_t gen_size) {
-    if (gen_size > MAX_TIMELINE_FRAMES) {
+optional<TrackBlock> validate_track_block(ErrorState & state, TrackBlock block) {
+    bool has_fatal = false;
+
+    const TickT begin_time = block.begin_tick;
+    if (begin_time < 0) {
+        PUSH_ERROR(state,
+            " starts before begin of song, begin_time={} < 0", begin_time
+        );
+        has_fatal = true;
+    }
+
+    if (block.loop_count == 0) {
         PUSH_WARNING(state,
-            " too long, size()={} > {}, truncating", gen_size, MAX_TIMELINE_FRAMES
+            " has zero loop_count={}", block.loop_count
         );
     }
-    return std::min(gen_size, (size_t) MAX_TIMELINE_FRAMES);
+    if (block.loop_count > (uint32_t) MAX_TICK) {
+        PUSH_ERROR(state,
+            ".loop_count={} > {}, too high", block.loop_count, MAX_TICK
+        );
+        return {};
+    }
+
+    // block.pattern.length_ticks is gracefully validated in validate_pattern(), called
+    // before this function.
+    release_assert(block.pattern.length_ticks >= 0);
+    release_assert(block.pattern.length_ticks <= MAX_TICK);
+
+    const auto length_ticks =
+        (int64_t) block.loop_count * (int64_t) block.pattern.length_ticks;
+    release_assert(length_ticks >= 0);
+
+    if (length_ticks > (int64_t) MAX_TICK) {
+        PUSH_ERROR(state,
+            " total length = {} ticks > {}, too long", length_ticks, MAX_TICK
+        );
+        return {};
+    }
+
+    const auto end_time = (int64_t) begin_time + length_ticks;
+    if (end_time < 0) {
+        PUSH_ERROR(state, " end time = {} ticks < 0, invalid", end_time);
+        return {};
+    }
+    if (end_time > (int64_t) MAX_TICK) {
+        PUSH_ERROR(state, " end time = {} ticks > {}, too high", end_time, MAX_TICK);
+        return {};
+    }
+
+    release_assert((int64_t) begin_time <= end_time);
+    // TODO how to handle zero-length blocks?
+
+    if (has_fatal) {
+        return {};
+    } else {
+        return block;
+    }
+}
+
+ChannelSettings validate_channel_settings(
+    ErrorState & state, ChannelSettings settings
+) {
+    CLAMP_WARN(settings, n_effect_col, 1, MAX_EFFECTS_PER_EVENT, state);
+    return settings;
+}
+
+size_t truncate_blocks(ErrorState & state, size_t gen_nblock) {
+    if (gen_nblock > MAX_BLOCKS_PER_TRACK) {
+        PUSH_WARNING(state,
+            ".blocks too long, size()={} > {}, truncating",
+            gen_nblock, MAX_BLOCKS_PER_TRACK
+        );
+    }
+    return std::min(gen_nblock, (size_t) MAX_BLOCKS_PER_TRACK);
 }
 
 uint8_t validate_effect_name_chars(ErrorState & state, uint8_t gen_nchar) {

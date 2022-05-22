@@ -10,7 +10,6 @@
 #include "gui/tempo_dialog.h"
 #include "gui/lib/icon_toolbar.h"
 // Other
-#include "gui/move_cursor.h"
 #include "gui/lib/layout_macros.h"
 #include "gui_common.h"
 #include "cmd_queue.h"
@@ -18,7 +17,9 @@
 #include "serialize.h"
 #include "spc_export.h"
 #include "sample_docs.h"
+#include "doc_util/time_util.h"
 #include "util/defer.h"
+#include "util/enumerate.h"
 #include "util/expr.h"
 #include "util/math.h"
 #include "util/release_assert.h"
@@ -80,19 +81,18 @@ using gui::pattern_editor::PatternEditor;
 using gui::pattern_editor::StepDirection;
 using gui::timeline_editor::TimelineEditor;
 using gui::instrument_list::InstrumentList;
-using doc::BeatFraction;
+using doc_util::time_util::RowIter;
 using util::math::ceildiv;
-using util::math::frac_floor;
 using util::reverse::reverse;
 namespace edit_doc = edit::edit_doc;
 
 
 // # impl RawSelection
 
-RawSelection::RawSelection(Cursor cursor, int rows_per_beat)
+RawSelection::RawSelection(Cursor cursor, TickT ticks_per_row)
     : _begin(cursor)
     , _end(cursor)
-    , _bottom_padding(BeatFraction{1, rows_per_beat})
+    , _bottom_padding(ticks_per_row)
 {}
 
 Selection RawSelection::get_select() const {
@@ -107,7 +107,7 @@ Selection RawSelection::get_select() const {
         .bottom = bottom,
     };
 
-    out.bottom.beat += _bottom_padding;
+    out.bottom += _bottom_padding;
     return out;
 }
 
@@ -116,10 +116,10 @@ void RawSelection::set_end(Cursor end) {
     _mode = SelectionMode::Normal;
 }
 
-void RawSelection::toggle_padding(int rows_per_beat) {
+void RawSelection::toggle_padding(TickT ticks_per_row) {
     if (_bottom_padding == 0) {
         // 1 row * beats/row
-        _bottom_padding = BeatFraction{1, rows_per_beat};
+        _bottom_padding = ticks_per_row;
     } else {
         _bottom_padding = 0;
     }
@@ -128,31 +128,37 @@ void RawSelection::toggle_padding(int rows_per_beat) {
 void RawSelection::select_all(
     doc::Document const& document,
     ColumnToNumSubcol col_to_nsubcol,
-    int rows_per_beat
+    TickT ticks_per_row
 ) {
-    using doc::GridIndex;
     using cursor::ColumnIndex;
-
     Selection select = get_select();
-    GridIndex top_seq = select.top.grid;
-    GridIndex bottom_seq = select.bottom.grid;
 
     // Unconditionally enable padding below bottom of selection.
-    _bottom_padding = BeatFraction{1, rows_per_beat};
+    _bottom_padding = ticks_per_row;
 
-    auto select_block = [this, &document, col_to_nsubcol, top_seq, bottom_seq] (
+    // TODO create top_tick and bottom_tick by combining all channels the current
+    // cursor/selection encompasses
+
+    // TODO implement select all
+    auto select_block = [this, &document, col_to_nsubcol] (
         ColumnIndex left_col, ColumnIndex right_col
     ) {
         release_assert(left_col < col_to_nsubcol.size());
         release_assert(right_col < col_to_nsubcol.size());
 
         _begin.x = CursorX{left_col, 0};
-        _begin.y = GridAndBeat{top_seq, 0};
+//        _begin.y = top_seq;
 
         _end.x = CursorX{right_col, col_to_nsubcol[right_col] - 1};
-        _end.y = GridAndBeat{
-            bottom_seq, document.timeline[bottom_seq].nbeats - _bottom_padding
-        };
+        // TODO what if _bottom_padding=ticks_per_row > block height? Ideas:
+        //
+        // - Allow selections where end.y < begin.y, and treat them as empty
+        // - Change get_select() to treat negative-height selections as zero-height,
+        //   which actually includes 1 tick rather than being empty
+        // - Prohibit disabling bottom padding if it would make a selection negative
+        // - Set _end.y = _begin.y, _bottom_padding = bottom_tick - top_tick
+        //
+        // _end.y = bottom_tick - _bottom_padding;
     };
 
     if (_mode == SelectionMode::Normal) {
@@ -195,8 +201,14 @@ Cursor & CursorAndSelection::get_mut() {
     return _cursor;
 }
 
+/// Don't allow positioning the cursor where it risks integer overflow.
+static void clamp_cursor(TickT & time) {
+    time = std::clamp(time, 0, doc::MAX_TICK);
+}
+
 void CursorAndSelection::set(Cursor cursor) {
     _cursor = cursor;
+    clamp_cursor(_cursor.y);
     if (_select) {
         _select->set_end(_cursor);
     }
@@ -209,8 +221,9 @@ void CursorAndSelection::set_x(CursorX x) {
     }
 }
 
-void CursorAndSelection::set_y(GridAndBeat y) {
+void CursorAndSelection::set_y(TickT y) {
     _cursor.y = y;
+    clamp_cursor(_cursor.y);
     if (_select) {
         _select->set_end(_cursor);
     }
@@ -231,9 +244,9 @@ std::optional<Selection> CursorAndSelection::get_select() const {
     return {};
 }
 
-void CursorAndSelection::enable_select(int rows_per_beat) {
+void CursorAndSelection::enable_select(int ticks_per_row) {
     if (!_select) {
-        _select = RawSelection(_cursor, rows_per_beat);
+        _select = RawSelection(_cursor, ticks_per_row);
     }
 }
 
@@ -286,6 +299,16 @@ public:
 using WheelSpinBox = WheelSpinBoxT<QSpinBox>;
 using WheelDoubleSpinBox = WheelSpinBoxT<QDoubleSpinBox>;
 
+class WheelComboBox : public QComboBox {
+public:
+    explicit WheelComboBox(QWidget * parent = nullptr)
+        : QComboBox(parent)
+    {
+        // Prevent mouse scrolling from focusing the spinbox.
+        QComboBox::setFocusPolicy(Qt::StrongFocus);
+    }
+};
+
 // # MainWindow components
 
 using cmd_queue::CommandQueue;
@@ -317,21 +340,22 @@ struct MainWindowUi : MainWindow {
     QAction * _follow_playback;
     QAction * _compact_view;
 
+    // Zoom actions:
+    QAction * _zoom_out_triplet;
+    QAction * _zoom_in_triplet;
+    QAction * _zoom_out;
+    QAction * _zoom_in;
+
     // Instrument menu
     QAction * _show_sample_dialog;
 
     // Panels
     TimelineEditor * _timeline_editor;
 
-    struct Timeline {
-        QAction * add_frame;
-        QAction * remove_frame;
-
-        QAction * move_up;
-        QAction * move_down;
-
-        QAction * clone_frame;
-    } _timeline;
+    struct Sequence {
+        QAction * add_block;
+        QAction * remove_block;
+    } _sequence;
 
     InstrumentList * _instrument_list;
 
@@ -339,24 +363,28 @@ struct MainWindowUi : MainWindow {
 
     // Control panel
     // Per-song ephemeral state
-    WheelSpinBox * _zoom_level;
+
+    // Invariants:
+    // - currentIndex() should never be -1 (may be violated upon loading a document).
+    // - If currentIndex() != -1. _row_heights[currentIndex()] ==
+    //   _pattern_editor->ticks_per_row().
+    WheelComboBox * _row_height;
 
     // Song options
     QPushButton * _edit_tempo;  // TODO non-modal?
     WheelDoubleSpinBox * _tempo;
     WheelSpinBox * _beats_per_measure;
-    QComboBox * _end_action;
+    WheelComboBox * _end_action;
     WheelSpinBox * _end_jump_to;
 
     // TODO rework settings GUI
-    WheelSpinBox * _length_beats;
 
     // Global state (editing)
     WheelSpinBox * _octave;
 
     // Step
     WheelSpinBox * _step;
-    QComboBox * _step_direction;
+    WheelComboBox * _step_direction;
     QCheckBox * _step_to_event;
 
     /// Output: _pattern_editor.
@@ -409,6 +437,11 @@ struct MainWindowUi : MainWindow {
                     _compact_view = a;
                     a->setEnabled(false);
                 }
+                m->addSeparator();
+                _zoom_in = m->addAction(tr("Zoom &In"));
+                _zoom_out = m->addAction(tr("Zoom &Out"));
+                _zoom_in_triplet = m->addAction(tr("Zoom In (Triplet)"));
+                _zoom_out_triplet = m->addAction(tr("Zoom Out (Triplet)"));
             }
 
             {m__m(tr("&Instrument"));
@@ -448,7 +481,7 @@ struct MainWindowUi : MainWindow {
         }
     }
 
-    static constexpr int MAX_ZOOM_LEVEL = 64;
+    static constexpr int MAX_TICKS_PER_ROW = 48;
 
     void timeline_editor_panel(QBoxLayout * l) {
         {l__c_l(QGroupBox, QVBoxLayout)
@@ -458,20 +491,11 @@ struct MainWindowUi : MainWindow {
                 _timeline_editor = w;
             }
             {l__w(IconToolBar)
-                _timeline.add_frame = w->add_icon_action(
-                    tr("Add Timeline Frame"), "document-new"
+                _sequence.add_block = w->add_icon_action(
+                    tr("Add Sequence Block"), "document-new"
                 );
-                _timeline.remove_frame = w->add_icon_action(
-                    tr("Delete Timeline Frame"), "edit-delete"
-                );
-                _timeline.move_up = w->add_icon_action(
-                    tr("Move Frame Up"), "go-up"
-                );
-                _timeline.move_down = w->add_icon_action(
-                    tr("Move Frame Down"), "go-down"
-                );
-                _timeline.clone_frame = w->add_icon_action(
-                    tr("Clone Frame"), "edit-copy"
+                _sequence.remove_block = w->add_icon_action(
+                    tr("Delete Sequence Block"), "edit-delete"
                 );
                 enable_button_borders(w);
             }
@@ -503,8 +527,7 @@ struct MainWindowUi : MainWindow {
                     tr("Beats/measure"),
                     [this] {
                         auto w = _beats_per_measure = new WheelSpinBox;
-                        w->setRange(1, (int) doc::MAX_BEATS_PER_FRAME);
-                        w->setEnabled(false);
+                        w->setRange(1, doc::MAX_BEATS_PER_MEASURE);
                         return w;
                     }()
                 );
@@ -513,7 +536,7 @@ struct MainWindowUi : MainWindow {
                 {form__l(QHBoxLayout);
                     l->addWidget(new QLabel(tr("End")));
 
-                    {l__w(QComboBox);
+                    {l__w(WheelComboBox);
                         _end_action = w;
                         w->setEnabled(false);
                         w->addItem(tr("Stop"));
@@ -531,17 +554,10 @@ struct MainWindowUi : MainWindow {
 
             // TODO rework settings GUI
             {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("Timeline frame"));
+                c->setTitle(tr("Current Block"));
 
-                form->addRow(
-                    new QLabel(tr("Length (beats)")),
-                    [this] {
-                        auto w = _length_beats = new WheelSpinBox;
-                        w->setRange(1, (int) doc::MAX_BEATS_PER_FRAME);
-                        w->setValue(16);
-                        return w;
-                    }()
-                );
+                // TODO add length viewer/editor (measure, beat, tick)
+                // TODO add WheelSpinBox controlling current block loop count
             }
             l->addStretch();
         }
@@ -549,11 +565,10 @@ struct MainWindowUi : MainWindow {
         // Pattern editing.
         {l__l(QVBoxLayout);
             {l__c_form(QGroupBox, QFormLayout);
-                c->setTitle(tr("View"));
+                c->setTitle(tr("Row size"));
 
-                {form__label_w(tr("Zoom"), WheelSpinBox);
-                    _zoom_level = w;
-                    w->setRange(1, MAX_ZOOM_LEVEL);
+                {form__w(WheelComboBox);
+                    _row_height = w;
                 }
             }
             {l__c_form(QGroupBox, QFormLayout);
@@ -573,7 +588,7 @@ struct MainWindowUi : MainWindow {
                     w->setRange(0, 256);
                 }
 
-                {form__w(QComboBox);
+                {form__w(WheelComboBox);
                     _step_direction = w;
 
                     auto push = [&w] (StepDirection step, QString item) {
@@ -615,6 +630,9 @@ struct MainWindowUi : MainWindow {
         }
     }
 };
+
+using timing::MaybeSequencerTime;
+using timing::SequencerTime;
 
 class AudioComponent {
     // GUI/audio communication.
@@ -765,9 +783,9 @@ public:
             gc_command_queue();
 
             if (_audio_state == AudioState::Stopped) {
-                auto cursor = tx.state().cursor().y;
-                cursor.beat = 0;
-                play_from(tx, cursor);
+                // TODO play from previous bookmark or beginning of block/pattern?
+                TickT play_start = 0;
+                play_from(tx, play_start);
             } else {
                 stop_play();
             }
@@ -787,7 +805,7 @@ public:
     }
 
 private:
-    void play_from(StateTransaction & tx, std::optional<GridAndBeat> time) {
+    void play_from(StateTransaction & tx, std::optional<TickT> time) {
         auto start_time = time.value_or(tx.state().cursor().y);
         _command_queue.push(cmd_queue::PlayFrom{start_time});
         _audio_state = AudioState::Starting;
@@ -877,6 +895,17 @@ using tempo_dialog::TempoDialog;
 using instrument_dialog::InstrumentDialog;
 using sample_dialog::SampleDialog;
 
+struct RowHeight {
+    TickT ticks_per_row;
+    QString description;
+
+    bool operator<(RowHeight const& other) const {
+        return ticks_per_row < other.ticks_per_row;
+    }
+};
+
+constexpr TickT MAX_ROW_HEIGHT = 192;
+
 // module-private
 class MainWindowImpl : public MainWindowUi {
      W_OBJECT(MainWindowImpl)
@@ -889,6 +918,9 @@ public:
     QPointer<InstrumentDialog> _maybe_instr_dialog;
     QPointer<SampleDialog> _maybe_sample_dialog;
 
+    std::vector<RowHeight> _row_heights;
+    QIntValidator _row_height_validator;
+
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
     // When user changes shortcuts, reassign shortcut keybinds.
@@ -897,14 +929,6 @@ public:
     // Editor actions:
     QAction _play_pause;
     QAction _play_from_row;
-
-    // Zoom actions:
-    QAction _zoom_out;
-    QAction _zoom_in;
-    QAction _zoom_out_half;
-    QAction _zoom_in_half;
-    QAction _zoom_out_triplet;
-    QAction _zoom_in_triplet;
 
     // Global actions:
     QAction _restart_audio;
@@ -928,53 +952,32 @@ public:
         return unwrap(edit_state());
     }
 
-    /// Called after edit/undo/redo, which are capable of deleting the timeline row
-    /// we're currently in.
-    void clamp_cursor(StateTransaction & tx) {
-        doc::Document const& document = get_document();
-
-        auto cursor_y = _state.cursor().y;
-        auto const orig = cursor_y;
-        auto ngrid = doc::GridIndex(document.timeline.size());
-
-        if (cursor_y.grid >= ngrid) {
-            cursor_y.grid = ngrid - 1;
-
-            BeatFraction nbeats = document.timeline[cursor_y.grid].nbeats;
-            cursor_y.beat = nbeats;
-        }
-
-        BeatFraction nbeats = document.timeline[cursor_y.grid].nbeats;
-
-        // If cursor is out of bounds, move to last row in pattern.
-        if (cursor_y.beat >= nbeats) {
-            auto rows_per_beat = _pattern_editor->zoom_level();
-
-            BeatFraction rows = nbeats * rows_per_beat;
-            int prev_row = util::math::frac_prev(rows);
-            cursor_y.beat = BeatFraction{prev_row, rows_per_beat};
-        }
-
-        if (cursor_y != orig) {
-            tx.cursor_mut().set_y(cursor_y);
-        }
-    }
 
     void push_edit(
         StateTransaction & tx, edit::EditBox command, MoveCursor cursor_move
     ) {
         _audio.push_edit(tx, std::move(command), cursor_move);
-        clamp_cursor(tx);
     }
 
     // private methods
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindowUi(std::move(document), parent)
         , _error_dialog(this)
+        , _row_height_validator(1, MAX_ROW_HEIGHT)
     {
         // Setup GUI.
         setup_widgets();  // Output: _pattern_editor.
         setup_error_dialog(_error_dialog);
+
+        _row_heights = calc_row_heights();
+        for (auto const& x : _row_heights) {
+            _row_height->addItem(x.description);
+        }
+
+        // _row_height->setInsertPolicy(QComboBox::NoInsert) prevents custom zoom
+        // levels from being registered. Should we keep custom zoom levels?
+
+        _row_height->setValidator(&_row_height_validator);
 
         _pattern_editor->set_history(_state.document_getter());
         _timeline_editor->set_history(_state.document_getter());
@@ -984,33 +987,23 @@ public:
         connect(
             &_gui_refresh_timer, &QTimer::timeout,
             this, [this] () {
-                auto maybe_seq_time = _audio.maybe_seq_time();
+                MaybeSequencerTime maybe_seq_time = _audio.maybe_seq_time();
                 if (!maybe_seq_time) return;
-                auto const seq_time = *maybe_seq_time;
+                SequencerTime const seq_time = *maybe_seq_time;
 
                 // Update cursor to sequencer position (from audio thread).
 
-                GridAndBeat play_time =
-                    [seq_time, rows_per_beat = _zoom_level->value()]
-                {
-                    GridAndBeat play_time{seq_time.grid, seq_time.beats};
-
-                    // Find row.
-                    for (int curr_row = rows_per_beat - 1; curr_row >= 0; curr_row--) {
-                        auto curr_ticks = curr_row / doc::BeatFraction{rows_per_beat}
-                            * seq_time.curr_ticks_per_beat;
-
-                        if (doc::round_to_int(curr_ticks) <= seq_time.ticks) {
-                            play_time.beat += BeatFraction{curr_row, rows_per_beat};
-                            break;
-                        }
-                    }
-                    return play_time;
-                }();
+                auto const& doc = get_document();
+                int ticks_per_row = row_height();
+                auto rows = RowIter::at_time(doc, seq_time.ticks, ticks_per_row).iter;
+                TickT play_time_quantized = rows.peek().time;
 
                 // Optionally set cursor to match play time.
-                if (_follow_playback->isChecked() && _state.cursor().y != play_time) {
-                    edit_unwrap().cursor_mut().set_y(play_time);
+                if (
+                    _follow_playback->isChecked()
+                    && _state.cursor().y != play_time_quantized
+                ) {
+                    edit_unwrap().cursor_mut().set_y(play_time_quantized);
                 }
 
                 // TODO if audio is playing, and cursor is detached from playback point,
@@ -1027,6 +1020,48 @@ public:
         // Last thing.
         on_startup(get_app().options());
         // TODO reload_shortcuts() when shortcut keybinds changed
+    }
+
+    // The design of the row/zoom system is subject to change.
+    TickT row_height() const {
+        return _pattern_editor->ticks_per_row();
+    }
+
+    std::optional<TickT> input_row_height() const {
+        int index = _row_height->currentIndex();
+        if ((size_t) index < _row_heights.size()) {
+            return _row_heights[(size_t) index].ticks_per_row;
+        }
+
+        // Currently unreachable, since custom row heights are disabled.
+        bool valid_text;
+        TickT row_height = locale().toInt(_row_height->currentText(), &valid_text);
+        if (valid_text) {
+            return row_height;
+        } else {
+            return {};
+        }
+    }
+
+    void set_row_height(TickT row_height) {
+        // We don't have names for row heights past 48.
+        row_height = std::clamp(row_height, 1, 48);
+
+        _pattern_editor->set_ticks_per_row(row_height);
+        display_row_height();
+    }
+
+    void display_row_height() {
+        TickT row_height = _pattern_editor->ticks_per_row();
+        for (auto const& [idx, r] : enumerate<int>(_row_heights)) {
+            if (r.ticks_per_row == row_height) {
+                _row_height->setCurrentIndex(idx);
+                return;
+            }
+        }
+
+        auto b = QSignalBlocker(_row_height);
+        _row_height->setCurrentText(locale().toString(row_height));
     }
 
     void setup_screen() {
@@ -1142,12 +1177,11 @@ public:
             });
         });
 
-        connect_spin(_length_beats, this, [this] (int grid_length_beats) {
+        connect_spin(_beats_per_measure, this, [this](int measure_len) {
             debug_unwrap(edit_state(), [&](auto & tx) {
                 tx.push_edit(
-                    edit_doc::set_grid_length(_state.cursor().y.grid, grid_length_beats),
-                    MoveCursor_::IGNORE_CURSOR
-                );
+                    edit_doc::set_beats_per_measure(measure_len),
+                    MoveCursor_::IGNORE_CURSOR);
             });
         });
 
@@ -1170,21 +1204,25 @@ public:
             );
         }
 
-        BIND_SPIN(_zoom_level, zoom_level)
+        display_row_height();
+        connect(
+            _row_height, &QComboBox::currentTextChanged,
+            this, [this]() {
+                if (auto h = input_row_height()) {
+                    _pattern_editor->set_ticks_per_row(*h);
+                }
+            });
 
         BIND_SPIN(_step, step)
         BIND_COMBO(_step_direction, step_direction);
         BIND_CHECK(_step_to_event, step_to_event);
 
         // Connect timeline editor toolbar.
-        auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
-            connect(&action, &QAction::triggered, this, func);
-        };
-        connect_action(*_timeline.add_frame, &MainWindowImpl::add_timeline_frame);
-        connect_action(*_timeline.remove_frame, &MainWindowImpl::remove_timeline_frame);
-        connect_action(*_timeline.move_up, &MainWindowImpl::move_frame_up);
-        connect_action(*_timeline.move_down, &MainWindowImpl::move_frame_down);
-        connect_action(*_timeline.clone_frame, &MainWindowImpl::clone_timeline_frame);
+//        auto connect_action = [this] (QAction & action, auto /*copied*/ func) {
+//            connect(&action, &QAction::triggered, this, func);
+//        };
+//        connect_action(*_sequence.add_block, &MainWindowImpl::add_sequence_block);
+//        connect_action(*_sequence.remove_block, &MainWindowImpl::remove_sequence_block);
 
         // Bind keyboard shortcuts, and (for the time being) connect to functions.
         reload_shortcuts();
@@ -1320,7 +1358,7 @@ public:
             tx.set_instrument(0);
         }
 
-        _zoom_level->setValue(metadata.zoom_level);
+        set_row_height(metadata.ticks_per_row);
 
         // Restart the audio thread with the new document.
         _audio.restart_audio_thread(_state);
@@ -1334,7 +1372,7 @@ public:
         open_document(
             sample_docs::new_document(),
             Metadata {
-                .zoom_level = pattern_editor::DEFAULT_ZOOM_LEVEL,
+                .ticks_per_row = pattern_editor::DEFAULT_TICKS_PER_ROW,
             },
             "");
     }
@@ -1448,7 +1486,7 @@ private:
         auto error = serialize::save_to_path(
             get_document(),
             Metadata {
-                .zoom_level = (uint16_t) _zoom_level->value(),
+                .ticks_per_row = (uint16_t) row_height(),
             },
             path.toUtf8());
 
@@ -1556,26 +1594,34 @@ private:
         }
     }
 
-    /// Compute the fixed zoom sequence, consisting of powers of 2
+    /// Compute the fixed "ticks per row" sequence, consisting of powers of 2
     /// and an optional factor of 3.
-    static std::vector<int> calc_zoom_levels() {
-        std::vector<int> zoom_levels;
+    std::vector<RowHeight> calc_row_heights() const {
+        std::vector<RowHeight> row_heights = {
+            // Notes
+            {48, tr("1/4")},
+            {24, tr("1/8")},
+            {12, tr("1/16")},
+            {6, tr("1/32")},
+            {3, tr("1/64")},
+            // Triplets
+            {16, tr("1/8 triplet")},
+            {8, tr("1/16 triplet")},
+            {4, tr("1/32 triplet")},
+            {2, tr("1/64 triplet")},
+            {1, tr("1/128 triplet")},
+        };
+//        for (auto & r : row_heights) {
+//            r.description = tr("%1 (%2)")
+//                .arg(r.description)
+//                .arg(r.ticks_per_row);
+//        }
 
-        // Add regular zoom levels.
-        for (int i = 1; i <= MAX_ZOOM_LEVEL; i *= 2) {
-            zoom_levels.push_back(i);
-        }
-        // Add triplet zoom levels.
-        for (int i = 3; i <= MAX_ZOOM_LEVEL; i *= 2) {
-            zoom_levels.push_back(i);
-        }
         // Sort in increasing order.
-        std::sort(zoom_levels.begin(), zoom_levels.end());
+        std::sort(row_heights.begin(), row_heights.end());
 
-        return zoom_levels;
+        return row_heights;
     }
-
-    std::vector<int> _zoom_levels = calc_zoom_levels();
 
     /// Clears existing bindings and rebinds shortcuts.
     /// Can be called multiple times.
@@ -1604,6 +1650,9 @@ private:
         #define BIND_FROM_CONFIG(NAME) \
             _##NAME.setShortcut(QKeySequence{shortcuts.NAME}); \
             bind_editor_action(&_##NAME)
+        #define BINDP_FROM_CONFIG(NAME) \
+            _##NAME->setShortcut(QKeySequence{shortcuts.NAME}); \
+            bind_editor_action(_##NAME)
 
         BIND_FROM_CONFIG(play_pause);
         connect_action(&_play_pause, [this] () {
@@ -1626,63 +1675,33 @@ private:
         connect_action(_redo, &MainWindowImpl::redo);
 
         // TODO maybe these shortcuts should be inactive when order editor is focused
-        BIND_FROM_CONFIG(zoom_out);
-        connect_action(&_zoom_out, [this] () {
-            int const curr_zoom = _zoom_level->value();
+        BINDP_FROM_CONFIG(zoom_out);
+        auto zoomed_out_half = [](TickT new_height, TickT curr_height) {
+            return new_height == 2 * curr_height;
+        };
+        connect_action(_zoom_out, &MainWindowImpl::zoom_out<decltype(zoomed_out_half)>);
 
-            // Pick the next smaller zoom level in the fixed zoom sequence.
-            for (int const new_zoom : reverse(_zoom_levels)) {
-                if (new_zoom < curr_zoom) {
-                    _zoom_level->setValue(new_zoom);
-                    return;
-                }
-            }
-            // If we're already at minimum zoom, don't change zoom level.
-        });
+        BINDP_FROM_CONFIG(zoom_in);
+        auto zoomed_in_half = [](TickT new_height, TickT curr_height) {
+            return 2 * new_height == curr_height;
+        };
+        connect_action(_zoom_in, &MainWindowImpl::zoom_in<decltype(zoomed_in_half)>);
 
-        BIND_FROM_CONFIG(zoom_in);
-        connect_action(&_zoom_in, [this] () {
-            int const curr_zoom = _zoom_level->value();
+        BINDP_FROM_CONFIG(zoom_out_triplet);
+        auto zoomed_out_triplet = [](TickT new_height, TickT curr_height) {
+            return new_height > curr_height;
+        };
+        connect_action(
+            _zoom_out_triplet, &MainWindowImpl::zoom_out<decltype(zoomed_out_triplet)>
+        );
 
-            // Pick the next larger zoom level in the fixed zoom sequence.
-            for (int const new_zoom : _zoom_levels) {
-                if (new_zoom > curr_zoom) {
-                    _zoom_level->setValue(new_zoom);
-                    return;
-                }
-            }
-            // If we're already at maximum zoom, don't change zoom level.
-        });
-
-        BIND_FROM_CONFIG(zoom_out_half);
-        connect_action(&_zoom_out_half, [this] () {
-            // Halve zoom, rounded down. QSpinBox will clamp minimum to 1.
-            _zoom_level->setValue(_zoom_level->value() / 2);
-        });
-
-        BIND_FROM_CONFIG(zoom_in_half);
-        connect_action(&_zoom_in_half, [this] () {
-            // Double zoom. QSpinBox will truncate to maximum value.
-            _zoom_level->setValue(_zoom_level->value() * 2);
-        });
-
-        BIND_FROM_CONFIG(zoom_out_triplet);
-        connect_action(&_zoom_out_triplet, [this] () {
-            // Multiply zoom by 2/3, rounded down. QSpinBox will clamp minimum to 1.
-            _zoom_level->setValue(_zoom_level->value() * 2 / 3);
-        });
-
-        BIND_FROM_CONFIG(zoom_in_triplet);
-        connect_action(&_zoom_in_triplet, [this] () {
-            // Multiply zoom by 3/2, rounded up.
-            // If we rounded down, zooming 1 would result in 1, which is bad.
-            // QSpinBox will truncate to maximum value.
-            //
-            // Rounding up has the nice property that zoom_in_triplet() followed by
-            // zoom_out_triplet() always produces the value we started with
-            // (assuming no truncation).
-            _zoom_level->setValue(ceildiv(_zoom_level->value() * 3, 2));
-        });
+        BINDP_FROM_CONFIG(zoom_in_triplet);
+        auto zoomed_in_triplet = [](TickT new_height, TickT curr_height) {
+            return new_height < curr_height;
+        };
+        connect_action(
+            _zoom_in_triplet, &MainWindowImpl::zoom_in<decltype(zoomed_in_triplet)>
+        );
 
         _restart_audio.setShortcut(QKeySequence{Qt::Key_F12});
         _restart_audio.setShortcutContext(Qt::ShortcutContext::ApplicationShortcut);
@@ -1692,109 +1711,45 @@ private:
         });
     }
 
+    // [dear god] [oh god] [please no] [why must it be so]
+    template<typename IsZoomedOut>
+    void zoom_out() {
+        const int curr_height = row_height();
+
+        // Pick the next larger row height in the fixed sequence.
+        for (auto const& r : _row_heights) {
+            if (IsZoomedOut()(r.ticks_per_row, curr_height)) {
+                set_row_height(r.ticks_per_row);
+                return;
+            }
+        }
+        // If we're already at maximum row height, don't change level.
+    }
+
+    template<typename IsZoomedIn>
+    void zoom_in() {
+        const int curr_height = row_height();
+
+        // Pick the next smaller row height in the fixed sequence.
+        for (auto const& r : reverse(_row_heights)) {
+            if (IsZoomedIn()(r.ticks_per_row, curr_height)) {
+                set_row_height(r.ticks_per_row);
+                return;
+            }
+        }
+        // If we're already at minimum row height, don't change level.
+    }
+
     // # Mutation methods, called when QAction are triggered.
 
     void undo() {
         auto tx = edit_unwrap();
-        if (_audio.undo(tx)) {
-            clamp_cursor(tx);
-        }
+        _audio.undo(tx);
     }
 
     void redo() {
         auto tx = edit_unwrap();
-        if (_audio.redo(tx)) {
-            clamp_cursor(tx);
-        }
-    }
-
-    void add_timeline_frame() {
-        auto & document = get_document();
-        if (document.timeline.size() >= doc::MAX_TIMELINE_FRAMES) {
-            return;
-        }
-
-        auto old_grid = _state.cursor().y.grid;
-
-        // Don't use this for undo.
-        // If you do, "add, undo, add" will differ from "add".
-        Cursor new_cursor = {
-            .x = _state.cursor().x,
-            .y = {
-                .grid = old_grid + 1,
-                .beat = 0,
-            },
-        };
-
-        auto tx = edit_unwrap();
-        tx.push_edit(
-            edit_doc::add_timeline_frame(document, old_grid + 1, _length_beats->value()),
-            move_to(new_cursor));
-    }
-
-    void remove_timeline_frame() {
-        auto old_grid = _state.cursor().y.grid;
-
-        // The resulting cursor is invalid if you delete the last row.
-        // clamp_cursor() will fix it.
-        Cursor new_cursor = {
-            .x = _state.cursor().x,
-            .y = {
-                .grid = old_grid,
-                .beat = 0,
-            },
-        };
-
-        auto & document = get_document();
-        if (document.timeline.size() <= 1) {
-            return;
-        }
-
-        auto tx = edit_unwrap();
-        tx.push_edit(
-            edit_doc::remove_timeline_frame(_state.cursor().y.grid), move_to(new_cursor)
-        );
-    }
-
-    void move_frame_up() {
-        auto const& cursor = _state.cursor();
-        if (cursor.y.grid.v > 0) {
-            auto up = cursor;
-            up.y.grid--;
-
-            auto tx = edit_unwrap();
-            tx.push_edit(edit_doc::move_grid_up(_state.cursor().y.grid), move_to(up));
-        }
-    }
-
-    void move_frame_down() {
-        auto const& cursor = _state.cursor();
-        auto & document = get_document();
-        if (cursor.y.grid + 1 < document.timeline.size()) {
-            auto down = cursor;
-            down.y.grid++;
-
-            auto tx = edit_unwrap();
-            tx.push_edit(
-                edit_doc::move_grid_down(_state.cursor().y.grid), move_to(down)
-            );
-        }
-    }
-
-    void clone_timeline_frame() {
-        auto & document = get_document();
-        if (document.timeline.size() >= doc::MAX_TIMELINE_FRAMES) {
-            return;
-        }
-
-        auto tx = edit_unwrap();
-
-        // Right now the clone button keeps the cursor position.
-        // Should it move the cursor down by 1 pattern, into the clone?
-        // Or down to the beat 0 of the clone?
-        tx.push_edit(
-            edit_doc::clone_timeline_frame(document, _state.cursor().y.grid),
-            move_to_here());
+        _audio.redo(tx);
     }
 };
 W_OBJECT_IMPL(MainWindowImpl)
@@ -1896,14 +1851,18 @@ StateTransaction::~StateTransaction() noexcept(false) {
     doc::Document const& doc = state.document();
 
     if (e & E::DocumentEdited) {
-        auto b = QSignalBlocker(_win->_tempo);
-        _win->_tempo->setValue(doc.sequencer_options.target_tempo);
+        {
+            auto b = QSignalBlocker(_win->_tempo);
+            _win->_tempo->setValue(doc.sequencer_options.target_tempo);
+        }
+        {
+            auto b = QSignalBlocker(_win->_beats_per_measure);
+            _win->_beats_per_measure->setValue(doc.sequencer_options.beats_per_measure);
+        }
     }
 
     if (e & (E::DocumentEdited | E::CursorMoved)) {
-        auto b = QSignalBlocker(_win->_length_beats);
-        auto nbeats = frac_floor(doc.timeline[state.cursor().y.grid].nbeats);
-        _win->_length_beats->setValue(nbeats);
+        // TODO update "Current Block" length editor
     }
 }
 

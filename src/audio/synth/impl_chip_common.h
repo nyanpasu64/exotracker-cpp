@@ -54,7 +54,7 @@ public:
     {}
 
     // impl ChipInstance
-    void seek(doc::Document const& document, timing::GridAndBeat time) override {
+    void seek(doc::Document const& document, doc::TickT time) override {
         _chip_sequencer.seek(document, time);
     }
 
@@ -63,16 +63,8 @@ public:
         _driver.stop_playback(/*mut*/ _register_writes);
     }
 
-    void ticks_per_beat_changed(doc::Document const& document) override {
-        _chip_sequencer.ticks_per_beat_changed(document);
-    }
-
     void doc_edited(doc::Document const& document) override {
         _chip_sequencer.doc_edited(document);
-    }
-
-    void timeline_modified(doc::Document const& document) override {
-        _chip_sequencer.timeline_modified(document);
     }
 
     void reset_state(doc::Document const& document) override {

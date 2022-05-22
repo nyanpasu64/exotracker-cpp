@@ -14,7 +14,7 @@
 
 namespace gui::move_cursor {
 
-using timing::GridAndBeat;
+using timing::TickT;
 
 
 // # Moving cursor by events
@@ -26,7 +26,7 @@ using timing::GridAndBeat;
 ///
 /// If the channel has no events, returns {original time, wrapped=true}.
 [[nodiscard]]
-GridAndBeat prev_event(doc::Document const& document, cursor::Cursor cursor);
+TickT prev_event(doc::Document const& document, cursor::Cursor cursor);
 
 /// Return the timestamp of the next event
 /// whose beat fraction is strictly greater than the cursor's.
@@ -35,28 +35,20 @@ GridAndBeat prev_event(doc::Document const& document, cursor::Cursor cursor);
 ///
 /// If the channel has no events, returns {original time, wrapped=true}.
 [[nodiscard]]
-GridAndBeat next_event(doc::Document const& document, cursor::Cursor cursor);
+TickT next_event(doc::Document const& document, cursor::Cursor cursor);
 
 
 // # Moving cursor by beats
 
 using config::cursor_config::MovementConfig;
 
-[[nodiscard]] GridAndBeat prev_beat(
-    doc::Document const& document,
-    GridAndBeat cursor_y,
-    MovementConfig const& move_cfg
-);
+[[nodiscard]] TickT prev_beat(doc::Document const& doc, TickT cursor_y);
 
-[[nodiscard]] GridAndBeat next_beat(
-    doc::Document const& document,
-    GridAndBeat cursor_y,
-    MovementConfig const& move_cfg
-);
+[[nodiscard]] TickT next_beat(doc::Document const& doc, TickT cursor_y);
 
 /// Options owned by pattern editor panel and set in GUI, not set in settings dialog.
 struct MoveCursorYArgs {
-    int rows_per_beat;
+    int ticks_per_row;
     int step;
 };
 
@@ -65,7 +57,7 @@ struct MoveCursorYArgs {
 ///   and prev_event() doesn't wrap and is closer than the nearest row above,
 ///   jump up to prev_event().time.
 /// - Move to nearest row above.
-[[nodiscard]] GridAndBeat move_up(
+[[nodiscard]] TickT move_up(
     doc::Document const& document,
     cursor::Cursor cursor,
     MoveCursorYArgs const& args,
@@ -77,7 +69,7 @@ struct MoveCursorYArgs {
 ///   and next_event() doesn't wrap and is closer than the nearest row below,
 ///   jump down to next_event().time.
 /// - Move to nearest row below.
-[[nodiscard]] GridAndBeat move_down(
+[[nodiscard]] TickT move_down(
     doc::Document const& document,
     cursor::Cursor cursor,
     MoveCursorYArgs const& args,
@@ -85,42 +77,44 @@ struct MoveCursorYArgs {
 );
 
 
-[[nodiscard]] GridAndBeat page_up(
+[[nodiscard]] TickT page_up(
     doc::Document const& document,
-    GridAndBeat cursor_y,
+    TickT cursor_y,
+    int ticks_per_row,
     MovementConfig const& move_cfg);
 
-[[nodiscard]] GridAndBeat page_down(
+[[nodiscard]] TickT page_down(
     doc::Document const& document,
-    GridAndBeat cursor_y,
+    TickT cursor_y,
+    int ticks_per_row,
     MovementConfig const& move_cfg);
 
 
-[[nodiscard]] GridAndBeat frame_begin(
+[[nodiscard]] TickT block_begin(
     doc::Document const& document,
     cursor::Cursor cursor,
     MovementConfig const& move_cfg);
 
-[[nodiscard]] GridAndBeat frame_end(
+[[nodiscard]] TickT block_end(
     doc::Document const& document,
     cursor::Cursor cursor,
     MovementConfig const& move_cfg,
-    doc::BeatFraction bottom_padding);
+    TickT bottom_padding);
 
 
-[[nodiscard]] GridAndBeat prev_frame(
+[[nodiscard]] TickT prev_block(
     doc::Document const& document,
     cursor::Cursor cursor,
-    int zoom_level);
+    TickT ticks_per_row);
 
-[[nodiscard]] GridAndBeat next_frame(
+[[nodiscard]] TickT next_block(
     doc::Document const& document,
     cursor::Cursor cursor,
-    int zoom_level);
+    TickT ticks_per_row);
 
 
 struct CursorStepArgs {
-    int rows_per_beat;
+    TickT ticks_per_row;
     int step;
     bool step_to_event;
 };
@@ -133,7 +127,7 @@ struct CursorStepArgs {
 ///   and next_event() doesn't wrap and is closer than the nearest row below,
 ///   jump down to next_event().time.
 /// - Move to nearest row below `step` times.
-[[nodiscard]] GridAndBeat cursor_step(
+[[nodiscard]] TickT cursor_step(
     doc::Document const& document,
     cursor::Cursor cursor,
     CursorStepArgs const& args,

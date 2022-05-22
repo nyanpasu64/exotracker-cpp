@@ -1,13 +1,12 @@
 #pragma once
 
-/// Utility functions for searching through TimelineCell
-/// and extracting patterns from Timeline.
+/// Thin wrapper around doc_util/track_util (iterating over patterns in a
+/// SequenceTrack). Currently behaves similarly to TrackPatternIter; I may re-add
+/// wrapping at some point.
 
 #include "doc.h"
 #include "doc_util/track_util.h"
 #include "timing_common.h"
-
-#include <coroutine.h>
 
 #include <tuple>
 
@@ -18,19 +17,12 @@ using namespace doc_util::track_util;
 
 using doc::ChipIndex;
 using doc::ChannelIndex;
+using doc::TickT;
+using doc::PatternRef;
 
-using doc::GridIndex;
-using doc::BeatFraction;
+// # Iterating over SequenceTrack (only used in move_cursor.cpp).
 
-using timing::GridAndBeat;
-
-
-// # Iterating over Timeline (only used in move_cursor.cpp).
-
-struct GuiPatternIterItem {
-    GridIndex grid;
-    doc::PatternRef pattern;
-};
+using GuiPatternIterItem = doc::PatternRef;
 
 namespace detail {
     enum class Direction {
@@ -38,27 +30,25 @@ namespace detail {
         Reverse,
     };
 
-    /// Allocates memory, cannot be used on audio thread.
+    /// Returns the pattern the cursor lies within (if any), then patterns before or
+    /// after the cursor (based on `direction`).
     ///
-    /// Currently used for moving cursor to the next event
+    /// Does not allocate memory. Currently used for moving cursor to the next event
     /// (which may be on the current pattern, next, or even further).
     template<Direction direction>
     class GuiPatternIter {
     public:
         // Please don't poke this class's fields.
         // I'm marking them public to silence Clang warnings.
-        scrDefine;
-        doc::TimelineChannelRef _timeline;
-
-        GridIndex _grid;
-        std::vector<doc::PatternRef> _cell_patterns;
-        size_t _pattern;
+        TrackPatternIterRef _iter;
 
         // impl
     public:
 
+        /// Returns the pattern the cursor lies within (if any), then patterns before
+        /// or after the cursor (based on `direction`).
         [[nodiscard]] static
-        GuiPatternIter from_beat(doc::TimelineChannelRef timeline, GridAndBeat now);
+        GuiPatternIter from_time(doc::SequenceTrackRef track, TickT now);
 
         /// First call:
         /// - If original state is valid, return it as-is.

@@ -130,6 +130,10 @@ class SequencerTiming {
     /// Initializing to 0xff is unusual,
     /// but it's the easiest way to tick the sequencer immediately when playback begins.
     /// I'm too lazy to add a separate boolean flag.
+    ///
+    /// The real AMK initializes to 0x00, resulting in a delay before the first note.
+    /// Is this worth emulating? I don't know; starting playback in the middle of a
+    /// song is always inaccurate.
     constexpr static uint8_t DEFAULT_SEQUENCER_PHASE = 0xff;
 
 public:

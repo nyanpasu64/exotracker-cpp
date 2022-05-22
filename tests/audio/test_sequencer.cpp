@@ -22,20 +22,19 @@ namespace audio::synth::sequencer {
 using namespace doc;
 using chip_kinds::ChipKind;
 using namespace doc_util::event_builder;
-using doc_util::sample_instrs::spc_chip_channel_settings;
 using Ev = EventBuilder;
 using std::move;
 
 static Document simple_doc() {
     SequencerOptions sequencer_options{
         .target_tempo = 100,
-        .ticks_per_beat = 10,
+        .ticks_per_qnote = 10,
     };
 
     Timeline timeline;
 
     timeline.push_back([]() -> TimelineFrame {
-        TimelineCell ch0{TimelineBlock::from_events({
+        SequenceTrack ch0{TrackBlock::from_events({
             // TimeInPattern, RowEvent
             {0, {0}},
             {1, {1}},
@@ -64,7 +63,7 @@ static ChannelSequencer make_channel_sequencer(
 ) {
     ChannelSequencer seq;
     seq.set_chip_chan(chip_index, chan_index);
-    seq.seek(document, GridAndBeat{});
+    seq.seek(document, TickT{});
     return seq;
 }
 
@@ -140,7 +139,7 @@ TEST_CASE("Test seeking") {
         return seq.next_tick(document);
     };
 
-    seq.seek(document, GridAndBeat{0, {1, 2}});
+    seq.seek(document, TickT{0, {1, 2}});
 
     for (int16_t i = 5; i < 10; i++) {
         auto [t, ev] = next_tick();
@@ -275,15 +274,15 @@ static Document parametric_doc(
 ) {
     SequencerOptions sequencer_options{
         .target_tempo = 100,
-        .ticks_per_beat = 10,
+        .ticks_per_qnote = 10,
     };
 
     Timeline timeline;
 
     // grid 0
     timeline.push_back([&]() -> TimelineFrame {
-        TimelineCell ch0{
-            TimelineBlock::from_events({
+        SequenceTrack ch0{
+            TrackBlock::from_events({
                 // TimeInPattern, RowEvent
                 Ev(beat, {0}).delay(delay),
                 Ev(beat + 2, {1}).delay(-delay),
@@ -301,16 +300,16 @@ static Document parametric_doc(
 
     // grid 1
     timeline.push_back([&]() -> TimelineFrame {
-        TimelineCell ch0{
+        SequenceTrack ch0{
             // Add two blocks into one grid cell, as a test case.
-            TimelineBlock{(BeatIndex) beat, beat + 2, Pattern{
+            TrackBlock{(BeatIndex) beat, beat + 2, Pattern{
                 {
                     // TimeInPattern, RowEvent
                     Ev(0, {2}).delay(delay),
                 },
                 loop_length
             }},
-            TimelineBlock{(BeatIndex) beat + 2, END_OF_GRID, Pattern{
+            TrackBlock{(BeatIndex) beat + 2, END_OF_GRID, Pattern{
                 {
                     // TimeInPattern, RowEvent
                     Ev(0, {3}).delay(-delay),
@@ -347,7 +346,7 @@ static Document short_doc(
 ) {
     SequencerOptions sequencer_options{
         .target_tempo = 100,
-        .ticks_per_beat = 10,
+        .ticks_per_qnote = 10,
     };
 
     Timeline timeline;
@@ -359,7 +358,7 @@ static Document short_doc(
             events.push_back(Ev(beat, {beat}).delay(delay));
         }
 
-        TimelineCell ch0{TimelineBlock::from_events(move(events), loop_length)};
+        SequenceTrack ch0{TrackBlock::from_events(move(events), loop_length)};
 
         return TimelineFrame {
             .nbeats = 4,
@@ -385,7 +384,7 @@ static Document gap_doc(
 ) {
     SequencerOptions sequencer_options{
         .target_tempo = 100,
-        .ticks_per_beat = 10,
+        .ticks_per_qnote = 10,
     };
 
     Timeline timeline;
@@ -399,8 +398,8 @@ static Document gap_doc(
 
     // grid 0
     timeline.push_back([&]() -> TimelineFrame {
-        TimelineCell ch0{
-            TimelineBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}}
+        SequenceTrack ch0{
+            TrackBlock{0, END_OF_GRID, Pattern{std::move(events), loop_length}}
         };
 
         return TimelineFrame {
@@ -673,11 +672,11 @@ TEST_CASE("Deterministically switch between tempos") {
         // Randomly decide whether to switch documents.
         if (tick == 1) {
             // This frequently causes `release_assert(dbeat <= 1)` to fail.
-            document.sequencer_options.ticks_per_beat = 6;
+            document.sequencer_options.ticks_per_qnote = 6;
             seq.ticks_per_beat_changed(document);
         }
         if (tick == 3) {
-            document.sequencer_options.ticks_per_beat = 1;
+            document.sequencer_options.ticks_per_qnote = 1;
             seq.ticks_per_beat_changed(document);
         }
 
@@ -706,7 +705,7 @@ TEST_CASE("Switch tempos twice on every tick, and ensure it doesn't affect behav
         Document const& doc = sample_docs::DOCUMENTS.at(doc_name);
 
         Document slow_doc = doc.clone();
-        slow_doc.sequencer_options.ticks_per_beat *= 2;
+        slow_doc.sequencer_options.ticks_per_qnote *= 2;
 
         auto pure = make_channel_sequencer(0, 0, doc);
         auto dirty = make_channel_sequencer(0, 0, doc);
@@ -790,10 +789,11 @@ TEST_CASE("Randomly switch between random tempos") {
             if (rand_bool{0.4}(rng)) {
                 if (rand_bool{0.25}(rng)) {
                     // This frequently causes `release_assert(dbeat <= 1)` to fail.
-                    document.sequencer_options.ticks_per_beat = 1;
+                    document.sequencer_options.ticks_per_qnote = 1;
                     seq.ticks_per_beat_changed(document);
                 } else {
-                    document.sequencer_options.ticks_per_beat = rand_u32{2, 10}(rng);
+                    document.sequencer_options.ticks_per_qnote =
+                        (TickT) rand_u32{2, 10}(rng);
                     seq.ticks_per_beat_changed(document);
                 }
             }

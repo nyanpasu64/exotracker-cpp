@@ -38,11 +38,4 @@ inline Instrument music_box(SampleIndex sample_idx) {
     };
 }
 
-inline ChipChannelSettings spc_chip_channel_settings() {
-    // 8 channels of default settings
-    return {
-        {{}, {}, {}, {}, {}, {}, {}, {}},
-    };
-}
-
 }

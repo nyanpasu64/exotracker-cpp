@@ -34,8 +34,7 @@ namespace gui::main_window {
 #endif
 
 using audio::output::AudioThreadHandle;
-using timing::GridAndBeat;
-using timing::MaybeSequencerTime;
+using timing::TickT;
 
 enum class AudioState {
     Stopped,
@@ -60,8 +59,8 @@ using cursor::CursorX;
 struct Selection {
     CursorX left;
     CursorX right;
-    GridAndBeat top;
-    GridAndBeat bottom;
+    TickT top;
+    TickT bottom;
 };
 
 enum class SelectionMode {
@@ -70,6 +69,7 @@ enum class SelectionMode {
     SelectAll,
 };
 
+using doc::TickT;
 using ColumnToNumSubcol = gsl::span<cursor::SubColumnIndex>;
 
 /// Internal representation of selection, used for cursor movement.
@@ -80,7 +80,7 @@ class RawSelection {
     Cursor _begin;
 
     /// Endpoint of the selection. Always updated when the cursor moves,
-    /// but select-all can move selection without moving cursor.
+    /// but "select all" can move the selection without moving the cursor.
     Cursor _end;
 
     SelectionMode _mode = SelectionMode::Normal;
@@ -89,21 +89,21 @@ class RawSelection {
 
     /// How many beats to select below the bottom endpoint
     /// (whichever of _begin and cursor is lower).
-    doc::BeatFraction _bottom_padding;
+    TickT _bottom_padding;
 
     // impl
 public:
-    explicit RawSelection(Cursor cursor, int rows_per_beat);
+    explicit RawSelection(Cursor cursor, TickT ticks_per_row);
 
     Selection get_select() const;
 
-    doc::BeatFraction bottom_padding() const {
+    TickT bottom_padding() const {
         return _bottom_padding;
     }
 
     void set_end(Cursor end);
 
-    void toggle_padding(int rows_per_beat);
+    void toggle_padding(TickT ticks_per_row);
 
     void select_all(
         doc::Document const& document,
@@ -132,10 +132,10 @@ public:
     /// Only called by PatternEditorImpl during edit/undo/redo.
     Cursor & get_mut();
 
-    /// Moving the cursor always updates the selection endpoint.
+    /// Move the cursor and update the selection endpoint.
     void set(Cursor cursor);
     void set_x(CursorX x);
-    void set_y(GridAndBeat y);
+    void set_y(TickT y);
 
 
     // # Selection
@@ -146,7 +146,7 @@ public:
 
     /// If selection not enabled, begin from cursor position.
     /// Otherwise continue selection.
-    void enable_select(int rows_per_beat);
+    void enable_select(int ticks_per_row);
 
     /// Clear selection.
     void clear_select();

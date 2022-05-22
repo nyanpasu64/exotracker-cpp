@@ -2,67 +2,81 @@
 
 #include "doc/timeline.h"
 
-#include <coroutine.h>
-
-#include <tuple>
-
 namespace doc_util::track_util {
 
 using namespace doc::timeline;
-using doc::event_list::EventIndex;
 
-/// Timeline iterator that yields one pattern per loop instance.
-class [[nodiscard]] FramePatternIter {
-    scrDefine;
+// Cross-track search
 
-    BlockIndex _block;
+TickT song_length(Sequence const& tracks);
 
-    BeatIndex _loop_begin_time;
-    BeatFraction _block_end_time;
+// Per-track pattern iteration
 
-    /// Where to truncate the event when looping.
-    EventIndex _loop_ev_idx;
+struct IterResult;
+
+/// Track iterator that yields one pattern per loop instance.
+///
+/// You must pass in the same unmodified track to every method call.
+class [[nodiscard]] TrackPatternIter {
+    // Mutable
+    /// Normally in [0..blocks.size()). When incremented past the document, equals
+    /// blocks.size(). When decremented before the document, equals (uint32_t) -1.
+    ///
+    /// Bad things happen when you try to make a class a forward and reverse iterator
+    /// at the same time. But the exposed API is sooo convenient...
+    BlockIndex _maybe_block_idx;
+    uint32_t _loop_idx;
+
+private:
+    TrackPatternIter(BlockIndex block_idx, uint32_t loop_idx);
 
 public:
-    FramePatternIter() = default;
+    /// Find the first block where now < block.end, and save the first loop index where
+    /// now < loop.end.
+    static IterResult at_time(SequenceTrackRef track, TickT now);
 
-    /// You must pass in the same unmodified cell on each iteration,
-    /// matching nbeats passed into the constructor.
-    [[nodiscard]] MaybePatternRef next(TimelineCellRef cell_ref);
+    [[nodiscard]] MaybePatternRef peek(SequenceTrackRef track) const;
+
+    /// Do not call if _block_idx == {-1 or blocks.size()}.
+    void next(SequenceTrackRef track);
+
+    /// Do not call if _block_idx == -1. Safe to call on blocks.size().
+    void prev(SequenceTrackRef track);
 };
 
-/// Version of FramePatternIter that holds onto a reference to the cell.
-class [[nodiscard]] FramePatternIterRef {
-    TimelineCellRef _cell_ref;
-    FramePatternIter _iter;
+struct IterResult {
+    TrackPatternIter iter;
+    bool snapped_later;
+};
+
+struct IterResultRef;
+
+/// Version of TrackPatternIter that holds onto a reference to the cell.
+class [[nodiscard]] TrackPatternIterRef {
+    SequenceTrack const* _track;
+    TrackPatternIter _iter;
+
+private:
+    TrackPatternIterRef(SequenceTrackRef track, TrackPatternIter iter);
 
 public:
-    FramePatternIterRef(TimelineCellRef cell_ref);
+    /// Find the first block where now < block.end, and save the first loop index where
+    /// now < loop.end.
+    static IterResultRef at_time(SequenceTrackRef track, TickT now);
 
-    [[nodiscard]] MaybePatternRef next();
+    [[nodiscard]] MaybePatternRef peek() const;
+
+    /// Do not call if _block_idx == {-1 or blocks.size()}.
+    void next();
+
+    /// Do not call if _block_idx == -1. Safe to call on blocks.size().
+    void prev();
 };
 
-// # Searching a document by time.
+struct IterResultRef {
+    TrackPatternIterRef iter;
+    bool snapped_later;
+};
 
-/// Returns a FramePatternIterRef pointing to a particular time in the document:
-///
-/// Returns the first (block, pattern loop) where pattern.end_time > beat,
-/// or nullopt if the provided time lies after all patterns end.
-std::tuple<MaybePatternRef, FramePatternIterRef> pattern_iter_seek(
-    TimelineCellRef cell_ref, BeatFraction beat
-);
-
-/// Returns a PatternRef pointing to a particular time in the document:
-///
-/// Returns the first (block, pattern loop) where pattern.end_time > beat.
-///
-/// beat ∈ [prev_pattern.end_time, pattern.end_time).
-/// If beat ≥ pattern.begin, beat ∈ [pattern.begin_time, pattern.end_time).
-///
-/// If there exists no pattern where pattern.end > beat,
-/// returns (cell.size(), empty slice) which is out-of-bounds!
-[[nodiscard]]
-PatternRef pattern_or_end(TimelineCellRef cell_ref, BeatFraction beat);
-
-} // namespaces
+} // namespace
 

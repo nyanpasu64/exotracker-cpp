@@ -4,6 +4,7 @@
 #include "doc.h"
 #include "chip_common.h"
 #include "timing_common.h"
+#include "gui/config/block_config.h"
 
 #include <cstdint>
 #include <memory>
@@ -33,26 +34,14 @@ namespace SubColumn_ {
 using SubColumn_::SubColumn;
 
 using doc::Document;
-using timing::GridAndBeat;
+using timing::TickT;
 using chip_common::ChipIndex;
 using chip_common::ChannelIndex;
+using gui::config::block_config::ExtendBlock;
 
 // You can't pass Cursor into edit functions,
 // because Cursor stores (column: int, subcolumn: int)
 // but edit functions need (chip: int, channel: int, subcolumn: SubColumn).
-
-/// Calling this in space not occupied by a block creates a block.
-/// Calling this in space not occupied by a block returns a no-op edit.
-///
-/// Currently only used by unit tests. Could be exposed to users through the GUI,
-/// but the functionality can be achieved by inserting a note
-/// (or maybe even deleting a non-existent event).
-[[nodiscard]] EditBox create_block(
-    Document const & document,
-    ChipIndex chip,
-    ChannelIndex channel,
-    GridAndBeat abs_time
-);
 
 /// Clear the focused subcolumn of all events
 /// anchored exactly to the current beat fraction.
@@ -64,7 +53,7 @@ using chip_common::ChannelIndex;
     ChipIndex chip,
     ChannelIndex channel,
     SubColumn subcolumn,
-    GridAndBeat abs_time
+    TickT now
 );
 
 /// Insert note at current beat fraction, reusing last existing event if it exists.
@@ -75,10 +64,10 @@ using chip_common::ChannelIndex;
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
-    GridAndBeat abs_time,
+    TickT now,
+    ExtendBlock block_mode,
     doc::Note note,
-    std::optional<doc::InstrumentIndex> instrument
-);
+    std::optional<doc::InstrumentIndex> instrument);
 
 using MultiDigitField = std::variant<
     SubColumn_::Instrument, SubColumn_::Volume, SubColumn_::Effect
@@ -112,7 +101,8 @@ enum class DigitAction {
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
-    GridAndBeat abs_time,
+    TickT now,
+    ExtendBlock block_mode,
     MultiDigitField subcolumn,
     DigitAction digit_action,
     uint8_t nybble);
@@ -149,7 +139,8 @@ using EffectAction_::EffectAction;
     Document const& document,
     ChipIndex chip,
     ChannelIndex channel,
-    GridAndBeat abs_time,
+    TickT now,
+    ExtendBlock block_mode,
     SubColumn_::Effect subcolumn,
     EffectAction effect_action);
 

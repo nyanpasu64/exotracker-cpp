@@ -10,6 +10,7 @@
 #include "doc/gui_traits.h"
 #include "chip_kinds.h"
 #include "edit/edit_pattern.h"
+#include "doc_util/time_util.h"
 #include "doc_util/track_util.h"
 #include "util/distance.h"
 #include "util/enumerate.h"
@@ -38,6 +39,7 @@
 
 #include <algorithm>  // std::max, std::clamp
 #include <cmath>  // round
+#include <cstdlib>  // std::div
 #include <functional>  // std::invoke
 #include <optional>
 #include <stdexcept>
@@ -105,11 +107,12 @@ TODO:
 */
 
 namespace columns {
+    /// Add 1/_ characters of width to the left/right of each subcolumn (but not
+    /// between character cells).
     constexpr int EXTRA_WIDTH_DIVISOR = 5;
 
-    // TODO switch to 3-digit ruler/space in decimal mode?
-    // If I label fractional beats, this needs to increase to 3 or more.
-    constexpr int RULER_WIDTH_CHARS = 2;
+    /// How many digits of space to allocate for the ruler.
+    constexpr int RULER_WIDTH_CHARS = 3;
 }
 
 namespace header {
@@ -154,7 +157,7 @@ static void setup_shortcuts(PatternEditor & self) {
     // on_cursor_move() clears/extends the selection
     // before calling the movement action handlers,
     // in the same transaction as moving the cursor.
-    using TxMethod = void (PatternEditor::*)(StateTransaction & tx);
+    using TxMethod = void (PatternEditor::*)(CursorAndSelection & cursor_sel);
 
     // Regular actions handle clearing the selection (if necessary) themselves,
     // so connect_shortcut()'s callback doesn't create and pass in a transaction
@@ -170,15 +173,16 @@ static void setup_shortcuts(PatternEditor & self) {
         PatternEditor & self, TxMethod method, AlterSelection alter_selection
     ) {
         auto tx = self._win.edit_unwrap();
+        auto & cursor_sel = tx.cursor_mut();
         if (alter_selection == AlterSelection::Clear) {
-            tx.cursor_mut().clear_select();
+            cursor_sel.clear_select();
         }
         if (alter_selection == AlterSelection::Extend) {
             // Begin or extend selection at old cursor position.
-            tx.cursor_mut().enable_select(self._zoom_level);
+            cursor_sel.enable_select(self._ticks_per_row);
         }
         // Move cursor.
-        std::invoke(method, self, tx);
+        std::invoke(method, self, cursor_sel);
     };
 
     // Connect cursor-movement keys to cursor-movement functions
@@ -432,6 +436,7 @@ using SubColumnLayout = std::vector<SubColumnPx>;
 struct LeftOfScreen{};
 struct RightOfScreen{};
 
+/// One full channel or track, shown on-screen.
 struct ColumnPx {
     ChipIndex chip;
     ChannelIndex channel;
@@ -482,14 +487,19 @@ struct MaybeColumnPx {
     }
 };
 
-/// Has the same number of items as ColumnList. Does *not* exclude off-screen columns.
-/// To skip drawing off-screen columns, fill their slot with nullopt.
+/// Holds one item per track (the same as ColumnList). Does *not* exclude off-screen
+/// columns. To skip drawing off-screen columns, fill their slot with nullopt.
 struct ColumnLayout {
     RulerOrHandlePx ruler;
     std::vector<MaybeColumnPx> cols;
 };
 
-/// Compute where on-screen to draw each pattern column.
+struct Fraction {
+    int num;
+    int den = 1;
+};
+
+/// Compute where on-screen to draw each pattern column (track).
 [[nodiscard]] static ColumnLayout gen_column_layout(
     PatternEditor const & self,
     doc::Document const & document
@@ -504,9 +514,9 @@ struct ColumnLayout {
     constexpr int DIVIDER_WIDTH = 1;
 
     auto ruler_or_handle = [&x_px, pad_width, width_per_char] (
-        boost::rational<int32_t> nchar, bool padding
+        Fraction nchar, bool padding
     ) -> RulerOrHandlePx {
-        int const chars_width = width_per_char * nchar.numerator() / nchar.denominator();
+        int const chars_width = width_per_char * nchar.num / nchar.den;
 
         RulerOrHandlePx col;
 
@@ -576,7 +586,7 @@ struct ColumnLayout {
     };
 
     // SubColumn doesn't matter.
-    RulerOrHandlePx ruler = ruler_or_handle(columns::RULER_WIDTH_CHARS, true);
+    RulerOrHandlePx ruler = ruler_or_handle(Fraction{columns::RULER_WIDTH_CHARS}, true);
 
     ColumnLayout column_layout{.ruler = ruler, .cols = {}};
 
@@ -591,7 +601,7 @@ struct ColumnLayout {
             channel_index++
         ) {
             doc::EffColIndex n_effect_col =
-                document.chip_channel_settings[chip_index][channel_index].n_effect_col;
+                document.sequence[chip_index][channel_index].settings.n_effect_col;
 
             int const orig_left_px = x_px;
 
@@ -677,7 +687,7 @@ using ColumnList = std::vector<Column>;
             channel_index++
         ) {
             doc::EffColIndex n_effect_col =
-                document.chip_channel_settings[chip_index][channel_index].n_effect_col;
+                document.sequence[chip_index][channel_index].settings.n_effect_col;
             SubColumnList subcolumns;
 
             subcolumns.push_back({SubColumn_::Note{}, 1});
@@ -842,24 +852,21 @@ std::optional<RawSelection> get_raw_sel(PatternEditor const& widget) {
 using PxInt = int;
 //using PxNat = uint32_t;
 
-/// Convert a relative timestamp to a vertical display offset.
-PxInt pixels_from_beat(PatternEditor const & widget, BeatFraction beat) {
-    PxInt out = doc::round_to_int(
-        beat * widget._zoom_level * widget._pixels_per_row
-    );
-    return out;
+/// Convert a TickT timestamp to a pixel distance from the top of the song. Do not pass
+/// in a TickT *delta*, since adding the result to other on-screen coordinates can
+/// cause inconsistent rounding!
+PxInt dpixels_from_time(PatternEditor const & widget, TickT time_ticks) {
+    auto [rows, ticks_left] = std::div(time_ticks, widget._ticks_per_row);
+    PxInt pixels = rows * widget._pixels_per_row
+        + ticks_left * widget._pixels_per_row / widget._ticks_per_row;
+    return pixels;
 }
 
-struct GridCellPosition {
-    GridIndex grid;
-    // top and bottom lie on gridlines like GridRect, not pixels like QRect.
+struct SongPosition {
     PxInt top;
-    PxInt bottom;
-    bool focused;
 };
 
 struct PatternPosition {
-    GridIndex grid;
     // top and bottom lie on gridlines like GridRect, not pixels like QRect.
     PxInt top;
     PxInt bottom;
@@ -871,20 +878,13 @@ enum class Direction {
     Reverse,
 };
 
-/// Stores the location of a grid cell on-screen.
-struct GridCellIteratorState {
-    PatternEditor const & _widget;
-    doc::Document const & _document;
+/// Stores the location of the document on-screen.
+struct SongScrollPos {
+    /// Top of song, relative to top of screen.
+    PxInt song_top_px;
 
-    // Screen pixels (non-negative, but mark as signed to avoid conversion errors)
-    static constexpr PxInt _screen_top = 0;
-    const PxInt _screen_bottom;
-
-    // Initialized from _scroll_position.
-    GridIndex _curr_grid_index;
-    PxInt _curr_grid_pos;  // Represents top if Forward, bottom if Reverse.
-
-    bool _focused;
+    /// Cursor relative to top of screen.
+    PxInt cursor_px;
 
     // impl
     static PxInt centered_cursor_pos(PxInt screen_height) {
@@ -892,155 +892,35 @@ struct GridCellIteratorState {
     }
 
 public:
-    static std::tuple<GridCellIteratorState, PxInt> make(
-        PatternEditor const & widget,  // holds reference
-        doc::Document const & document,  // holds reference
-        PxInt const screen_height
+    static SongScrollPos make(
+        PatternEditor const & widget, PxInt const screen_height
     ) {
-        GridAndBeat cursor_y = get_cursor(widget).y;
-        PxInt const cursor_from_pattern_top =
-            pixels_from_beat(widget, cursor_y.beat);
+        TickT cursor_time = get_cursor(widget).y;
+        PxInt const cursor_from_song_top =
+            dpixels_from_time(widget, cursor_time);
 
-        GridAndBeat scroll_position;
-        PxInt pattern_top_from_screen_top;
+        PxInt song_top_from_screen_top;
         PxInt cursor_from_screen_top;
 
         if (widget._free_scroll_position.has_value()) {
-            // Free scrolling.
-            scroll_position = *widget._free_scroll_position;
+            // Free scrolling. scroll_time is placed at top of screen.
+            TickT scroll_time = *widget._free_scroll_position;
 
-            PxInt const screen_top_from_pattern_top =
-                pixels_from_beat(widget, scroll_position.beat);
-            pattern_top_from_screen_top = -screen_top_from_pattern_top;
-            cursor_from_screen_top =
-                cursor_from_pattern_top + pattern_top_from_screen_top;
+            PxInt const screen_top_from_song_top =
+                dpixels_from_time(widget, scroll_time);
+            song_top_from_screen_top = -screen_top_from_song_top;
+            cursor_from_screen_top = cursor_from_song_top + song_top_from_screen_top;
+
         } else {
-            // Cursor-locked scrolling.
-            scroll_position = cursor_y;
-
+            // Cursor-locked scrolling. cursor_from_song_top is centered.
             cursor_from_screen_top = centered_cursor_pos(screen_height);
-            pattern_top_from_screen_top =
-                cursor_from_screen_top - cursor_from_pattern_top;
+            song_top_from_screen_top = cursor_from_screen_top - cursor_from_song_top;
         }
 
-        GridCellIteratorState out {
-            widget,
-            document,
-            screen_height,
-            scroll_position.grid,
-            pattern_top_from_screen_top,
-            // This WILL break if _free_scroll_position exists
-            // and lies in a different grid than the cursor
-            // (which 0CC-FT deliberately prevents from happening).
-            true,
+        return SongScrollPos {
+            .song_top_px = song_top_from_screen_top,
+            .cursor_px = cursor_from_screen_top,
         };
-        return {out, cursor_from_screen_top};
-    }
-};
-
-/// Iterates up or down through patterns, and yields their locations on-screen.
-template<Direction direction>
-class GridCellIterator : private GridCellIteratorState {
-    // impl
-public:
-    explicit GridCellIterator(GridCellIteratorState state) :
-        GridCellIteratorState{state}
-    {
-        if constexpr (direction == Direction::Reverse) {
-            _curr_grid_index--;
-            _focused = false;
-        }
-    }
-
-private:
-    bool valid_grid_cell() const {
-        return (size_t) _curr_grid_index < _document.timeline.size();
-    }
-
-    /// Precondition: valid_grid_cell() is true.
-    inline PxInt curr_grid_height() const {
-        return pixels_from_beat(
-            _widget, _document.timeline[_curr_grid_index].nbeats
-        );
-    }
-
-    /// Precondition: valid_grid_cell() is true.
-    inline PxInt curr_grid_top() const {
-        if constexpr (direction == Direction::Forward) {
-            return _curr_grid_pos;
-        } else {
-            return _curr_grid_pos - curr_grid_height();
-        }
-    }
-
-    /// Precondition: valid_grid_cell() is true.
-    inline PxInt curr_grid_bottom() const {
-        if constexpr (direction == Direction::Reverse) {
-            return _curr_grid_pos;
-        } else {
-            return _curr_grid_pos + curr_grid_height();
-        }
-    }
-
-private:
-    inline GridCellPosition peek() const {
-        return GridCellPosition {
-            .grid = _curr_grid_index,
-            .top = curr_grid_top(),
-            .bottom = curr_grid_bottom(),
-            .focused = _focused,
-        };
-    }
-
-public:
-    std::optional<GridCellPosition> next() {
-        if constexpr (direction == Direction::Forward) {
-            if (!valid_grid_cell() || _curr_grid_pos >= _screen_bottom) {
-                return std::nullopt;
-            }
-
-            GridCellPosition out = peek();
-            _curr_grid_pos += curr_grid_height();
-            _curr_grid_index++;
-            _focused = false;
-            return out;
-
-        } else {
-            if (!valid_grid_cell() || _curr_grid_pos <= _screen_top) {
-                return std::nullopt;
-            }
-
-            GridCellPosition out = peek();
-            _curr_grid_pos -= curr_grid_height();
-            _curr_grid_index--;  // May overflow to UINT32_MAX. Not UB.
-            _focused = false;
-            return out;
-        }
-    }
-};
-
-/// Iterates through all patterns visible on-screen, both above and below cursor.
-/// Calls the callback with the on-screen pixel coordinates of the pattern.
-class ForeachGrid {
-    GridCellIteratorState const& _state;
-
-public:
-    ForeachGrid(GridCellIteratorState const& state) : _state{state} {}
-
-    template<typename Visitor>
-    void operator()(Visitor visit_grid_cell) const {
-        {
-            auto forward = GridCellIterator<Direction::Forward>{_state};
-            while (std::optional<GridCellPosition> pos = forward.next()) {
-                visit_grid_cell(*pos);
-            }
-        }
-        {
-            auto reverse = GridCellIterator<Direction::Reverse>{_state};
-            while (auto pos = reverse.next()) {
-                visit_grid_cell(*pos);
-            }
-        }
     }
 };
 
@@ -1067,12 +947,83 @@ static QLinearGradient make_gradient(
     return grad;
 }
 
-using FrameIter = doc_util::track_util::FramePatternIterRef;
+using doc_util::track_util::TrackPatternIterRef;
+using doc::timeline::PatternRef;
+using doc_util::time_util::measure_at;
+using doc_util::time_util::RowIter;
+using doc_util::time_util::BeatIter;
+using doc_util::time_util::Row;
+using doc_util::time_util::Beat;
 
 /// Computing colors may require blending with the background color.
 /// So cache the color for each timeline entry being drawn.
 #define CACHE_COLOR(COLOR) \
-    QColor COLOR = visual.COLOR(pos.focused);
+    QColor COLOR = visual.COLOR(true);
+// TODO should we darken areas of the document between blocks?
+
+template<typename PatternFn>
+void foreach_visible_pattern(
+    PatternEditor & self,
+    doc::Document const& doc,
+    ColumnPx const& col,
+    const PxInt view_height,
+    const PxInt y_scroll,
+    const TickT render_begin,
+    PatternFn & pattern_fn)
+{
+    doc::SequenceTrack const& track = doc.sequence[col.chip][col.channel];
+
+    auto patterns = TrackPatternIterRef::at_time(track, render_begin).iter;
+
+    // Find the topmost visible pattern. (Looped handles must be drawn from top to
+    // bottom.)
+    //
+    // Converting a pixel coordinate to a timestamp would be faster, but is
+    // difficult to implement or use correctly, due to rounding errors.
+    {
+        auto up_patterns = patterns;
+        // This is safe even at block 0.
+        up_patterns.prev();
+
+        while (true) {
+            auto maybe_pattern = up_patterns.peek();
+            if (!maybe_pattern) {
+                break;
+            }
+            PatternRef const& pattern = *maybe_pattern;
+
+            PxInt bottom = y_scroll + dpixels_from_time(self, pattern.end_tick);
+            if (bottom < 0) {
+                break;
+            }
+
+            patterns = up_patterns;
+            up_patterns.prev();
+        }
+    }
+    // Loop through visible patterns and draw block handles.
+    while (true) {
+        auto maybe_pattern = patterns.peek();
+        if (!maybe_pattern) {
+            break;
+        }
+        PatternRef const& pattern = *maybe_pattern;
+
+        // TODO should we draw patterns outside the cursor differently?
+        // probably not necessary for now, klystrack doesn't do that.
+        PatternPosition pattern_pos {
+            .top = y_scroll + dpixels_from_time(self, pattern.begin_tick),
+            .bottom = y_scroll + dpixels_from_time(self, pattern.end_tick),
+            .focused = true,
+        };
+        if (pattern_pos.top > view_height) {
+            break;
+        }
+
+        pattern_fn(col, pattern_pos, pattern);
+        patterns.next();
+    }
+}
 
 /// Draw the background lying behind notes/etc.
 static void draw_pattern_background(
@@ -1092,16 +1043,16 @@ static void draw_pattern_background(
         }
     }
 
-    auto const [seq, cursor_top] =
-        GridCellIteratorState::make(self, document, (PxInt) inner_size.height());
-    ForeachGrid foreach_grid{seq};
+    const PxInt view_height = inner_size.height();
+    const auto [y_scroll, cursor_top] = SongScrollPos::make(self, view_height);
 
-    auto draw_pattern_bg = [&] (GridCellPosition const & pos) {
-        doc::TimelineFrame const & grid_cell = document.timeline[pos.grid];
+    const TickT render_begin = self._free_scroll_position.value_or(get_cursor(self).y);
 
+    // Draw background columns and beat lines.
+    {
         #define CACHE_SUBCOLUMN_COLOR(OUT) \
-            QColor OUT##_divider = visual.OUT##_divider(pos.focused); \
-            QColor OUT##_bg = visual.OUT##_bg(pos.focused);
+            QColor OUT##_divider = visual.OUT##_divider(true); \
+            QColor OUT##_bg = visual.OUT##_bg(true);
 
         CACHE_SUBCOLUMN_COLOR(note);
         CACHE_SUBCOLUMN_COLOR(instrument);
@@ -1111,6 +1062,9 @@ static void draw_pattern_background(
         CACHE_COLOR(gridline_beat);
         CACHE_COLOR(gridline_non_beat);
 
+        PxInt visible_top = std::max(0, y_scroll);
+        PxInt visible_bottom = inner_size.height();
+
         // Draw background columns.
         for (MaybeColumnPx const & maybe_column : columns.cols) {
             if (!maybe_column) {
@@ -1118,7 +1072,8 @@ static void draw_pattern_background(
             }
             for (SubColumnPx const & sub : maybe_column->subcolumns) {
                 GridRect sub_rect{
-                    QPoint{sub.left_px(), pos.top}, QPoint{sub.right_px(), pos.bottom}
+                    QPoint{sub.left_px(), visible_top},
+                    QPoint{sub.right_px(), visible_bottom}
                 };
 
                 // Unrecognized columns are red to indicate an error.
@@ -1159,42 +1114,61 @@ static void draw_pattern_background(
             }
         }
 
-        // Draw rows.
-        // Begin loop(row)
-        int row = 0;
-        BeatFraction const beats_per_row{1, self._zoom_level};
-        BeatFraction curr_beats = 0;
-        for (;
-            curr_beats < grid_cell.nbeats;
-            curr_beats += beats_per_row, row += 1)
-        {
-            // Compute row height.
-            int ytop = pos.top + self._pixels_per_row * row;
-            // End loop(row)
+        // Draw row and beat lines.
+        const auto start_row =
+            RowIter::at_time(document, render_begin, self._ticks_per_row).iter;
 
-            // Draw gridline along top of row.
-            if (curr_beats.denominator() == 1) {
+        auto draw_row = [&](Row row, PxInt ytop) {
+            if (row.is_beat()) {
                 painter.setPen(gridline_beat);
             } else {
                 painter.setPen(gridline_non_beat);
             }
             draw_top_border(painter, QPoint{0, ytop}, QPoint{row_right_px, ytop});
+        };
+
+        // Draw all rows visible.
+        {
+            auto up_row = start_row;
+            while (true) {
+                const Row row = up_row.peek();
+                const PxInt ytop = y_scroll + dpixels_from_time(self, row.time);
+                if (ytop < -self._pixels_per_row) {
+                    break;
+                }
+
+                draw_row(row, ytop);
+                if (!up_row.try_prev()) {
+                    break;
+                }
+            }
         }
-    };
+        {
+            auto down_row = start_row;
+            down_row.next();
+            while (true) {
+                const Row row = down_row.peek();
+                const PxInt ytop = y_scroll + dpixels_from_time(self, row.time);
+                if (ytop >= view_height) {
+                    break;
+                }
 
-    foreach_grid(draw_pattern_bg);
+                draw_row(row, ytop);
+                down_row.next();
+            }
+        }
+    }
 
-    /// Draw divider "just past right" of each column.
-    /// This replaces the "note divider" of the next column.
-    /// The last column draws a divider in the void.
+    // Draw divider "just past right" of each column (track). This replaces the next
+    // track's block handle's left border. The last column draws a divider in the void.
+    painter.setPen(visual.channel_divider);
+
     auto draw_divider = [&painter, &inner_size] (int x) {
         QPoint right_top{x, 0};
         QPoint right_bottom{x, inner_size.height()};
 
         draw_left_border(painter, right_top, right_bottom);
     };
-
-    painter.setPen(visual.channel_divider);
 
     draw_divider(columns.ruler.right_px());
     for (auto & column : columns.cols) {
@@ -1203,7 +1177,9 @@ static void draw_pattern_background(
         }
     }
 
-    auto pattern_draw_blocks = [&] (
+    // Draw block handles. Must be called from top down for loop triangles to be drawn
+    // properly.
+    auto pattern_draw_handle = [&] (
         ColumnPx const & column, PatternPosition const & pos, doc::PatternRef pattern
     ) {
         PainterScope scope{painter};
@@ -1272,33 +1248,19 @@ static void draw_pattern_background(
         draw_right_border(painter, sub_rect);
     };
 
-    foreach_grid([&self, &columns, &document, &pattern_draw_blocks] (
-        GridCellPosition const& pos
-    ) {
-        for (auto const& maybe_col : columns.cols) {
-            if (!maybe_col) continue;
-            ColumnPx const& col = *maybe_col;
-
-            auto timeline =
-                doc::TimelineChannelRef(document.timeline, col.chip, col.channel);
-            auto iter = FrameIter(timeline[pos.grid]);
-
-            while (auto p = iter.next()) {
-                auto pattern = *p;
-                PxInt top = pos.top + pixels_from_beat(self, pattern.begin_time);
-                PxInt bottom = pos.top + pixels_from_beat(self, pattern.end_time);
-
-                PatternPosition pattern_pos {
-                    .grid = pos.grid,
-                    .top = top,
-                    .bottom = bottom,
-                    .focused = pos.focused,
-                };
-
-                pattern_draw_blocks(col, pattern_pos, *p);
-            }
-        }
-    });
+    // Draw each pattern's block handle.
+    for (auto const& maybe_col : columns.cols) {
+        if (!maybe_col) continue;
+        ColumnPx const& col = *maybe_col;
+        foreach_visible_pattern(
+            self,
+            document,
+            col,
+            view_height,
+            y_scroll,
+            render_begin,
+            pattern_draw_handle);
+    }
 
     // Draw selection.
     if (auto maybe_select = get_select(self)) {
@@ -1312,73 +1274,9 @@ static void draw_pattern_background(
 
         int off_screen = std::max(inner_size.width(), inner_size.height()) + 100;
 
-        using MaybePxInt = std::optional<PxInt>;
-
-        /// Overwritten with the estimated top/bottom of the selection on-screen.
-        /// Set to ±off_screen if selection endpoint is above or below screen.
-        ///
-        /// These values are initialized to nullopt,
-        /// and overwritten with a non-null value on the first call to calc_select_pos().
-        MaybePxInt maybe_select_top{};
-        MaybePxInt maybe_select_bottom{};
-
-        /// Every time we compare a selection endpoint against a timeline entry / grid cell,
-        /// we can identify if it's within, above, or below it.
-        ///
-        /// If within, overwrite `select_px` unconditionally.
-        /// If above/below, overwrite `select_px` if it's nullopt.
-        ///
-        /// Once all on-screen grid cells have been checked, `select_px` holds
-        /// either a pixel value (if it's located in an on-screen grid cell),
-        /// or ±off_screen (if it's located in an off-screen grid cell).
-        auto calc_select_pos = [&self, off_screen] (
-            GridAndBeat select_time,
-            GridCellPosition const& grid_px,
-            MaybePxInt &/*mut*/ select_px
-        ) {
-            using Frac = BeatFraction;
-
-            // If time is in current grid cell, set exact position.
-            // This overwrites ±off_screen, and will not be replaced with ±off_screen.
-            if (select_time.grid == grid_px.grid) {
-                Frac select_row = select_time.beat * self._zoom_level;
-                PxInt select_y = doc::round_to_int(self._pixels_per_row * select_row);
-
-                select_px = grid_px.top + select_y;
-                return;
-            }
-
-            // If time is above current grid cell,
-            // set to -off_screen (if no value present).
-            if (select_time.grid < grid_px.grid) {
-                select_px = select_px.value_or(-off_screen);
-                return;
-            }
-
-            // If time is below current grid cell,
-            // set to +off_screen (if no value present).
-            release_assert(select_time.grid > grid_px.grid);
-            select_px = select_px.value_or(+off_screen);
-        };
-
-        foreach_grid([
-            &select, &calc_select_pos,
-            &/*mut*/ maybe_select_top, &/*mut*/ maybe_select_bottom
-        ] (GridCellPosition const& grid_px) {
-            calc_select_pos(select.top, grid_px, maybe_select_top);
-            calc_select_pos(select.bottom, grid_px, maybe_select_bottom);
-        });
-
-        // calc_select_pos() is called once for every on-screen timeline entry.
-        // These variables are overwritten on the first call to calc_select_pos().
-        // It should be impossible to scroll the screen (or move the cursor)
-        // such that 0 timeline entries are drawn.
-        if (!maybe_select_top || !maybe_select_bottom) {
-            throw std::logic_error("Trying to draw selection with 0 patterns");
-        }
-
-        PxInt & select_top = *maybe_select_top;
-        PxInt & select_bottom = *maybe_select_bottom;
+        /// The top/bottom of the selection on-screen.
+        const PxInt select_top = y_scroll + dpixels_from_time(self, select.top);
+        const PxInt select_bottom = y_scroll + dpixels_from_time(self, select.bottom);
 
         release_assert(select_top <= select_bottom);
 
@@ -1501,43 +1399,79 @@ static void draw_pattern_background(
         }
     }
 
-    auto draw_row_numbers = [&] (GridCellPosition const & pos) {
-        auto const & grid_cell = document.timeline[pos.grid];
+    {
         CACHE_COLOR(note_line_beat);
 
-        // Draw rows.
-        // Begin loop(row)
-        int row = 0;
-        BeatFraction const beats_per_row{1, self._zoom_level};
-        BeatFraction curr_beats = 0;
-        for (;
-            curr_beats < grid_cell.nbeats;
-            curr_beats += beats_per_row, row += 1)
+        // Draw beat and measure numbers.
+        auto draw_beat = [&](Beat beat, int measure_idx, PxInt ytop) {
+            auto beat_in_measure = beat.beat_in_measure;
+
+            // Draw current beat.
+            QString s = EXPR(
+                if (beat_in_measure == 0) {
+                    return QStringLiteral("%1")
+                        .arg(measure_idx, 3, 10, QChar('0'));
+                } else {
+                    return QStringLiteral(".%1").arg(beat_in_measure);
+                }
+            );
+
+            painter.setFont(visual.pattern_font);
+            painter.setPen(note_line_beat);
+
+            DrawText draw_text{visual.pattern_font};
+            draw_text.draw_text(
+                painter,
+                columns.ruler.center_px(),
+                ytop + visual.font_tweaks.pixels_above_text,
+                Qt::AlignTop | Qt::AlignHCenter,
+                s
+            );
+        };
+
+        // Draw all beats visible.
+        const BeatIter start_beat = BeatIter::at_time(document, render_begin).iter;
+        const int start_measure = measure_at(document, render_begin);
         {
-            int ytop = pos.top + self._pixels_per_row * row;
+            auto up_beat = start_beat;
+            auto curr_measure = start_measure;
+            while (true) {
+                const Beat beat = up_beat.peek();
+                const PxInt ytop = y_scroll + dpixels_from_time(self, beat.time);
+                if (ytop < -self._pixels_per_row) {
+                    break;
+                }
 
-            // Draw ruler labels (numbers).
-            if (curr_beats.denominator() == 1) {
-                // Draw current beat.
-                QString s = format_hex_2((uint8_t) curr_beats.numerator());
+                draw_beat(beat, curr_measure, ytop);
 
-                painter.setFont(visual.pattern_font);
-                painter.setPen(note_line_beat);
-
-                DrawText draw_text{visual.pattern_font};
-                draw_text.draw_text(
-                    painter,
-                    columns.ruler.center_px(),
-                    ytop + visual.font_tweaks.pixels_above_text,
-                    Qt::AlignTop | Qt::AlignHCenter,
-                    s
-                );
+                if (!up_beat.try_prev()) {
+                    break;
+                }
+                if (beat.is_measure()) {
+                    curr_measure--;
+                }
             }
-            // Don't label non-beat rows for the time being.
         }
-    };
+        {
+            auto down_beat = start_beat;
+            auto curr_measure = start_measure;
+            down_beat.next();
+            while (true) {
+                const Beat beat = down_beat.peek();
+                const PxInt ytop = y_scroll + dpixels_from_time(self, beat.time);
+                if (ytop >= view_height) {
+                    break;
+                }
+                if (beat.is_measure()) {
+                    curr_measure++;
+                }
 
-    foreach_grid(draw_row_numbers);
+                draw_beat(beat, curr_measure, ytop);
+
+                down_beat.next();
+            }
+        }
+    }
 }
 
 /// Draw `RowEvent`s positioned at TimeInPattern. Not all events occur at beat boundaries.
@@ -1548,8 +1482,6 @@ static void draw_pattern_foreground(
     QPainter & painter,
     QSize const inner_size
 ) {
-    using Frac = BeatFraction;
-
     auto & visual = get_app().options().visual;
     auto & note_cfg = get_app().options().note_names;
 
@@ -1614,12 +1546,16 @@ static void draw_pattern_foreground(
 
         PainterScope scope{painter};
 
+        // Allow drawing into the space reserved for the next pattern, to be consistent
+        // with "within block".
+        // Keep in sync with "2 * self._pixels_per_row" below!
+        // TODO should we skip drawing and/or playing events past the end of the
+        // pattern?
         painter.setClipRect(
             GridRect(
-                QPoint(column.left_px, pos.top), QPoint(column.right_px, pos.bottom)
-            ),
-            Qt::IntersectClip
-        );
+                QPoint(column.left_px, pos.top),
+                QPoint(column.right_px, pos.bottom + 2 * self._pixels_per_row)),
+            Qt::IntersectClip);
 
         // Right now, only draw_pattern_foreground() and not draw_pattern_background()
         // calls translate(pos.top).
@@ -1629,29 +1565,32 @@ static void draw_pattern_foreground(
         // https://bugs.llvm.org/show_bug.cgi?id=33236
         // the original C++17 spec broke const struct unpacking.
         for (doc::TimedRowEvent timed_event : pattern.events) {
-            Frac beat = timed_event.anchor_beat;
+            TickT anchor_tick = timed_event.anchor_tick;
             doc::RowEvent row_event = timed_event.v;
 
             // Compute where to draw row.
-            Frac row = beat * self._zoom_level;
-            int yPx = doc::round_to_int(self._pixels_per_row * row);
+            PxInt yPx = dpixels_from_time(self, anchor_tick);
 
             // Move painter relative to current row (not cell).
             PainterScope scope{painter};
             painter.translate(0, yPx);
 
-            // TODO add coarse/fine highlight fractions
             QColor note_color;
 
-            if (beat.denominator() == 1) {
-                // Highlighted notes
-                note_color = note_line_beat;
-            } else if (row.denominator() == 1) {
-                // Non-highlighted notes
-                note_color = note_line_non_beat;
-            } else {
+            auto x = RowIter::at_time(document, anchor_tick, self._ticks_per_row);
+
+            if (x.snapped_earlier) {
                 // Off-grid misaligned notes (not possible in traditional trackers)
                 note_color = note_line_fractional;
+            } else {
+                Row row = x.iter.peek();
+                if (row.is_beat()) {
+                    // Highlighted notes (on beats)
+                    note_color = note_line_beat;
+                } else {
+                    // Non-highlighted notes (on rows)
+                    note_color = note_line_non_beat;
+                }
             }
 
             auto draw_top_line = [&painter, &note_color] (
@@ -1677,6 +1616,7 @@ static void draw_pattern_foreground(
                         QPoint{subcolumn.left_px(), 0},
                         // Double the height so descenders can still draw into the next row.
                         // Is this a good idea? IDK.
+                        // Keep in sync with "2 * self._pixels_per_row" above!
                         QPoint{subcolumn.right_px(), 2 * self._pixels_per_row},
                     },
                     Qt::IntersectClip
@@ -1919,37 +1859,23 @@ static void draw_pattern_foreground(
         }
     };
 
-    auto const [seq, cursor_top] =
-        GridCellIteratorState::make(self, document, (PxInt) inner_size.height());
-    ForeachGrid foreach_grid{seq};
+    const PxInt view_height = inner_size.height();
+    const auto [y_scroll, cursor_top] = SongScrollPos::make(self, view_height);
 
-    foreach_grid([&self, &columns, &document, &pattern_draw_notes] (
-        GridCellPosition const& pos
-    ) {
-        for (auto const& maybe_col : columns.cols) {
-            if (!maybe_col) continue;
-            ColumnPx const& col = *maybe_col;
+    const TickT render_begin = self._free_scroll_position.value_or(get_cursor(self).y);
 
-            auto timeline =
-                doc::TimelineChannelRef(document.timeline, col.chip, col.channel);
-            auto iter = FrameIter(timeline[pos.grid]);
-
-            while (auto p = iter.next()) {
-                auto pattern = *p;
-                PxInt top = pos.top + pixels_from_beat(self, pattern.begin_time);
-                PxInt bottom = pos.top + pixels_from_beat(self, pattern.end_time);
-
-                PatternPosition pattern_pos {
-                    .grid = pos.grid,
-                    .top = top,
-                    .bottom = bottom,
-                    .focused = pos.focused,
-                };
-
-                pattern_draw_notes(col, pattern_pos, *p);
-            }
-        }
-    });
+    for (auto const& maybe_col : columns.cols) {
+        if (!maybe_col) continue;
+        ColumnPx const& col = *maybe_col;
+        foreach_visible_pattern(
+            self,
+            document,
+            col,
+            view_height,
+            y_scroll,
+            render_begin,
+            pattern_draw_notes);
+    }
 
     // Draw cursor.
     // The cursor is drawn on top of channel dividers and note lines/text.
@@ -2069,118 +1995,116 @@ void PatternEditor::paintEvent(QPaintEvent * /*event*/) {
 
 // # Vertical cursor movement
 
-void PatternEditor::up_pressed(StateTransaction & tx) {
+void PatternEditor::up_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
-        .rows_per_beat = _zoom_level,
+        .ticks_per_row = _ticks_per_row,
         .step = _step,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    auto cursor = get_cursor(*this);
-    tx.cursor_mut().set_y(move_cursor::move_up(document, cursor, args, move_cfg));
+    auto cursor = cursor_sel.get();
+    cursor_sel.set_y(move_cursor::move_up(document, cursor, args, move_cfg));
 }
 
-void PatternEditor::down_pressed(StateTransaction & tx) {
+void PatternEditor::down_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
-        .rows_per_beat = _zoom_level,
+        .ticks_per_row = _ticks_per_row,
         .step = _step,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    auto cursor = get_cursor(*this);
-    tx.cursor_mut().set_y(move_cursor::move_down(document, cursor, args, move_cfg));
+    auto cursor = cursor_sel.get();
+    cursor_sel.set_y(move_cursor::move_down(document, cursor, args, move_cfg));
 }
 
 
-void PatternEditor::up_row_pressed(StateTransaction & tx) {
+void PatternEditor::up_row_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
-        .rows_per_beat = _zoom_level,
+        .ticks_per_row = _ticks_per_row,
         .step = 1,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    auto cursor = get_cursor(*this);
-    tx.cursor_mut().set_y(move_cursor::move_up(document, cursor, args, move_cfg));
+    auto cursor = cursor_sel.get();
+    cursor_sel.set_y(move_cursor::move_up(document, cursor, args, move_cfg));
 }
 
-void PatternEditor::down_row_pressed(StateTransaction & tx) {
+void PatternEditor::down_row_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
     move_cursor::MoveCursorYArgs args{
-        .rows_per_beat = _zoom_level,
+        .ticks_per_row = _ticks_per_row,
         .step = 1,
     };
     auto const& move_cfg = get_app().options().move_cfg;
 
-    auto cursor = get_cursor(*this);
-    tx.cursor_mut().set_y(move_cursor::move_down(document, cursor, args, move_cfg));
+    auto cursor = cursor_sel.get();
+    cursor_sel.set_y(move_cursor::move_down(document, cursor, args, move_cfg));
 }
 
 
-void PatternEditor::prev_beat_pressed(StateTransaction & tx) {
+void PatternEditor::prev_beat_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
-    auto const & move_cfg = get_app().options().move_cfg;
 
-    auto cursor_y = get_cursor(*this).y;
-    tx.cursor_mut().set_y(move_cursor::prev_beat(document, cursor_y, move_cfg));
+    auto cursor_y = cursor_sel.get().y;
+    cursor_sel.set_y(move_cursor::prev_beat(document, cursor_y));
 }
 
-void PatternEditor::next_beat_pressed(StateTransaction & tx) {
+void PatternEditor::next_beat_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
-    auto const & move_cfg = get_app().options().move_cfg;
 
-    auto cursor_y = get_cursor(*this).y;
-    tx.cursor_mut().set_y(move_cursor::next_beat(document, cursor_y, move_cfg));
+    auto cursor_y = cursor_sel.get().y;
+    cursor_sel.set_y(move_cursor::next_beat(document, cursor_y));
 }
 
 
-void PatternEditor::prev_event_pressed(StateTransaction & tx) {
+void PatternEditor::prev_event_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
-    auto ev_time = move_cursor::prev_event(document, get_cursor(*this));
-    tx.cursor_mut().set_y(ev_time);
+    auto ev_time = move_cursor::prev_event(document, cursor_sel.get());
+    cursor_sel.set_y(ev_time);
 }
 
-void PatternEditor::next_event_pressed(StateTransaction & tx) {
+void PatternEditor::next_event_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
-    auto ev_time = move_cursor::next_event(document, get_cursor(*this));
-    tx.cursor_mut().set_y(ev_time);
+    auto ev_time = move_cursor::next_event(document, cursor_sel.get());
+    cursor_sel.set_y(ev_time);
 }
 
 
-void PatternEditor::scroll_prev_pressed(StateTransaction & tx) {
+void PatternEditor::scroll_prev_pressed(CursorAndSelection & cursor_sel) {
+    doc::Document const & doc = get_document();
+    auto const& move_cfg = get_app().options().move_cfg;
+    TickT cursor_y = cursor_sel.get().y;
+
+    cursor_sel.set_y(move_cursor::page_up(doc, cursor_y, _ticks_per_row, move_cfg));
+}
+
+void PatternEditor::scroll_next_pressed(CursorAndSelection & cursor_sel) {
+    doc::Document const & doc = get_document();
+    auto const& move_cfg = get_app().options().move_cfg;
+    TickT cursor_y = cursor_sel.get().y;
+
+    cursor_sel.set_y(move_cursor::page_down(doc, cursor_y, _ticks_per_row, move_cfg));
+}
+
+void PatternEditor::top_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
     auto const& move_cfg = get_app().options().move_cfg;
-    auto cursor_y = get_cursor(*this).y;
+    Cursor cursor = cursor_sel.get();
 
-    tx.cursor_mut().set_y(move_cursor::page_up(document, cursor_y, move_cfg));
+    auto new_y = move_cursor::block_begin(document, cursor, move_cfg);
+    cursor_sel.set_y(new_y);
 }
 
-void PatternEditor::scroll_next_pressed(StateTransaction & tx) {
-    doc::Document const & document = get_document();
-    auto const& move_cfg = get_app().options().move_cfg;
-    auto cursor_y = get_cursor(*this).y;
-
-    tx.cursor_mut().set_y(move_cursor::page_down(document, cursor_y, move_cfg));
-}
-
-void PatternEditor::top_pressed(StateTransaction & tx) {
-    doc::Document const & document = get_document();
-    auto const& move_cfg = get_app().options().move_cfg;
-    Cursor cursor = get_cursor(*this);
-
-    auto new_y = move_cursor::frame_begin(document, cursor, move_cfg);
-    tx.cursor_mut().set_y(new_y);
-}
-
-void PatternEditor::bottom_pressed(StateTransaction & tx) {
+void PatternEditor::bottom_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const& document = get_document();
     auto const& move_cfg = get_app().options().move_cfg;
-    Cursor cursor = get_cursor(*this);
+    Cursor cursor = cursor_sel.get();
 
     // Move the cursor _ above the end of the current frame.
-    auto bottom_padding = EXPR(
+    TickT bottom_padding = EXPR(
         auto raw_select = get_raw_sel(*this);
 
         /*
@@ -2198,28 +2122,28 @@ void PatternEditor::bottom_pressed(StateTransaction & tx) {
         if (raw_select && raw_select->bottom_padding() > 0) {
             return raw_select->bottom_padding();
         } else {
-            return BeatFraction{1, _zoom_level};
+            return _ticks_per_row;
         }
     );
 
-    auto new_y = move_cursor::frame_end(document, cursor, move_cfg, bottom_padding);
-    tx.cursor_mut().set_y(new_y);
+    auto new_y = move_cursor::block_end(document, cursor, move_cfg, bottom_padding);
+    cursor_sel.set_y(new_y);
 }
 
-void PatternEditor::prev_pattern_pressed(StateTransaction & tx) {
+void PatternEditor::prev_pattern_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
-    Cursor cursor = get_cursor(*this);
+    Cursor cursor = cursor_sel.get();
 
-    auto new_y = move_cursor::prev_frame(document, cursor, _zoom_level);
-    tx.cursor_mut().set_y(new_y);
+    auto new_y = move_cursor::prev_block(document, cursor, _ticks_per_row);
+    cursor_sel.set_y(new_y);
 }
 
-void PatternEditor::next_pattern_pressed(StateTransaction & tx) {
+void PatternEditor::next_pattern_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
-    Cursor cursor = get_cursor(*this);
+    Cursor cursor = cursor_sel.get();
 
-    auto new_y = move_cursor::next_frame(document, cursor, _zoom_level);
-    tx.cursor_mut().set_y(new_y);
+    auto new_y = move_cursor::next_block(document, cursor, _ticks_per_row);
+    cursor_sel.set_y(new_y);
 }
 
 // # Horizontal cursor movement
@@ -2294,18 +2218,18 @@ static CursorX move_right(PatternEditor const& self, CursorX cursor_x) {
     return cursor_x;
 }
 
-void PatternEditor::left_pressed(StateTransaction & tx) {
-    auto cursor_x = get_cursor(*this).x;
+void PatternEditor::left_pressed(CursorAndSelection & cursor_sel) {
+    auto cursor_x = cursor_sel.get().x;
     cursor_x = move_left(*this, cursor_x);
 
-    tx.cursor_mut().set_x(cursor_x);
+    cursor_sel.set_x(cursor_x);
 }
 
-void PatternEditor::right_pressed(StateTransaction & tx) {
-    auto cursor_x = get_cursor(*this).x;
+void PatternEditor::right_pressed(CursorAndSelection & cursor_sel) {
+    auto cursor_x = cursor_sel.get().x;
     cursor_x = move_right(*this, cursor_x);
 
-    tx.cursor_mut().set_x(cursor_x);
+    cursor_sel.set_x(cursor_x);
 }
 
 // TODO implement comparison between subcolumn variants,
@@ -2336,11 +2260,11 @@ CursorX cursor_clamp_subcol(ColumnList const& cols, CursorX cursor_x) {
     return cursor_x;
 }
 
-void PatternEditor::scroll_left_pressed(StateTransaction & tx) {
+void PatternEditor::scroll_left_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    CursorX cursor_x = get_cursor(*this).x;
+    CursorX cursor_x = cursor_sel.get().x;
     if (cursor_x.column > 0) {
         cursor_x.column--;
     } else {
@@ -2349,14 +2273,14 @@ void PatternEditor::scroll_left_pressed(StateTransaction & tx) {
 
     cursor_x = cursor_clamp_subcol(cols, cursor_x);
 
-    tx.cursor_mut().set_x(cursor_x);
+    cursor_sel.set_x(cursor_x);
 }
 
-void PatternEditor::scroll_right_pressed(StateTransaction & tx) {
+void PatternEditor::scroll_right_pressed(CursorAndSelection & cursor_sel) {
     doc::Document const & document = get_document();
     ColumnList cols = gen_column_list(*this, document);
 
-    CursorX cursor_x = get_cursor(*this).x;
+    CursorX cursor_x = cursor_sel.get().x;
 
     cursor_x.column++;
     if (cursor_x.column >= ncol(cols)) {
@@ -2365,7 +2289,7 @@ void PatternEditor::scroll_right_pressed(StateTransaction & tx) {
 
     cursor_x = cursor_clamp_subcol(cols, cursor_x);
 
-    tx.cursor_mut().set_x(cursor_x);
+    cursor_sel.set_x(cursor_x);
 }
 
 void PatternEditor::escape_pressed() {
@@ -2389,7 +2313,7 @@ void PatternEditor::toggle_edit_pressed() {
 static Cursor step_down_only(PatternEditor const& self, Cursor cursor) {
     doc::Document const & document = self.get_document();
     move_cursor::CursorStepArgs args{
-        .rows_per_beat = self._zoom_level,
+        .ticks_per_row = self._ticks_per_row,
         .step = self._step,
         .step_to_event = self._step_to_event,
     };
@@ -2516,11 +2440,12 @@ static void note_pressed(
     }
 
     auto abs_time = get_cursor(self).y;
+    auto extend_block = get_app().options().extend_block;
 
     auto tx = self._win.edit_unwrap();
     tx.push_edit(
         ed::insert_note(
-            self.get_document(), chip, channel, abs_time, note, instrument
+            self.get_document(), chip, channel, abs_time, extend_block, note, instrument
         ),
         main_window::move_to(step_cursor(self))
     );
@@ -2553,8 +2478,8 @@ void PatternEditor::select_all_pressed() {
     // TODO add a method abstraction?
     auto tx = _win.edit_unwrap();
     auto & cursor = tx.cursor_mut();
-    cursor.enable_select(_zoom_level);
-    cursor.raw_select_mut()->select_all(document, col_to_nsubcol, _zoom_level);
+    cursor.enable_select(_ticks_per_row);
+    cursor.raw_select_mut()->select_all(document, col_to_nsubcol, _ticks_per_row);
 }
 
 void PatternEditor::selection_padding_pressed() {
@@ -2562,10 +2487,10 @@ void PatternEditor::selection_padding_pressed() {
     auto & cursor = tx.cursor_mut();
     if (auto & select = cursor.raw_select_mut()) {
         // If selection enabled, toggle whether to include bottom row.
-        select->toggle_padding(_zoom_level);
+        select->toggle_padding(_ticks_per_row);
     } else {
         // Otherwise create a single-cell selection.
-        cursor.enable_select(_zoom_level);
+        cursor.enable_select(_ticks_per_row);
     }
 }
 
@@ -2590,8 +2515,9 @@ static void add_digit(
     using ed::DigitAction;
     using main_window::MoveCursor;
 
-    auto const& document = self.get_document();
+    auto const& doc = self.get_document();
     auto abs_time = get_cursor(self).y;
+    auto extend_block = get_app().options().extend_block;
 
     // TODO add support for DigitAction::ShiftLeft?
     // We'd have to track "cursor items" and "digits per item" separately,
@@ -2610,7 +2536,7 @@ static void add_digit(
     MoveCursor move_cursor =  main_window::move_to(step_cursor(self));
 
     auto [number, box] = ed::add_digit(
-        document, chip, channel, abs_time, field.type, digit_action, nybble
+        doc, chip, channel, abs_time, extend_block, field.type, digit_action, nybble
     );
 
     auto tx = self._win.edit_unwrap();
@@ -2648,8 +2574,9 @@ static void add_effect_char(
     namespace EffectAction_ = ed::EffectAction_;
     using main_window::MoveCursor;
 
-    auto const& document = self.get_document();
+    auto const& doc = self.get_document();
     auto abs_time = get_cursor(self).y;
+    auto extend_block = get_app().options().extend_block;
 
     doc::EffectName dummy_name{doc::EFFECT_NAME_PLACEHOLDER, c};
 
@@ -2672,7 +2599,7 @@ static void add_effect_char(
     MoveCursor move_cursor =  main_window::move_to(step_cursor(self));
 
     auto box = ed::add_effect_char(
-        document, chip, channel, abs_time, field.type, effect_action
+        doc, chip, channel, abs_time, extend_block, field.type, effect_action
     );
     auto tx = self._win.edit_unwrap();
     tx.push_edit(std::move(box), move_cursor);

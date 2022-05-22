@@ -6,6 +6,7 @@
 #include "doc/effect_names.h"
 #include "util/release_assert.h"
 
+#include <algorithm>  // std::clamp
 #include <cstdint>
 
 namespace doc_util::event_builder {
@@ -29,8 +30,8 @@ class EventBuilder {
 
 // impl
 public:
-    EventBuilder(BeatFraction anchor_beat, std::optional<Note> note)
-        : _ev{anchor_beat, RowEvent{note}}
+    EventBuilder(TickT anchor_tick, std::optional<Note> note)
+        : _ev{anchor_tick, RowEvent{note}}
     {}
 
     operator TimedRowEvent() {
@@ -71,8 +72,8 @@ public:
     }
 };
 
-inline BeatFraction at(int start, int num, int den) {
-    return start + BeatFraction(num, den);
+inline TickT at(int beat, TickT ticks = 0) {
+    return 48 * beat + ticks;
 }
 
 inline Note pitch(int octave, int semitone) {

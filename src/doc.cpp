@@ -42,28 +42,14 @@ Document Document::clone() const {
 }
 
 static void post_init(Document & document) {
-    release_assert_equal(document.chip_channel_settings.size(), document.chips.size());
-    for (ChipIndex chip = 0; chip < document.chips.size(); chip++) {
-        release_assert_equal(
-            document.chip_channel_settings[chip].size(),
-            document.chip_index_to_nchan(chip));
-    }
+    // Reserve 1024 elements to ensure that adding blocks is bounded-time.
+    auto & sequence = document.sequence;
+    release_assert_equal(sequence.size(), document.chips.size());
 
-    // Reserve 256 elements to ensure that insert/delete is bounded-time.
-    document.timeline.reserve(MAX_TIMELINE_FRAMES);
-
-    // Reserve 32 elements to ensure that adding blocks is bounded-time.
-    for (auto & row : document.timeline) {
-        release_assert_equal(row.chip_channel_cells.size(), document.chips.size());
-
-        for (
-            auto const& [chip, chan_cells]
-            : enumerate<ChipIndex>(row.chip_channel_cells)
-        ) {
-            release_assert_equal(chan_cells.size(), document.chip_index_to_nchan(chip));
-            for (auto & cell : chan_cells) {
-                cell._raw_blocks.reserve(MAX_BLOCKS_PER_CELL);
-            }
+    for (auto const& [chip, chan_tracks] : enumerate<ChipIndex>(sequence)) {
+        release_assert_equal(chan_tracks.size(), document.chip_index_to_nchan(chip));
+        for (SequenceTrack & track : chan_tracks) {
+            track.blocks.reserve(MAX_BLOCKS_PER_TRACK);
         }
     }
 }

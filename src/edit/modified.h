@@ -13,21 +13,16 @@ namespace edit::modified {
 // (only by including a specific header), or allow downcasting, or idk even...
 
 enum ModifiedFlags : ModifiedInt {
-    /// The timeline of grid cells has been changed. The playback point may be invalid.
-    /// If set, Patterns is ignored.
-    TimelineFrames = 0x1,
-    /// Events within some patterns have changed.
-    Patterns = 0x2,
+    /// Song length, blocks or patterns, or events have changed. The playback point may
+    /// now point out of bounds.
+    Patterns = 0x1,
 
-    /// SequencerOptions::target_tempo has changed.
-    TargetTempo = 0x10,
-    /// SequencerOptions::.spc_timer_period has changed.
-    SpcTimerPeriod = 0x20,
-    /// SequencerOptions::.ticks_per_beat has changed.
-    TicksPerBeat = 0x40,
+    /// SequencerOptions::target_tempo or ticks_per_beat or spc_timer_period has
+    /// changed.
+    EngineTempo = 0x10,
 
     /// Any field in SequencerOptions has changed.
-    SequencerOptions = TargetTempo | SpcTimerPeriod | TicksPerBeat,
+    AllSequencerOptions = EngineTempo,
 
     /// Sample metadata has changed, but the actual data has not.
     /// Keep playing existing notes. (TODO reload tuning/loop points)
