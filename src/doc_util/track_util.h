@@ -6,7 +6,7 @@
 
 #include <tuple>
 
-namespace doc_util::time_util {
+namespace doc_util::track_util {
 
 using namespace doc::timeline;
 using doc::event_list::EventIndex;

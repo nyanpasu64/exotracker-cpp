@@ -184,8 +184,8 @@ add_library(exotracker-core
     src/doc/effect_names.h
     src/doc/gui_traits.h
     src/doc/gui_traits.cpp
-    src/doc_util/time_util.h
-    src/doc_util/time_util.cpp
+    src/doc_util/track_util.h
+    src/doc_util/track_util.cpp
     src/timing_common.h
     src/timing_common.cpp
     src/util/format.h
@@ -439,7 +439,7 @@ add_executable(exotracker-tests
     src/gui/move_cursor.cpp
     # src/audio/synth/envelope.cpp
     src/audio/synth/spc700_driver.cpp
-    src/doc_util/time_util.cpp
+    src/doc_util/track_util.cpp
     src/spc_export.cpp
 )
 target_compile_options(exotracker-tests PRIVATE "${options}")
