@@ -1674,7 +1674,11 @@ private:
         // TODO maybe these shortcuts should be inactive when order editor is focused
         BINDP_FROM_CONFIG(zoom_out);
         auto zoomed_out_half = [](TickT new_height, TickT curr_height) {
-            return new_height == 2 * curr_height;
+            // This normally only jumps from regular to regular and triplet to triplet,
+            // but if you start from "1/8 triplet", it zooms out by 3 times to "1/4".
+            // This ensures that repeatedly pressing Ctrl+- zooms out all the way.
+
+            return new_height >= 2 * curr_height;
         };
         connect_action(_zoom_out, &MainWindowImpl::zoom_out<decltype(zoomed_out_half)>);
 
