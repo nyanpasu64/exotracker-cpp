@@ -919,7 +919,6 @@ public:
     QPointer<SampleDialog> _maybe_sample_dialog;
 
     std::vector<RowHeight> _row_heights;
-    QIntValidator _row_height_validator;
 
     // Global playback shortcuts.
     // TODO implement global configuration system with "reloaded" signal.
@@ -963,7 +962,6 @@ public:
     MainWindowImpl(doc::Document document, QWidget * parent)
         : MainWindowUi(std::move(document), parent)
         , _error_dialog(this)
-        , _row_height_validator(1, MAX_ROW_HEIGHT)
     {
         // Setup GUI.
         setup_widgets();  // Output: _pattern_editor.
@@ -976,8 +974,6 @@ public:
 
         // _row_height->setInsertPolicy(QComboBox::NoInsert) prevents custom zoom
         // levels from being registered. Should we keep custom zoom levels?
-
-        _row_height->setValidator(&_row_height_validator);
 
         _pattern_editor->set_history(_state.document_getter());
         _timeline_editor->set_history(_state.document_getter());
