@@ -1,4 +1,5 @@
 #include "validate.h"
+#include "util/enumerate.h"
 #include "util/release_assert.h"
 #include "chip_kinds.h"
 
@@ -328,9 +329,24 @@ size_t truncate_events(ErrorState & state, size_t gen_nevent) {
     return std::min(gen_nevent, (size_t) MAX_EVENTS_PER_PATTERN);
 }
 
-EventList validate_events(ErrorState & state, EventList events) {
+EventList validate_events(ErrorState & state, EventList events, TickT length_ticks) {
     bool must_sort = false;
     auto const n = events.size();
+
+    // Warn on out-of-bounds events.
+    for (auto const& [i, event] : enumerate<size_t>(events)) {
+        auto t = event.anchor_tick;
+        if (t < 0) {
+            PUSH_WARNING(state,
+                "[{}].anchor_tick={} < 0, may not play properly",
+                i, t);
+        }
+        if (t >= length_ticks) {
+            PUSH_WARNING(state,
+                "[{}].anchor_tick={} >= pattern length={}, may not play properly",
+                i, t, length_ticks);
+        }
+    }
 
     // Loop over all i where i and i + 1 are valid indices.
     for (size_t i = 0; i + 1 < n; i++) {

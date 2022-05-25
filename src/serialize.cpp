@@ -872,7 +872,7 @@ optional<Pattern> load_pattern(ErrorState & state, gen::Pattern::Reader gen_patt
     // Validate events are sorted <= in time (ignoring delay effects
     // since those depend on column count).
     PUSH(".events");
-    events = validate_events(state, move(events));
+    events = validate_events(state, move(events), length_ticks);
     POP();
 
     return validate_pattern(state, Pattern {

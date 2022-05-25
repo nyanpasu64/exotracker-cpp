@@ -281,7 +281,8 @@ ChipMetadatas compute_chip_metadata(gsl::span<const ChipKind> chips);
 
 [[nodiscard]] size_t truncate_events(ErrorState & state, size_t gen_nevent);
 
-[[nodiscard]] EventList validate_events(ErrorState & state, EventList events);
+[[nodiscard]]
+EventList validate_events(ErrorState & state, EventList events, TickT length_ticks);
 
 [[nodiscard]] optional<Pattern> validate_pattern(ErrorState & state, Pattern pattern);
 
