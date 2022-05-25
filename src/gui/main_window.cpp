@@ -1048,6 +1048,8 @@ public:
     }
 
     void display_row_height() {
+        auto b = QSignalBlocker(_row_height);
+
         TickT row_height = _pattern_editor->ticks_per_row();
         for (auto const& [idx, r] : enumerate<int>(_row_heights)) {
             if (r.ticks_per_row == row_height) {
@@ -1056,7 +1058,6 @@ public:
             }
         }
 
-        auto b = QSignalBlocker(_row_height);
         _row_height->setCurrentText(locale().toString(row_height));
     }
 
