@@ -973,40 +973,40 @@ void foreach_visible_pattern(
 {
     doc::SequenceTrack const& track = doc.sequence[col.chip][col.channel];
 
-    auto patterns = TrackPatternIterRef::at_time(track, render_begin).iter;
-
-    // Find the topmost visible pattern. (Looped handles must be drawn from top to
-    // bottom.)
+    // Find the topmost visible pattern and store it in `patterns`. Then use it to draw
+    // looped handles from top to bottom.
     //
-    // Converting a pixel coordinate to a timestamp would be faster, but is
-    // difficult to implement or use correctly, due to rounding errors.
-    {
-        auto up_patterns = patterns;
-        // This is safe even at block 0.
-        up_patterns.prev();
+    // Converting a pixel coordinate `y_scroll` to a timestamp and passing it to
+    // `TrackPatternIterRef::at_time()` would be faster, but is difficult to implement
+    // or use correctly, due to rounding errors.
+    auto patterns = EXPR(
+        auto patterns = TrackPatternIterRef::at_time(track, render_begin).iter;
+        auto prev_patterns = patterns;
 
+        // Starting at `patterns`, check every previous pattern (`prev_patterns`) until
+        // we find one off-screen, keeping the final on-screen pattern in `patterns`.
         while (true) {
-            auto maybe_pattern = up_patterns.peek();
-            if (!maybe_pattern) {
+            // This is safe even if `patterns` points to block 0, or if the document
+            // has no patterns.
+            prev_patterns.prev();
+
+            auto maybe_prev_pattern = prev_patterns.peek();
+            if (!maybe_prev_pattern) {
                 break;
             }
-            PatternRef const& pattern = *maybe_pattern;
+            PatternRef const& prev_pattern = *maybe_prev_pattern;
 
-            PxInt bottom = y_scroll + dpixels_from_time(self, pattern.end_tick);
+            PxInt bottom = y_scroll + dpixels_from_time(self, prev_pattern.end_tick);
             if (bottom < 0) {
                 break;
+            } else {
+                patterns = prev_patterns;
             }
-
-            patterns = up_patterns;
-            up_patterns.prev();
         }
-    }
+        return patterns;
+    );
     // Loop through visible patterns and draw block handles.
-    while (true) {
-        auto maybe_pattern = patterns.peek();
-        if (!maybe_pattern) {
-            break;
-        }
+    while (auto maybe_pattern = patterns.peek()) {
         PatternRef const& pattern = *maybe_pattern;
 
         // TODO should we draw patterns outside the cursor differently?
