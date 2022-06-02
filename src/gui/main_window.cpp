@@ -696,34 +696,30 @@ private:
         using fmt::print;
 
         // Determine the number of devices available
-        unsigned int n_devices = _rt.getDeviceCount();
+        auto devices = _rt.getDeviceIds();
 
         // Scan through devices for various capabilities
-        for (unsigned int i = 0; i < n_devices; i++) {
+        for (unsigned int i : devices) {
             print("    {}: ", i);
 
             RtAudio::DeviceInfo info = _rt.getDeviceInfo(i);
-            if (info.probed == true) {
-                print(
-                    "name={}, rate={}, out_nchan={}\n",
-                    info.name,
-                    info.preferredSampleRate,
-                    info.outputChannels
-                );
-            } else {
-                print("probe failed\n");
-            }
+            print(
+                "name={}, rate={}, out_nchan={}\n",
+                info.name,
+                info.preferredSampleRate,
+                info.outputChannels
+            );
         }
 
         std::cout << "}\n";
         fflush(stdout);
 
-        if (n_devices == 0) {
+        if (devices.size() == 0) {
             std::cout << "No devices available\n";
             return;
         }
 
-        print("Default device index: {}\n", _rt.getDefaultOutputDevice());
+        print("Default device ID: {}\n", _rt.getDefaultOutputDevice());
         fflush(stdout);
 
         _curr_audio_device = _rt.getDefaultOutputDevice();
