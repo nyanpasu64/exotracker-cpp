@@ -88,8 +88,7 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
     // sometimes PulseAudio tells RtAudio there are 0 output devices,
     // and RtAudio throws an exception trying to open device 0.
     // TODO return RtAudio error message? They're not very useful TBH.
-    try {
-        rt.openStream(
+    auto e = rt.openStream(
             &/*mut*/ outParams,
             nullptr,
             AmplitudeFmt,
@@ -99,21 +98,25 @@ std::optional<AudioThreadHandle> AudioThreadHandle::make(
             synth.get(),
             &/*mut*/ stream_opt
         );
-        /*
-        What does RtAudio::openStream() mutate?
+    if (e != RTAUDIO_NO_ERROR) {
+        fmt::print("RtAudio::openStream() error {}\n", e);
+        return {};
+    }
+    /*
+    What does RtAudio::openStream() mutate?
 
-        outParams: Not mutated. If nChannels decreased, would result in out-of-bounds writes.
-        mono_smp_per_block: Mutated by DirectSound, but callback doesn't store the old value.
-        stream_opt: Only numberOfBuffers is mutated. If flags mutated, would result in garbled audio.
-        */
+    outParams: Not mutated. If nChannels decreased, would result in out-of-bounds writes.
+    mono_smp_per_block: Mutated by DirectSound, but callback doesn't store the old value.
+    stream_opt: Only numberOfBuffers is mutated. If flags mutated, would result in garbled audio.
+    */
 
-        fmt::print(stderr,
-            "{} smp/block, {} buffers\n", mono_smp_per_block, stream_opt.numberOfBuffers
-        );
+    fmt::print(stderr,
+        "{} smp/block, {} buffers\n", mono_smp_per_block, stream_opt.numberOfBuffers
+    );
 
-        rt.startStream();
-    } catch (RtAudioError & e) {
-        e.printMessage();
+    e = rt.startStream();
+    if (e != RTAUDIO_NO_ERROR) {
+        fmt::print("RtAudio::startStream() error {}\n", e);
         return {};
     }
 
@@ -126,10 +129,9 @@ AudioThreadHandle::~AudioThreadHandle() {
         return;
     }
 
-    try {
-        _rt.get().stopStream();
-    } catch (RtAudioError & e) {
-        e.printMessage();
+    auto e = _rt.get().stopStream();
+    if (e != RTAUDIO_NO_ERROR) {
+        fmt::print("RtAudio::stopStream() error {}\n", e);
     }
 
     _rt.get().closeStream();
