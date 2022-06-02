@@ -75,7 +75,7 @@ typedef unsigned int rtaudio_stream_flags_t;
 #define RTAUDIO_FLAGS_HOG_DEVICE 0x4
 #define RTAUDIO_FLAGS_SCHEDULE_REALTIME 0x8
 #define RTAUDIO_FLAGS_ALSA_USE_DEFAULT 0x10
-#define RTAUDIO_FLAGS_JACK_DONT_CONNECT = 0x20
+#define RTAUDIO_FLAGS_JACK_DONT_CONNECT 0x20
 
 /*! \typedef typedef unsigned long rtaudio_stream_status_t;
     \brief RtAudio stream status (over- or underflow) flags.
@@ -113,7 +113,7 @@ typedef int (*rtaudio_cb_t)(void *out, void *in, unsigned int nFrames,
     See \ref RtAudioError.
 */
 typedef enum rtaudio_error {
-  RTAUDIO_NO_ERROR = -1,           /*!< No error. */
+  RTAUDIO_ERROR_NONE = -1,         /*!< No error. */
   RTAUDIO_ERROR_WARNING,           /*!< A non-critical error. */
   RTAUDIO_ERROR_DEBUG_WARNING,     /*!< A non-critical error which might be useful for debugging. */
   RTAUDIO_ERROR_UNSPECIFIED,       /*!< The default, unspecified error type. */
@@ -157,7 +157,7 @@ typedef enum rtaudio_api {
 //! The public device information structure for returning queried values.
 //! See \ref RtAudio::DeviceInfo.
 typedef struct rtaudio_device_info {
-  int probed;
+  unsigned int id;
   unsigned int output_channels;
   unsigned int input_channels;
   unsigned int duplex_channels;
@@ -237,16 +237,23 @@ RTAUDIOAPI rtaudio_api_t rtaudio_current_api(rtaudio_t audio);
 //! RtAudio::getDeviceCount().
 RTAUDIOAPI int rtaudio_device_count(rtaudio_t audio);
 
+//! Returns the audio device ID corresponding to a given index
+//! value (valid index values are between 0 and rtaudio_device_count()-1).
+//! Note that a return value of 0 is invalid, which will occur if the
+//! index value is out of bounds or no devices are found. See \ref
+//! RtAudio::getDeviceIds().
+RTAUDIOAPI int rtaudio_get_device_id(rtaudio_t audio, int i);
+
 //! Return a struct rtaudio_device_info for a specified device number.
 //! See \ref RtAudio::getDeviceInfo().
 RTAUDIOAPI rtaudio_device_info_t rtaudio_get_device_info(rtaudio_t audio,
                                                          int i);
 
-//! Returns the index of the default output device.  See \ref
+//! Returns the device id of the default output device.  See \ref
 //! RtAudio::getDefaultOutputDevice().
 RTAUDIOAPI unsigned int rtaudio_get_default_output_device(rtaudio_t audio);
 
-//! Returns the index of the default input device.  See \ref
+//! Returns the device id of the default input device.  See \ref
 //! RtAudio::getDefaultInputDevice().
 RTAUDIOAPI unsigned int rtaudio_get_default_input_device(rtaudio_t audio);
 

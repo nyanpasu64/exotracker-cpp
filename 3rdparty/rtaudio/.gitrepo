@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/nyanpasu64/rtaudio.git
 	branch = nyanpasu64
-	commit = 726fe9060b599580d7741bb998daafc2676cec90
-	parent = c4172fc62f87096c39317fa1c26e45c51cfea463
+	commit = ff76a6740813df0c9f45325b893e3115dd9c975c
+	parent = 9508ce1cd252811033c6e40b2438835a8c75126b
 	method = rebase
 	cmdver = 0.4.3

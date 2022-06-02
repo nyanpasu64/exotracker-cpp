@@ -88,7 +88,7 @@ foreach(_S ${CONFIGAC})
 endforeach()
 math(EXPR SO_current_minus_age "${SO_current} - ${SO_age}")
 set(SO_VER "${SO_current_minus_age}")
-set(FULL_VER "${SO_current_minus_age}.${SO_revision}.${SO_age}")
+set(FULL_VER "${SO_current_minus_age}.${SO_age}.${SO_revision}")
 
 # Read package version info from configure.ac
 set(R "AC_INIT\\(RtAudio, ([0-9\\.]+),.*\\)")
@@ -100,6 +100,7 @@ string(REGEX REPLACE "${R}" "\\1" PACKAGE_VERSION "${CONFIGAC}")
 set(rtaudio_SOURCES RtAudio.cpp RtAudio.h)
 set(LINKLIBS)
 set(PKGCONFIG_REQUIRES)
+set(LIBS_REQUIRES)
 set(API_DEFS)
 set(API_LIST)
 
@@ -134,7 +135,7 @@ if (RTAUDIO_API_ALSA)
 endif()
 
 # OSS
-if (RTAUDIO_OSS)
+if (RTAUDIO_API_OSS)
   set(NEED_PTHREAD ON)
   find_library(OSSAUDIO_LIB ossaudio)
   if (OSSAUDIO_LIB)
@@ -161,6 +162,7 @@ if (RTAUDIO_API_CORE)
   find_library(COREAUDIO_LIB CoreAudio)
   find_library(COREFOUNDATION_LIB CoreFoundation)
   list(APPEND LINKLIBS ${COREAUDIO_LIB} ${COREFOUNDATION_LIB})
+  list(APPEND LIBS_REQUIRES "-framework CoreAudio -framework CoreFoundation")
   list(APPEND API_DEFS "-D__MACOSX_CORE__")
   list(APPEND API_LIST "core")
 endif()
@@ -235,6 +237,10 @@ else()
 endif()
 list(APPEND LIB_TARGETS rtaudio)
 
+# Windows: If RTAUDIO_STATIC_MSVCRT is not set, it defaults to ON when building as a
+# static library and OFF when building as a DLL.  If you want to have more control, you
+# can explicitly override RTAUDIO_STATIC_MSVCRT to turn it off/on.  It controls the flags
+# related to MSVC runtime linkage in the next clause, below.
 if (NOT DEFINED RTAUDIO_STATIC_MSVCRT)
   set(RTAUDIO_STATIC_MSVCRT ${RTAUDIO_IS_STATIC})
 endif()
@@ -251,8 +257,6 @@ if(MSVC AND RTAUDIO_STATIC_MSVCRT)
   endforeach(flag_var)
 endif()
 
-# Add headers destination for install rule.
-set_property(TARGET rtaudio PROPERTY PUBLIC_HEADER RtAudio.h rtaudio_c.h)
 set_target_properties(rtaudio PROPERTIES
   SOVERSION ${SO_VER}
   VERSION ${FULL_VER})
@@ -262,10 +266,10 @@ include(GNUInstallDirs)
 
 # Set include paths, populate target interface.
 target_include_directories(rtaudio
-  INTERFACE
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/rtaudio>
-  PRIVATE
+  PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  PRIVATE
     ${INCDIRS}
 )
 
@@ -290,6 +294,7 @@ message(STATUS "Compiling with support for: ${apilist}")
 
 # PkgConfig file
 string(REPLACE ";" " " req "${PKGCONFIG_REQUIRES}")
+string(REPLACE ";" " " req_libs "${LIBS_REQUIRES}")
 string(REPLACE ";" " " api "${API_DEFS}")
 set(prefix ${CMAKE_INSTALL_PREFIX})
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/rtaudio.pc.in" "rtaudio.pc" @ONLY)
@@ -300,7 +305,11 @@ install(TARGETS ${LIB_TARGETS}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rtaudio)
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rtaudio)
+
+# Install public header files
+install(FILES RtAudio.h rtaudio_c.h
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rtaudio)
 
 # Store the package in the user registry.
 export(PACKAGE RtAudio)
