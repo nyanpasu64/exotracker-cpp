@@ -4,7 +4,7 @@
 /// and extracting patterns from Timeline.
 
 #include "doc.h"
-#include "doc_util/time_util.h"
+#include "doc_util/track_util.h"
 #include "timing_common.h"
 
 #include <coroutine.h>
@@ -14,7 +14,7 @@
 namespace gui::gui_time {
 
 // Public re-export.
-using namespace doc_util::time_util;
+using namespace doc_util::track_util;
 
 using doc::ChipIndex;
 using doc::ChannelIndex;

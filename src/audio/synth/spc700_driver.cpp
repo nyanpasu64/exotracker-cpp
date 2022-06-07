@@ -1,5 +1,6 @@
 #include "spc700_driver.h"
 #include "spc700_synth.h"
+#include "spc700_math.h"
 #include "chip_instance_common.h"
 #include "doc.h"
 #include "doc/effect_names.h"
@@ -62,13 +63,6 @@ struct StereoVolume {
 };
 
 // Utilities
-
-#define REG(x)  ((size_t) (x))
-
-/// Equivalent to SPC700 `mul ya` followed by discarding a and keeping y.
-static inline uint8_t mul_hi(uint8_t a, uint8_t b) {
-    return (uint8_t) ((REG(a) * REG(b)) >> 8);
-}
 
 struct BytePair {
     uint8_t lower;

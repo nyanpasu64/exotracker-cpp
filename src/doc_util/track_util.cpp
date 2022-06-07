@@ -1,10 +1,10 @@
-#include "time_util.h"
+#include "track_util.h"
 #include "doc_util/event_search.h"
 #include "util/release_assert.h"
 
 #include <algorithm>  // std::min
 
-namespace doc_util::time_util {
+namespace doc_util::track_util {
 
 using doc_util::event_search::EventSearch;
 
@@ -147,7 +147,7 @@ PatternRef pattern_or_end(TimelineCellRef cell_ref, BeatFraction beat) {
 
 #include <doctest.h>
 
-namespace doc_util::time_util {
+namespace doc_util::track_util {
 TEST_SUITE_BEGIN("doc/timeline");
 
 using namespace doc::events;

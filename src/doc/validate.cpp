@@ -118,8 +118,9 @@ doc::SampleTuning validate_tuning(ErrorState & state, doc::SampleTuning tuning) 
 
 doc::Sample validate_sample(ErrorState & state, doc::Sample sample) {
     auto brr_size = sample.brr.size();
-    if (brr_size > 0x10000) {
-        PUSH_WARNING(state, ".brr.size()={} is over 2^16", brr_size);
+    // Spc700Driver::reload_samples() asserts that brr.size() < 0x10000.
+    if (brr_size >= 0x10000) {
+        PUSH_WARNING(state, ".brr.size()={} >= 2^16", brr_size);
     }
     if (brr_size % BRR_BLOCK_SIZE != 0) {
         PUSH_WARNING(state, ".brr.size()={} is not a multiple of 9", brr_size);
@@ -129,9 +130,10 @@ doc::Sample validate_sample(ErrorState & state, doc::Sample sample) {
     if (loop_byte % BRR_BLOCK_SIZE != 0) {
         PUSH_WARNING(state, ".loop_byte={} is not a multiple of 9", loop_byte);
     }
-    if (loop_byte > brr_size) {
+    // Spc700Driver::reload_samples() asserts that loop_byte < brr.size().
+    if (loop_byte >= brr_size) {
         PUSH_WARNING(state,
-            ".loop_byte={} > brr.size()={}, defaulting to 0", loop_byte, brr_size
+            ".loop_byte={} >= brr.size()={}, defaulting to 0", loop_byte, brr_size
         );
         sample.loop_byte = 0;
     }

@@ -16,7 +16,7 @@
 
 namespace gui::gui_time {
 
-using FrameIter = doc_util::time_util::FramePatternIterRef;
+using FrameIter = doc_util::track_util::FramePatternIterRef;
 
 
 // It might be useful for GuiPatternIter prev/next to return a different first value

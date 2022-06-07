@@ -1,7 +1,7 @@
 #pragma once
 
 #include "doc.h"
-#include "doc_util/time_util.h"
+#include "doc_util/track_util.h"
 #include "sequencer_driver_common.h"
 #include "chip_common.h"
 #include "timing_common.h"
@@ -51,7 +51,7 @@ struct RealTime {
     BeatPlusTick next_tick = {0, 0};
 };
 
-using doc_util::time_util::FramePatternIter;
+using doc_util::track_util::FramePatternIter;
 
 /// Like doc::PatternRef but doesn't hold a persistent reference to the document
 /// (which will dangle if parts of the document are replaced during mutation).
