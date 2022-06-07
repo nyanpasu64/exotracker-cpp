@@ -1256,7 +1256,15 @@ LoadDocumentResult::LoadDocumentResult(
 namespace serialize {
 
 static Document default_doc() {
-    return DocumentCopy(sample_docs::DOCUMENTS.at("dream-fragments"));
+    Document doc = DocumentCopy(sample_docs::DOCUMENTS.at("dream-fragments"));
+
+    // Change as many parameters as possible, to test round-trip.
+    doc.sequencer_options.note_gap_ticks = 2;
+    doc.sequencer_options.spc_timer_period = 40;
+    doc.accidental_mode = AccidentalMode::Flat;
+    doc.effect_name_chars = 2;
+
+    return doc;
 }
 
 using namespace std::string_literals;
