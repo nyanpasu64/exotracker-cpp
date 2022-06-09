@@ -3,12 +3,6 @@
 
 namespace timing {
 
-COMPARABLE_IMPL(GridBlockBeat, (self.grid, self.block, self.beat))
-COMPARABLE_IMPL(GridAndBeat, (self.grid, self.beat))
-
-EQUALABLE_IMPL(
-    SequencerTime,
-    (self.grid, self.curr_ticks_per_beat, self.beats, self.ticks)
-)
+EQUALABLE_IMPL(SequencerTime, (self.ticks, self.playing))
 
 }

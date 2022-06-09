@@ -24,7 +24,7 @@ inline constexpr char const* MODULE_EXT = ".etm";
 
 // TODO struct ExportConfig { compatibility settings, etc. }
 struct Metadata {
-    uint16_t zoom_level;
+    uint16_t ticks_per_row;
 
 // impl
 #ifdef UNITTEST

@@ -298,21 +298,11 @@ gsl::span<float> OverallSynth::synthesize_tick_oversampled() {
         }
 
         // Tempo changes
-        if (total_modified & ModifiedFlags::SequencerOptions) {
+        if (total_modified & ModifiedFlags::AllSequencerOptions) {
             _sequencer_timing.recompute_tempo(_document.sequencer_options);
         }
-        if (total_modified & ModifiedFlags::TicksPerBeat) {
-            for (auto & chip : _chip_instances) {
-                chip->ticks_per_beat_changed(_document);
-            }
-        }
 
-        if (total_modified & ModifiedFlags::TimelineFrames) {
-            for (auto & chip : _chip_instances) {
-                chip->timeline_modified(_document);
-            }
-            // Invalidates all sequencer state. We do not need to check the other flags.
-        } else if (total_modified & ModifiedFlags::Patterns) {
+        if (total_modified & ModifiedFlags::Patterns) {
             for (auto & chip : _chip_instances) {
                 chip->doc_edited(_document);
             }

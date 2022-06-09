@@ -40,10 +40,8 @@ enum class ColumnCollapse {
     NotesOnly,
 };
 
-using doc::GridIndex;
 using RowIndex = uint32_t;
-using doc::BeatFraction;
-using timing::GridAndBeat;
+using timing::TickT;
 
 enum class StepDirection {
     Down,
@@ -124,10 +122,10 @@ struct PatternEditorShortcuts {
 // and subclassed QWidget to contain an instance of my class?
 
 using main_window::MainWindow;
-using main_window::StateTransaction;
+using main_window::CursorAndSelection;
 using history::GetDocument;
 
-constexpr int DEFAULT_ZOOM_LEVEL = 4;
+constexpr int DEFAULT_TICKS_PER_ROW = 12;
 
 class PatternEditor : public QWidget
 {
@@ -163,7 +161,7 @@ pattern_editor_INTERNAL:
     bool _edit_mode = false;
 
     // # Editing state, set by user interactions.
-    int _zoom_level = DEFAULT_ZOOM_LEVEL;
+    int _ticks_per_row = DEFAULT_TICKS_PER_ROW;
     int _octave = 5;
     int _step = 1;  // can't remember if it will be saved on close, or defaulted via settings dialog
     StepDirection _step_direction = StepDirection::RightEffect;
@@ -171,7 +169,7 @@ pattern_editor_INTERNAL:
     // TODO add speed-1 zoom
 
     // Non-empty if free scrolling is enabled.
-    std::optional<GridAndBeat> _free_scroll_position;
+    std::optional<TickT> _free_scroll_position;
 
 // Interface
 public:
@@ -193,7 +191,7 @@ public:
             update(); \
         }
 
-    PROPERTY(int, _zoom_level, zoom_level)
+    PROPERTY(int, _ticks_per_row, ticks_per_row)
     PROPERTY(int, _octave, octave)
     PROPERTY(int, _step, step)
     PROPERTY(StepDirection, _step_direction, step_direction)
@@ -216,7 +214,7 @@ pattern_editor_INTERNAL:
     // QShortcut signals are bound to a lambda slot, which calls these methods.
 
     #define X(KEY) \
-        void KEY##_pressed(StateTransaction & tx);
+        void KEY##_pressed(CursorAndSelection & cursor_sel);
     FOREACH_SHORTCUT_PAIR(X, )
     #undef X
     #define X(KEY) \

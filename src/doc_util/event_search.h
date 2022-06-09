@@ -23,8 +23,8 @@ private:
 public:
     EventSearch(EventsT event_list) : _event_list{event_list} {}
 
-    [[nodiscard]] ConstIterator beat_begin(BeatFraction beat) const;
-    [[nodiscard]] ConstIterator beat_end(BeatFraction beat) const;
+    [[nodiscard]] ConstIterator tick_begin(TickT beat) const;
+    [[nodiscard]] ConstIterator tick_end(TickT beat) const;
 };
 
 
@@ -46,20 +46,20 @@ public:
     EventSearchMut(EventsT event_list) : _event_list{event_list} {}
 
     // Const methods.
-    [[nodiscard]] ConstIterator beat_begin(BeatFraction beat) const;
-    [[nodiscard]] ConstIterator beat_end(BeatFraction beat) const;
+    [[nodiscard]] ConstIterator tick_begin(TickT beat) const;
+    [[nodiscard]] ConstIterator tick_end(TickT beat) const;
 
     // Mutating methods.
-    [[nodiscard]] Iterator beat_begin(BeatFraction beat);
-    [[nodiscard]] Iterator beat_end(BeatFraction beat);
+    [[nodiscard]] Iterator tick_begin(TickT beat);
+    [[nodiscard]] Iterator tick_end(TickT beat);
 
     /// Returns pointer to last event anchored to this beat fraction.
     /// Returns nullptr if none exist at this time.
-    [[nodiscard]] TimedRowEvent * get_maybe(BeatFraction beat);
+    [[nodiscard]] TimedRowEvent * get_maybe(TickT beat);
 
     /// Returns reference to last event anchored to this beat fraction.
     /// Inserts new event if none exist at this time.
-    [[nodiscard]] TimedRowEvent & get_or_insert(BeatFraction beat);
+    [[nodiscard]] TimedRowEvent & get_or_insert(TickT beat);
 };
 
 }

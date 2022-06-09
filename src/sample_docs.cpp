@@ -17,6 +17,16 @@ using Ev = EventBuilder;
 using std::move;
 using std::nullopt;
 
+static Sequence empty_sequence() {
+    Sequence sequence{{{}, {}, {}, {}, {}, {}, {}, {}}};
+
+    // Add an empty block to channel 0, so playback (modulo song length) moves within
+    // the block rather than hanging in place.
+    sequence[0][0].blocks.push_back(TrackBlock::from_events(0, 4 * 48, {}));
+
+    return sequence;
+}
+
 Document new_document() {
     SequencerOptions sequencer_options{.target_tempo = 150, .ticks_per_beat = 48};
 
@@ -39,14 +49,7 @@ Document new_document() {
 
     ChipList chips{ChipKind::Spc700};
 
-    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
-
-    Timeline timeline;
-
-    timeline.push_back(TimelineFrame{
-        .nbeats = 16,
-        .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
-    });
+    Sequence sequence = empty_sequence();
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -55,8 +58,7 @@ Document new_document() {
         .samples = move(samples),
         .instruments = move(instruments),
         .chips = move(chips),
-        .chip_channel_settings = move(chip_channel_settings),
-        .timeline = move(timeline),
+        .sequence = move(sequence),
     };
 }
 
@@ -150,14 +152,7 @@ static Document instruments() {
 
     ChipList chips{ChipKind::Spc700};
 
-    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
-
-    Timeline timeline;
-
-    timeline.push_back(TimelineFrame{
-        .nbeats = 16,
-        .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
-    });
+    Sequence sequence = empty_sequence();
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -166,8 +161,7 @@ static Document instruments() {
         .samples = move(samples),
         .instruments = move(instruments),
         .chips = move(chips),
-        .chip_channel_settings = move(chip_channel_settings),
-        .timeline = move(timeline),
+        .sequence = move(sequence),
     };
 }
 
@@ -189,71 +183,77 @@ static Document dream_fragments() {
     auto const chip_kind = ChipKind::Spc700;
     ChipList chips{chip_kind};
 
-    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
+    Sequence sequence{{{}, {}, {}, {}, {}, {}, {}, {}}};
+    sequence[0][3].settings.n_effect_col = 2;
 
-    Timeline timeline;
+    // frame 0
+    sequence[0][0].blocks.push_back(TrackBlock {
+        .begin_tick = at(0),
+        .loop_count = 1,
+        .pattern = Pattern {
+            .length_ticks = at(8),
+            .events = {
+                // Since ch0 has only 1 effect column,
+                // the delay should neither be visible on-screen
+                // nor affect the sequencer.
+                // TODO write a unit test to make sure the sequencer only uses
+                // in-bounds delays.
+                Ev(at(0), pitch(5, 7)).instr(0).no_effect().delay(16),
+                Ev(at(1), pitch(6, 2)),
+                Ev(at(4+0), pitch(5, 7+2)),
+                Ev(at(4+1), pitch(6, 2+2)),
+            },
+        },
+    });
+    sequence[0][1].blocks.push_back(TrackBlock::from_events(
+        at(0), at(8),
+        EventList {
+            Ev(at(0, 36), NOTE_CUT),
+            Ev(at(1, 24), pitch(7, -3)).instr(0),
+            Ev(at(2, 0), pitch(7, 6)),
+            Ev(at(2, 24), pitch(7, 7)),
+            Ev(at(3, 24), pitch(7, 9)),
+            Ev(at(4, 24), pitch(7, 4)),
+            Ev(at(5, 24), pitch(7, 2)),
+            Ev(at(6, 24), pitch(7, 1)),
+        }));
 
-    timeline.push_back([]() -> TimelineFrame {
-        TimelineCell ch0{TimelineBlock::from_events({
-            // Since ch0 has only 1 effect column,
-            // the delay should neither be visible on-screen
-            // nor affect the sequencer.
-            // TODO write a unit test to make sure the sequencer only uses
-            // in-bounds delays.
-            Ev(0, pitch(5, 7)).instr(0).no_effect().delay(16),
-            Ev(1, pitch(6, 2)),
-            Ev(4+0, pitch(5, 7+2)),
-            Ev(4+1, pitch(6, 2+2)),
-        })};
-        TimelineCell ch1{TimelineBlock::from_events({
-            Ev(at(0, 3, 4), NOTE_CUT),
-            Ev(at(1, 1, 2), pitch(7, -3)).instr(0),
-            Ev(at(2, 0, 2), pitch(7, 6)),
-            Ev(at(2, 1, 2), pitch(7, 7)),
-            Ev(at(3, 1, 2), pitch(7, 9)),
-            Ev(at(4, 1, 2), pitch(7, 4)),
-            Ev(at(5, 1, 2), pitch(7, 2)),
-            Ev(at(6, 1, 2), pitch(7, 1)),
-        })};
-        return TimelineFrame{
-            .nbeats = 8,
-            .chip_channel_cells = {{move(ch0), move(ch1), {}, {}, {}, {}, {}, {}}},
-        };
-    }());
-
-    timeline.push_back([] {
-        auto ch0 = TimelineCell{TimelineBlock::from_events({
-            Ev(0, pitch(6, 4)).instr(0).delay(-5),
-            Ev(1, pitch(6, -1)),
-            Ev(2, pitch(6, 4)),
-            Ev(3, pitch(6, 7)),
-            Ev(4, pitch(6, 6)).delay(-5),
-            Ev(5, pitch(6, 1)),
-            Ev(6, pitch(6, -2)),
-            Ev(7, pitch(6, 1)),
-        })};
-        auto ch1 = TimelineCell{TimelineBlock::from_events({
-            Ev(0, pitch(6, 7)).instr(0).delay(-2),
-            Ev(at(1, 1, 2), pitch(7, -1)),
-            Ev(3, pitch(7, 4)),
-            Ev(4, pitch(7, -2)).delay(-2),
-            Ev(at(5, 2, 4), pitch(7, 7)),
-            Ev(at(5, 3, 4), pitch(7, 6)),
-            Ev(6, pitch(7, 4)),
-        })};
-        TimelineCell ch2{TimelineBlock::from_events({
-            Ev(0, pitch(7, -1)).instr(0).delay(1),
-            Ev(4, pitch(7, 1)).delay(1),
-        })};
-        TimelineCell ch3{TimelineBlock::from_events({
-            Ev(0, pitch(7, 4)).instr(0).no_effect().delay(4),
-            Ev(4, pitch(7, 6)).no_effect().delay(4),
-        })};
-        return TimelineFrame{
-            .nbeats = 8,
-            .chip_channel_cells = {{move(ch0), move(ch1), move(ch2), move(ch3), {}, {}, {}, {}}},
-        };
-    }());
+    // frame 1
+    sequence[0][0].blocks.push_back(TrackBlock::from_events(
+        at(8), at(8),
+        EventList {
+            Ev(at(0), pitch(6, 4)).instr(0),
+            Ev(at(1), pitch(6, -1)),
+            Ev(at(2), pitch(6, 4)),
+            Ev(at(3), pitch(6, 7)),
+            Ev(at(4), pitch(6, 6)),
+            Ev(at(5), pitch(6, 1)),
+            Ev(at(6), pitch(6, -2)),
+            Ev(at(7), pitch(6, 1)),
+        }));
+    sequence[0][1].blocks.push_back(TrackBlock::from_events(
+        at(8), at(8),
+        EventList {
+            Ev(at(0), pitch(6, 7)).instr(0).delay(3),
+            Ev(at(1, 24), pitch(7, -1)),
+            Ev(at(3), pitch(7, 4)),
+            Ev(at(4), pitch(7, -2)).delay(3),
+            Ev(at(5, 24), pitch(7, 7)),
+            Ev(at(5, 36), pitch(7, 6)),
+            Ev(at(6), pitch(7, 4)),
+        }));
+    sequence[0][2].blocks.push_back(TrackBlock::from_events(
+        at(8), at(8),
+        EventList {
+            Ev(at(0), pitch(7, -1)).instr(0).delay(6),
+            Ev(at(4), pitch(7, 1)).delay(6),
+        }));
+    sequence[0][3].blocks.push_back(TrackBlock::from_events(
+        at(8), at(8),
+        EventList {
+            Ev(at(0), pitch(7, 4)).instr(0).no_effect().delay(9),
+            Ev(at(4), pitch(7, 6)).no_effect().delay(9),
+        }));
 
     return DocumentCopy {
         .sequencer_options = sequencer_options,
@@ -262,8 +262,7 @@ static Document dream_fragments() {
         .samples = move(samples),
         .instruments = move(instruments),
         .chips = move(chips),
-        .chip_channel_settings = chip_channel_settings,
-        .timeline = move(timeline),
+        .sequence = move(sequence),
     };
 }
 
@@ -283,22 +282,14 @@ static Document all_channels() {
     auto const chip_kind = ChipKind::Spc700;
     ChipList chips{chip_kind};
 
-    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
-
-    Timeline timeline;
-
-    timeline.push_back([]() -> TimelineFrame {
-        std::vector<TimelineCell> channels;
-        for (int i = 0; i < 8; i++) {
-            channels.push_back({TimelineBlock::from_events({
-                Ev(BeatFraction(i, 4), Note(Chromatic(60 + 2 * i))).instr(0)
-            })});
-        }
-        return TimelineFrame{
-            .nbeats = 8,
-            .chip_channel_cells = {move(channels)},
-        };
-    }());
+    Sequence sequence{{{}, {}, {}, {}, {}, {}, {}, {}}};
+    for (int i = 0; i < 8; i++) {
+        sequence[0][(size_t) i].blocks.push_back(TrackBlock::from_events(
+            at(0), at(8),
+            EventList {
+                Ev(i * (48 / 4), Note(Chromatic(60 + 2 * i))).instr(0),
+            }));
+    }
 
     return DocumentCopy {
         .sequencer_options = sequencer_options,
@@ -307,8 +298,7 @@ static Document all_channels() {
         .samples = move(samples),
         .instruments = move(instruments),
         .chips = move(chips),
-        .chip_channel_settings = chip_channel_settings,
-        .timeline = move(timeline),
+        .sequence = move(sequence),
     };
 }
 
@@ -376,7 +366,7 @@ static Document world_revolution() {
     constexpr Note NOISE_HIGH = 0xD;
     constexpr Note NOISE_LOW = 0xC;
 
-    auto noise_loop = TimelineCell{TimelineBlock::from_events({
+    auto noise_loop = SequenceTrack{TrackBlock::from_events({
         Ev(0, NOISE_HIGH).instr(TAMBOURINE),
         Ev(at(0, 1, 2), NOISE_LOW),
         Ev(at(1, 1, 2), NOISE_HIGH),
@@ -388,14 +378,14 @@ static Document world_revolution() {
         Ev(7, NOISE_LOW),
     }, 8)};
 
-    auto dpcm_level = TimelineCell{TimelineBlock::from_events({
+    auto dpcm_level = SequenceTrack{TrackBlock::from_events({
         Ev(0, {}).volume(0x7f)
     })};
 
     timeline.push_back([&]() -> TimelineFrame {
         // Add two blocks into one grid cell, as a test case.
-        auto ch0 = TimelineCell{
-            TimelineBlock{0, BeatOrEnd(8),
+        auto ch0 = SequenceTrack{
+            TrackBlock{0, BeatOrEnd(8),
                 Pattern{EventList{
                     // 0
                     Ev(0, pitch(6, 0)).instr(TRUMPET).volume(0xf).effect("0A", 0),
@@ -415,7 +405,7 @@ static Document world_revolution() {
                     Ev(at(7, 1, 2), pitch(6, -1)),
                 }}
             },
-            TimelineBlock{8, BeatOrEnd(16),
+            TrackBlock{8, BeatOrEnd(16),
                 Pattern{EventList{
                     // 0
                     Ev(0, pitch(6, 0)).volume(0xf),
@@ -437,15 +427,15 @@ static Document world_revolution() {
             },
         };
 
-        auto ch1 = TimelineCell{
-            TimelineBlock{0, 4, Pattern{generate_bass(1, 5), 1}},
-            TimelineBlock{4, 8, Pattern{generate_bass(1, 7), 1}},
-            TimelineBlock{8, 12, Pattern{generate_bass(1, 5), 1}},
-            TimelineBlock{12, 16, Pattern{generate_bass(1, 7), 1}},
+        auto ch1 = SequenceTrack{
+            TrackBlock{0, 4, Pattern{generate_bass(1, 5), 1}},
+            TrackBlock{4, 8, Pattern{generate_bass(1, 7), 1}},
+            TrackBlock{8, 12, Pattern{generate_bass(1, 5), 1}},
+            TrackBlock{12, 16, Pattern{generate_bass(1, 7), 1}},
         };
 
-        auto tri = TimelineCell{
-            TimelineBlock{0, 8, {{
+        auto tri = SequenceTrack{
+            TrackBlock{0, 8, {{
                 // 0
                 Ev(0, pitch(5, 9)),
                 Ev(at(3, 2, 4), pitch(5, 7)),
@@ -453,7 +443,7 @@ static Document world_revolution() {
                 Ev(4, pitch(5, 7)),
                 Ev(6, pitch(5, 4)),
             }}},
-            TimelineBlock{8, 16, {{
+            TrackBlock{8, 16, {{
                 // 8
                 Ev(0, pitch(5, 9)),
                 Ev(at(3, 2, 4), pitch(5, 7)),
@@ -471,7 +461,7 @@ static Document world_revolution() {
         };
     }());
     timeline.push_back([&]() -> TimelineFrame {
-        auto ch0 = TimelineCell{TimelineBlock::from_events({
+        auto ch0 = SequenceTrack{TrackBlock::from_events({
             // 0
             Ev(0, pitch(6, 0)).instr(TRUMPET),
             Ev(at(0, 4, 8), pitch(6, -1)),
@@ -489,10 +479,10 @@ static Document world_revolution() {
             Ev(6, pitch(6, 0)),
             Ev(7, pitch(6, 2)),
         })};
-        auto ch1 = TimelineCell{TimelineBlock::from_events(generate_bass(8))};
+        auto ch1 = SequenceTrack{TrackBlock::from_events(generate_bass(8))};
 
-        auto tri = TimelineCell{
-            TimelineBlock{0, 8, {{
+        auto tri = SequenceTrack{
+            TrackBlock{0, 8, {{
                 // 0
                 Ev(0, pitch(5, 9)),
                 Ev(at(3, 2, 4), pitch(5, 7)),
@@ -544,7 +534,7 @@ static Document render_test() {
     Timeline timeline;
 
     timeline.push_back([]() -> TimelineFrame {
-        TimelineCell ch0{TimelineBlock::from_events([&] {
+        SequenceTrack ch0{TrackBlock::from_events([&] {
             EventList ev;
             for (int i = 0; i <= 10; i++) {
                 // Play MIDI pitches 0, 12... 120.
@@ -561,7 +551,7 @@ static Document render_test() {
             return ev;
         }())};
 
-        TimelineCell ch1{TimelineBlock::from_events({
+        SequenceTrack ch1{TrackBlock::from_events({
             Ev(2, {NOTE_CUT}),
             Ev(4, {NOTE_RELEASE}),
         })};
@@ -601,7 +591,7 @@ static Document audio_test() {
     ChipChannelSettings chip_channel_settings{{{}, {}}, {{}, {}}};
 
     auto get_channel = [&] (Note note) {
-        return TimelineCell{TimelineBlock::from_events({
+        return SequenceTrack{TrackBlock::from_events({
             Ev(0, note).instr(0)
         })};
     };
@@ -609,19 +599,19 @@ static Document audio_test() {
     Timeline timeline;
 
     timeline.push_back([&]() -> TimelineFrame {
-        TimelineCell ch0{};
+        SequenceTrack ch0{};
 
-        TimelineCell ch1{TimelineBlock::from_events({
+        SequenceTrack ch1{TrackBlock::from_events({
             // Events go here.
         })};
 
-        TimelineCell ch2{TimelineBlock{0, BeatOrEnd(8),
+        SequenceTrack ch2{TrackBlock{0, BeatOrEnd(8),
             Pattern{EventList{
                 // Events go here.
             }}
         }};
 
-        TimelineCell ch3{TimelineBlock{0, END_OF_GRID,
+        SequenceTrack ch3{TrackBlock{0, END_OF_GRID,
             Pattern{EventList{
                 // Events go here.
             }, 4}
@@ -647,54 +637,76 @@ static Document audio_test() {
     };
 }
 
-/// Document used to test block rendering and cursor movement,
-/// and see how blocks look when overlapping
+#endif
+
+/// Document used to test block rendering and editing, as well as cursor movement.
 static Document block_test() {
-    SequencerOptions sequencer_options{.ticks_per_beat = 24};
+    SequencerOptions sequencer_options{.target_tempo = 150, .ticks_per_beat = 48};
+
+    Samples samples;
+    samples[0] = triangle();
 
     Instruments instruments;
-    instruments[0] = music_box();
+    instruments[0] = music_box(0);
 
-    ChipList chips{ChipKind::Apu1, ChipKind::Apu1};
-    ChipChannelSettings chip_channel_settings{{{}, {}}, {{}, {}}};
+    ChipList chips{ChipKind::Spc700};
 
-    TimelineBlock unlooped{0, END_OF_GRID, Pattern{{}}};
-    TimelineBlock looped{0, END_OF_GRID, Pattern{{}, 1}};
+    constexpr TickT BEAT_LEN = 48;
 
-    std::vector<TimelineCell> ch0;
-    ch0.push_back({unlooped});
-    ch0.push_back({});
-    ch0.push_back({looped});
-    ch0.push_back({});
-    ch0.push_back({unlooped});
+    // Length 96.
+    auto unlooped2 = [](int start_beat) -> TrackBlock {
+        return TrackBlock {
+            .begin_tick = start_beat * BEAT_LEN,
+            .loop_count = 1,
+            .pattern = Pattern {
+                .length_ticks = 2 * BEAT_LEN,
+                .events = {},
+            },
+        };
+    };
+    // Length 96.
+    auto looped2 = [](int start_beat) -> TrackBlock {
+        return TrackBlock {
+            .begin_tick = start_beat * BEAT_LEN,
+            .loop_count = 2,
+            .pattern = Pattern {
+                .length_ticks = BEAT_LEN,
+                .events = {},
+            },
+        };
+    };
 
-    std::vector<TimelineCell> ch1;
-    ch1.push_back({});
-    ch1.push_back({looped});
-    ch1.push_back({looped});
-    ch1.push_back({unlooped});
-    ch1.push_back({});
+    // Measure boundaries lie at multiples of 192 ticks.
+    std::vector<TrackBlock> ch0;
+    ch0.push_back(unlooped2(2));
+    ch0.push_back(unlooped2(4));
 
-    Timeline timeline;
-    for (size_t i = 0; i < ch0.size(); i++) {
-        timeline.push_back(TimelineFrame{
-            .nbeats = 2,
-            .chip_channel_cells = {{move(ch0[i]), move(ch1[i])}, {{}, {}}},
-        });
-    }
+    std::vector<TrackBlock> ch1;
+    ch1.push_back(looped2(2));
+    ch1.push_back(looped2(4));
+
+    Sequence sequence{{
+        SequenceTrack(std::move(ch0)),
+        SequenceTrack(std::move(ch1)),
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+    }};
+    assert(sequence[0].size() == 8);
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
         .frequency_table = equal_temperament(),
         .accidental_mode = AccidentalMode::Sharp,
+        .samples = move(samples),
         .instruments = move(instruments),
         .chips = move(chips),
-        .chip_channel_settings = move(chip_channel_settings),
-        .timeline = move(timeline),
+        .sequence = move(sequence),
     };
 }
-
-#endif
 
 std::map<std::string, doc::Document> const DOCUMENTS = [] {
     std::map<std::string, doc::Document> out;
@@ -704,7 +716,7 @@ std::map<std::string, doc::Document> const DOCUMENTS = [] {
     // out.insert({"world-revolution", world_revolution()});
     // out.insert({"render-test", render_test()});
     // out.insert({"audio-test", audio_test()});
-    // out.insert({"block-test", block_test()});
+     out.insert({"block-test", block_test()});
     return out;
 }();
 

@@ -25,7 +25,7 @@ struct CursorX {
 
 struct Cursor {
     CursorX x{};
-    timing::GridAndBeat y{};
+    timing::TickT y{};
 };
 
 }

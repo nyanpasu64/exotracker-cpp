@@ -7,6 +7,7 @@
 #include <fmt/format.h>  // format.h contains fmt::memory_buffer, core.h doesn't
 #include <fmt/compile.h>
 
+#include <cassert>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -241,10 +242,6 @@ size_t truncate_instruments(ErrorState & state, size_t gen_ninstr);
 // This reduces boilerplate and prevents capnp/C++'s values from desyncing,
 // but also increases coupling and doesn't make sense when loading text to C++ enums.
 
-[[nodiscard]] ChannelSettings validate_channel_settings(
-    ErrorState & state, ChannelSettings settings
-);
-
 [[nodiscard]] optional<size_t> validate_nchip_matches(
     ErrorState & state, size_t gen_nchip, size_t nchip
 );
@@ -274,33 +271,29 @@ ChipMetadatas compute_chip_metadata(gsl::span<const ChipKind> chips);
 
 [[nodiscard]] doc::Effect validate_effect(ErrorState & state, doc::Effect effect);
 
-[[nodiscard]] optional<BeatFraction> validate_anchor_beat(
-    ErrorState & state, FractionInt num, FractionInt den
-);
-
-[[nodiscard]] optional<BeatFraction> validate_frame_nbeats(
-    ErrorState & state, uint32_t num, uint32_t den
-);
+[[nodiscard]] TickT validate_anchor_tick(ErrorState & state, TickT time);
 
 [[nodiscard]] size_t truncate_effects(ErrorState & state, size_t gen_neffect);
 
 [[nodiscard]] TimedRowEvent validate_event(
-    ErrorState & state, TimedRowEvent timed_ev, MaybeNonZero<uint32_t> loop_length
+    ErrorState & state, TimedRowEvent timed_ev, TickT pattern_length
 );
-
-[[nodiscard]] EventList validate_events(ErrorState & state, EventList events);
-
-[[nodiscard]] optional<TimelineBlock> validate_timeline_block(
-    ErrorState & state, TimelineBlock block
-);
-
-[[nodiscard]] size_t truncate_blocks(ErrorState & state, size_t gen_nblock);
 
 [[nodiscard]] size_t truncate_events(ErrorState & state, size_t gen_nevent);
 
-[[nodiscard]] Pattern validate_pattern(ErrorState & state, Pattern pattern);
+[[nodiscard]]
+EventList validate_events(ErrorState & state, EventList events, TickT length_ticks);
 
-[[nodiscard]] size_t truncate_timeline_frames(ErrorState & state, size_t gen_size);
+[[nodiscard]] optional<Pattern> validate_pattern(ErrorState & state, Pattern pattern);
+
+[[nodiscard]]
+optional<TrackBlock> validate_track_block(ErrorState & state, TrackBlock block);
+
+[[nodiscard]] ChannelSettings validate_channel_settings(
+    ErrorState & state, ChannelSettings settings
+);
+
+[[nodiscard]] size_t truncate_blocks(ErrorState & state, size_t gen_nblock);
 
 [[nodiscard]] uint8_t validate_effect_name_chars(ErrorState & state, uint8_t gen_nchar);
 

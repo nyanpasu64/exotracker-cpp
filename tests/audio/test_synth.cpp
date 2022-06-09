@@ -6,6 +6,7 @@
 #include "cmd_queue.h"
 #include "timing_common.h"
 #include "doc_util/sample_instrs.h"
+#include "doc_util/event_builder.h"
 #include "edit/edit_sample_list.h"
 #include "test_utils/parameterize.h"
 
@@ -25,6 +26,7 @@ using audio::synth::NsampT;
 using audio::synth::spc700_driver::Spc700Driver;
 using audio::synth::spc700_driver::Spc700ChannelDriver;
 using chip_kinds::Spc700ChannelID;
+using doc_util::event_builder::at;
 using std::move;
 
 using namespace doc_util::sample_instrs;
@@ -32,43 +34,38 @@ using namespace doc_util::sample_instrs;
 
 using MaybeChannelID = std::optional<Spc700ChannelID>;
 
-static doc::Document one_note_document(MaybeChannelID which_channel, doc::Note pitch) {
+/// Generates a document with no samples (will be filled in by the caller),
+/// and a single instrument pointing to a sample index.
+static doc::Document sample_idx_document(
+    MaybeChannelID which_channel, SampleIndex sample_idx, doc::Note pitch = 60
+) {
     using namespace doc;
 
     Samples samples;
-    samples[0] = pulse_50();
 
     Instruments instruments;
     instruments[0] = Instrument {
         .name = "50%",
         .keysplit = {InstrumentPatch {
-            .sample_idx = 0,
+            .sample_idx = sample_idx,
             .adsr = INFINITE,
         }}
     };
 
     ChipList chips{ChipKind::Spc700};
 
-    Timeline timeline;
+    Sequence sequence = {{{}, {}, {}, {}, {}, {}, {}, {}}};
+    assert(sequence[0].size() == enum_count<Spc700ChannelID>);
+    if (which_channel) {
+        assert((size_t) *which_channel < enum_count<Spc700ChannelID>);
 
-    timeline.push_back([&]() -> TimelineFrame {
         EventList one_note {TimedRowEvent{0, RowEvent{pitch, 0}}};
-        EventList blank {};
-
-        std::vector<TimelineCell> channel_cells;
-        for (size_t i = 0; i < enum_count<Spc700ChannelID>; i++) {
-            if (which_channel == Spc700ChannelID(i)) {
-                channel_cells.push_back(TimelineCell{TimelineBlock::from_events(one_note)});
-            } else {
-                channel_cells.push_back(TimelineCell{});
-            }
-        }
-
-        return TimelineFrame {
-            .nbeats = 4,
-            .chip_channel_cells = {move(channel_cells)},
-        };
-    }());
+        sequence[0][(size_t) *which_channel]
+            .blocks
+            .push_back(TrackBlock::from_events(
+                at(0), at(1), move(one_note)
+            ));
+    }
 
     return DocumentCopy {
         .sequencer_options = SequencerOptions{
@@ -79,9 +76,17 @@ static doc::Document one_note_document(MaybeChannelID which_channel, doc::Note p
         .samples = move(samples),
         .instruments = move(instruments),
         .chips = chips,
-        .chip_channel_settings = spc_chip_channel_settings(),
-        .timeline = move(timeline),
+        .sequence = move(sequence),
     };
+}
+
+static doc::Document one_note_document(MaybeChannelID which_channel, doc::Note pitch) {
+    using namespace doc;
+
+    auto doc = sample_idx_document(which_channel, 0, pitch);
+    doc.samples[0] = pulse_50();
+
+    return doc;
 }
 
 using audio::Amplitude;
@@ -101,7 +106,7 @@ constexpr AudioOptions FAST_RESAMPLER = {
 
 static CommandQueue play_from_begin() {
     CommandQueue out;
-    out.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+    out.push(cmd_queue::PlayFrom{0});
     return out;
 }
 
@@ -286,7 +291,7 @@ TEST_CASE("Ensure that restarting playback produces the same output range") {
     Amplitude play_min, play_max;
     {
         // Play audio from start.
-        play_commands.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+        play_commands.push(cmd_queue::PlayFrom{0});
         synth.synthesize_overall(buffer, NSAMP);
         play_min = *std::min_element(buffer.begin(), buffer.end());
         play_max = *std::max_element(buffer.begin(), buffer.end());
@@ -295,7 +300,7 @@ TEST_CASE("Ensure that restarting playback produces the same output range") {
     Amplitude replay_min, replay_max;
     {
         // Replay audio from start.
-        play_commands.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+        play_commands.push(cmd_queue::PlayFrom{0});
         synth.synthesize_overall(buffer, NSAMP);
         replay_min = *std::min_element(buffer.begin(), buffer.end());
         replay_max = *std::max_element(buffer.begin(), buffer.end());
@@ -321,7 +326,7 @@ TEST_CASE("Ensure that stopping playback works") {
     auto buffer = std::vector<Amplitude>(NSAMP * STEREO_NCHAN);
     {
         // Play audio from start.
-        play_commands.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+        play_commands.push(cmd_queue::PlayFrom{0});
         synth.synthesize_overall(buffer, NSAMP);
 
         Amplitude min = *std::min_element(buffer.begin(), buffer.end());
@@ -345,61 +350,6 @@ TEST_CASE("Ensure that stopping playback works") {
         CHECK(min == 0);
         CHECK(max == 0);
     }
-}
-
-/// Generates a document with no samples (will be filled in by the caller),
-/// and a single instrument pointing to a sample index.
-static doc::Document sample_idx_document(
-    Spc700ChannelID which_channel, SampleIndex sample_idx
-) {
-    using namespace doc;
-
-    Samples samples;
-
-    Instruments instruments;
-    instruments[0] = Instrument {
-        .name = "50%",
-        .keysplit = {InstrumentPatch {
-            .sample_idx = sample_idx,
-            .adsr = INFINITE,
-        }}
-    };
-
-    ChipList chips{ChipKind::Spc700};
-
-    Timeline timeline;
-
-    timeline.push_back([&]() -> TimelineFrame {
-        EventList one_note {TimedRowEvent{0, RowEvent{60, 0}}};
-        EventList blank {};
-
-        std::vector<TimelineCell> channel_cells;
-        for (size_t i = 0; i < enum_count<Spc700ChannelID>; i++) {
-            if (which_channel == Spc700ChannelID(i)) {
-                channel_cells.push_back(TimelineCell{TimelineBlock::from_events(one_note)});
-            } else {
-                channel_cells.push_back(TimelineCell{});
-            }
-        }
-
-        return TimelineFrame {
-            .nbeats = 1,
-            .chip_channel_cells = {move(channel_cells)},
-        };
-    }());
-
-    return DocumentCopy {
-        .sequencer_options = SequencerOptions{
-            .target_tempo = 100,
-        },
-        .frequency_table = equal_temperament(),
-        .accidental_mode = AccidentalMode::Sharp,
-        .samples = move(samples),
-        .instruments = move(instruments),
-        .chips = chips,
-        .chip_channel_settings = spc_chip_channel_settings(),
-        .timeline = move(timeline),
-    };
 }
 
 using namespace edit::edit_sample_list;
@@ -430,7 +380,7 @@ TEST_CASE("Ensure that editing samples mutes playing notes") {
     auto buffer = std::vector<Amplitude>(NSAMP * STEREO_NCHAN);
     {
         // Play audio from start.
-        play_commands.push(cmd_queue::PlayFrom{timing::GridAndBeat{0, 0}});
+        play_commands.push(cmd_queue::PlayFrom{0});
         synth.synthesize_overall(buffer, NSAMP);
 
         orig_min = *std::min_element(buffer.begin(), buffer.end());

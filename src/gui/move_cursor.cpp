@@ -1,5 +1,7 @@
 #include "move_cursor.h"
 #include "doc_util/event_search.h"
+#include "doc_util/time_util.h"
+#include "doc_util/track_util.h"
 #include "gui_time.h"
 #include "util/compare_impl.h"
 #include "util/expr.h"
@@ -49,229 +51,161 @@ using ChannelList = std::vector<CursorChannel>;
 
 // # Moving cursor by events
 
-using doc::GridIndex;
-
 using doc::PatternRef;
 using doc_util::event_search::EventSearch;
 
 using gui_time::FwdGuiPatternIter;
 using gui_time::RevGuiPatternIter;
 
-struct MoveCursorResult {
-    GridAndBeat time{};
-
-    COMPARABLE(MoveCursorResult)
-};
-
-COMPARABLE_IMPL(MoveCursorResult, (self.time))
-
-static GridAndBeat pattern_to_abs_time(
-    GridIndex grid, PatternRef pattern, doc::TimedRowEvent const& ev
-) {
-    return GridAndBeat{grid, pattern.begin_time + ev.anchor_beat};
+static TickT pattern_to_abs_time(PatternRef pattern, doc::TimedRowEvent const& ev) {
+    return pattern.begin_tick + ev.anchor_tick;
 }
 
-[[nodiscard]] static MoveCursorResult prev_event_impl(
+
+[[nodiscard]] static TickT prev_event_impl(
     doc::Document const& document, cursor::Cursor const cursor
 ) {
-    auto [chip, channel] = gen_channel_list(document)[cursor.x.column];
+    const auto [chip, channel] = gen_channel_list(document)[cursor.x.column];
 
-    auto timeline = doc::TimelineChannelRef(document.timeline, chip, channel);
+    doc::SequenceTrackRef track = document.sequence[chip][channel];
 
-    auto iter = RevGuiPatternIter::from_beat(timeline, cursor.y);
-
-    bool first = true;
+    // Loop over all patterns backwards, starting from the cursor's current pattern.
+    auto patterns = RevGuiPatternIter::from_time(track, cursor.y);
+    bool contains_cursor = true;
     while (true) {
-        auto maybe_state = iter.next();
-        if (!maybe_state) {
-            return MoveCursorResult{cursor.y};
+        auto maybe_pattern = patterns.next();
+        if (!maybe_pattern) {
+            return cursor.y;
         }
 
-        // [Wrap, GridIndex, PatternRef]
-        auto [grid, pattern] = *maybe_state;
+        PatternRef pattern = *maybe_pattern;
         doc::TimedEventsRef event_list = pattern.events;
         using Rev = doc::TimedEventsRef::reverse_iterator;
 
-        // Out-of-bounds events from a long pattern in a short block
-        // are properly excluded.
-        // Using a long block in a short grid cell is not excluded yet.
-        if (first && grid == cursor.y.grid) {
-            // We can compare timestamps directly.
-            doc::BeatFraction rel_time = cursor.y.beat - pattern.begin_time;
+        if (contains_cursor) {
+            // Pattern holds cursor.
+            const TickT rel_time = cursor.y - pattern.begin_tick;
+            const auto kv = EventSearch(event_list);
 
-            auto const kv = EventSearch{event_list};
-            auto ev = Rev{kv.beat_begin(rel_time)};
-
-            // Find nearest event before given time.
+            // Find nearest event before cursor time.
+            auto ev = Rev(kv.tick_begin(rel_time));
             if (ev != event_list.rend()) {
-                return MoveCursorResult{
-                    pattern_to_abs_time(grid, pattern, *ev)
-                };
+                return pattern_to_abs_time(pattern, *ev);
             }
 
         } else {
-            // Find last event.
+            // Pattern lies before cursor; find last event.
             if (!event_list.empty()) {
-                return MoveCursorResult{
-                    pattern_to_abs_time(grid, pattern, event_list.back())
-                };
+                return pattern_to_abs_time(pattern, event_list.back());
             }
         }
 
-        first = false;
+        contains_cursor = false;
     }
 }
 
-[[nodiscard]] static MoveCursorResult next_event_impl(
+[[nodiscard]] static TickT next_event_impl(
     doc::Document const& document, cursor::Cursor const cursor
 ) {
-    auto [chip, channel] = gen_channel_list(document)[cursor.x.column];
+    const auto [chip, channel] = gen_channel_list(document)[cursor.x.column];
 
-    auto timeline = doc::TimelineChannelRef(document.timeline, chip, channel);
+    doc::SequenceTrackRef track = document.sequence[chip][channel];
 
-    auto iter = FwdGuiPatternIter::from_beat(timeline, cursor.y);
-
-    bool first = true;
+    // Loop over all patterns forwards, starting from the cursor's current pattern.
+    auto patterns = FwdGuiPatternIter::from_time(track, cursor.y);
+    bool contains_cursor = true;
     while (true) {
-        auto maybe_state = iter.next();
-        if (!maybe_state) {
-            return MoveCursorResult{cursor.y};
+        auto maybe_pattern = patterns.next();
+        if (!maybe_pattern) {
+            return cursor.y;
         }
 
-        // [Wrap, GridIndex, PatternRef]
-        auto [grid, pattern] = *maybe_state;
+        auto pattern = *maybe_pattern;
         doc::TimedEventsRef event_list = pattern.events;
 
-        // Out-of-bounds events from a long pattern in a short block
-        // are properly excluded.
-        // Using a long block in a short grid cell is not excluded yet.
-        if (first && grid == cursor.y.grid) {
-            // We can compare timestamps directly.
-            doc::BeatFraction rel_time = cursor.y.beat - pattern.begin_time;
+        if (contains_cursor) {
+            // Pattern holds cursor.
+            const TickT rel_time = cursor.y - pattern.begin_tick;
+            const auto kv = EventSearch(event_list);
 
-            auto const kv = EventSearch{event_list};
-            auto ev = kv.beat_end(rel_time);
-
-            // Find first event past given time.
+            // Find nearest event after cursor time.
+            auto ev = kv.tick_end(rel_time);
             if (ev != event_list.end()) {
-                return MoveCursorResult{
-                    pattern_to_abs_time(grid, pattern, *ev)
-                };
+                return pattern_to_abs_time(pattern, *ev);
             }
 
         } else {
-            // Find first event.
+            // Pattern lies after cursor; find first event.
             if (!event_list.empty()) {
-                return MoveCursorResult{
-                    pattern_to_abs_time(grid, pattern, event_list.front())
-                };
+                return pattern_to_abs_time(pattern, event_list.front());
             }
         }
 
-        first = false;
+        contains_cursor = false;
     }
 }
 
-GridAndBeat prev_event(doc::Document const& document, cursor::Cursor cursor) {
-    return prev_event_impl(document, cursor).time;
+TickT prev_event(doc::Document const& document, cursor::Cursor cursor) {
+    return prev_event_impl(document, cursor);
 }
 
-GridAndBeat next_event(doc::Document const& document, cursor::Cursor cursor) {
-    return next_event_impl(document, cursor).time;
+TickT next_event(doc::Document const& document, cursor::Cursor cursor) {
+    return next_event_impl(document, cursor);
 }
 
 
 // # Moving cursor by beats
 
-using doc::GridIndex;
-using doc::BeatFraction;
-using doc::FractionInt;
-using util::math::increment_mod;
-using util::math::decrement_mod;
-using util::math::frac_prev;
-using util::math::frac_next;
+using doc_util::time_util::BeatIter;
+using doc_util::time_util::RowIter;
 
 // Move the cursor, snapping to the nearest row.
 
-[[nodiscard]] static MoveCursorResult prev_row_impl(
-    doc::Document const& document,
-    GridAndBeat cursor_y,
-    int rows_per_beat,
-    MovementConfig const& move_cfg
-) {
-    BeatFraction const orig_row = cursor_y.beat * rows_per_beat;
-    FractionInt const raw_prev = frac_prev(orig_row);
-    FractionInt prev_row;
+TickT prev_beat(doc::Document const& doc, TickT cursor_y) {
+    auto x = BeatIter::at_time(doc, cursor_y);
 
-    if (raw_prev >= 0) {
-        // If we're not at row 0, go up.
-        prev_row = raw_prev;
+    // If cursor starts between beats, BeatIter already snaps to previous beat, so skip
+    // calling prev.
+    if (!x.snapped_earlier) {
+        x.iter.try_prev();
     }
-    // We're at row 0.
-    else if (move_cfg.wrap_across_frames && cursor_y.grid > doc::GridIndex(0)) {
-        // If possible, go to previous frame.
-        cursor_y.grid--;
-        auto nbeats = document.timeline[cursor_y.grid].nbeats;
-        prev_row = frac_prev(nbeats * rows_per_beat);
-    } else {
-        // Remain at row 0 in our current frame.
-        return MoveCursorResult{cursor_y};
+    return x.iter.peek().time;
+}
+
+TickT next_beat(doc::Document const& doc, TickT cursor_y) {
+    auto x = BeatIter::at_time(doc, cursor_y);
+    x.iter.next();
+    return x.iter.peek().time;
+}
+
+static TickT prev_rows(
+    doc::Document const& doc, TickT cursor_y, int ticks_per_row, int step
+) {
+    auto x = RowIter::at_time(doc, cursor_y, ticks_per_row);
+
+    // This code is wrong for step=0, but this function never gets called with that.
+    assert(step >= 1);
+
+    // If cursor starts between rows (!row_at_cursor), RowIter already snaps to
+    // previous beat, so skip the first call to prev.
+    ptrdiff_t i = x.snapped_earlier ? 1 : 0;
+    for (; i < step; i++) {
+        x.iter.try_prev();
     }
-
-    cursor_y.beat = BeatFraction{prev_row, rows_per_beat};
-    return MoveCursorResult{cursor_y};
+    return x.iter.peek().time;
 }
 
-[[nodiscard]] static MoveCursorResult next_row_impl(
-    doc::Document const& document,
-    GridAndBeat cursor_y,
-    int rows_per_beat,
-    MovementConfig const& move_cfg
+static TickT next_rows(
+    doc::Document const& doc, TickT cursor_y, int ticks_per_row, int step
 ) {
-    BeatFraction const orig_row = cursor_y.beat * rows_per_beat;
-    FractionInt const raw_next = frac_next(orig_row);
-    FractionInt next_row;
-
-    auto nbeats = document.timeline[cursor_y.grid].nbeats;
-    BeatFraction const num_rows = nbeats * rows_per_beat;
-
-    if (raw_next < num_rows) {
-        // If we're not at end, go up.
-        next_row = raw_next;
-
-    } else if (
-        move_cfg.wrap_across_frames
-        && cursor_y.grid + 1 < document.timeline.size()
-    ) {
-        cursor_y.grid++;
-        next_row = 0;
-    } else {
-        // Don't move the cursor.
-        return MoveCursorResult{cursor_y};
+    auto x = RowIter::at_time(doc, cursor_y, ticks_per_row);
+    for (ptrdiff_t i = 0; i < step; i++) {
+        x.iter.next();
     }
-
-    cursor_y.beat = BeatFraction{next_row, rows_per_beat};
-    return MoveCursorResult{cursor_y};
+    return x.iter.peek().time;
 }
 
-GridAndBeat prev_beat(
-    doc::Document const& document,
-    GridAndBeat cursor_y,
-    MovementConfig const& move_cfg
-) {
-    return prev_row_impl(document, cursor_y, 1, move_cfg).time;
-}
-
-GridAndBeat next_beat(
-    doc::Document const& document,
-    GridAndBeat cursor_y,
-    MovementConfig const& move_cfg
-) {
-    return next_row_impl(document, cursor_y, 1, move_cfg).time;
-}
-
-
-GridAndBeat move_up(
+TickT move_up(
     doc::Document const& document,
     cursor::Cursor cursor,
     MoveCursorYArgs const& args,
@@ -282,27 +216,24 @@ GridAndBeat move_up(
 
     // If option enabled and step > 1, move cursor by multiple rows.
     if (move_cfg.arrow_follows_step && args.step > 1) {
-        for (int i = 0; i < args.step; i++) {
-            cursor.y = prev_row_impl(document, cursor.y, args.rows_per_beat, move_cfg).time;
-        }
+        cursor.y = prev_rows(document, cursor.y, args.ticks_per_row, args.step);
         return cursor.y;
     }
 
-    MoveCursorResult grid_row =
-        prev_row_impl(document, cursor.y, args.rows_per_beat, move_cfg);
+    TickT grid_row = prev_rows(document, cursor.y, args.ticks_per_row, 1);
 
     // If option enabled and nearest event is located between cursor and nearest row,
     // move cursor to nearest event.
     if (move_cfg.snap_to_events) {
-        MoveCursorResult event = prev_event_impl(document, cursor);
-        return std::max(grid_row, event).time;
+        TickT event = prev_event_impl(document, cursor);
+        return std::max(grid_row, event);
     }
 
     // Move cursor to previous row.
-    return grid_row.time;
+    return grid_row;
 }
 
-GridAndBeat move_down(
+TickT move_down(
     doc::Document const& document,
     cursor::Cursor cursor,
     MoveCursorYArgs const& args,
@@ -312,28 +243,24 @@ GridAndBeat move_down(
 
     // If option enabled and step > 1, move cursor by multiple rows.
     if (move_cfg.arrow_follows_step && args.step > 1) {
-        for (int i = 0; i < args.step; i++) {
-            cursor.y =
-                next_row_impl(document, cursor.y, args.rows_per_beat, move_cfg).time;
-        }
+        cursor.y = next_rows(document, cursor.y, args.ticks_per_row, args.step);
         return cursor.y;
     }
 
-    MoveCursorResult grid_row =
-        next_row_impl(document, cursor.y, args.rows_per_beat, move_cfg);
+    TickT grid_row = next_rows(document, cursor.y, args.ticks_per_row, 1);
 
     // If option enabled and nearest event is located between cursor and nearest row,
     // move cursor to nearest event.
     if (move_cfg.snap_to_events) {
-        MoveCursorResult event = next_event_impl(document, cursor);
-        return std::min(grid_row, event).time;
+        TickT event = next_event_impl(document, cursor);
+        return std::min(grid_row, event);
     }
 
     // Move cursor to next row.
-    return grid_row.time;
+    return grid_row;
 }
 
-GridAndBeat cursor_step(
+TickT cursor_step(
     doc::Document const& document,
     cursor::Cursor cursor,
     CursorStepArgs const& args,
@@ -342,97 +269,85 @@ GridAndBeat cursor_step(
     // See doc comment in header for more docs.
 
     if (args.step_to_event) {
-        return next_event_impl(document, cursor).time;
+        return next_event_impl(document, cursor);
     }
 
     if (move_cfg.snap_to_events && args.step == 1) {
-        MoveCursorResult grid_row =
-            next_row_impl(document, cursor.y, args.rows_per_beat, move_cfg);
-        MoveCursorResult event = next_event_impl(document, cursor);
+        TickT grid_row =
+            next_rows(document, cursor.y, args.ticks_per_row, 1);
+        TickT event = next_event_impl(document, cursor);
 
-        return std::min(grid_row, event).time;
+        return std::min(grid_row, event);
     }
 
     // Move cursor by multiple rows.
-    for (int i = 0; i < args.step; i++) {
-        cursor.y = next_row_impl(document, cursor.y, args.rows_per_beat, move_cfg).time;
-    }
+    cursor.y = next_rows(document, cursor.y, args.ticks_per_row, args.step);
     return cursor.y;
 }
 
-/// To avoid an infinite loop,
-/// avoid scrolling more than _ patterns in a single Page Down keystroke.
-constexpr int MAX_PAGEDOWN_SCROLL = 16;
-
-GridAndBeat page_up(
+TickT page_up(
     doc::Document const& document,
-    GridAndBeat cursor_y,
+    TickT cursor_y,
+    int ticks_per_row,
     MovementConfig const& move_cfg)
 {
-    cursor_y.beat -= move_cfg.page_down_distance;
+    const TickT page_up_distance = ticks_per_row * move_cfg.page_down_rows;
 
-    for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
-        if (cursor_y.beat < 0) {
-            if (cursor_y.grid.v > 0) {
-                cursor_y.grid--;
-                cursor_y.beat += document.timeline[cursor_y.grid].nbeats;
-            } else {
-                cursor_y.beat = 0;
-                break;
-            }
-        } else {
-            break;
-        }
+    if (cursor_y >= page_up_distance) {
+        cursor_y -= page_up_distance;
+    } else {
+        cursor_y = 0;
     }
+
     return cursor_y;
 }
 
-GridAndBeat page_down(
+TickT page_down(
     doc::Document const& document,
-    GridAndBeat cursor_y,
+    TickT cursor_y,
+    int ticks_per_row,
     MovementConfig const& move_cfg)
 {
-    const auto orig_beat = cursor_y.beat;
-    cursor_y.beat += move_cfg.page_down_distance;
+    const TickT page_down_distance = ticks_per_row * move_cfg.page_down_rows;
 
-    for (int i = 0; i < MAX_PAGEDOWN_SCROLL; i++) {
-        auto const & grid_cell = document.timeline[cursor_y.grid];
-        if (cursor_y.beat >= grid_cell.nbeats) {
-            if (cursor_y.grid.v + 1 < document.timeline.size()) {
-                cursor_y.grid++;
-                cursor_y.beat -= grid_cell.nbeats;
-            } else {
-                // Kinda hacky, but will do.
-                cursor_y.beat = orig_beat;
-                break;
-            }
-        } else {
-            break;
-        }
-    }
+    cursor_y += page_down_distance;
+
     return cursor_y;
 }
 
-GridAndBeat frame_begin(
+TickT block_begin(
     doc::Document const& document,
     cursor::Cursor cursor,
     MovementConfig const& move_cfg)
 {
-    if (move_cfg.home_end_switch_patterns && cursor.y.beat <= 0) {
-        if (cursor.y.grid.v > 0) {
-            cursor.y.grid--;
+    // TODO snap to top of current block, and when pressed again snap to previous block
+    /*
+    fn calc_top(PatternRef) = PatternRef.begin_tick
+    iter = RevTrackPatternWrap(cursor) [begin is inclusive]
+    block = iter.next()
+    release_assert block and not wrapped
+    if (move_cfg.home_end_switch_patterns && cursor.y <= top_tick) {
+        block = iter.next()
+        if block && block.wrapped == Wrap::None {
+            cursor.y = calc_top(block.pattern);
+        } else {
+            // leave cursor unchanged? goto begin of song?
         }
+    } else {
+        cursor.y = calc_top(block.pattern);
     }
+    */
 
-    cursor.y.beat = 0;
+    cursor.y = 0;
+
     return cursor.y;
 }
 
-GridAndBeat frame_end(
+TickT block_end(
     doc::Document const& document,
     cursor::Cursor cursor,
     MovementConfig const& move_cfg,
-    doc::BeatFraction bottom_padding)
+    TickT bottom_padding)
 {
     // TODO pick a way of handling edge cases.
     //  We should use the same method of moving the cursor to end of pattern,
@@ -440,59 +355,43 @@ GridAndBeat frame_end(
     //  calc_bottom() is dependent on selection's cached rows_per_beat (limitation)
     //  but selects one pattern exactly (good).
 
-    auto calc_bottom = [&] (GridAndBeat cursor_y) -> BeatFraction {
-        return document.timeline[cursor_y.grid].nbeats - bottom_padding;
-    };
-
-    auto bottom_beat = calc_bottom(cursor.y);
-
-    if (move_cfg.home_end_switch_patterns && cursor.y.beat >= bottom_beat) {
-        if (cursor.y.grid + 1 < document.timeline.size()) {
-            cursor.y.grid++;
-            bottom_beat = calc_bottom(cursor.y);
+    /*
+    fn calc_bottom(PatternRef) = max(PatternRef.end_tick - bottom_padding, PatternRef.begin_tick)
+    iter = FwdTrackPatternWrap(cursor) [begin is inclusive]
+    block = iter.next()
+    release_assert block and not wrapped
+    if (move_cfg.home_end_switch_patterns && cursor.y >= bottom_tick) {
+        block = iter.next()
+        if block && block.wrapped == Wrap::None {
+            cursor.y = calc_bottom(block.pattern);
+        } else {
+            // leave cursor unchanged? goto max(end of song - padding, now)?
         }
+    } else {
+        cursor.y = calc_bottom(block.pattern);
     }
+    */
 
-    cursor.y.beat = bottom_beat;
+    using doc_util::track_util::song_length;
 
-    return cursor.y;
+    return song_length(document.sequence);
 }
 
-GridAndBeat prev_frame(
+TickT prev_block(
     doc::Document const& document,
     cursor::Cursor cursor,
     int zoom_level)
 {
-    decrement_mod(cursor.y.grid, (GridIndex) document.timeline.size());
-
-    BeatFraction nbeats = document.timeline[cursor.y.grid].nbeats;
-
-    // If cursor is out of bounds, move to last row in frame.
-    if (cursor.y.beat >= nbeats) {
-        BeatFraction row_count = nbeats * zoom_level;
-        int last_row = util::math::frac_prev(row_count);
-        cursor.y.beat = BeatFraction{last_row, zoom_level};
-    }
-
+    // TODO implement RevGuiTrackIter
     return cursor.y;
 }
 
-GridAndBeat next_frame(
+TickT next_block(
     doc::Document const& document,
     cursor::Cursor cursor,
     int zoom_level)
 {
-    increment_mod(cursor.y.grid, (GridIndex) document.timeline.size());
-
-    BeatFraction nbeats = document.timeline[cursor.y.grid].nbeats;
-
-    // If cursor is out of bounds, move to last row in frame.
-    if (cursor.y.beat >= nbeats) {
-        BeatFraction row_count = nbeats * zoom_level;
-        int last_row = util::math::frac_prev(row_count);
-        cursor.y.beat = BeatFraction{last_row, zoom_level};
-    }
-
+    // TODO implement FwdGuiTrackIter
     return cursor.y;
 }
 
@@ -514,27 +413,13 @@ namespace gui::move_cursor {
 using namespace doc;
 using chip_kinds::ChipKind;
 using namespace doc_util::event_builder;
-using doc_util::sample_instrs::spc_chip_channel_settings;
 
-static Document empty_doc(int n_seq_entry) {
+static Document empty_doc() {
     SequencerOptions sequencer_options{
         .target_tempo = 100,
     };
 
-    Timeline timeline;
-
-    for (int seq_entry_idx = 0; seq_entry_idx < n_seq_entry; seq_entry_idx++) {
-        timeline.push_back(TimelineFrame {
-            .nbeats = 4,
-            .chip_channel_cells = {
-                // chip 0
-                {
-                    // 8 channels
-                    {}, {}, {}, {}, {}, {}, {}, {}
-                }
-            },
-        });
-    }
+    Sequence sequence = {{{}, {}, {}, {}, {}, {}, {}, {}}};
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -543,65 +428,65 @@ static Document empty_doc(int n_seq_entry) {
         .samples = Samples(),
         .instruments = Instruments(),
         .chips = {ChipKind::Spc700},
-        .chip_channel_settings = spc_chip_channel_settings(),
-        .timeline = timeline
+        .sequence = sequence
     };
 }
 
 // # Documents for event search
 
-using timing::GridAndBeat;
+using timing::TickT;
 using cursor::Cursor;
 
-/// Uses a single full-grid block to store events.
-static doc::Document simple_document() {
-    auto document = empty_doc(4);
-    auto & cell = document.timeline[1].chip_channel_cells[0][0];
+// Create three documents with events at at(1, 1) and at(2, 1) (tick 49 and 97).
 
-    auto block = doc::TimelineBlock{0, END_OF_GRID, Pattern{}};
+/// Uses a single block to store events.
+static Document simple_document() {
+    auto document = empty_doc();
+    auto & track = document.sequence[0][0];
 
-    block.pattern.events.push_back({1, {1}});
-    block.pattern.events.push_back({2, {2}});
+    auto block = TrackBlock::from_events(0, at(4), {
+        {at(1, 1), {1}},
+        {at(2, 1), {2}},
+    });
 
-    cell._raw_blocks = {std::move(block)};
+    track.blocks = {std::move(block)};
 
     return document;
 }
 
-/// Uses two mid-grid blocks to store events.
-static doc::Document blocked_document() {
-    auto document = empty_doc(4);
-    auto & cell = document.timeline[1].chip_channel_cells[0][0];
+/// Uses two blocks to store events.
+static Document blocked_document() {
+    auto document = empty_doc();
+    auto & track = document.sequence[0][0];
 
-    auto block1 = doc::TimelineBlock{1, 2, Pattern{
-        .events = {{0, {1}}}
-    }};
+    auto block1 = TrackBlock::from_events(at(1), at(1), {
+        {at(0, 1), {1}}
+    });
 
-    auto block2 = doc::TimelineBlock{2, 3, Pattern{
-        .events = {{0, {2}}}
-    }};
+    auto block2 = TrackBlock::from_events(at(2), at(1), {
+        {at(0, 1), {2}}
+    });
 
-    cell._raw_blocks = {std::move(block1), std::move(block2)};
+    track.blocks = {std::move(block1), std::move(block2)};
 
     return document;
 }
 
 /// Uses a looped pattern to play the same event multiple times.
-static doc::Document looped_document() {
-    auto document = empty_doc(4);
-    auto & cell = document.timeline[1].chip_channel_cells[0][0];
+static Document looped_document() {
+    auto document = empty_doc();
+    auto & track = document.sequence[0][0];
 
-    auto block = doc::TimelineBlock{1, 3, Pattern{
-        .events = {{0, {1}}},
-        .loop_length = 1,
-    }};
+    auto block = TrackBlock::from_events(at(1), at(1), {
+        {at(0, 1), {1}}
+    }, 2);
 
-    cell._raw_blocks = {std::move(block)};
+    track.blocks = {std::move(block)};
 
     return document;
 }
 
-PARAMETERIZE(event_search_doc, doc::Document, document,
+PARAMETERIZE(event_search_doc, Document, document,
     OPTION(document, simple_document());
     OPTION(document, blocked_document());
     OPTION(document, looped_document());
@@ -611,75 +496,76 @@ PARAMETERIZE(event_search_doc, doc::Document, document,
 TEST_CASE("Test next_event_impl()/prev_event_impl()") {
     cursor::CursorX const x{0, 0};
 
+    // Pick one of 3 documents with events at time 49 and 97.
+    Document document{DocumentCopy{}};
+    PICK(event_search_doc(document));
+
     enum WhichFunction {
         PrevEvent,
         NextEvent,
     };
 
     struct TestCase {
-        GridAndBeat start;
+        TickT start;
         WhichFunction which_function;
-        GridAndBeat end;
+        TickT end;
         char const * message;
     };
 
+    // Test locating events from various times.
     TestCase test_cases[] {
         // next_event_impl()
-        {{0, 0}, NextEvent, {1, 1}, "Ensure next_event_impl() moves to next pattern if current empty"},
-        {{1, 0}, NextEvent, {1, 1}, "Ensure next_event_impl() works"},
-        {{1, 1}, NextEvent, {1, 2}, "Ensure next_event_impl() skips current event"},
-        {{1, 2}, NextEvent, {1, 2}, "Ensure next_event_impl() doesn't wrap (1)"},
-        {{1, 3}, NextEvent, {1, 3}, "Ensure next_event_impl() doesn't wrap (2)"},
-        {{2, 0}, NextEvent, {2, 0}, "Ensure next_event_impl() doesn't wrap (3)"},
+        {at(0, 0), NextEvent, at(1, 1), "Ensure next_event_impl() moves to next pattern if current empty"},
+        {at(1, 0), NextEvent, at(1, 1), "Ensure next_event_impl() works"},
+        {at(1, 1), NextEvent, at(2, 1), "Ensure next_event_impl() skips current event"},
+        {at(2, 1), NextEvent, at(2, 1), "Ensure next_event_impl() skips current event and doesn't wrap"},
+        {at(2, 2), NextEvent, at(2, 2), "Ensure next_event_impl() doesn't wrap"},
+        {at(10, 0), NextEvent, at(10, 0), "Ensure next_event_impl() doesn't wrap (2)"},
         // prev_event_impl()
-        {{2, 0}, PrevEvent, {1, 2}, "Ensure prev_event_impl() moves to next pattern if current empty"},
-        {{1, 3}, PrevEvent, {1, 2}, "Ensure prev_event_impl() works"},
-        {{1, 2}, PrevEvent, {1, 1}, "Ensure prev_event_impl() skips current event"},
-        {{1, 1}, PrevEvent, {1, 1}, "Ensure prev_event_impl() doesn't wrap (1)"},
-        {{1, 0}, PrevEvent, {1, 0}, "Ensure prev_event_impl() doesn't wrap (2)"},
-        {{0, 0}, PrevEvent, {0, 0}, "Ensure prev_event_impl() doesn't wrap (3)"},
+        {at(10, 0), PrevEvent, at(2, 1), "Ensure prev_event_impl() moves to prev pattern if current empty"},
+        {at(2, 2), PrevEvent, at(2, 1), "Ensure prev_event_impl() works"},
+        {at(2, 1), PrevEvent, at(1, 1), "Ensure prev_event_impl() skips current event"},
+        {at(1, 1), PrevEvent, at(1, 1), "Ensure prev_event_impl() skips current event and doesn't wrap"},
+        {at(1, 0), PrevEvent, at(1, 0), "Ensure prev_event_impl() doesn't wrap (1)"},
+        {at(0, 0), PrevEvent, at(0, 0), "Ensure prev_event_impl() doesn't wrap (2)"},
     };
 
-    doc::Document document{doc::DocumentCopy{}};
-    PICK(event_search_doc(document));
 
     for (TestCase test_case : test_cases) {
         CAPTURE(test_case.message);
 
-        MoveCursorResult out;
+        TickT out;
         if (test_case.which_function == NextEvent) {
             out = next_event_impl(document, Cursor{x, test_case.start});
         } else {
             out = prev_event_impl(document, Cursor{x, test_case.start});
         }
 
-        CHECK(out.time == test_case.end);
+        CHECK(out == test_case.end);
     }
 }
 
 TEST_CASE("Test next_event_impl()/prev_event_impl() on empty document") {
-    auto document = empty_doc(4);
+    auto document = empty_doc();
 
     cursor::CursorX const x{0, 0};
 
     // Both functions should be no-op identity functions on empty documents,
     // and indicate that the cursor has wrapped.
     {
-        MoveCursorResult out = next_event_impl(document, Cursor{x, {1, 2}});
-        CHECK(out.time == GridAndBeat{1, 2});
+        TickT out = next_event_impl(document, Cursor{x, at(1, 2)});
+        CHECK(out == at(1, 2));
     }
     {
-        MoveCursorResult out = prev_event_impl(document, Cursor{x, {1, 2}});
-        CHECK(out.time == GridAndBeat{1, 2});
+        TickT out = prev_event_impl(document, Cursor{x, at(1, 2)});
+        CHECK(out == at(1, 2));
     }
 }
 
-static BeatFraction time(int start, int num, int den) {
-    return start + BeatFraction(num, den);
-}
+#if 0
 
 TEST_CASE("Test prev_row_impl()/next_row_impl()") {
-    auto document = empty_doc(4);
+    auto document = empty_doc();
     int rows_per_beat = 4;
 
     MovementConfig move_cfg{
@@ -693,8 +579,8 @@ TEST_CASE("Test prev_row_impl()/next_row_impl()") {
 
     struct TestCase {
         WhichFunction which_function;
-        GridAndBeat start;
-        GridAndBeat end;
+        TickT start;
+        TickT end;
         char const * message;
     };
 
@@ -712,20 +598,20 @@ TEST_CASE("Test prev_row_impl()/next_row_impl()") {
     for (TestCase test_case : test_cases) {
         CAPTURE(test_case.message);
 
-        MoveCursorResult out;
+        TickT out;
         if (test_case.which_function == NextRow) {
             out = next_row_impl(document, test_case.start, rows_per_beat, move_cfg);
         } else {
             out = prev_row_impl(document, test_case.start, rows_per_beat, move_cfg);
         }
 
-        CHECK(out == MoveCursorResult{test_case.end});
+        CHECK(out == TickT{test_case.end});
     }
 }
 
 TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
     // nbeats=4, npattern=4
-    auto document = empty_doc(4);
+    auto document = empty_doc();
     int rows_per_beat = 4;
 
     MovementConfig wrap_doc_1{
@@ -748,9 +634,9 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
     */
     struct TestCase {
         WhichFunction which_function;
-        GridAndBeat start;
-        MoveCursorResult wrap_doc;
-        GridAndBeat wrap_pattern;
+        TickT start;
+        TickT wrap_doc;
+        TickT wrap_pattern;
         // If wrap is turned off, the position should be unchanged (= start).
         char const * message;
     };
@@ -769,10 +655,10 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
         CAPTURE(test_case.message);
 
         auto verify = [&] (
-            char const* move_name, MovementConfig const& move_cfg, MoveCursorResult end
+            char const* move_name, MovementConfig const& move_cfg, TickT end
         ) {
             CAPTURE(move_name);
-            MoveCursorResult out;
+            TickT out;
             if (test_case.which_function == NextRow) {
                 out = next_row_impl(document, test_case.start, rows_per_beat, move_cfg);
             } else {
@@ -783,15 +669,16 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
         };
 
         verify("wrap_doc_1", wrap_doc_1, test_case.wrap_doc);
-        verify("no_wrap", no_wrap, MoveCursorResult{test_case.start});
+        verify("no_wrap", no_wrap, TickT{test_case.start});
     }
 }
+#endif
 
 // TODO add tests for cursor_step
 
 //TEST_CASE("Test move_up()/move_down() wrapping and events") {
 //    // nbeats=4, npattern=4
-//    auto document = empty_doc(4);
+//    auto document = empty_doc();
 //    MoveCursorYArgs args{.rows_per_beat = 4, .step = 1};
 
 //    MovementConfig move_cfg{
@@ -820,7 +707,7 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
 //        TimedRowEvent{TimeInPattern{mid_last_row, 0}, RowEvent{0}}
 //    );
 
-//    auto event_in_middle = empty_doc(4);
+//    auto event_in_middle = empty_doc();
 //    event_in_middle.sequence[2].chip_channel_events[0][0].push_back(
 //        TimedRowEvent{TimeInPattern{2, 0}, RowEvent{0}}
 //    );
@@ -837,8 +724,8 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
 //    */
 //    struct TestCase {
 //        WhichFunction which_function;
-//        GridAndBeat start;
-//        GridAndBeat end;
+//        TickT start;
+//        TickT end;
 //        // If wrap is turned off, the position should be unchanged (= start).
 //        char const * message;
 //    };
@@ -867,7 +754,7 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
 
 //        Cursor cursor{{0, 0}, test_case.start};
 
-//        GridAndBeat out;
+//        TickT out;
 //        if (test_case.which_function == MoveDown) {
 //            out = move_down(document, cursor, args, move_cfg);
 //        } else {
@@ -882,7 +769,7 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
 //        Cursor cursor{{0, 0}, {3, last_row}};
 //        CHECK(
 //            move_down(event_in_middle, cursor, args, move_cfg)
-//            == GridAndBeat{0, row_0}
+//            == TickT{0, row_0}
 //        );
 //    }
 
@@ -891,7 +778,7 @@ TEST_CASE("Test prev_row_impl()/next_row_impl() wrapping") {
 //        Cursor cursor{{0, 0}, {0, 0}};
 //        CHECK(
 //            move_up(event_in_middle, cursor, args, move_cfg)
-//            == GridAndBeat{3, last_row}
+//            == TickT{3, last_row}
 //        );
 //    }
 //}

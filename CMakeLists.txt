@@ -160,6 +160,7 @@ add_library(exotracker-core
     src/util/safe_typedef.h
     src/util/typeid_cast.h
     src/util/unwrap.h
+    src/util/variant_cast.h
 
     # Document
     src/chip_common.h
@@ -267,6 +268,8 @@ add_library(exotracker-headless
     src/doc_util/event_search.cpp
     src/doc_util/sample_instrs.h
     src/doc_util/sample_instrs.cpp
+    src/doc_util/time_util.h
+    src/doc_util/time_util.cpp
     src/edit_common.h
     src/edit/edit_impl.h
     src/edit/modified_common.h
@@ -316,6 +319,7 @@ add_executable(exotracker-qt
     src/gui_common.h
     src/gui/config.h
     src/gui/config.cpp
+    src/gui/config/block_config.h
     src/gui/config/cursor_config.h
     src/gui/cursor.h
     src/gui/lib/color.h
@@ -429,7 +433,7 @@ add_executable(exotracker-tests
     tests/test_edit_history.cpp
     tests/test_math.cpp
     tests/audio/test_event_queue.cpp
-    tests/audio/test_sequencer.cpp
+#    tests/audio/test_sequencer.cpp
     tests/audio/test_synth.cpp
     tests/test_utils/test_parameterize.cpp
 

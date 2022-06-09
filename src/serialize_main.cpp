@@ -25,7 +25,7 @@ int main() {
     for (size_t i = 0; i < 3; i++) {
         {
             auto result = save_to_path(
-                d, Metadata { .zoom_level = 4 }, PATH
+                d, Metadata {}, PATH
             );
             if (result) {
                 fmt::print("save error: {}\n", *result);

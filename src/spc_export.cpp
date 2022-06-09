@@ -777,10 +777,13 @@ ExportSpcResult export_spc(Document const& doc, char const* path) {
 
 #include "chip_kinds.h"
 #include "doc_util/sample_instrs.h"
+#include "doc_util/event_builder.h"
 
 #include <doctest.h>
 
 namespace spc_export {
+
+using doc_util::event_builder::at;
 
 TEST_CASE("Test converting tuning into AMK") {
     ErrorState state;
@@ -858,8 +861,6 @@ TEST_CASE("Test converting tuning into AMK") {
     }
 }
 
-using doc_util::sample_instrs::spc_chip_channel_settings;
-
 // Keep in sync with instrument_test().
 constexpr size_t PATCH_COUNT = 4;
 
@@ -890,14 +891,8 @@ static Document instrument_test() {
 
     ChipList chips{ChipKind::Spc700};
 
-    ChipChannelSettings chip_channel_settings = spc_chip_channel_settings();
-
-    Timeline timeline;
-
-    timeline.push_back(TimelineFrame{
-        .nbeats = 16,
-        .chip_channel_cells = {{{}, {}, {}, {}, {}, {}, {}, {}}},
-    });
+    Sequence sequence{{{}, {}, {}, {}, {}, {}, {}, {}}};
+    sequence[0][0].blocks.push_back(TrackBlock::from_events(at(0), at(16), {}));
 
     return DocumentCopy{
         .sequencer_options = sequencer_options,
@@ -906,8 +901,7 @@ static Document instrument_test() {
         .samples = move(samples),
         .instruments = move(instruments),
         .chips = move(chips),
-        .chip_channel_settings = move(chip_channel_settings),
-        .timeline = move(timeline),
+        .sequence = move(sequence),
     };
 }
 

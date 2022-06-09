@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui/config/block_config.h"
 #include "gui/config/cursor_config.h"
 #include "gui/lib/color.h"
 #include "doc/accidental_common.h"
@@ -51,11 +52,8 @@ inline namespace keys {
         KeyInt zoom_out = chord(Qt::CTRL, Qt::Key_Minus);
         KeyInt zoom_in = chord(Qt::CTRL, Qt::Key_Equal);
 
-        KeyInt zoom_out_half = chord(Qt::CTRL | Qt::SHIFT, Qt::Key_Minus);
-        KeyInt zoom_in_half = chord(Qt::CTRL | Qt::SHIFT, Qt::Key_Equal);
-
-        KeyInt zoom_out_triplet = chord(Qt::CTRL | Qt::ALT, Qt::Key_Minus);
-        KeyInt zoom_in_triplet = chord(Qt::CTRL | Qt::ALT, Qt::Key_Equal);
+        KeyInt zoom_out_triplet = chord(Qt::CTRL | Qt::SHIFT, Qt::Key_Minus);
+        KeyInt zoom_in_triplet = chord(Qt::CTRL | Qt::SHIFT, Qt::Key_Equal);
     };
 
     // Allow a few notes of the following octave. Match 0CC's behavior.
@@ -270,12 +268,15 @@ inline namespace visual {
     };
 }
 
+using block_config::ExtendBlock;
+
 /// Set via dialog. Written to disk when dialog applied or closed.
 /// Stored in the GuiApp class.
 struct Options {
     GlobalKeys global_keys;
     PatternKeys pattern_keys;
     MovementConfig move_cfg;
+    ExtendBlock extend_block = ExtendBlock::Adjacent;
 
     PatternAppearance visual = default_appearance();
 

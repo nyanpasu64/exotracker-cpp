@@ -44,7 +44,7 @@ exotracker does not link to the MinGW runtime statically. Enabling it removes th
 I am following some Rust-inspired rules in the codebase.
 
 - Polymorphic classes are non-copyable. Maybe non-polymorphic classes (not value structs) too.
-- Mutable aliasing is disallowed, except when mandated by third-party libraries (Blip_Synth points to Blip_Buffer, nsfplay APU2 points to APU1).
+- Nonlocal (interprocedural) mutable aliasing is strongly discouraged, except when mandated by third-party libraries.
 - Self-referential structs are disallowed, except when mandated by third-party libraries (blip_buffer and rtaudio), in which case the copy and move constructors are disabled (or move constructor is manually fixed, in the case of Blip_Buffer).
 - Inheritance and storing data in base classes is discouraged.
 
@@ -185,41 +185,27 @@ In FamiTracker, the list of valid patterns is not exposed to the user. You can o
 
 My goal in exploring alternative approaches is not file-size efficiency (deleting unused patterns when saving to disk), but searching for a mental model where patterns are (by default) used in only one place, and multiple uses of a single pattern is explicitly specified. My goals are clear warning signs when editing a pattern used in multiple places, and clear indications of a reused pattern's purpose (a name) and all usages.
 
-## Timeline
+## Sequence
 
-The frame/order editor is replaced with a timeline editor, and its functionality is changed significantly.
+The frame/order editor is removed with no replacement yet. Its functionality is changed significantly, based off N-SPC/AMK's design.
 
-The pattern grid structure from existing trackers is carried over (under the name of timeline frames and grid cells). Each timeline frame has its own length which can vary between rows (like OpenMPT, unlike FamiTracker). Each timeline frame holds one timeline cell (or grid cell) per channel. However, unlike patterns, timeline cells do not contain events directly, but through several layers of indirection.
+A song has a single sequence, holding chips and tracks. A track can hold zero or more blocks, which carry a start tick, loop count, and a fixed-length pattern. A block's length is determined by multiplying the pattern's (nonzero) length with the block's (nonzero) loop count. Blocks have nonzero length, do not overlap in time, and occur in increasing time order. A song's length is determined by the end time of the last block in the song.
 
-A timeline cell can hold zero or more blocks, which carry a start and end time (in integer beats) and a pattern. These blocks have nonzero length, do not overlap in time, occur in increasing time order, and lie between 0 and the timeline cell's length (the last block's end time can take on a special value corresponding to "end of cell")[1].
+A pattern consists of a duration (in ticks) and a list of events. Eventually, patterns can be reused in multiple blocks at different times (and possibly different channels). At some point, we may add support for early exits from looped patterns (like the upcoming AddMusicFR's "Loop break").
 
-Each block contains a single pattern, consisting of a list of events and an optional loop duration (in integer beats). The pattern starts playing when absolute time reaches the block's start time, and stops playing when absolute time reaches the block's end time. If the loop duration is set, whenever relative time (within the pattern) reaches the loop duration, playback jumps back to the pattern's begin. A block can cut off a pattern's events early when time reaches the block's end time (either the pattern's initial play or during a loop). However a block cannot start playback partway into a pattern (no plans to add support yet).
-
-Eventually, patterns can be reused in multiple blocks at different times (and possibly different channels).
-
-[1] If a user shrinks a timeline entry, it may cause an timed-end block to end past the cell, or an "end of cell" block to have a size ≤ 0. To prevent this from breaking the GUI or sequencer, `FramePatternIter` clamps block end times to the end of the cell, and skips blocks beginning at or past the end of the cell. However, out-of-bounds events and blocks are still stored in the document. I have not decided how to indicate these to the user.
+Currently to match N-SPC/AMK, notes are stopped upon a block end. This is subject to change, and you can turn this off using the upcoming legato effect.
 
 ### Motivation
 
-The timeline system is intended to allow treating the program like FamiStudio or a tracker, with timestamps encoded relative to current pattern/frame begin, and reuse at pattern-level granularity. If you try to enter a note/volume/effect in a region without a block in place, a block is automatically created in the current channel, filling all empty space available (up to an entire grid cell) (not implemented yet).
+The track system is intended to allow treating the program like FamiStudio or a tracker, with timestamps encoded relative to current pattern/frame begin, and reuse at pattern-level granularity. If you try to enter a note/volume/effect in a region without a block in place, a block is automatically created in the current track, or the previous block is extended if not shared or looped (this is configurable but the UI is not implemented). Eventually we will add support for block splitting/joining, looping/unrolling, and shared block cloning.
 
-It is also intended to have a similar degree of flexibility as a DAW like Reaper (fine-grained block splitting and looping). The tradeoff is that because global timestamps are relative to grid cell begin, blocks are not allowed to cross grid cell boundaries (otherwise it would be painful to convert between block/pattern-relative and global timestamps).
+It is also intended to have a similar degree of flexibility as a DAW like Reaper (fine-grained block splitting and looping).
 
-### Implementation
+#### TrackPatternIter(Ref)
 
-The timeline code is implemented in `doc/timeline.h`. I added several helper classes.
+I added classes `TrackPatternIter` and `TrackPatternIterRef` to step through a track's blocks, and loop each block's patterns for its loop count. These classes (which act like bidirectional iterators) are constructed with a `TimelineTrack` and its duration, allow peeking a `MaybePatternRef`, and moving to the next/previous pattern. `TrackPatternIter::at_time()` returns the current pattern (or next pattern if between blocks), and `bool snapped_later` indicating whether we skipped to a future pattern.
 
-`TimelineCellRef` and `TimelineCellRefMut` store a reference to a timeline cell, and the owning timeline frame's length.
-
-`TimelineChannelRef` and `TimelineChannelRefMut` store a reference to a `Timeline` (all grid cells, all channels), and a chip and channel value. Timelines are currently stored as `[grid] [chip, channel] TimelineCell` to make adding/removing grid cells easy. But `TimelineChannelRef` can be indexed `[grid] TimelineCell`, to simplify code (like sequencers and cursor movement) that interacts with multiple grid/timeline cells, but only one channel.
-
-#### FramePatternIter(Ref)
-
-I added classes `FramePatternIter` and `TimelineCellIterRef` to step through a timeline cell's blocks, and loop each block's patterns for as long as it's playing. These classes (which act like coroutines/generators) are constructed with a `TimelineCell` and its duration, and yield `PatternRef` objects until exhausted.
-
-For each block in the cell, `FramePatternIter(Ref)` will yield a `PatternRef` with the block's pattern either once (if the pattern doesn't loop), or once for each time the pattern loops within the block. The `PatternRef` stores the time the pattern plays within the grid cell, and a span (pointer, size) to the events that should be played (excluding all events past the block's end time, but currently not excluding events at the beginning).
-
-To add support for starting playback partway through a pattern, a `PatternRef` would have to store a timestamp to subtract from all events when calculating the absolute time (relative to the grid cell) the events play at.
+For each block in the cell, `TrackPatternIter(Ref)` will yield a `PatternRef` with the block's pattern either once (if the pattern doesn't loop), or once for each time the pattern loops within the block. The `PatternRef` stores the time the pattern plays within the grid cell, and a span (pointer, size) to all of its events.
 
 ## Audio architecture
 
@@ -278,33 +264,31 @@ Data flows from doc.h (document) -> sequencer.h (notes each tick) -> nes_2a03_dr
 
 ----
 
-Each `ChipInstance` subclass `(Chip)Instance` has an associated `(Chip)ChannelID` enum (or enum class), also found as `(Chip)Instance::ChannelID`, specifying which channels that chip has. `(Chip)Instance` owns a sequencer (`ChipSequencer<(Chip)Instance::ChannelID>`), driver `(Chip)Driver`, and sound chip emulator (from nsfplay).
+Each `ChipInstance` subclass `(Chip)Instance` has an associated `(Chip)ChannelID` enum (or enum class), also found as `(Chip)Instance::ChannelID`, specifying which channels that chip has. `(Chip)Instance` owns a sequencer (`ChipSequencer<(Chip)Instance::ChannelID>`), driver `(Chip)Driver`, and sound chip emulator (Blargg's SPC_DSP from snes9x).
 
 Each sound chip module (`ChipInstance` subclass) can be run for a specific period of time (nclock: `ClockT`). The sound chip's synthesis callback (`ChipInstance::run_chip_for()`) is called by `OverallSynth`, and alternates running the synthesizer to generate audio for a duration in clock cycles (`ChipInstance::synth_run_clocks()`), and handling externally-imposed ticks or internally-timed register writes. On every tick (60 ticks/second), the synthesis callback returns, `OverallSynth` calls `ChipInstance::driver_tick()`, `ChipInstance`'s sound driver fetches event data from the sequencer and determines what registers to write to the chip (for new notes, instruments, vibrato, etc), and `OverallSynth` calls the synthesis callback again. On every register write, the synthesis callback writes to the registers of its sound chip (`ChipInstance::synth_write_memory()`) before resuming synthesis.
 
-Audio generated from separate emulated sound chips is mixed linearly (addition or weighted average). Each sound chip returns premixed audio from all channels, instead of returning each channel's audio level. (Why? I use nsfplay to emulate sound chips; each nsfplay chip returns premixed audio from all channels. Also many Famicom chips mix their channels using nonlinear or time-division mixing.) Each sound chip can output audio by either writing to `OverallSynth._nes_blip` (type: `Blip_Buffer`), or writing to an temporary buffer passed into the sound chip callback.
+Audio generated from separate emulated sound chips is mixed linearly (addition or weighted average). Each sound chip returns premixed audio from all channels, instead of returning each channel's audio level. (Why? I use SPC_DSP to emulate sound chips; SPC_DSP returns premixed audio from all channels, and the echo buffer is shared across all channels and cannot be cleanly channel-split. Also many non-SNES chips mix their channels using nonlinear or time-division mixing.) Each sound chip can output audio by either writing to `OverallSynth._nes_blip` (type: `Blip_Buffer`), or writing to an temporary buffer passed into the sound chip callback.
 
-Sound chip emulation (audio synthesis) will *not* be implemented in my future NSF driver (since it's handled by hardware or the NSF player/emulator).
+Sound chip emulation (audio synthesis) will *not* be implemented in my future .spc driver (since it's handled by hardware or the .spc player/emulator).
 
 ----
 
-The sequencer (`ChipSequencer<ChannelID>` holding many `ChannelSequencer`) is implemented in C++, and converts pattern data from "events placed at beats" into "events placed at ticks". This is a complex task because events are located at beat fractions, not entries in a fixed array (which other trackers use). However I have come up with a sequencer design implemented in C++, that should be portable to low-powered CPUs without multiplication and division units.
+The sequencer (`ChipSequencer<ChannelID>` holding many `ChannelSequencer`) is implemented in C++, and converts pattern data from "events placed at pattern-relative ticks plus Gxx" into "events placed at absolute ticks".
 
-At a given tempo, all beats are assumed to be the same length, an integer number of ticks. In both NSF export and PC preview, exotracker converts all note positions from beat fractions into two parts, a non-negative integer part and a "fraction less than 1" part. During NSF export, each fractional part, or possibly (beat fraction, tick offset) tuple, will be converted to a unique integer index. During playback, the sequencer uses these integers to index into the current tempo's "timing table" (precomputed for each tempo during NSF export), determining the note's position within the current beat.
-
-In the remainder of this section, I ignore NSF export and focus on PC playback. Each `ChannelSequencer` remembers its position in a document, but not what document it's playing (except as a performance optimization). Every call to `ChannelSequencer` will pass the latest document available as an argument (which changes every time the user edits the document's patterns or global options). Editing is not implemented yet, though.
+In the remainder of this section, I ignore .spc export and focus on PC playback. Each `ChannelSequencer` remembers its position in a document, but not what document it's playing (except as a performance optimization). Every call to `ChannelSequencer` will pass the latest document available as an argument (which changes every time the user edits the document's patterns or global options). If the document's tracks or sequencer options have changed, you must call `ChannelSequencer::doc_edited()` with the edited document before continuing playback, to avoid playback errors or crashes.
 
 `ChipSequencer<ChannelID>` is defined in `audio/synth/sequencer.h`. It owns `EnumMap<ChannelID, ChannelSequencer>` (one `ChannelSequencer` for every channel the current chip has).
 
 ----
 
-Each chip's sound driver (`(Chip)Driver`) is called once per tick. It handles events from the sequencer, as well as volume envelopes and vibrato. It generates register writes once per tick (possibly with delays between channels). It will be implemented separately in C++ and NSF export.
+Each chip's sound driver (`(Chip)Driver`) is called once per tick. It handles events from the sequencer, as well as volume envelopes and vibrato. It generates register writes once per tick (possibly with delays between channels). It will be implemented separately in C++ and .spc export.
 
 Each `(Chip)Instance` subclass owns a `(Chip)Driver` owning several `(Chip)(Channel)Driver`, neither of which inherits from global interfaces. Drivers are only exposed to their owning instance, not to `OverallSynth` or beyond.
 
 My current API provides no way for drivers to *read* from sound chips' address spaces. Channel drivers can use custom APIs to tell their owning chip driver how to handle chip-wide register writes: after all channel drivers are done running (and generating register writes), the chip driver knows the desired state of each channel and can generate more register writes. (For example, the 5B chip has a single 6-bit register telling the chip to enable/disable tone/noise for each of the 3 channels.)
 
-j0CC handles this differently. CAPU (hardware chip synth) has a Read() method, but it's completely unused. The 5B uses static globals, rather than a ChipDriver class, to write chip-wide registers.
+0CC/Dn-FT handles this differently. CAPU (hardware chip synth) has a Read() method, but it's completely unused. The 5B uses static globals, rather than a ChipDriver class, to write chip-wide registers.
 
 ## GUI/audio communication
 

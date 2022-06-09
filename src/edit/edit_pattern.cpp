@@ -1,9 +1,14 @@
 #include "edit_pattern.h"
 #include "edit_impl.h"
-#include "doc_util/event_search.h"
+#include "doc_util/time_util.h"
 #include "doc_util/track_util.h"
+#include "doc_util/event_search.h"
+#include "util/compare.h"
+#include "util/compare_impl.h"
+#include "util/expr.h"
 #include "util/release_assert.h"
 #include "util/typeid_cast.h"
+#include "util/variant_cast.h"
 
 #include <cpp11-on-multicore/bitfield.h>
 
@@ -16,7 +21,7 @@
 namespace edit::edit_pattern {
 
 using namespace doc;
-using timing::GridBlockBeat;
+using timing::TickT;
 using namespace edit_impl;
 
 namespace edit {
@@ -24,7 +29,7 @@ namespace edit {
         doc::Pattern pattern;
     };
     struct AddBlock {
-        doc::TimelineBlock block;
+        doc::TrackBlock block;
     };
     struct RemoveBlock {};
 
@@ -37,22 +42,19 @@ using edit::Edit;
 struct PatternEdit {
     ChipIndex _chip;
     ChannelIndex _channel;
-    GridIndex _grid_index;
-    BlockIndex _block_index;
+    BlockIndex _block;
 
     Edit _edit;
 
     ModifiedFlags _modified = ModifiedFlags::Patterns;
 
     void apply_swap(doc::Document & document) {
-        auto & doc_blocks =
-            document.timeline[_grid_index]
-            .chip_channel_cells[_chip][_channel]._raw_blocks;
+        auto & doc_blocks = document.sequence[_chip][_channel].blocks;
 
         auto p = &_edit;
 
         if (auto edit = std::get_if<edit::EditPattern>(p)) {
-            Pattern & doc_pattern = doc_blocks[_block_index].pattern;
+            Pattern & doc_pattern = doc_blocks[_block].pattern;
 
             // Reject all edits that create 64k or more events in a single edit.
             // Don't assert that this never happens,
@@ -60,6 +62,8 @@ struct PatternEdit {
             if (edit->pattern.events.size() > MAX_EVENTS_PER_PATTERN) {
                 return;
             }
+            // Why do we check for too many events at apply_swap time, but too many
+            // blocks at create time?
 
             for (auto & ev : edit->pattern.events) {
                 assert(ev.v != doc::RowEvent{});
@@ -73,16 +77,27 @@ struct PatternEdit {
                 assert(ev.v != doc::RowEvent{});
                 (void) ev;
             }
-            doc_blocks.insert(doc_blocks.begin() + _block_index, std::move(add->block));
+            doc_blocks.insert(doc_blocks.begin() + _block, std::move(add->block));
             *p = edit::RemoveBlock{};
 
         } else
         if (std::get_if<edit::RemoveBlock>(p)) {
-            *p = edit::AddBlock{std::move(doc_blocks[_block_index])};
-            doc_blocks.erase(doc_blocks.begin() + _block_index);
+            *p = edit::AddBlock{std::move(doc_blocks[_block])};
+            doc_blocks.erase(doc_blocks.begin() + _block);
 
         } else
             throw std::logic_error("PatternEdit with missing edit operaton");
+
+#ifdef DEBUG
+        TickT prev_end = 0;
+        for (auto const& block : doc_blocks) {
+            assert(block.begin_tick >= prev_end);
+            assert(block.loop_count > 0);
+            assert(block.pattern.length_ticks > 0);
+            prev_end =
+                block.begin_tick + (int) block.loop_count * block.pattern.length_ticks;
+        }
+#endif
     }
 
     using Impl = ImplEditCommand<PatternEdit, Override::None>;
@@ -100,122 +115,43 @@ static void erase_empty(EventList & v) {
 }
 
 
-struct EmptyBlock {
-    /// Index where you can insert a new block filling a gap in time.
-    /// time.block may point to the end of the array, out of bounds.
-    GridBlockBeat time;
-
-    /// Time the block can take up.
-    BeatIndex begin_time;
-    BeatOrEnd end_time;
-};
-
-
-namespace track_util = doc_util::track_util;
-
-[[nodiscard]] static
-std::variant<GridBlockBeat, EmptyBlock> get_current_block(
-    doc::Document const& document,
-    doc::ChipIndex chip,
-    doc::ChannelIndex channel,
-    timing::GridAndBeat now
-) {
-    auto cell_ref = doc::TimelineChannelRef(document.timeline, chip, channel)[now.grid];
-    doc::TimelineCell const& cell = cell_ref.cell;
-
-    doc::PatternRef pattern_or_end = track_util::pattern_or_end(cell_ref, now.beat);
-    if (pattern_or_end.block < cell.size()) {
-        doc::PatternRef pattern = pattern_or_end;
-        // block_or_end() is required to return a block where block.end_time > beat.
-        release_assert(now.beat < pattern.end_time);
-
-        // Check if the beat points within the block.
-        if (now.beat >= pattern.begin_time) {
-            return GridBlockBeat{
-                now.grid, pattern.block, now.beat - pattern.begin_time
-            };
-        }
-    }
-
-    // If now points in between blocks, compute the gap's boundaries.
-    /// Index where you can insert a new block filling a gap in time.
-    auto block_or_end = pattern_or_end.block;
-    auto empty_begin = block_or_end.v > 0
-        ? (BeatIndex) cell._raw_blocks[block_or_end - 1].end_time
-        : 0;
-
-    auto empty_end = block_or_end < cell.size()
-        ? (BeatOrEnd) pattern_or_end.begin_time
-        : END_OF_GRID;
-
-    return EmptyBlock{
-        {now.grid, block_or_end, now.beat - empty_begin}, empty_begin, empty_end
-    };
-}
-
-
+using doc_util::time_util::MeasureIter;
+using doc_util::time_util::MeasureIterResult;
+using doc_util::track_util::TrackPatternIterRef;
+using doc_util::track_util::IterResultRef;
 using doc_util::event_search::EventSearchMut;
 
-EditBox create_block(
-    Document const & document,
-    ChipIndex chip,
-    ChannelIndex channel,
-    GridAndBeat abs_time
-) {
-    // We don't need to check if the user is inserting "no note",
-    // because it has type optional<Note> and value nullopt.
-
-    auto maybe_block = get_current_block(document, chip, channel, abs_time);
-    auto p = &maybe_block;
-
-    if (std::get_if<GridBlockBeat>(p)) {
-        return make_command(edit_impl::NullEditCommand{});
-    }
-
-    auto empty = std::get_if<EmptyBlock>(p);
-    release_assert(empty);
-    GridBlockBeat time = empty->time;
-
-    // Create new pattern.
-    Edit edit = edit::AddBlock{doc::TimelineBlock{
-        .begin_time = empty->begin_time,
-        .end_time = empty->end_time,
-        .pattern = Pattern{.events = EventList{}, .loop_length = {}},
-    }};
-
-    return make_command(PatternEdit{
-        chip, channel, time.grid, time.block, std::move(edit)
-    });
-}
-
 EditBox delete_cell(
-    Document const & document,
-    ChipIndex chip,
-    ChannelIndex channel,
-    SubColumn subcolumn,
-    GridAndBeat abs_time
+    Document const& document,
+    const ChipIndex chip,
+    const ChannelIndex channel,
+    const SubColumn subcolumn,
+    const TickT now
 ) {
-    auto maybe_block = get_current_block(document, chip, channel, abs_time);
+    doc::SequenceTrackRef track = document.sequence[chip][channel];
 
-    GridBlockBeat time;
-    if (auto p_time = std::get_if<GridBlockBeat>(&maybe_block)) {
-        time = *p_time;
-    } else {
+    const IterResultRef x = TrackPatternIterRef::at_time(track, now);
+    if (x.snapped_later) {
         // If you press Delete in a region with no block/pattern, do nothing.
         return make_command(edit_impl::NullEditCommand{});
     }
 
+    // If you pressed Delete in a block/pattern...
+    const PatternRef pattern_ref = x.iter.peek().value();
+    const TickT rel_tick = now - pattern_ref.begin_tick;
+    assert(rel_tick >= 0);
+
     // Copy pattern.
     doc::Pattern pattern =
-        document.timeline[time.grid].chip_channel_cells[chip][channel]
-        ._raw_blocks[time.block].pattern;
+        document.sequence[chip][channel].blocks[pattern_ref.block].pattern;
 
     // Erase certain event fields, based on where the cursor was positioned.
     {
         EventSearchMut kv{pattern.events};
 
-        auto ev_begin = kv.beat_begin(time.beat);
-        auto ev_end = kv.beat_end(time.beat);
+        // TODO erase a full row of events?
+        auto ev_begin = kv.tick_begin(rel_tick);
+        auto ev_end = kv.tick_end(rel_tick);
         auto p = &subcolumn;
 
         for (auto it = ev_begin; it != ev_end; it++) {
@@ -242,57 +178,220 @@ EditBox delete_cell(
     // If we erase all fields from an event, remove the event entirely.
     erase_empty(pattern.events);
 
-    return make_command(PatternEdit{
-        chip, channel, time.grid, time.block, edit::EditPattern{std::move(pattern)}
+    return make_command(PatternEdit {
+        ._chip = chip,
+        ._channel = channel,
+        ._block = pattern_ref.block,
+        ._edit = edit::EditPattern{std::move(pattern)},
     });
 }
+
+static edit::AddBlock create_block_at(TickT block_begin, TickT block_end) {
+    assert(block_begin < block_end);
+
+    return edit::AddBlock{doc::TrackBlock {
+        .begin_tick = block_begin,
+        .loop_count = 1,
+        .pattern = Pattern {
+            .length_ticks = block_end - block_begin,
+            .events = EventList{},
+        },
+    }};
+}
+
+struct CreateOrEdit {
+    ChipIndex chip;
+    ChannelIndex channel;
+    BlockIndex block;
+    std::variant<edit::EditPattern, edit::AddBlock> edit;
+    TickT rel_tick;
+
+    /// Returns nullopt if we need to create a block, but MAX_BLOCKS_PER_TRACK blocks
+    /// already exist.
+    static std::optional<CreateOrEdit> try_make(
+        doc::Document const& doc,
+        ChipIndex chip,
+        ChannelIndex channel,
+        TickT now,
+        ExtendBlock block_mode)
+    {
+        doc::SequenceTrackRef track = doc.sequence[chip][channel];
+
+        const IterResultRef p = TrackPatternIterRef::at_time(track, now);
+        if (!p.snapped_later) {
+            // When editing a block/pattern, return a pattern copy in-place.
+            const PatternRef pattern_ref = p.iter.peek().value();
+            const TickT rel_tick = now - pattern_ref.begin_tick;
+            assert(rel_tick >= 0);
+
+            // Copy pattern.
+            return CreateOrEdit {
+                .chip = chip,
+                .channel = channel,
+                .block = pattern_ref.block,
+                .edit = edit::EditPattern{doc::Pattern(
+                    doc.sequence[chip][channel].blocks[pattern_ref.block].pattern
+                )},
+                .rel_tick = rel_tick,
+            };
+        }
+        // When editing between blocks/patterns...
+
+        // nullopt if inserting notes before the first block.
+        const MaybePatternRef above = EXPR(
+            auto prev = p.iter;
+            prev.prev();
+            return prev.peek();
+        );
+        // nullopt if inserting notes after the last block.
+        const MaybePatternRef below = p.iter.peek();
+
+        // Measure boundaries, truncated to fit within above/below patterns.
+        TickT measure_begin, measure_end;
+        {
+            // Returns the nearest measure boundary <= now.
+            const MeasureIter curr_meas = MeasureIter::at_time(doc, now).iter;
+            MeasureIter next_meas = curr_meas;
+            next_meas.next();
+
+            measure_begin = curr_meas.peek();
+            measure_end = next_meas.peek();
+
+            if (above) {
+                measure_begin = std::max(measure_begin, above->end_tick);
+            }
+            if (below) {
+                measure_end = std::min(measure_end, below->begin_tick);
+            }
+            release_assert(measure_begin < measure_end);
+            release_assert(now >= measure_begin);
+        }
+
+        auto create_block_index = below
+            ? below->block
+            : (BlockIndex) track.blocks.size();
+
+        // Do not capture measure_begin!
+        auto extend_above = [&doc, now, &above, chip, channel, measure_end]() {
+            release_assert(above);
+
+            TrackBlock const& block =
+                doc.sequence[chip][channel].blocks[above->block];
+            release_assert(block.loop_count == 1);
+
+            const TickT block_begin = block.begin_tick;
+            release_assert(measure_end > block_begin);
+
+            // Copy pattern and extend to measure_end.
+            auto pattern = block.pattern;
+            pattern.length_ticks = measure_end - block_begin;
+            return CreateOrEdit {
+                .chip = chip,
+                .channel = channel,
+                .block = above->block,
+                .edit = edit::EditPattern{std::move(pattern)},
+                .rel_tick = now - block_begin,
+            };
+        };
+
+        // Do not capture measure_begin!
+        auto try_create_block = [
+            now, chip, channel, create_block_index, measure_end, &track
+        ](TickT block_begin) -> std::optional<CreateOrEdit> {
+            if (track.blocks.size() >= MAX_BLOCKS_PER_TRACK) {
+                return {};
+            }
+            return CreateOrEdit {
+                .chip = chip,
+                .channel = channel,
+                .block = create_block_index,
+                .edit = create_block_at(block_begin, measure_end),
+                .rel_tick = now - block_begin,
+            };
+        };
+
+        // Since we're in a gap between blocks, the above pattern is a block end. If
+        // it's a block begin as well, the block has a loop count of 1.
+        const bool above_unlooped = above && above->is_block_begin;
+        // above->is_block_begin is UB if above is nullopt, but we never use it then...
+
+        switch (block_mode) {
+        case ExtendBlock::Never:
+            // Create a 1-measure block (truncated to fit).
+            return try_create_block(measure_begin);
+
+        case ExtendBlock::Adjacent:
+            // If next to above unlooped pattern, extend it.
+            if (above && above_unlooped && above->end_tick == measure_begin) {
+                return extend_above();
+            } else {
+                // Otherwise, create a 1-measure block (truncated to fit).
+                return try_create_block(measure_begin);
+            }
+
+        case ExtendBlock::Always:
+            // If above pattern exists...
+            if (above) {
+                // Extend if unlooped, create maximally sized block otherwise.
+                if (above_unlooped) {
+                    return extend_above();
+                } else {
+                    return try_create_block(above->end_tick);
+                }
+            } else {
+                // Otherwise (if creating first pattern), start from time=0.
+                return try_create_block(0);
+            }
+        }
+        throw std::logic_error(
+            "CreateOrEdit::make() passed unrecognized ExtendBlock mode"
+        );
+    }
+
+    Pattern & pattern() {
+        if (auto edit_ = std::get_if<edit::EditPattern>(&edit)) {
+            return edit_->pattern;
+        } else
+        if (auto add = std::get_if<edit::AddBlock>(&edit)) {
+            return add->block.pattern;
+        } else
+            throw std::logic_error("CreateOrEdit pattern(), edit holds nothing");
+    }
+
+    PatternEdit into_edit() && {
+        return PatternEdit {
+            ._chip = chip,
+            ._channel = channel,
+            ._block = block,
+            ._edit = variant_cast(std::move(edit)),
+        };
+    }
+};
 
 EditBox insert_note(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
-    GridAndBeat abs_time,
+    TickT now,
+    ExtendBlock block_mode,
     doc::Note note,
-    std::optional<doc::InstrumentIndex> instrument
-) {
-    // We don't need to check if the user is inserting "no note",
-    // because it has type optional<Note> and value nullopt.
+    std::optional<doc::InstrumentIndex> instrument)
+{
+    // We don't need to check if `Note note` contains "no note",
+    // because "no note" has type optional<Note> and value nullopt.
 
-    auto maybe_block = get_current_block(document, chip, channel, abs_time);
-    auto p = &maybe_block;
+    auto maybe_edit = CreateOrEdit::try_make(document, chip, channel, now, block_mode);
+    if (!maybe_edit) {
+        // Return an edit command to simplify the call site and move the cursor anyway.
+        return make_command(NullEditCommand{});
+    }
+    CreateOrEdit & edit = *maybe_edit;
 
-    GridBlockBeat time;
-    Edit edit;
-    doc::EventList * events;
-
-    if (auto exists = std::get_if<GridBlockBeat>(p)) {
-        time = *exists;
-
-        // Copy pattern.
-        edit = edit::EditPattern{doc::Pattern(
-            document.timeline[time.grid].chip_channel_cells[chip][channel]
-                ._raw_blocks[time.block].pattern
-        )};
-        events = &std::get<edit::EditPattern>(edit).pattern.events;
-
-    } else
-    if (auto empty = std::get_if<EmptyBlock>(p)) {
-        time = empty->time;
-
-        // Create new pattern.
-        edit = edit::AddBlock{doc::TimelineBlock{
-            .begin_time = empty->begin_time,
-            .end_time = empty->end_time,
-            .pattern = Pattern{.events = EventList{}, .loop_length = {}},
-        }};
-        events = &std::get<edit::AddBlock>(edit).block.pattern.events;
-
-    } else
-        throw std::logic_error("insert_note() get_current_block() returned nothing");
+    EventList & pattern_events = edit.pattern().events;
 
     // Insert note.
-    EventSearchMut kv{*events};
-    auto & ev = kv.get_or_insert(time.beat);
+    EventSearchMut kv{pattern_events};
+    auto & ev = kv.get_or_insert(edit.rel_tick);
 
     ev.v.note = note;
 
@@ -308,9 +407,7 @@ EditBox insert_note(
         // TODO add ability to set volume of each new note
     }
 
-    return make_command(PatternEdit{
-        chip, channel, time.grid, time.block, std::move(edit)
-    });
+    return make_command(std::move(edit).into_edit());
 }
 
 BEGIN_BITFIELD_TYPE(HexByte, uint8_t)
@@ -319,47 +416,25 @@ BEGIN_BITFIELD_TYPE(HexByte, uint8_t)
     ADD_BITFIELD_MEMBER(upper,      4,      4)
 END_BITFIELD_TYPE()
 
-// TODO add similar function for effect name (two ASCII characters, not nybbles).
 std::tuple<uint8_t, EditBox> add_digit(
     Document const & document,
     ChipIndex chip,
     ChannelIndex channel,
-    GridAndBeat abs_time,
+    TickT now,
+    ExtendBlock block_mode,
     MultiDigitField subcolumn,
     DigitAction digit_action,
     uint8_t nybble)
 {
-    auto maybe_block = get_current_block(document, chip, channel, abs_time);
-    auto p = &maybe_block;
+    auto maybe_edit = CreateOrEdit::try_make(document, chip, channel, now, block_mode);
+    if (!maybe_edit) {
+        // The returned uint8_t doesn't really matter, it's not worth the complexity of
+        // rewriting the remaining function around maybe_edit.
+        return {0, make_command(NullEditCommand{})};
+    }
+    CreateOrEdit & edit = *maybe_edit;
 
-    GridBlockBeat time;
-    Edit edit;
-    doc::EventList * events;  // events: 'edit
-
-    if (auto exists = std::get_if<GridBlockBeat>(p)) {
-        time = *exists;
-
-        // Copy pattern.
-        edit = edit::EditPattern{doc::Pattern(
-            document.timeline[time.grid].chip_channel_cells[chip][channel]
-                ._raw_blocks[time.block].pattern
-        )};
-        events = &std::get<edit::EditPattern>(edit).pattern.events;
-
-    } else
-    if (auto empty = std::get_if<EmptyBlock>(p)) {
-        time = empty->time;
-
-        // Create new pattern.
-        edit = edit::AddBlock{doc::TimelineBlock{
-            .begin_time = empty->begin_time,
-            .end_time = empty->end_time,
-            .pattern = Pattern{.events = EventList{}, .loop_length = {}},
-        }};
-        events = &std::get<edit::AddBlock>(edit).block.pattern.events;
-
-    } else
-        throw std::logic_error("add_digit() get_current_block() returned nothing");
+    EventList & pattern_events = edit.pattern().events;
 
     // Insert instrument/volume, edit effect. No-op if no effect present.
 
@@ -370,19 +445,19 @@ std::tuple<uint8_t, EditBox> add_digit(
 
     // field: ('events = 'edit).
     auto field = [&] () -> uint8_t * {
-        EventSearchMut kv{*events};
+        EventSearchMut kv{pattern_events};
 
 
         if (std::holds_alternative<SubColumn_::Instrument>(subcolumn)) {
-            auto & ev = kv.get_or_insert(time.beat);
+            auto & ev = kv.get_or_insert(edit.rel_tick);
             return &make_some(ev.v.instr);
         }
         if (std::holds_alternative<SubColumn_::Volume>(subcolumn)) {
-            auto & ev = kv.get_or_insert(time.beat);
+            auto & ev = kv.get_or_insert(edit.rel_tick);
             return &make_some(ev.v.volume);
         }
         if (auto p = std::get_if<SubColumn_::Effect>(&subcolumn)) {
-            auto ev = kv.get_maybe(time.beat);
+            auto ev = kv.get_maybe(edit.rel_tick);
             // If there's no event at the current time,
             // discard the new value and don't modify the document.
             if (!ev) {
@@ -435,7 +510,7 @@ std::tuple<uint8_t, EditBox> add_digit(
         // Tell GUI the newly selected volume/instrument number.
         value,
         // Return edit to be applied to GUI/audio documents.
-        make_command(PatternEdit{chip, channel, time.grid, time.block, std::move(edit)}),
+        make_command(std::move(edit).into_edit()),
     };
 }
 
@@ -445,46 +520,23 @@ std::tuple<uint8_t, EditBox> add_digit(
     Document const& document,
     ChipIndex chip,
     ChannelIndex channel,
-    GridAndBeat abs_time,
+    TickT now,
+    ExtendBlock block_mode,
     SubColumn_::Effect subcolumn,
     EffectAction effect_action)
 {
-    auto maybe_block = get_current_block(document, chip, channel, abs_time);
-    auto p = &maybe_block;
+    auto maybe_edit = CreateOrEdit::try_make(document, chip, channel, now, block_mode);
+    if (!maybe_edit) {
+        return make_command(NullEditCommand{});
+    }
+    CreateOrEdit & edit = *maybe_edit;
 
-    GridBlockBeat time;
-    Edit edit;
-    doc::EventList * events;  // events: 'edit
-
-    if (auto exists = std::get_if<GridBlockBeat>(p)) {
-        time = *exists;
-
-        // Copy pattern.
-        edit = edit::EditPattern{doc::Pattern(
-            document.timeline[time.grid].chip_channel_cells[chip][channel]
-                ._raw_blocks[time.block].pattern
-        )};
-        events = &std::get<edit::EditPattern>(edit).pattern.events;
-
-    } else
-    if (auto empty = std::get_if<EmptyBlock>(p)) {
-        time = empty->time;
-
-        // Create new pattern.
-        edit = edit::AddBlock{doc::TimelineBlock{
-            .begin_time = empty->begin_time,
-            .end_time = empty->end_time,
-            .pattern = Pattern{.events = EventList{}, .loop_length = {}},
-        }};
-        events = &std::get<edit::AddBlock>(edit).block.pattern.events;
-
-    } else
-        throw std::logic_error("add_effect_char() get_current_block() returned nothing");
+    EventList & pattern_events = edit.pattern().events;
 
     // field: ('events = 'edit).
     auto & field = [&] () -> doc::Effect & {
-        EventSearchMut kv{*events};
-        auto & ev = kv.get_or_insert(time.beat);
+        EventSearchMut kv{pattern_events};
+        auto & ev = kv.get_or_insert(edit.rel_tick);
 
         doc::MaybeEffect & maybe_eff = ev.v.effects[subcolumn.effect_col];
         maybe_eff = maybe_eff.value_or(Effect());
@@ -503,9 +555,7 @@ std::tuple<uint8_t, EditBox> add_digit(
     } else
         throw std::logic_error("invalid EffectAction when calling add_effect_char()");
 
-    return make_command(PatternEdit{
-        chip, channel, time.grid, time.block, std::move(edit)
-    });
+    return make_command(std::move(edit).into_edit());
 }
 
 }

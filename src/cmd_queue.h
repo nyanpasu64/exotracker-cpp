@@ -14,9 +14,9 @@ namespace cmd_queue {
 #endif
 
 struct PlayFrom {
-    timing::GridAndBeat time;
+    doc::TickT time;
 
-    PlayFrom(timing::GridAndBeat time)
+    PlayFrom(doc::TickT time)
         : time{time}
     {}
 

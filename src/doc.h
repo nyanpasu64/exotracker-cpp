@@ -61,21 +61,44 @@ using util::box_array::BoxArray;
 ///     t = (8010*60/256)r/dp beat/min
 ///     (dp*256/60/8010)t = r
 ///
-/// The default values of d=39 and p=48 results in r = 0.9972...*t.
-/// With these values, "sequencer rate" ≈ `target_tempo` to within 0.5
-/// for all `target_tempo` up to 175 BPM (the exact boundary depends on the
-/// specific console's base frequency error, which varies with age and temperature).
-/// For higher frequencies, "sequencer rate" ≈ `target_tempo` - 1.
+/// The default values of d=16 and p=48 (taken from AMK) results in r ≈ 0.4091*t. As a
+/// result, the only achievable tempos are multiples of around 2.5 BPM.
 ///
-/// The user can change `spc_timer_period` and `ticks_per_beat`,
-/// but this may result in a less straightforward conversion factor
-/// (though not necessarily less accurate).
+/// Increasing `ticks_per_beat` makes note timing and tempo more fine-grained, but
+/// makes exported .spcs more likely to lag.
+///
+/// Increasing `spc_timer_period` increases the per-tick clock budget (making exported
+/// .spcs less likely to lag) and makes tempo more fine-grained, but increases note
+/// timing error as well.
 struct SequencerOptions {
-    /// The target tempo to play the module at, in beats/minute.
-    /// Controls the percentage of timer ticks that trigger sequencer ticks.
-    /// Note that the actual playback tempo will not match this value exactly
-    /// (due to rounding), and note times will jitter slightly as well.
+    /// The target tempo to play the module at, in beats/minute. Controls the
+    /// percentage of timer ticks that trigger sequencer ticks. Note that the actual
+    /// playback tempo will not match this value exactly (due to rounding), and note
+    /// times will jitter slightly as well (increasing spc_timer_period increases note
+    /// jitter).
     double target_tempo;
+
+    /// How many sequencer ticks before a new note/rest to release the previous note.
+    /// This creates a gap between notes, but allows the previous note to fade to
+    /// silence instead of being interrupted by the next note creating a pop.
+    ///
+    /// Increasing target_tempo or ticks_per_beat reduces the duration of each
+    /// sequencer tick. Increasing spc_timer_period increases the jitter of each
+    /// sequencer tick.
+    ///
+    /// 2 by default on AMK, 1 with "light staccato" enabled.
+    TickT note_gap_ticks = 1;
+
+    /// The scaling factor used to convert *all* BPM tempos into sequencer tempos; also
+    /// determines *initial* visual beat length in the pattern editor.
+    ///
+    /// Defaults to 48 (the value used in Square's SPC drivers, including FF6, as well
+    /// as AMK). Change to 36 or 72 for 6/8 songs.
+    TickT ticks_per_beat = 48;
+
+    /// Purely cosmetic; determines the initial visual measure length in the pattern
+    /// editor.
+    int beats_per_measure = 4;
 
     /// Controls the period of the SPC timer, which controls when the engine advances.
     /// Increasing this value causes the driver to run less often.
@@ -86,18 +109,11 @@ struct SequencerOptions {
     /// The value will be written into the SNES S-SMP timer divisor address ($00fa),
     /// except 256 (0x100) will be written as 0 instead (which acts as 256).
     ///
-    /// Defaults to 39 (the value used in FF6 by Square),
-    /// resulting in a near-1:1 mapping from sequencer rate to BPM.
-    /// You probably don't need to change this.
-    uint32_t spc_timer_period = 39;
-
-    /// Controls the number of "sequencer ticks" per beat.
-    /// Switching to a multiple of 9 will make playback slightly more even
-    /// if you subdivide a beat into 9 notes.
-    ///
-    /// Defaults to 48 (the value used in Square's SPC drivers, including FF6).
-    /// You probably don't need to change this.
-    uint32_t ticks_per_beat = 48;
+    /// Defaults to 16 which runs the engine at 500 Hz, matching N-SPC and AddMusicK.
+    /// This results in low tempo precision, plus slowdown in busy sections of music.
+    /// Increasing this value improves tempo precision and reduces lag, but reduces
+    /// note and vibrato time resolution. Values of 39-45 may work well.
+    uint32_t spc_timer_period = 16;
 
 // impl
 #ifdef UNITTEST
@@ -111,8 +127,8 @@ constexpr double MAX_TEMPO = 999.;
 constexpr uint32_t MIN_TIMER_PERIOD = 1;
 constexpr uint32_t MAX_TIMER_PERIOD = 256;
 
-constexpr uint32_t MIN_TICKS_PER_BEAT = 1;
-constexpr uint32_t MAX_TICKS_PER_BEAT = 127;
+constexpr TickT MIN_TICKS_PER_BEAT = 1;
+constexpr TickT MAX_TICKS_PER_BEAT = 192;
 
 // Tuning table types
 inline namespace tuning {
@@ -144,17 +160,6 @@ inline namespace tuning {
 using chip_kinds::ChipKind;
 using ChipList = std::vector<chip_kinds::ChipKind>;
 
-struct ChannelSettings {
-    events::EffColIndex n_effect_col = 1;
-
-// impl
-#ifdef UNITTEST
-    DEFAULT_EQUALABLE(ChannelSettings)
-#endif
-};
-
-using ChipChannelSettings = ChipChannelTo<ChannelSettings>;
-
 /// Document struct.
 ///
 /// Usage:
@@ -178,20 +183,7 @@ struct DocumentCopy {
     /// chips.size() in [1..MAX_NCHIP] inclusive (not enforced yet).
     ChipList chips;
 
-    ChipChannelSettings chip_channel_settings;
-
-    /// The order editor is replaced with a global timeline grid for placing patterns in.
-    /// We don't store the absolute times of gridlines,
-    /// but instead the distance between them.
-    ///
-    /// Grid cells lie between gridlines.
-    /// Each cell has a duration consisting of an integer(?) number of beats.
-    /// This variable stores both cell durations and block/pattern data.
-    /// ----
-    /// Timeline cell `i` has duration `timeline[i].nbeats`.
-    /// Valid gridlines are `0 .. timeline.size()` inclusive.
-    /// However, the last grid cell is at size() - 1.
-    Timeline timeline;
+    Sequence sequence;
 
 // impl
     [[nodiscard]] chip_common::ChannelIndex chip_index_to_nchan(

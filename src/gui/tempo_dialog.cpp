@@ -4,6 +4,7 @@
 #include "doc.h"
 #include "audio/tempo_calc.h"
 #include "edit/edit_doc.h"
+#include "util/math.h"
 
 #include <verdigris/wobjectimpl.h>
 
@@ -25,10 +26,13 @@
 #include <QEvent>
 #include <QFontMetrics>
 
+#include <cmath>  // INFINITY
 #include <limits>  // std::numeric_limits<>
 #include <utility>  // std::move
 
 namespace gui::tempo_dialog {
+
+using util::math::ceildiv;
 
 namespace {
 
@@ -48,6 +52,11 @@ public:
         str += _suffix;
         return str;
     }
+};
+
+struct DoubleRange {
+    double begin;
+    double end;
 };
 
 class DoubleFormatter {
@@ -70,6 +79,16 @@ public:
         QString str = locale.toString(value, 'f', _decimals);
         str += _suffix;
         return str;
+    }
+
+    QString format(QLocale locale, DoubleRange value) const {
+        // based on QDoubleSpinBox::textFromValue().
+
+        locale.setNumberOptions(QLocale::OmitGroupSeparator);
+        return TempoDialog::tr("%1-%2%3")
+            .arg(locale.toString(value.begin, 'f', _decimals))
+            .arg(locale.toString(value.end, 'f', _decimals))
+            .arg(_suffix);
     }
 };
 
@@ -190,6 +209,7 @@ protected:
 
 using IntViewer = NumericViewer<int, IntFormatter>;
 using DoubleViewer = NumericViewer<double, DoubleFormatter>;
+using DoubleRangeViewer = NumericViewer<DoubleRange, DoubleFormatter>;
 
 class TempoDialogImpl : public TempoDialog {
     W_OBJECT(TempoDialogImpl)
@@ -199,8 +219,9 @@ class TempoDialogImpl : public TempoDialog {
 
     // User-editable parameters.
     QDoubleSpinBox * _target_beats_per_min;
-    QSpinBox * _spc_timer_period;
+    QSpinBox * _note_gap_ticks;
     QSpinBox * _ticks_per_beat;
+    QSpinBox * _spc_timer_period;
 
     // Read-only outputs.
     IntViewer * _engine_tempo;
@@ -208,6 +229,7 @@ class TempoDialogImpl : public TempoDialog {
     DoubleViewer * _timers_per_s;
     DoubleViewer * _ms_per_timer;
     DoubleViewer * _bpm_step;
+    DoubleRangeViewer * _note_gap_ms;
 
     // Show/hide right side of dialog.
     QCheckBox * _show_advanced;
@@ -254,6 +276,11 @@ public:
                         w->setValue(_options.target_tempo);
                         w->setSuffix(tr(" BPM"));
                     }
+                    {form__label_w(tr("Note gap (ticks)"), QSpinBox);
+                        _note_gap_ticks = w;
+                        w->setRange(0, 2);
+                        w->setValue(_options.note_gap_ticks);
+                    }
                 }
                 {l__w(HLine);
                 }
@@ -266,6 +293,13 @@ public:
                         _actual_beats_per_min = w;
                         w->setSuffix(tr(" BPM"));
                     }
+                    {form__label_w(tr("Note gap:"), DoubleRangeViewer(DoubleRange {
+                        .begin = 99.,
+                        .end = 99.,
+                    }));
+                        _note_gap_ms = w;
+                        w->setSuffix(tr(" ms"));
+                    }
                 }
             }
             {l__w(QCheckBox(tr("Show advanced options")));
@@ -277,15 +311,15 @@ public:
 
                 {l__form(QFormLayout);
                     form->setHorizontalSpacing(HORIZONTAL_SPACING);
+                    {form__label_w(tr("Ticks/beat"), QSpinBox);
+                        _ticks_per_beat = w;
+                        w->setRange(doc::MIN_TICKS_PER_BEAT, doc::MAX_TICKS_PER_BEAT);
+                        w->setValue(_options.ticks_per_beat);
+                    }
                     {form__label_w(tr("Timer register"), QSpinBox);
                         _spc_timer_period = w;
                         w->setRange(doc::MIN_TIMER_PERIOD, doc::MAX_TIMER_PERIOD);
                         w->setValue((int) _options.spc_timer_period);
-                    }
-                    {form__label_w(tr("Ticks/beat"), QSpinBox);
-                        _ticks_per_beat = w;
-                        w->setRange(doc::MIN_TICKS_PER_BEAT, doc::MAX_TICKS_PER_BEAT);
-                        w->setValue((int) _options.ticks_per_beat);
                     }
                 }
                 {l__w(HLine);
@@ -343,8 +377,9 @@ public:
                 this, &TempoDialogImpl::update_state);
         };
         connect_dspin(_target_beats_per_min);
-        connect_spin(_spc_timer_period);
+        connect_spin(_note_gap_ticks);
         connect_spin(_ticks_per_beat);
+        connect_spin(_spc_timer_period);
 
         connect(
             _ok, &QPushButton::clicked,
@@ -370,12 +405,13 @@ public:
 
         // Calculate tempo values.
         _options.target_tempo = _target_beats_per_min->value();
+        _options.note_gap_ticks = _note_gap_ticks->value();
+        _options.ticks_per_beat = _ticks_per_beat->value();
         _options.spc_timer_period = (uint32_t) _spc_timer_period->value();
-        _options.ticks_per_beat = (uint32_t) _ticks_per_beat->value();
 
-        uint8_t sequencer_rate = calc_sequencer_rate(_options);
+        const auto engine_tempo = (int) calc_sequencer_rate(_options);
 
-        double timers_per_s =
+        const double timers_per_s =
             double(tempo::CLOCKS_PER_S_IDEAL)
             / double(calc_clocks_per_timer(_options.spc_timer_period));
 
@@ -388,16 +424,43 @@ public:
             return beats_per_min;
         };
 
-        double beats_per_min = calc_bpm(sequencer_rate);
-        double bpm_step = calc_bpm(1);
+        const double beats_per_min = calc_bpm(engine_tempo);
+        const double bpm_step = calc_bpm(1);
 
         constexpr double ms_per_s = 1000.;
 
-        _engine_tempo->setValue((int) sequencer_rate);
+        const double ms_per_timer = ms_per_s / timers_per_s;
+
+        _engine_tempo->setValue(engine_tempo);
         _actual_beats_per_min->setValue(beats_per_min);
         _timers_per_s->setValue(timers_per_s);
-        _ms_per_timer->setValue(ms_per_s / timers_per_s);
+        _ms_per_timer->setValue(ms_per_timer);
         _bpm_step->setValue(bpm_step);
+
+        // TODO extract to function -> DoubleRange, and write unit test that bounds are
+        // only equal for factor-of-256 tempos?
+        if (engine_tempo != 0) {
+            // When a note gets released early, the tempo phase varies within
+            // [0, phase step - 1].
+            const int max_start_phase = engine_tempo - 1;
+
+            // The next note plays when the tempo phase reaches 256 * gap length ticks.
+            const int end_phase = _options.note_gap_ticks * 256;
+
+            // Calculate how many phase steps it takes to get there.
+            const int min_ticks = ceildiv(end_phase - max_start_phase, engine_tempo);
+            const int max_ticks = ceildiv(end_phase - 0, engine_tempo);
+
+            _note_gap_ms->setValue(DoubleRange {
+                .begin = (double) min_ticks * ms_per_timer,
+                .end = (double) max_ticks * ms_per_timer,
+            });
+        } else {
+            _note_gap_ms->setValue(DoubleRange {
+                .begin = INFINITY,
+                .end = INFINITY,
+            });
+        }
     }
 
     void save_document() {

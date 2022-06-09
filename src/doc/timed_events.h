@@ -1,59 +1,35 @@
 #pragma once
 
 #include "events.h"
-#include "util/compare.h"
-
-#include <boost/rational.hpp>
 
 #include <limits>
 
 namespace doc::timed_events {
 
-using FractionInt = int32_t;
-using BeatFraction = boost::rational<FractionInt>;
-
-/// Used to round beat-fraction timestamps to integer ticks.
-FractionInt round_to_int(BeatFraction v);
-
-/// Why signed? Events can have negative offsets and play before their anchor beat,
-/// or even before the owning pattern starts. This is a feature(tm).
+/// Why signed?
+///
+/// - We subtract TickT and expect to get a signed result.
+/// - Events can have negative offsets and play before their anchor beat.
+///   This is a feature(tm).
+///
+/// In any case, ticks are soft-restricted to below 1 billion (MAX_TICK), so this
+/// shouldn't be an issue in practice.
 using TickT = int32_t;
 
-/// A timestamp of a row in a pattern.
-///
-/// Everything about exotracker operates using half-open [inclusive, exclusive) ranges.
-/// begin_of_beat() makes it easy to find all notes whose anchor_beat lies in [a, b).
-///
-/// `anchor_beat` controls "how many beats into the pattern" the note plays.
-/// It should be non-negative.
-///
-/// The NES generally runs the audio driver 60 times a second,
-/// whereas SNES games vary by company/driver.
-/// Negative or positive `tick_offset` causes a note to play before or after the beat.
-///
-/// All positions are sorted by (anchor_beat, tick_offset).
-/// This code makes no attempt to prevent `tick_offset` from
-/// causing the sorting order to differ from the playback order.
-/// If this happens, the pattern is valid, but playing the pattern will misbehave.
-struct TimeInPattern {
-    BeatFraction anchor_beat;
-    TickT tick_offset;
-
-// impl
-    COMPARABLE(TimeInPattern)
-};
-
 struct TimedRowEvent {
-    BeatFraction anchor_beat;
-    // Tick offset is now specified through signed Gxx delay effects.
+    /// Relative to pattern start. May be offset further through signed Gxx delay
+    /// effects.
+    TickT anchor_tick;
 
     events::RowEvent v;
 
 // impl
     TickT tick_offset(events::EffColIndex n_effect_col) const;
 
-    TimeInPattern time(events::EffColIndex n_effect_col) const {
-        return {anchor_beat, tick_offset(n_effect_col)};
+    /// Returns event's time relative to pattern begin, including Gxx effects in the
+    /// first _ columns.
+    TickT time(events::EffColIndex n_effect_col) const {
+        return anchor_tick + tick_offset(n_effect_col);
     }
 
     DEFAULT_EQUALABLE(TimedRowEvent)
@@ -61,32 +37,3 @@ struct TimedRowEvent {
 
 // end namespace
 }
-
-#ifdef UNITTEST
-
-#include "util/format.h"
-
-#include <fmt/core.h>
-
-#include <ostream>
-#include <string>
-
-namespace boost {
-    inline std::ostream& operator<< (std::ostream& os, doc::timed_events::BeatFraction const & frac) {
-        os << format_frac(frac);
-        return os;
-    }
-}
-
-namespace doc::timed_events {
-    inline std::ostream& operator<< (std::ostream& os, TimeInPattern const & value) {
-        os << fmt::format(
-            "TimeInPattern{{{} + {}}}",
-            format_frac(value.anchor_beat),
-            value.tick_offset
-        );
-        return os;
-    }
-}
-
-#endif

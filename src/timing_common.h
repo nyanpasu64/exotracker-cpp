@@ -8,52 +8,20 @@
 
 namespace timing {
 
-struct GridBlockBeat {
-    doc::GridIndex grid{0};
-    doc::BlockIndex block{0};
-
-    /// Time from block begin to now.
-    doc::BeatFraction beat = 0;
-
-    COMPARABLE(GridBlockBeat)
-};
-
-struct GridAndBeat {
-    doc::GridIndex grid{0};
-    doc::BeatFraction beat = 0;
-
-    COMPARABLE(GridAndBeat)
-};
-
+using doc::TickT;
 
 // Atomically written by audio thread, atomically read by GUI.
 // Make sure this fits within 8 bytes.
 struct [[nodiscard]] alignas(uint64_t) SequencerTime {
-    uint16_t grid;
+    TickT ticks;
+    bool playing;
 
-    // should this be removed, or should the audio thread keep track of this
-    // for the GUI thread rendering?
-    uint16_t curr_ticks_per_beat;
-
-    // sequencer.h BeatPlusTick is signed.
-    // Neither beats nor ticks should be negative in regular playback,
-    // but mark as signed just in case.
-    int16_t beats;
-    int16_t ticks;
-
-    constexpr SequencerTime(
-        uint16_t grid,
-        uint16_t curr_ticks_per_beat,
-        int16_t beats,
-        int16_t ticks
-    )
-        : grid{grid}
-        , curr_ticks_per_beat{curr_ticks_per_beat}
-        , beats{beats}
-        , ticks{ticks}
+    constexpr SequencerTime(TickT ticks, bool playing = true)
+        : ticks(ticks)
+        , playing(playing)
     {}
 
-    constexpr SequencerTime() : SequencerTime{0, 1, 0, 0} {}
+    constexpr SequencerTime() : SequencerTime(0) {}
 
     CONSTEXPR_COPY(SequencerTime)
     EQUALABLE(SequencerTime)
@@ -73,7 +41,7 @@ public:
     {}
 
     static constexpr MaybeSequencerTime none() {
-        return SequencerTime{(uint16_t) -1, (uint16_t) -1, -1, -1};
+        return SequencerTime(0, false);
     }
 
     constexpr MaybeSequencerTime()
@@ -137,28 +105,7 @@ static_assert(
 
 namespace timing {
     inline std::ostream& operator<< (std::ostream& os, SequencerTime const & value) {
-        os << fmt::format("SequencerTime{{{}, {}, {}, {}}}",
-            value.grid,
-            value.curr_ticks_per_beat,
-            value.beats,
-            value.ticks
-        );
-        return os;
-    }
-
-    inline std::ostream& operator<< (std::ostream& os, GridAndBeat const & value) {
-        os << fmt::format("GridAndBeat{{{}, {}}}",
-            value.grid,
-            format_frac(value.beat)
-        );
-        return os;
-    }
-
-    inline std::ostream& operator<< (std::ostream& os, GridBlockBeat const & value) {
-        os << fmt::format("GridBlockBeat{{{}, {}}}",
-            value.block,
-            format_frac(value.beat)
-        );
+        os << fmt::format("SequencerTime{{{}, {}}}", value.ticks, value.playing);
         return os;
     }
 }

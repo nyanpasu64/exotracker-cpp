@@ -54,8 +54,19 @@ static double & get_tempo_mut(doc::Document & document) {
 };
 
 EditBox set_tempo(double tempo) {
-    return make_command(Setter<double, get_tempo_mut, ModifiedFlags::TargetTempo> (
+    return make_command(Setter<double, get_tempo_mut, ModifiedFlags::EngineTempo>(
         tempo
+    ));
+}
+
+static int& get_measure_len_mut(doc::Document & document) {
+    return document.sequencer_options.beats_per_measure;
+};
+
+
+EditBox set_beats_per_measure(int measure_len) {
+    return make_command(Setter<int, get_measure_len_mut, (ModifiedFlags) 0>(
+        measure_len
     ));
 }
 
@@ -87,170 +98,28 @@ EditBox set_sequencer_options(
     {
         auto const& orig_options = orig_doc.sequencer_options;
 
-        if (orig_options.target_tempo != options.target_tempo) {
-            flags |= ModifiedFlags::TargetTempo;
+#define CHANGED(FIELD)  (options.FIELD != orig_options.FIELD)
+
+        // These parameters are used to calculate engine tempo; set the flag if any
+        // changed.
+        if (
+            CHANGED(target_tempo) ||
+            CHANGED(ticks_per_beat) ||
+            CHANGED(spc_timer_period))
+        {
+            flags |= ModifiedFlags::EngineTempo;
         }
-        if (orig_options.spc_timer_period != options.spc_timer_period) {
-            flags |= ModifiedFlags::SpcTimerPeriod;
-        }
-        if (orig_options.ticks_per_beat != options.ticks_per_beat) {
-            flags |= ModifiedFlags::TicksPerBeat;
-        }
+
+        // Not worth adding a flag for CHANGED(note_gap_ticks). Even if the sequencer
+        // doesn't handle it changing, the worst thing that can happen is that notes
+        // release 2 ticks later than they should, causing a momentary pop upon the
+        // next note.
+        //
+        // CHANGED(beats_per_measure) only affects the pattern editor, not the
+        // sequencer; don't set a flag.
     }
 
     return make_command(SetSequencerOptions(options, ModifiedFlags{flags}));
-}
-
-
-// # Timeline operations.
-
-using namespace doc;
-
-struct AddRemoveFrame {
-    doc::GridIndex _grid;
-    std::optional<TimelineFrame> _edit;
-
-    /// If the command holds a row to be inserted, reserve memory for each cell.
-    /// Once a cell gets swapped into the document,
-    /// adding blocks must not allocate memory, to prevent blocking the audio thread.
-    AddRemoveFrame(doc::GridIndex grid, std::optional<TimelineFrame> edit)
-        : _grid(grid)
-        , _edit(std::move(edit))
-    {
-        if (_edit) {
-            for (auto & channel_cells : _edit->chip_channel_cells) {
-                for (auto & cell : channel_cells) {
-                    cell._raw_blocks.reserve(doc::MAX_BLOCKS_PER_CELL);
-                }
-            }
-        }
-    }
-
-    // Do *not* replace with default-derived copy/move constructors.
-    // They fail to call _raw_blocks.reserve()!
-    AddRemoveFrame(AddRemoveFrame const& other)
-        : AddRemoveFrame(other._grid, other._edit)
-    {}
-
-    AddRemoveFrame(AddRemoveFrame && other) noexcept
-        : AddRemoveFrame(other._grid, std::move(other._edit))
-    {}
-
-    void apply_swap(doc::Document & document) {
-        assert(document.timeline.capacity() >= MAX_TIMELINE_FRAMES);
-
-        auto validate_reserved = [] (TimelineFrame & frame) {
-            for (auto & channel_cells : frame.chip_channel_cells) {
-                for (auto & cell : channel_cells) {
-                    (void) cell;
-                    assert(cell._raw_blocks.capacity() >= doc::MAX_BLOCKS_PER_CELL);
-                }
-            }
-        };
-
-        auto validate_empty = [] (TimelineFrame & frame) {
-            (void) frame;
-            assert(frame.chip_channel_cells.capacity() == 0);
-        };
-
-        if (_edit) {
-            validate_reserved(*_edit);
-            document.timeline.insert(document.timeline.begin() + _grid, std::move(*_edit));
-            validate_empty(*_edit);
-            _edit = std::nullopt;
-
-        } else {
-            _edit = {std::move(document.timeline[_grid])};
-            validate_reserved(*_edit);
-            validate_empty(document.timeline[_grid]);
-            document.timeline.erase(document.timeline.begin() + _grid);
-        }
-    }
-
-    using Impl = ImplEditCommand<AddRemoveFrame, Override::None>;
-    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineFrames;
-};
-
-// Exported via headers.
-
-EditBox add_timeline_frame(
-    doc::Document const& document, doc::GridIndex grid_pos, doc::BeatFraction nbeats
-) {
-    ChipChannelTo<TimelineCell> chip_channel_cells;
-    auto nchip = (ChipIndex) document.chips.size();
-    for (ChipIndex chip = 0; chip < nchip; chip++) {
-
-        ChannelTo<TimelineCell> channel_cells;
-        auto nchan = document.chip_index_to_nchan(chip);
-        for (ChannelIndex chan = 0; chan < nchan; chan++) {
-            channel_cells.push_back(TimelineCell{});
-        }
-
-        chip_channel_cells.push_back(std::move(channel_cells));
-    }
-
-    return make_command(AddRemoveFrame(
-        grid_pos,
-        TimelineFrame{nbeats, std::move(chip_channel_cells)}
-    ));
-}
-
-EditBox remove_timeline_frame(doc::GridIndex grid_pos) {
-    return make_command(AddRemoveFrame(grid_pos, {}));
-}
-
-EditBox clone_timeline_frame(doc::Document const& document, doc::GridIndex grid_pos) {
-    return make_command(AddRemoveFrame(
-        grid_pos + 1, TimelineFrame(document.timeline[grid_pos])
-    ));
-}
-
-// # Set grid length.
-
-struct SetGridLength {
-    doc::GridIndex _grid;
-    doc::BeatFraction _row_nbeats;
-
-    void apply_swap(doc::Document & document) {
-        std::swap(document.timeline[_grid].nbeats, _row_nbeats);
-    }
-
-    using Impl = ImplEditCommand<SetGridLength, Override::CanMerge>;
-    bool can_merge(BaseEditCommand & prev) const {
-        if (auto p = typeid_cast<Impl *>(&prev)) {
-            SetGridLength & prev = *p;
-            return prev._grid == _grid;
-        }
-
-        return false;
-    }
-
-    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineFrames;
-};
-
-EditBox set_grid_length(doc::GridIndex grid_pos, doc::BeatFraction nbeats) {
-    return make_command(SetGridLength{grid_pos, nbeats});
-}
-
-// # Move timeline rows.
-
-struct MoveGridDown {
-    doc::GridIndex _grid;
-
-    void apply_swap(doc::Document & document) {
-        std::swap(document.timeline[_grid], document.timeline[_grid + 1]);
-    }
-
-    using Impl = ImplEditCommand<MoveGridDown, Override::None>;
-    constexpr static ModifiedFlags _modified = ModifiedFlags::TimelineFrames;
-};
-
-EditBox move_grid_up(doc::GridIndex grid_pos) {
-    return make_command(MoveGridDown{grid_pos - 1});
-}
-
-EditBox move_grid_down(doc::GridIndex grid_pos) {
-    return make_command(MoveGridDown{grid_pos});
 }
 
 }

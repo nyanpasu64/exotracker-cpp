@@ -5,8 +5,8 @@
 
 namespace doc_util::event_search {
 
-static BeatFraction const & time(const TimedRowEvent & a) {
-    return a.anchor_beat;
+static TickT const & time(const TimedRowEvent & a) {
+    return a.anchor_tick;
 }
 
 template<auto key_func>
@@ -41,29 +41,29 @@ using Mut = EventSearchMut;
     IMPL_IMPL(Mut, FUNC_NAME, BOUND, KEY_T, const, ConstIterator, KEY_FUNC) \
     IMPL_IMPL(Mut, FUNC_NAME, BOUND, KEY_T, , Iterator, KEY_FUNC) \
 
-IMPL(beat_begin, std::lower_bound, BeatFraction, time)
-IMPL(beat_end, std::upper_bound, BeatFraction, time)
+IMPL(tick_begin, std::lower_bound, TickT, time)
+IMPL(tick_end, std::upper_bound, TickT, time)
 
-TimedRowEvent * EventSearchMut::get_maybe(BeatFraction beat) {
+TimedRowEvent * EventSearchMut::get_maybe(TickT beat) {
     // Last event anchored to this beat fraction.
-    EventList::reverse_iterator it{beat_end(beat)};
+    EventList::reverse_iterator it{tick_end(beat)};
 
-    if (it != _event_list.rend() && it->anchor_beat == beat) {
+    if (it != _event_list.rend() && it->anchor_tick == beat) {
         return &*it;
     } else {
         return nullptr;
     }
 }
 
-TimedRowEvent & EventSearchMut::get_or_insert(BeatFraction beat) {
+TimedRowEvent & EventSearchMut::get_or_insert(TickT beat) {
     // Last event anchored to this beat fraction.
-    EventList::reverse_iterator it{beat_end(beat)};
+    EventList::reverse_iterator it{tick_end(beat)};
 
-    if (it != _event_list.rend() && it->anchor_beat == beat) {
+    if (it != _event_list.rend() && it->anchor_tick == beat) {
         return *it;
     } else {
         TimedRowEvent ev {
-            .anchor_beat = beat,
+            .anchor_tick = beat,
             .v = RowEvent{},
         };
         return *_event_list.insert(it.base(), std::move(ev));
